@@ -1,0 +1,71 @@
+{
+  "record_kind": "millrace.workflow_package_manifest",
+  "manifest_format_version": "1",
+  "package": {
+    "package_id": "millrace.plus.scaffold",
+    "package_version": "0.0.0",
+    "package_format_version": "1",
+    "package_role": "workflow_package",
+    "publisher": "Millrace",
+    "base_millrace_compatibility": ">=0.22,<0.23",
+    "publication_scope": "test",
+    "license": "Apache-2.0",
+    "repository_url": "https://github.com/tim-osterhus/millrace-plus",
+    "display": {
+      "name": "Millrace Plus Scaffold",
+      "role": "workflow package scaffold/test fixture"
+    }
+  },
+  "workflows": [
+    {
+      "workflow_id": "millrace.plus.scaffold",
+      "workflow_version": "0.0.0",
+      "visibility": "test_only",
+      "entrypoints": [
+        "default"
+      ],
+      "selected_authority": {
+        "fixture_kind": "scaffold_smoke",
+        "asset_refs": [
+          "millrace.plus.scaffold.prompt"
+        ]
+      },
+      "required_assets": [
+        {
+          "asset_id": "millrace.plus.scaffold.prompt",
+          "content_digest": "sha256:ae664ee612ff3b8c9caf19e897d22270d411cb419b3539c8c8e876b27ff3cd11"
+        }
+      ],
+      "display": {
+        "name": "Millrace Plus Scaffold Smoke Fixture"
+      }
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "millrace.plus.scaffold.prompt",
+      "asset_kind": "entrypoint_prompt",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:ae664ee612ff3b8c9caf19e897d22270d411cb419b3539c8c8e876b27ff3cd11",
+      "byte_length": 381,
+      "package_path": "assets/scaffold_prompt.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    }
+  ],
+  "dependencies": [],
+  "compatibility": {
+    "base_millrace": ">=0.22,<0.23",
+    "package_contract": "v0.22"
+  },
+  "canonicalization": {
+    "algorithm": "millrace-json-v1",
+    "hash": "sha256"
+  },
+  "manifest_digest": "sha256:29beae84b3652d59feaffdd1155d84e88116a4c1f9dfa1062d07c86d1c84dc9f",
+  "non_authoritative_metadata": {
+    "plus_packet": "PLUS-0001",
+    "status": "scaffold_smoke_fixture"
+  }
+}
