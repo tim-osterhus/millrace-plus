@@ -73,22 +73,15 @@ def test_source_tree_does_not_shadow_runtime_or_import_private_runtime_code() ->
         assert forbidden not in source_text
 
 
-def test_scaffold_package_data_does_not_claim_official_workflow_content() -> None:
+def test_official_package_data_does_not_claim_lad_or_vendor_workflow_content() -> None:
     manifest_path = PROJECT_ROOT / "millrace_workflow_package" / "manifest.json"
-    prompt_path = (
-        PROJECT_ROOT
-        / "millrace_workflow_package"
-        / "assets"
-        / "scaffold_prompt.md"
-    )
     package_data_text = ""
-    for path in (manifest_path, prompt_path):
-        if path.exists():
-            package_data_text += path.read_text()
+    package_root = PROJECT_ROOT / "millrace_workflow_package"
+    for path in (manifest_path, *package_root.rglob("*.md")):
+        package_data_text += path.read_text()
 
     for forbidden in (
         "LAD",
-        "simple_loop",
         "vendor_selection",
         "Planning",
         "Execution",

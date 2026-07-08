@@ -6,9 +6,11 @@ import importlib.metadata
 import importlib.resources
 import json
 import os
+import re
 import subprocess
 import sys
 import zipfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,6 +31,34 @@ from millrace.operator.packages import (
 )
 from millrace.substrate import ContentAddressedByteStore, SQLiteRuntimeStore
 from millrace.substrate.package_archives import export_workflow_package_directory
+
+_RUNTIME_AUTHORITY_PATTERNS = (
+    re.compile(
+        r"\breturn\s+`?[A-Z_]+`?\s+to\s+"
+        r"(?:route|move|close|retry|select|authorize|enable|grant|mutate|update)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:this prompt|this skill|the prompt|the skill|filename|marker)\s+"
+        r"(?:routes|moves|closes|retries|selects|authorizes|enables|grants|"
+        r"mutates|updates)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:will|shall)\s+"
+        r"(?:route|move queues?|close|retry|select packages?|authorize effects?|"
+        r"enable capabilities?|grant capabilities?|mutate durable state|"
+        r"update durable state)\b",
+        re.IGNORECASE,
+    ),
+)
+_ARTIFACT_KIND_LINE_PATTERN = re.compile(
+    r"\bartifact[_ -]?kind\b",
+    re.IGNORECASE,
+)
+_DOTTED_IDENTIFIER_PATTERN = re.compile(
+    r"\b[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+\b",
+)
 
 
 def load_manifest_source(package_root: Path) -> dict[str, Any]:
@@ -297,6 +327,50 @@ def assert_installed_discovery_is_byte_only(
     assert_source_matches_package_root(source, expected_package_root)
     assert import_package not in sys.modules
     return source
+
+
+def assert_no_runtime_authority_claims(asset_texts: Mapping[str, str]) -> None:
+    violations: list[str] = []
+    for asset_name, text in asset_texts.items():
+        for pattern in _RUNTIME_AUTHORITY_PATTERNS:
+            match = pattern.search(text)
+            if match is not None:
+                violations.append(f"{asset_name}: {match.group(0)}")
+                break
+
+    assert violations == [], violations
+
+
+def selected_artifact_schema_ids(manifest: dict[str, Any]) -> frozenset[str]:
+    schema_ids: set[str] = set()
+    for workflow in _workflows(manifest):
+        selected_authority = cast(
+            dict[str, object],
+            workflow["selected_authority"],
+        )
+        artifact_schemas = cast(
+            list[dict[str, object]],
+            selected_authority["artifact_schemas"],
+        )
+        schema_ids.update(str(schema["id"]) for schema in artifact_schemas)
+    return frozenset(schema_ids)
+
+
+def assert_no_undeclared_selected_artifact_kind_mentions(
+    asset_texts: Mapping[str, str],
+    *,
+    declared_artifact_schema_ids: frozenset[str],
+) -> None:
+    violations: list[str] = []
+    for asset_name, text in asset_texts.items():
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            if _ARTIFACT_KIND_LINE_PATTERN.search(line) is None:
+                continue
+            for reference in _DOTTED_IDENTIFIER_PATTERN.findall(line):
+                if reference not in declared_artifact_schema_ids:
+                    violations.append(f"{asset_name}:{line_number}: {reference}")
+
+    assert violations == [], violations
 
 
 def _assets(manifest: dict[str, Any]) -> list[dict[str, object]]:

@@ -8,10 +8,6 @@ from millrace.compiler.workflow_package_sources import (
     read_archive_workflow_package_source,
     read_path_workflow_package_source,
 )
-from millrace.contracts.workflow_package import (
-    asset_digest_for_bytes,
-    manifest_digest_for_manifest,
-)
 from millrace.operator.packages import (
     PackageReadExportCommand,
     execute_package_read_export_command,
@@ -22,11 +18,14 @@ from millrace.substrate.package_archives import (
     read_workflow_package_archive_bytes,
 )
 
+from support import package_conformance as conformance
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
-PACKAGE_ID = "millrace.plus.scaffold"
+PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.0.0"
-ASSET_PATH = "assets/scaffold_prompt.md"
+WORKFLOW_ID = "simple_loop"
+WORKFLOW_VERSION = "0.1"
 
 
 def _manifest_source() -> dict[str, object]:
@@ -36,16 +35,25 @@ def _manifest_source() -> dict[str, object]:
     )
 
 
-def _asset_record(manifest: dict[str, object]) -> dict[str, object]:
-    assets = cast(list[object], manifest["assets"])
-    assert len(assets) == 1
-    return cast(dict[str, object], assets[0])
-
-
 def _workflow_record(manifest: dict[str, object]) -> dict[str, object]:
     workflows = cast(list[object], manifest["workflows"])
     assert len(workflows) == 1
     return cast(dict[str, object], workflows[0])
+
+
+def _assets(manifest: dict[str, object]) -> list[dict[str, object]]:
+    return cast(list[dict[str, object]], manifest["assets"])
+
+
+def _member_paths(manifest: dict[str, object]) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            (
+                "manifest.json",
+                *(str(asset["package_path"]) for asset in _assets(manifest)),
+            )
+        )
+    )
 
 
 def _store(tmp_path: Path) -> tuple[SQLiteRuntimeStore, ContentAddressedByteStore]:
@@ -82,43 +90,48 @@ def _inspect_imported_package(
         ),
     )
 
+    manifest = _manifest_source()
+    expected_paths = tuple(
+        str(asset["package_path"])
+        for asset in sorted(_assets(manifest), key=lambda item: str(item["asset_id"]))
+    )
+
     assert listed.outcome == "succeeded"
     assert [package.package_id for package in listed.packages] == [PACKAGE_ID]
     assert inspected.outcome == "succeeded"
     assert inspected.package is not None
     assert inspected.package.package_id == PACKAGE_ID
     assert inspected.package.package_version == PACKAGE_VERSION
-    assert inspected.package.assets[0].asset_id == "millrace.plus.scaffold.prompt"
+    assert tuple(asset.package_path for asset in inspected.package.assets) == (
+        expected_paths
+    )
     return inspected.package
 
 
-def test_scaffold_manifest_and_declared_asset_match_shipped_bytes() -> None:
+def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
     assert (PACKAGE_ROOT / "manifest.json").is_file()
-    assert (PACKAGE_ROOT / ASSET_PATH).is_file()
 
-    manifest = _manifest_source()
-    asset = _asset_record(manifest)
+    manifest = conformance.assert_manifest_and_asset_digests(PACKAGE_ROOT)
+    package = cast(dict[str, object], manifest["package"])
     workflow = _workflow_record(manifest)
-    asset_bytes = (PACKAGE_ROOT / ASSET_PATH).read_bytes()
+    assets = _assets(manifest)
 
-    assert manifest["manifest_digest"] == manifest_digest_for_manifest(manifest)
-    assert asset["content_digest"] == asset_digest_for_bytes(asset_bytes)
-    assert asset["byte_length"] == len(asset_bytes)
-    assert asset["package_path"] == ASSET_PATH
-    assert asset["selected_authority_participation"] == "yes"
-    assert workflow["workflow_id"] == PACKAGE_ID
-    assert workflow["workflow_version"] == PACKAGE_VERSION
-    assert workflow["visibility"] == "test_only"
+    assert package["package_id"] == PACKAGE_ID
+    assert package["package_version"] == PACKAGE_VERSION
+    assert workflow["workflow_id"] == WORKFLOW_ID
+    assert workflow["workflow_version"] == WORKFLOW_VERSION
+    assert workflow["visibility"] == "public"
     assert workflow["entrypoints"] == ["default"]
-    assert workflow["required_assets"] == [
-        {
-            "asset_id": "millrace.plus.scaffold.prompt",
-            "content_digest": asset["content_digest"],
-        }
-    ]
+    assert "assets" not in cast(dict[str, object], workflow["selected_authority"])
+    assert len(assets) == 8
+    assert {asset["asset_kind"] for asset in assets} == {
+        "entrypoint_prompt",
+        "stage_skill",
+    }
 
 
-def test_public_path_and_archive_readers_accept_scaffold_layout() -> None:
+def test_public_path_and_archive_readers_accept_official_layout() -> None:
+    manifest = _manifest_source()
     path_source = read_path_workflow_package_source(PACKAGE_ROOT)
     archive_bytes = export_workflow_package_directory(PACKAGE_ROOT)
     archive_members = read_workflow_package_archive_bytes(archive_bytes)
@@ -127,8 +140,8 @@ def test_public_path_and_archive_readers_accept_scaffold_layout() -> None:
     assert path_source.diagnostics == ()
     assert path_source.manifest is not None
     assert path_source.manifest.package.package_id == PACKAGE_ID
-    assert path_source.member_paths == (ASSET_PATH, "manifest.json")
-    assert archive_members.member_paths == (ASSET_PATH, "manifest.json")
+    assert path_source.member_paths == _member_paths(manifest)
+    assert archive_members.member_paths == _member_paths(manifest)
     assert archive_source.diagnostics == ()
     assert archive_source.manifest is not None
     assert (
@@ -166,7 +179,7 @@ def test_archive_source_imports_and_projects_through_public_operator_surface(
     store, cas_store = _store(tmp_path)
     archive_source = read_archive_workflow_package_source(
         export_workflow_package_directory(PACKAGE_ROOT),
-        source_uri="memory://millrace-plus-scaffold.mrpkg.tar",
+        source_uri="memory://millrace-plus-official.mrpkg.tar",
     )
 
     record = store.import_workflow_package_source(

@@ -17,7 +17,7 @@ def _shipped_manifest() -> dict[str, object]:
     )
 
 
-def test_readme_documents_plus_0002a_official_package_layout_plan() -> None:
+def test_readme_documents_plus_0002b_official_simple_loop_package_plan() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text()
 
     for required in (
@@ -25,25 +25,26 @@ def test_readme_documents_plus_0002a_official_package_layout_plan() -> None:
         "`millrace.plus.official`",
         "package version `0.0.0`",
         "installed resource root `millrace_workflow_package`",
-        "PLUS-0002B performs the first shipped official package-root conversion",
+        "`simple_loop`",
         "package data is non-executable",
     ):
         assert required in readme
 
 
-def test_shipped_package_root_remains_temporary_non_official_scaffold() -> None:
+def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
     manifest = _shipped_manifest()
     package = cast(dict[str, object], manifest["package"])
     workflows = cast(list[object], manifest["workflows"])
     metadata = cast(dict[str, object], manifest["non_authoritative_metadata"])
 
-    assert package["package_id"] == TEMPORARY_SCAFFOLD_PACKAGE_ID
-    assert package["package_id"] != OFFICIAL_PACKAGE_ID
+    assert package["package_id"] == OFFICIAL_PACKAGE_ID
+    assert package["package_id"] != TEMPORARY_SCAFFOLD_PACKAGE_ID
     assert package["package_version"] == "0.0.0"
     assert package["package_role"] == "workflow_package"
     assert workflows
     assert all(
-        cast(dict[str, object], workflow)["visibility"] == "test_only"
+        cast(dict[str, object], workflow)["visibility"] == "public"
         for workflow in workflows
     )
-    assert metadata["status"] == "temporary_non_official_scaffold_until_PLUS_0002B"
+    assert metadata["plus_packet"] == "PLUS-0002B"
+    assert metadata["status"] == "official_simple_loop_workflow_package"

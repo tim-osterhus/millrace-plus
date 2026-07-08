@@ -19,6 +19,7 @@ ASSET_PATH = "assets/test_prompt.md"
 DIST_NAME = "millrace-plus"
 IMPORT_PACKAGE = "millrace_plus"
 RESOURCE_ROOT = "millrace_workflow_package"
+PROJECT_PACKAGE_ROOT = PROJECT_ROOT / RESOURCE_ROOT
 
 
 def _conformance():
@@ -46,6 +47,20 @@ def _load_manifest(package_root: Path) -> dict[str, object]:
 def _write_manifest(package_root: Path, manifest: dict[str, object]) -> None:
     (package_root / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n",
+    )
+
+
+def _project_member_paths() -> tuple[str, ...]:
+    manifest = _load_manifest(PROJECT_PACKAGE_ROOT)
+    assets = manifest["assets"]
+    assert isinstance(assets, list)
+    return tuple(
+        sorted(
+            (
+                "manifest.json",
+                *(str(asset["package_path"]) for asset in assets),
+            )
+        )
     )
 
 
@@ -86,6 +101,23 @@ def test_helpers_refuse_stale_asset_digest_and_byte_length(tmp_path: Path) -> No
 
     with pytest.raises(AssertionError):
         conformance.assert_manifest_and_asset_digests(package_root)
+
+
+def test_helpers_refuse_undeclared_selected_artifact_kind_mentions() -> None:
+    conformance = _conformance()
+
+    with pytest.raises(AssertionError) as exc_info:
+        conformance.assert_no_undeclared_selected_artifact_kind_mentions(
+            {
+                "reviewer-core.md": (
+                    "| `artifact_kind` | yes | string | "
+                    "Use `simple_loop.review_result`. |"
+                )
+            },
+            declared_artifact_schema_ids=frozenset({"simple_loop.gap_packet"}),
+        )
+
+    assert "simple_loop.review_result" in str(exc_info.value)
 
 
 def test_helpers_select_compileable_fixture_and_assert_selected_pin(
@@ -177,7 +209,7 @@ def test_helpers_prove_installed_discovery_is_byte_only(
         wheel_path,
         resource_root=RESOURCE_ROOT,
         import_package=IMPORT_PACKAGE,
-        expected_member_paths=("manifest.json", "assets/scaffold_prompt.md"),
+        expected_member_paths=_project_member_paths(),
     )
     source = conformance.assert_installed_discovery_is_byte_only(
         monkeypatch,
@@ -186,8 +218,8 @@ def test_helpers_prove_installed_discovery_is_byte_only(
         distribution_name=DIST_NAME,
         import_package=IMPORT_PACKAGE,
         installed_resource_root=RESOURCE_ROOT,
-        expected_package_root=PROJECT_ROOT / RESOURCE_ROOT,
+        expected_package_root=PROJECT_PACKAGE_ROOT,
     )
 
     assert source.source_kind == "installed_python_package"
-    assert source.member_paths == ("assets/scaffold_prompt.md", "manifest.json")
+    assert source.member_paths == _project_member_paths()

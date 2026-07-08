@@ -2,54 +2,1235 @@
   "record_kind": "millrace.workflow_package_manifest",
   "manifest_format_version": "1",
   "package": {
-    "package_id": "millrace.plus.scaffold",
+    "package_id": "millrace.plus.official",
     "package_version": "0.0.0",
     "package_format_version": "1",
     "package_role": "workflow_package",
     "publisher": "Millrace",
     "base_millrace_compatibility": ">=0.22,<0.23",
-    "publication_scope": "test",
+    "publication_scope": "public",
     "license": "Apache-2.0",
     "repository_url": "https://github.com/tim-osterhus/millrace-plus",
     "display": {
-      "name": "Millrace Plus Scaffold",
-      "role": "workflow package scaffold/test fixture"
+      "name": "Millrace Plus Official Workflows",
+      "role": "public workflow package"
     }
   },
   "workflows": [
     {
-      "workflow_id": "millrace.plus.scaffold",
-      "workflow_version": "0.0.0",
-      "visibility": "test_only",
+      "workflow_id": "simple_loop",
+      "workflow_version": "0.1",
+      "visibility": "public",
       "entrypoints": [
         "default"
       ],
       "selected_authority": {
-        "fixture_kind": "scaffold_smoke",
-        "asset_refs": [
-          "millrace.plus.scaffold.prompt"
+        "workflow": {
+          "id": "simple_loop",
+          "version": "0.1",
+          "name": "Simple Loop",
+          "compatibility_profile": null,
+          "required_extensions": []
+        },
+        "lineage_policy": "root_from_external_enqueue",
+        "graphs": [
+          {
+            "id": "simple_loop.graph",
+            "node_ids": [
+              "simple_loop.manager.start",
+              "simple_loop.worker.start",
+              "simple_loop.reviewer.start",
+              "simple_loop.manager.detail_request",
+              "simple_loop.worker.gaps",
+              "simple_loop.manager.incident",
+              "simple_loop.troubleshooter.start"
+            ],
+            "presentation": {
+              "display_name": "Simple Loop Graph"
+            }
+          }
+        ],
+        "partitions": [
+          {
+            "id": "management",
+            "kind": "plane",
+            "presentation": {
+              "display_name": "Management"
+            }
+          },
+          {
+            "id": "implementation",
+            "kind": "plane",
+            "presentation": {
+              "display_name": "Implementation"
+            }
+          },
+          {
+            "id": "review",
+            "kind": "plane",
+            "presentation": {
+              "display_name": "Review"
+            }
+          }
+        ],
+        "queue_families": [
+          {
+            "id": "work_prompt",
+            "external_enqueue": true,
+            "presentation": {
+              "display_name": "Work prompt"
+            }
+          },
+          {
+            "id": "work_packet",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Work packet"
+            }
+          },
+          {
+            "id": "gap_packet",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Gap packet"
+            }
+          },
+          {
+            "id": "incident_report",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Incident report"
+            }
+          }
+        ],
+        "external_enqueue_routes": [
+          {
+            "id": "simple_loop.external_work_prompt",
+            "queue_family_id": "work_prompt",
+            "graph_node_id": "simple_loop.manager.start",
+            "stage_kind_id": "simple_loop.manager",
+            "runner_binding_id": "simple_loop.default_agent_runner"
+          }
+        ],
+        "artifact_schemas": [
+          {
+            "id": "simple_loop.work_prompt",
+            "schema": {
+              "type": "object",
+              "required": [
+                "prompt_id",
+                "body"
+              ],
+              "properties": {
+                "prompt_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "body": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Work prompt schema"
+            }
+          },
+          {
+            "id": "simple_loop.work_packet",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "source_prompt_id",
+                "title",
+                "objective",
+                "completion_definition"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "simple_loop.work_packet"
+                },
+                "source_prompt_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "title": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "objective": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "completion_definition": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Work packet schema"
+            }
+          },
+          {
+            "id": "simple_loop.detail_request",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "missing_details"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "simple_loop.detail_request"
+                },
+                "missing_details": {
+                  "type": "array",
+                  "min_items": 1,
+                  "items": {
+                    "type": "string",
+                    "min_length": 1
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Detail request schema"
+            }
+          },
+          {
+            "id": "simple_loop.work_result",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "simple_loop.work_result"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Work result schema"
+            }
+          },
+          {
+            "id": "simple_loop.gap_packet",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "gaps"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "simple_loop.gap_packet"
+                },
+                "gaps": {
+                  "type": "array",
+                  "min_items": 1,
+                  "items": {
+                    "type": "string",
+                    "min_length": 1
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Gap packet schema"
+            }
+          },
+          {
+            "id": "simple_loop.incident_report",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "reason"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "simple_loop.incident_report"
+                },
+                "reason": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Incident report schema"
+            }
+          },
+          {
+            "id": "simple_loop.troubleshooting_report",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "result",
+                "blocker_cause",
+                "attempted_repair",
+                "next_route"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "simple_loop.troubleshooting_report"
+                },
+                "result": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "blocker_cause": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "attempted_repair": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "next_route": {
+                  "type": "string",
+                  "enum": [
+                    "retry_recorded_source",
+                    "operator_intervention",
+                    "unresolved_return"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Troubleshooting report schema"
+            }
+          }
+        ],
+        "terminal_outcomes": [
+          {
+            "id": "simple_loop.manager.packet_ready",
+            "stage_kind_id": "simple_loop.manager",
+            "marker": "PACKET_READY",
+            "presentation": {
+              "display_name": "Packet ready"
+            }
+          },
+          {
+            "id": "simple_loop.manager.needs_operator_detail",
+            "stage_kind_id": "simple_loop.manager",
+            "marker": "NEEDS_OPERATOR_DETAIL",
+            "presentation": {
+              "display_name": "Needs operator detail"
+            }
+          },
+          {
+            "id": "simple_loop.manager.incident_triaged",
+            "stage_kind_id": "simple_loop.manager",
+            "marker": "INCIDENT_TRIAGED",
+            "presentation": {
+              "display_name": "Incident triaged"
+            }
+          },
+          {
+            "id": "simple_loop.manager.blocked",
+            "stage_kind_id": "simple_loop.manager",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Manager blocked"
+            }
+          },
+          {
+            "id": "simple_loop.manager.invalid_prompt",
+            "stage_kind_id": "simple_loop.manager",
+            "marker": "INVALID_PROMPT",
+            "presentation": {
+              "display_name": "Invalid prompt"
+            }
+          },
+          {
+            "id": "simple_loop.worker.work_done",
+            "stage_kind_id": "simple_loop.worker",
+            "marker": "WORK_DONE",
+            "presentation": {
+              "display_name": "Work done"
+            }
+          },
+          {
+            "id": "simple_loop.worker.insufficient_spec",
+            "stage_kind_id": "simple_loop.worker",
+            "marker": "INSUFFICIENT_SPEC",
+            "presentation": {
+              "display_name": "Insufficient spec"
+            }
+          },
+          {
+            "id": "simple_loop.worker.blocked",
+            "stage_kind_id": "simple_loop.worker",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Worker blocked"
+            }
+          },
+          {
+            "id": "simple_loop.worker.failed",
+            "stage_kind_id": "simple_loop.worker",
+            "marker": "FAILED",
+            "presentation": {
+              "display_name": "Worker failed"
+            }
+          },
+          {
+            "id": "simple_loop.reviewer.accepted",
+            "stage_kind_id": "simple_loop.reviewer",
+            "marker": "ACCEPTED",
+            "presentation": {
+              "display_name": "Accepted"
+            }
+          },
+          {
+            "id": "simple_loop.reviewer.gaps_found",
+            "stage_kind_id": "simple_loop.reviewer",
+            "marker": "GAPS_FOUND",
+            "presentation": {
+              "display_name": "Gaps found"
+            }
+          },
+          {
+            "id": "simple_loop.reviewer.incident_required",
+            "stage_kind_id": "simple_loop.reviewer",
+            "marker": "INCIDENT_REQUIRED",
+            "presentation": {
+              "display_name": "Incident required"
+            }
+          },
+          {
+            "id": "simple_loop.reviewer.blocked",
+            "stage_kind_id": "simple_loop.reviewer",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Reviewer blocked"
+            }
+          },
+          {
+            "id": "simple_loop.troubleshooter.resolved",
+            "stage_kind_id": "simple_loop.troubleshooter",
+            "marker": "RESOLVED",
+            "presentation": {
+              "display_name": "Resolved"
+            }
+          },
+          {
+            "id": "simple_loop.troubleshooter.unresolved",
+            "stage_kind_id": "simple_loop.troubleshooter",
+            "marker": "UNRESOLVED",
+            "presentation": {
+              "display_name": "Unresolved"
+            }
+          },
+          {
+            "id": "simple_loop.troubleshooter.operator_needed",
+            "stage_kind_id": "simple_loop.troubleshooter",
+            "marker": "OPERATOR_NEEDED",
+            "presentation": {
+              "display_name": "Operator needed"
+            }
+          }
+        ],
+        "stage_kinds": [
+          {
+            "id": "simple_loop.manager",
+            "partition_id": "management",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "input_queue_family_ids": [
+              "work_prompt",
+              "work_packet",
+              "incident_report"
+            ],
+            "output_queue_family_ids": [
+              "work_packet"
+            ],
+            "artifact_schema_ids": [
+              "simple_loop.work_packet",
+              "simple_loop.detail_request",
+              "simple_loop.incident_report"
+            ],
+            "asset_ids": [
+              "simple_loop.manager_prompt",
+              "simple_loop.manager_core_skill"
+            ],
+            "declared_outcome_ids": [
+              "simple_loop.manager.packet_ready",
+              "simple_loop.manager.needs_operator_detail",
+              "simple_loop.manager.incident_triaged",
+              "simple_loop.manager.blocked",
+              "simple_loop.manager.invalid_prompt"
+            ],
+            "presentation": {
+              "display_name": "Manager"
+            }
+          },
+          {
+            "id": "simple_loop.worker",
+            "partition_id": "implementation",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "input_queue_family_ids": [
+              "work_packet",
+              "gap_packet"
+            ],
+            "output_queue_family_ids": [
+              "work_packet"
+            ],
+            "artifact_schema_ids": [
+              "simple_loop.work_packet",
+              "simple_loop.detail_request",
+              "simple_loop.work_result",
+              "simple_loop.gap_packet"
+            ],
+            "asset_ids": [
+              "simple_loop.worker_prompt",
+              "simple_loop.worker_core_skill"
+            ],
+            "declared_outcome_ids": [
+              "simple_loop.worker.work_done",
+              "simple_loop.worker.insufficient_spec",
+              "simple_loop.worker.blocked",
+              "simple_loop.worker.failed"
+            ],
+            "presentation": {
+              "display_name": "Worker"
+            }
+          },
+          {
+            "id": "simple_loop.reviewer",
+            "partition_id": "review",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "input_queue_family_ids": [
+              "work_packet"
+            ],
+            "output_queue_family_ids": [
+              "work_packet",
+              "gap_packet",
+              "incident_report"
+            ],
+            "artifact_schema_ids": [
+              "simple_loop.work_packet",
+              "simple_loop.work_result",
+              "simple_loop.gap_packet",
+              "simple_loop.incident_report"
+            ],
+            "asset_ids": [
+              "simple_loop.reviewer_prompt",
+              "simple_loop.reviewer_core_skill"
+            ],
+            "declared_outcome_ids": [
+              "simple_loop.reviewer.accepted",
+              "simple_loop.reviewer.gaps_found",
+              "simple_loop.reviewer.incident_required",
+              "simple_loop.reviewer.blocked"
+            ],
+            "presentation": {
+              "display_name": "Reviewer"
+            }
+          },
+          {
+            "id": "simple_loop.troubleshooter",
+            "partition_id": null,
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "input_queue_family_ids": [],
+            "output_queue_family_ids": [],
+            "artifact_schema_ids": [
+              "simple_loop.troubleshooting_report"
+            ],
+            "asset_ids": [
+              "simple_loop.troubleshooter_prompt",
+              "simple_loop.troubleshooter_core_skill"
+            ],
+            "declared_outcome_ids": [
+              "simple_loop.troubleshooter.resolved",
+              "simple_loop.troubleshooter.unresolved",
+              "simple_loop.troubleshooter.operator_needed"
+            ],
+            "presentation": {
+              "display_name": "Troubleshooter"
+            }
+          }
+        ],
+        "terminal_actions": [
+          {
+            "id": "simple_loop.manager.packet_ready",
+            "stage_kind_id": "simple_loop.manager",
+            "outcome_id": "simple_loop.manager.packet_ready",
+            "kind": "route",
+            "target_stage_kind_id": "simple_loop.worker",
+            "target_graph_node_id": "simple_loop.worker.start",
+            "emitted_queue_family_id": "work_packet",
+            "artifact_schema_id": "simple_loop.work_packet",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "payload_projection": {
+              "kind": "object",
+              "fields": {
+                "work_packet": {
+                  "kind": "source",
+                  "path": [
+                    "artifact_payload"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "simple_loop.manager.packet_ready"
+            }
+          },
+          {
+            "id": "simple_loop.manager.needs_operator_detail",
+            "stage_kind_id": "simple_loop.manager",
+            "outcome_id": "simple_loop.manager.needs_operator_detail",
+            "kind": "operator_wait",
+            "artifact_schema_id": "simple_loop.detail_request",
+            "presentation": {
+              "display_name": "simple_loop.manager.needs_operator_detail"
+            }
+          },
+          {
+            "id": "simple_loop.manager.incident_triaged",
+            "stage_kind_id": "simple_loop.manager",
+            "outcome_id": "simple_loop.manager.incident_triaged",
+            "kind": "operator_wait",
+            "artifact_schema_id": "simple_loop.incident_report",
+            "presentation": {
+              "display_name": "simple_loop.manager.incident_triaged"
+            }
+          },
+          {
+            "id": "simple_loop.manager.blocked",
+            "stage_kind_id": "simple_loop.manager",
+            "outcome_id": "simple_loop.manager.blocked",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "simple_loop.troubleshooter",
+            "target_graph_node_id": "simple_loop.troubleshooter.start",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "asset_ids": [
+              "simple_loop.troubleshooter_prompt"
+            ],
+            "presentation": {
+              "display_name": "simple_loop.manager.blocked"
+            }
+          },
+          {
+            "id": "simple_loop.manager.invalid_prompt",
+            "stage_kind_id": "simple_loop.manager",
+            "outcome_id": "simple_loop.manager.invalid_prompt",
+            "kind": "close",
+            "artifact_schema_id": null,
+            "presentation": {
+              "display_name": "simple_loop.manager.invalid_prompt"
+            }
+          },
+          {
+            "id": "simple_loop.worker.work_done",
+            "stage_kind_id": "simple_loop.worker",
+            "outcome_id": "simple_loop.worker.work_done",
+            "kind": "route",
+            "target_stage_kind_id": "simple_loop.reviewer",
+            "target_graph_node_id": "simple_loop.reviewer.start",
+            "emitted_queue_family_id": "work_packet",
+            "artifact_schema_id": "simple_loop.work_result",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "payload_projection": {
+              "kind": "object",
+              "fields": {
+                "work_packet": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "work_packet"
+                  ]
+                },
+                "work_result": {
+                  "kind": "source",
+                  "path": [
+                    "artifact_payload"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "simple_loop.worker.work_done"
+            }
+          },
+          {
+            "id": "simple_loop.worker.insufficient_spec",
+            "stage_kind_id": "simple_loop.worker",
+            "outcome_id": "simple_loop.worker.insufficient_spec",
+            "kind": "route",
+            "target_stage_kind_id": "simple_loop.manager",
+            "target_graph_node_id": "simple_loop.manager.detail_request",
+            "emitted_queue_family_id": "work_packet",
+            "artifact_schema_id": "simple_loop.detail_request",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "payload_projection": {
+              "kind": "object",
+              "fields": {
+                "work_packet": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "work_packet"
+                  ]
+                },
+                "detail_request": {
+                  "kind": "source",
+                  "path": [
+                    "artifact_payload"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "simple_loop.worker.insufficient_spec"
+            }
+          },
+          {
+            "id": "simple_loop.worker.blocked",
+            "stage_kind_id": "simple_loop.worker",
+            "outcome_id": "simple_loop.worker.blocked",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "simple_loop.troubleshooter",
+            "target_graph_node_id": "simple_loop.troubleshooter.start",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "asset_ids": [
+              "simple_loop.troubleshooter_prompt"
+            ],
+            "presentation": {
+              "display_name": "simple_loop.worker.blocked"
+            }
+          },
+          {
+            "id": "simple_loop.worker.failed",
+            "stage_kind_id": "simple_loop.worker",
+            "outcome_id": "simple_loop.worker.failed",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "simple_loop.troubleshooter",
+            "target_graph_node_id": "simple_loop.troubleshooter.start",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "asset_ids": [
+              "simple_loop.troubleshooter_prompt"
+            ],
+            "presentation": {
+              "display_name": "simple_loop.worker.failed"
+            }
+          },
+          {
+            "id": "simple_loop.reviewer.accepted",
+            "stage_kind_id": "simple_loop.reviewer",
+            "outcome_id": "simple_loop.reviewer.accepted",
+            "kind": "close",
+            "artifact_schema_id": null,
+            "presentation": {
+              "display_name": "simple_loop.reviewer.accepted"
+            }
+          },
+          {
+            "id": "simple_loop.reviewer.gaps_found",
+            "stage_kind_id": "simple_loop.reviewer",
+            "outcome_id": "simple_loop.reviewer.gaps_found",
+            "kind": "route",
+            "target_stage_kind_id": "simple_loop.worker",
+            "target_graph_node_id": "simple_loop.worker.gaps",
+            "emitted_queue_family_id": "gap_packet",
+            "artifact_schema_id": "simple_loop.gap_packet",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "payload_projection": {
+              "kind": "object",
+              "fields": {
+                "work_packet": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "work_packet"
+                  ]
+                },
+                "latest_work_result": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "work_result"
+                  ]
+                },
+                "gap_packet": {
+                  "kind": "source",
+                  "path": [
+                    "artifact_payload"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "simple_loop.reviewer.gaps_found"
+            }
+          },
+          {
+            "id": "simple_loop.reviewer.incident_required",
+            "stage_kind_id": "simple_loop.reviewer",
+            "outcome_id": "simple_loop.reviewer.incident_required",
+            "kind": "route",
+            "target_stage_kind_id": "simple_loop.manager",
+            "target_graph_node_id": "simple_loop.manager.incident",
+            "emitted_queue_family_id": "incident_report",
+            "artifact_schema_id": "simple_loop.incident_report",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "payload_projection": {
+              "kind": "object",
+              "fields": {
+                "work_packet": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "work_packet"
+                  ]
+                },
+                "latest_work_result": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "work_result"
+                  ]
+                },
+                "incident_report": {
+                  "kind": "source",
+                  "path": [
+                    "artifact_payload"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "simple_loop.reviewer.incident_required"
+            }
+          },
+          {
+            "id": "simple_loop.reviewer.blocked",
+            "stage_kind_id": "simple_loop.reviewer",
+            "outcome_id": "simple_loop.reviewer.blocked",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "simple_loop.troubleshooter",
+            "target_graph_node_id": "simple_loop.troubleshooter.start",
+            "runner_binding_id": "simple_loop.default_agent_runner",
+            "asset_ids": [
+              "simple_loop.troubleshooter_prompt"
+            ],
+            "presentation": {
+              "display_name": "simple_loop.reviewer.blocked"
+            }
+          },
+          {
+            "id": "simple_loop.troubleshooter.resolved",
+            "stage_kind_id": "simple_loop.troubleshooter",
+            "outcome_id": "simple_loop.troubleshooter.resolved",
+            "kind": "return_to_recorded_source",
+            "artifact_schema_id": "simple_loop.troubleshooting_report",
+            "presentation": {
+              "display_name": "simple_loop.troubleshooter.resolved"
+            }
+          },
+          {
+            "id": "simple_loop.troubleshooter.unresolved",
+            "stage_kind_id": "simple_loop.troubleshooter",
+            "outcome_id": "simple_loop.troubleshooter.unresolved",
+            "kind": "return_to_recorded_source",
+            "artifact_schema_id": "simple_loop.troubleshooting_report",
+            "presentation": {
+              "display_name": "simple_loop.troubleshooter.unresolved"
+            }
+          },
+          {
+            "id": "simple_loop.troubleshooter.operator_needed",
+            "stage_kind_id": "simple_loop.troubleshooter",
+            "outcome_id": "simple_loop.troubleshooter.operator_needed",
+            "kind": "quarantine_lineage",
+            "artifact_schema_id": "simple_loop.troubleshooting_report",
+            "presentation": {
+              "display_name": "simple_loop.troubleshooter.operator_needed"
+            }
+          }
+        ],
+        "recovery_policies": [
+          {
+            "id": "simple_loop.blocked_recovery",
+            "source_recovery_action_ids": [
+              "simple_loop.manager.blocked",
+              "simple_loop.worker.blocked",
+              "simple_loop.worker.failed",
+              "simple_loop.reviewer.blocked"
+            ],
+            "return_action_ids": [
+              "simple_loop.troubleshooter.resolved",
+              "simple_loop.troubleshooter.unresolved"
+            ],
+            "quarantine_action_ids": [
+              "simple_loop.troubleshooter.operator_needed"
+            ],
+            "recovery_stage_kind_id": "simple_loop.troubleshooter",
+            "recorded_source_selector": "latest_recovery_attempt_for_lineage",
+            "attempt_scope": "lineage",
+            "immediate_recovery_limit": 1,
+            "cooldown_starts_at_attempt": 2,
+            "quarantine_threshold_attempt": 3,
+            "threshold_behavior": "runtime_quarantine_at_threshold",
+            "return_allowed_phases": [
+              "active_recovery",
+              "quarantine_eligible"
+            ],
+            "reset_trigger_action_ids": [
+              "simple_loop.manager.packet_ready",
+              "simple_loop.manager.incident_triaged",
+              "simple_loop.manager.invalid_prompt",
+              "simple_loop.worker.work_done",
+              "simple_loop.worker.insufficient_spec",
+              "simple_loop.reviewer.accepted",
+              "simple_loop.reviewer.gaps_found",
+              "simple_loop.reviewer.incident_required"
+            ],
+            "default_cooldown_seconds": 900,
+            "cooldown_wait_state_id": "simple_loop.blocked_recovery.cooldown"
+          }
+        ],
+        "wait_states": [
+          {
+            "id": "simple_loop.blocked_recovery.cooldown",
+            "kind": "timer",
+            "policy_id": "simple_loop.blocked_recovery",
+            "starts_at_attempt": 2,
+            "duration_seconds": 900
+          }
+        ],
+        "operator_waits": [
+          {
+            "id": "simple_loop.manager_detail_wait",
+            "source_action_ids": [
+              "simple_loop.manager.needs_operator_detail"
+            ],
+            "wait_scope": "lineage",
+            "source_work_item_behavior": "leave_open",
+            "unrelated_lineages_continue": true,
+            "allowed_resolution_kinds": [
+              "resume_recorded_source",
+              "close_recorded_source",
+              "revise_recorded_source"
+            ],
+            "payload_schema_id": "simple_loop.work_prompt",
+            "target_queue_family_id": "work_prompt",
+            "target_stage_kind_id": "simple_loop.manager",
+            "target_graph_node_id": "simple_loop.manager.start",
+            "target_runner_binding_id": "simple_loop.default_agent_runner",
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "wait_id",
+              "operator_wait_id",
+              "lineage_id",
+              "target_activation_id",
+              "empty_payload",
+              "closed_work_item_ids",
+              "target_work_item_id",
+              "payload_digest",
+              "payload_reference"
+            ],
+            "correlation_key": "wait_id",
+            "idempotency": "input_receipt_and_active_wait_status",
+            "timeout_policy": "none",
+            "expiry_policy": "none",
+            "cancellation_policy": "selected_resolution_only",
+            "status_effect": "operator_wait_active"
+          },
+          {
+            "id": "simple_loop.manager_incident_wait",
+            "source_action_ids": [
+              "simple_loop.manager.incident_triaged"
+            ],
+            "wait_scope": "lineage",
+            "source_work_item_behavior": "close_on_create",
+            "unrelated_lineages_continue": true,
+            "allowed_resolution_kinds": [
+              "close_recorded_source"
+            ],
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "wait_id",
+              "operator_wait_id",
+              "lineage_id",
+              "closed_work_item_ids",
+              "empty_payload"
+            ],
+            "correlation_key": "wait_id",
+            "idempotency": "input_receipt_and_active_wait_status",
+            "timeout_policy": "none",
+            "expiry_policy": "none",
+            "cancellation_policy": "selected_resolution_only",
+            "status_effect": "operator_wait_active"
+          }
+        ],
+        "counters": [
+          {
+            "id": "simple_loop.reviewer_gap_counter",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "simple_loop.reviewer",
+            "increment_action_id": "simple_loop.reviewer.gaps_found",
+            "threshold_action_id": "simple_loop.reviewer.incident_required",
+            "threshold_count": 4
+          }
+        ],
+        "intervention_options": [
+          {
+            "id": "simple_loop.resume_lineage",
+            "policy_id": "simple_loop.blocked_recovery",
+            "kind": "resume_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "resume_target_selector": "recorded_source",
+            "close_behavior": null,
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "target_activation_id",
+              "empty_payload"
+            ]
+          },
+          {
+            "id": "simple_loop.close_lineage",
+            "policy_id": "simple_loop.blocked_recovery",
+            "kind": "close_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "resume_target_selector": null,
+            "close_behavior": "close_ready_or_active_work_in_lineage",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "closed_work_item_ids",
+              "closed_activation_ids",
+              "closed_run_ids",
+              "empty_payload"
+            ]
+          },
+          {
+            "id": "simple_loop.revise_lineage",
+            "policy_id": "simple_loop.blocked_recovery",
+            "kind": "revise_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "resume_target_selector": null,
+            "close_behavior": null,
+            "payload_schema_id": "simple_loop.work_packet",
+            "target_queue_family_id": "work_packet",
+            "target_stage_kind_id": "simple_loop.worker",
+            "target_graph_node_id": "simple_loop.worker.start",
+            "target_runner_binding_id": "simple_loop.default_agent_runner",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "recovery_attempt_count",
+              "target_work_item_id",
+              "target_activation_id",
+              "payload_digest",
+              "payload_reference"
+            ]
+          }
+        ],
+        "runner_bindings": [
+          {
+            "id": "simple_loop.default_agent_runner",
+            "adapter_kind": "fake_local",
+            "stage_kind_ids": [
+              "simple_loop.manager",
+              "simple_loop.worker",
+              "simple_loop.reviewer",
+              "simple_loop.troubleshooter"
+            ],
+            "presentation": {
+              "display_name": "Default agent runner"
+            }
+          }
         ]
       },
       "required_assets": [
         {
-          "asset_id": "millrace.plus.scaffold.prompt",
-          "content_digest": "sha256:ae664ee612ff3b8c9caf19e897d22270d411cb419b3539c8c8e876b27ff3cd11"
+          "asset_id": "simple_loop.manager_prompt",
+          "content_digest": "sha256:b4837c4b3b1f302870efc21f34ec3b97ebabdb5292d381dbbe26e0dca3495720"
+        },
+        {
+          "asset_id": "simple_loop.worker_prompt",
+          "content_digest": "sha256:82f4ba7b804926b9730f69f0a19194b38f7611d5d5bb7bdcd7619b1394b51022"
+        },
+        {
+          "asset_id": "simple_loop.reviewer_prompt",
+          "content_digest": "sha256:83e108af820e02fd77adf24be381cba9c4fca95d422301cff7f7948b186f66c2"
+        },
+        {
+          "asset_id": "simple_loop.troubleshooter_prompt",
+          "content_digest": "sha256:e42d3d306dece493afe5577f6a6b2f50030e23795a23b7a327cd1de6bf01573b"
+        },
+        {
+          "asset_id": "simple_loop.manager_core_skill",
+          "content_digest": "sha256:072c2c3fe2a6bf62c5bc58f975e569f7fc731bf1d863d765d144f42433afde21"
+        },
+        {
+          "asset_id": "simple_loop.worker_core_skill",
+          "content_digest": "sha256:5e317e3efc5b7315bf7a40b77dd13cd52e3dca7d71826f546bf269361681e8d9"
+        },
+        {
+          "asset_id": "simple_loop.reviewer_core_skill",
+          "content_digest": "sha256:eaddd593333d592c78a43deaa74e2197831de1d5dda79a31ac0d3e52e0113e34"
+        },
+        {
+          "asset_id": "simple_loop.troubleshooter_core_skill",
+          "content_digest": "sha256:e841f3da62681fed0d75b28a79da9048c1068b8623c6fc7529912962a64ccf8f"
         }
       ],
+      "required_dependencies": [],
       "display": {
-        "name": "Millrace Plus Scaffold Smoke Fixture"
+        "name": "Simple Loop",
+        "summary": "Small reference workflow with manager, worker, reviewer, and troubleshooter stages."
       }
     }
   ],
   "assets": [
     {
-      "asset_id": "millrace.plus.scaffold.prompt",
+      "asset_id": "simple_loop.manager_prompt",
       "asset_kind": "entrypoint_prompt",
       "media_type": "text/markdown; charset=utf-8",
       "encoding": "utf-8",
-      "content_digest": "sha256:ae664ee612ff3b8c9caf19e897d22270d411cb419b3539c8c8e876b27ff3cd11",
-      "byte_length": 381,
-      "package_path": "assets/scaffold_prompt.md",
+      "content_digest": "sha256:b4837c4b3b1f302870efc21f34ec3b97ebabdb5292d381dbbe26e0dca3495720",
+      "byte_length": 2359,
+      "package_path": "assets/workflows/simple_loop/entrypoints/manager.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "simple_loop.worker_prompt",
+      "asset_kind": "entrypoint_prompt",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:82f4ba7b804926b9730f69f0a19194b38f7611d5d5bb7bdcd7619b1394b51022",
+      "byte_length": 2180,
+      "package_path": "assets/workflows/simple_loop/entrypoints/worker.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "simple_loop.reviewer_prompt",
+      "asset_kind": "entrypoint_prompt",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:83e108af820e02fd77adf24be381cba9c4fca95d422301cff7f7948b186f66c2",
+      "byte_length": 2153,
+      "package_path": "assets/workflows/simple_loop/entrypoints/reviewer.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "simple_loop.troubleshooter_prompt",
+      "asset_kind": "entrypoint_prompt",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:e42d3d306dece493afe5577f6a6b2f50030e23795a23b7a327cd1de6bf01573b",
+      "byte_length": 2078,
+      "package_path": "assets/workflows/simple_loop/entrypoints/troubleshooter.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "simple_loop.manager_core_skill",
+      "asset_kind": "stage_skill",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:072c2c3fe2a6bf62c5bc58f975e569f7fc731bf1d863d765d144f42433afde21",
+      "byte_length": 3124,
+      "package_path": "assets/workflows/simple_loop/skills/manager-core.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "simple_loop.worker_core_skill",
+      "asset_kind": "stage_skill",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:5e317e3efc5b7315bf7a40b77dd13cd52e3dca7d71826f546bf269361681e8d9",
+      "byte_length": 2829,
+      "package_path": "assets/workflows/simple_loop/skills/worker-core.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "simple_loop.reviewer_core_skill",
+      "asset_kind": "stage_skill",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:eaddd593333d592c78a43deaa74e2197831de1d5dda79a31ac0d3e52e0113e34",
+      "byte_length": 2914,
+      "package_path": "assets/workflows/simple_loop/skills/reviewer-core.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "simple_loop.troubleshooter_core_skill",
+      "asset_kind": "stage_skill",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:e841f3da62681fed0d75b28a79da9048c1068b8623c6fc7529912962a64ccf8f",
+      "byte_length": 2678,
+      "package_path": "assets/workflows/simple_loop/skills/troubleshooter-core.md",
       "selection": "required",
       "selected_authority_participation": "yes"
     }
@@ -63,9 +1244,10 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:29beae84b3652d59feaffdd1155d84e88116a4c1f9dfa1062d07c86d1c84dc9f",
+  "manifest_digest": "sha256:9968e13d5da2899efe5efb5ac5c0246a526bc495c9ebab10cc71be9c297f061a",
   "non_authoritative_metadata": {
-    "plus_packet": "PLUS-0001",
-    "status": "temporary_non_official_scaffold_until_PLUS_0002B"
+    "plus_packet": "PLUS-0002B",
+    "status": "official_simple_loop_workflow_package",
+    "ops_skill_evidence": "instruction-manual, loop-configuration, and entrypoint-authoring skills used for asset review"
   }
 }
