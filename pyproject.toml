@@ -38,6 +38,10 @@ include = [
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = ["-p", "no:cacheprovider"]
+markers = [
+    "public: standalone public package tests",
+    "internal_conformance: requires explicit Millrace runtime source evidence",
+]
 
 [tool.ruff]
 target-version = "py311"

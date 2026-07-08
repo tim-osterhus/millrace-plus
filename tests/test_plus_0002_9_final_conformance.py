@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
 import json
+import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
+
+from support.internal_conformance_gate import require_internal_conformance
+
+require_internal_conformance()
 
 from millrace.compiler.canonical import authority_fingerprint
 from millrace.compiler.runner_bindings import RUNNER_ADAPTER_KIND_DEFAULTED
@@ -38,11 +44,9 @@ from millrace.workflows import (
 from support import package_conformance as conformance
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_ROOT = PROJECT_ROOT.parents[2]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
-LEGACY_ASSET_ROOT = (
-    WORKSPACE_ROOT / "dev/source/millrace/src/millrace_ai/assets"
-)
+LEGACY_ASSET_ROOT = Path(os.environ["MILLRACE_LEGACY_ASSET_ROOT"])
+LEGACY_ASSET_LABEL = "dev/source/millrace/src/millrace_ai/assets"
 PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.0.0"
 DIST_NAME = "millrace-plus"
@@ -596,7 +600,7 @@ def _legacy_pair_expectations() -> tuple[LegacyPairExpectation, ...]:
 
 def _source_file_paths(pattern: str) -> set[str]:
     return {
-        str(path.relative_to(WORKSPACE_ROOT))
+        f"{LEGACY_ASSET_LABEL}/{path.relative_to(LEGACY_ASSET_ROOT).as_posix()}"
         for path in LEGACY_ASSET_ROOT.glob(pattern)
     }
 

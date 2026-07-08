@@ -8,6 +8,10 @@ from pathlib import Path
 
 import pytest
 
+from support.internal_conformance_gate import require_internal_conformance
+
+require_internal_conformance()
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = PROJECT_ROOT / "tests" / "fixtures" / "compileable_workflow_package"
 PACKAGE_ID = "millrace.plus.test_fixture"

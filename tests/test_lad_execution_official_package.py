@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
 import json
 import shutil
 from collections.abc import Callable
@@ -7,6 +8,11 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+
+from support.internal_conformance_gate import require_internal_conformance
+
+require_internal_conformance()
+
 from millrace.compiler.canonical import authority_fingerprint
 from millrace.contracts.workflow_package import (
     asset_digest_for_bytes,

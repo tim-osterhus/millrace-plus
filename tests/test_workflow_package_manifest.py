@@ -1,54 +1,66 @@
 from __future__ import annotations
 
+import io
 import json
-from pathlib import Path
-from typing import cast
-
-from millrace.compiler.workflow_package_sources import (
-    read_archive_workflow_package_source,
-    read_path_workflow_package_source,
-)
-from millrace.operator.packages import (
-    PackageReadExportCommand,
-    execute_package_read_export_command,
-)
-from millrace.substrate import ContentAddressedByteStore, SQLiteRuntimeStore
-from millrace.substrate.package_archives import (
-    export_workflow_package_directory,
-    read_workflow_package_archive_bytes,
-)
-
-from support import package_conformance as conformance
+import tarfile
+from hashlib import sha256
+from pathlib import Path, PurePosixPath
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.0.0"
-WORKFLOW_ID = "simple_loop"
-WORKFLOW_VERSION = "0.1"
+WORKFLOW_SELECTORS = {
+    ("simple_loop", "0.1"),
+    ("execution.lad", "0.1"),
+    ("execution.lad_integrator", "0.1"),
+    ("planning.lad", "0.1"),
+    ("lad.full", "0.1"),
+    ("vendor_selection", "0.1"),
+}
+
+_ROOT_AUTHORITY_FIELDS = (
+    "record_kind",
+    "manifest_format_version",
+    "package",
+    "workflows",
+    "assets",
+    "dependencies",
+    "compatibility",
+    "canonicalization",
+)
+_PACKAGE_PROVENANCE_FIELDS = frozenset(
+    {
+        "source_kind",
+        "publication_scope",
+        "license",
+        "repository_url",
+        "source_ref",
+        "display",
+    }
+)
+_MANIFEST_DIGEST_DOMAIN_BYTES = b"millrace.wpkg.manifest.v1\0"
+_ASSET_DIGEST_DOMAIN_BYTES = b"millrace.wpkg.asset.v1\0"
 
 
-def _manifest_source() -> dict[str, object]:
-    return cast(
-        dict[str, object],
-        json.loads((PACKAGE_ROOT / "manifest.json").read_text()),
-    )
+def _load_manifest() -> dict[str, Any]:
+    return json.loads((PACKAGE_ROOT / "manifest.json").read_text())
 
 
-def _workflow_record(manifest: dict[str, object]) -> dict[str, object]:
-    workflows = cast(list[object], manifest["workflows"])
-    for workflow in workflows:
-        workflow_record = cast(dict[str, object], workflow)
-        if workflow_record["workflow_id"] == WORKFLOW_ID:
-            return workflow_record
-    raise AssertionError(f"missing workflow {WORKFLOW_ID}")
+def _assets(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    assets = manifest["assets"]
+    assert isinstance(assets, list)
+    return assets
 
 
-def _assets(manifest: dict[str, object]) -> list[dict[str, object]]:
-    return cast(list[dict[str, object]], manifest["assets"])
+def _workflows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    workflows = manifest["workflows"]
+    assert isinstance(workflows, list)
+    return workflows
 
 
-def _member_paths(manifest: dict[str, object]) -> tuple[str, ...]:
+def _member_paths(manifest: dict[str, Any]) -> tuple[str, ...]:
     return tuple(
         sorted(
             (
@@ -59,143 +71,243 @@ def _member_paths(manifest: dict[str, object]) -> tuple[str, ...]:
     )
 
 
-def _store(tmp_path: Path) -> tuple[SQLiteRuntimeStore, ContentAddressedByteStore]:
-    return (
-        SQLiteRuntimeStore.initialize(tmp_path / "runtime.sqlite3"),
-        ContentAddressedByteStore(tmp_path / "cas"),
-    )
+def _assert_package_path(package_path: str) -> None:
+    path = PurePosixPath(package_path)
+    assert package_path
+    assert not path.is_absolute()
+    assert "\\" not in package_path
+    assert "" not in path.parts
+    assert "." not in path.parts
+    assert ".." not in path.parts
+    assert ".DS_Store" not in path.parts
 
 
-def _inspect_imported_package(
-    store: SQLiteRuntimeStore,
-    cas_store: ContentAddressedByteStore,
-    *,
-    command_prefix: str,
-):
-    listed = execute_package_read_export_command(
-        store,
-        cas_store,
-        PackageReadExportCommand(
-            command_id=f"{command_prefix}-list",
-            operation_id="package.list",
-            actor_id="operator:test",
-        ),
-    )
-    inspected = execute_package_read_export_command(
-        store,
-        cas_store,
-        PackageReadExportCommand(
-            command_id=f"{command_prefix}-inspect",
-            operation_id="package.inspect",
-            actor_id="operator:test",
-            package_id=PACKAGE_ID,
-            package_version=PACKAGE_VERSION,
-        ),
-    )
-
-    manifest = _manifest_source()
-    expected_paths = tuple(
-        str(asset["package_path"])
-        for asset in sorted(_assets(manifest), key=lambda item: str(item["asset_id"]))
-    )
-
-    assert listed.outcome == "succeeded"
-    assert [package.package_id for package in listed.packages] == [PACKAGE_ID]
-    assert inspected.outcome == "succeeded"
-    assert inspected.package is not None
-    assert inspected.package.package_id == PACKAGE_ID
-    assert inspected.package.package_version == PACKAGE_VERSION
-    assert tuple(asset.package_path for asset in inspected.package.assets) == (
-        expected_paths
-    )
-    return inspected.package
+def _asset_digest(asset_bytes: bytes) -> str:
+    return "sha256:" + sha256(_ASSET_DIGEST_DOMAIN_BYTES + asset_bytes).hexdigest()
 
 
-def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
-    assert (PACKAGE_ROOT / "manifest.json").is_file()
+def _manifest_digest(manifest: dict[str, Any]) -> str:
+    canonical_bytes = json.dumps(
+        _canonical_value(_manifest_mapping_authority(manifest)),
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return "sha256:" + sha256(
+        _MANIFEST_DIGEST_DOMAIN_BYTES + canonical_bytes
+    ).hexdigest()
 
-    manifest = conformance.assert_manifest_and_asset_digests(PACKAGE_ROOT)
-    package = cast(dict[str, object], manifest["package"])
-    workflow = _workflow_record(manifest)
-    assets = _assets(manifest)
 
-    assert package["package_id"] == PACKAGE_ID
-    assert package["package_version"] == PACKAGE_VERSION
-    assert workflow["workflow_id"] == WORKFLOW_ID
-    assert workflow["workflow_version"] == WORKFLOW_VERSION
-    assert workflow["visibility"] == "public"
-    assert workflow["entrypoints"] == ["default"]
-    assert "assets" not in cast(dict[str, object], workflow["selected_authority"])
-    assert len(assets) == 44
-    assert {asset["asset_kind"] for asset in assets} == {
-        "entrypoint_prompt",
-        "stage_skill",
+def _manifest_mapping_authority(manifest: dict[str, Any]) -> dict[str, Any]:
+    authority: dict[str, Any] = {}
+    for field in _ROOT_AUTHORITY_FIELDS:
+        if field not in manifest:
+            continue
+        value = manifest[field]
+        if field == "package":
+            authority[field] = _package_mapping_authority(value)
+        elif field == "workflows":
+            authority[field] = _sorted_mapping_records(
+                value,
+                "workflow_id",
+                normalizer=_workflow_mapping_authority,
+            )
+        elif field == "assets":
+            authority[field] = _sorted_mapping_records(value, "asset_id")
+        elif field == "dependencies":
+            authority[field] = _sorted_mapping_records(
+                value,
+                "package_id",
+                "version_constraint",
+                normalizer=_optional_none_mapping_authority,
+            )
+        else:
+            authority[field] = value
+    return authority
+
+
+def _package_mapping_authority(value: object) -> object:
+    if not isinstance(value, dict):
+        return value
+    return {
+        key: nested_value
+        for key, nested_value in value.items()
+        if key not in _PACKAGE_PROVENANCE_FIELDS
     }
 
 
-def test_public_path_and_archive_readers_accept_official_layout() -> None:
-    manifest = _manifest_source()
-    path_source = read_path_workflow_package_source(PACKAGE_ROOT)
-    archive_bytes = export_workflow_package_directory(PACKAGE_ROOT)
-    archive_members = read_workflow_package_archive_bytes(archive_bytes)
-    archive_source = read_archive_workflow_package_source(archive_bytes)
-
-    assert path_source.diagnostics == ()
-    assert path_source.manifest is not None
-    assert path_source.manifest.package.package_id == PACKAGE_ID
-    assert path_source.member_paths == _member_paths(manifest)
-    assert archive_members.member_paths == _member_paths(manifest)
-    assert archive_source.diagnostics == ()
-    assert archive_source.manifest is not None
-    assert (
-        archive_source.manifest.manifest_digest
-        == path_source.manifest.manifest_digest
-    )
-
-
-def test_path_source_imports_and_projects_through_public_operator_surface(
-    tmp_path: Path,
-) -> None:
-    store, cas_store = _store(tmp_path)
-    source = read_path_workflow_package_source(PACKAGE_ROOT)
-
-    record = store.import_workflow_package_source(
-        cas_store,
-        source,
-        actor_id="operator:test",
-    )
-    projection = _inspect_imported_package(
-        store,
-        cas_store,
-        command_prefix="path",
-    )
-
-    assert record.package_id == PACKAGE_ID
-    assert projection.manifest_digest == record.manifest_digest
-    assert projection.source_kind == "path"
-    assert projection.unselectable_reason == "package_status_imported"
+def _workflow_mapping_authority(value: object) -> object:
+    if not isinstance(value, dict):
+        return value
+    record = {
+        key: nested_value
+        for key, nested_value in value.items()
+        if key not in {"display", "source_refs"}
+    }
+    if "required_assets" in record:
+        record["required_assets"] = _sorted_mapping_records(
+            record["required_assets"],
+            "asset_id",
+            normalizer=_optional_none_mapping_authority,
+        )
+    if not record.get("required_dependencies"):
+        record.pop("required_dependencies", None)
+    return record
 
 
-def test_archive_source_imports_and_projects_through_public_operator_surface(
-    tmp_path: Path,
-) -> None:
-    store, cas_store = _store(tmp_path)
-    archive_source = read_archive_workflow_package_source(
-        export_workflow_package_directory(PACKAGE_ROOT),
-        source_uri="memory://millrace-plus-official.mrpkg.tar",
-    )
+def _optional_none_mapping_authority(value: object) -> object:
+    if not isinstance(value, dict):
+        return value
+    return {
+        key: nested_value
+        for key, nested_value in value.items()
+        if nested_value is not None
+    }
 
-    record = store.import_workflow_package_source(
-        cas_store,
-        archive_source,
-        actor_id="operator:test",
-    )
-    projection = _inspect_imported_package(
-        store,
-        cas_store,
-        command_prefix="archive",
-    )
 
-    assert record.package_id == PACKAGE_ID
-    assert projection.manifest_digest == record.manifest_digest
-    assert projection.source_kind == "archive"
+def _sorted_mapping_records(
+    value: object,
+    *key_fields: str,
+    normalizer: Any = None,
+) -> object:
+    if not isinstance(value, (list, tuple)):
+        return value
+    records = [
+        normalizer(record) if normalizer is not None else record for record in value
+    ]
+
+    def sort_key(record: object) -> tuple[str, ...]:
+        if not isinstance(record, dict):
+            return ("",)
+        return tuple(str(record.get(field, "")) for field in key_fields)
+
+    return sorted(records, key=sort_key)
+
+
+def _canonical_value(value: object) -> object:
+    if value is None or isinstance(value, (str, bool)):
+        return value
+    if type(value) is int:
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_canonical_value(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _canonical_value(nested) for key, nested in value.items()}
+    raise AssertionError(f"unsupported manifest value: {type(value).__name__}")
+
+
+def _archive_bytes(manifest: dict[str, Any]) -> bytes:
+    members = [
+        ("manifest.json", (PACKAGE_ROOT / "manifest.json").read_bytes()),
+        *(
+            (
+                str(asset["package_path"]),
+                (PACKAGE_ROOT / str(asset["package_path"])).read_bytes(),
+            )
+            for asset in _assets(manifest)
+        ),
+    ]
+    stream = io.BytesIO()
+    with tarfile.open(fileobj=stream, mode="w", format=tarfile.USTAR_FORMAT) as archive:
+        for package_path, payload in sorted(members, key=lambda item: item[0]):
+            _assert_package_path(package_path)
+            info = tarfile.TarInfo(package_path)
+            info.size = len(payload)
+            info.uid = 0
+            info.gid = 0
+            info.uname = ""
+            info.gname = ""
+            info.mtime = 0
+            info.mode = 0o644
+            archive.addfile(info, io.BytesIO(payload))
+    return stream.getvalue()
+
+
+def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
+    manifest = _load_manifest()
+    package = manifest["package"]
+    assert isinstance(package, dict)
+
+    assert package["package_id"] == PACKAGE_ID
+    assert package["package_version"] == PACKAGE_VERSION
+    assert package["package_role"] == "workflow_package"
+    assert manifest["manifest_digest"] == _manifest_digest(manifest)
+
+    asset_digests = {
+        str(asset["asset_id"]): str(asset["content_digest"])
+        for asset in _assets(manifest)
+    }
+    assert len(asset_digests) == 44
+    assert {asset["asset_kind"] for asset in _assets(manifest)} == {
+        "entrypoint_prompt",
+        "stage_skill",
+    }
+    for asset in _assets(manifest):
+        package_path = str(asset["package_path"])
+        asset_bytes = (PACKAGE_ROOT / package_path).read_bytes()
+        assert asset["content_digest"] == _asset_digest(asset_bytes)
+        assert asset["byte_length"] == len(asset_bytes)
+
+    for workflow in _workflows(manifest):
+        assert workflow["visibility"] == "public"
+        assert workflow["entrypoints"] == ["default"]
+        assert "assets" not in workflow["selected_authority"]
+        for required_asset in workflow["required_assets"]:
+            asset_id = str(required_asset["asset_id"])
+            assert required_asset["content_digest"] == asset_digests[asset_id]
+
+
+def test_public_workflow_package_declares_expected_workflows_only() -> None:
+    manifest = _load_manifest()
+    selectors = {
+        (str(workflow["workflow_id"]), str(workflow["workflow_version"]))
+        for workflow in _workflows(manifest)
+    }
+
+    assert selectors == WORKFLOW_SELECTORS
+    assert manifest["dependencies"] == []
+
+
+def test_package_paths_are_declared_contained_and_complete() -> None:
+    manifest = _load_manifest()
+    member_paths = _member_paths(manifest)
+
+    assert member_paths == tuple(sorted(set(member_paths)))
+    for member_path in member_paths:
+        _assert_package_path(member_path)
+        assert (PACKAGE_ROOT / member_path).is_file()
+
+    declared_files = {
+        path.relative_to(PACKAGE_ROOT).as_posix()
+        for path in PACKAGE_ROOT.rglob("*")
+        if path.is_file() and path.name != ".DS_Store"
+    }
+    assert declared_files == set(member_paths)
+
+
+def test_public_archive_bytes_are_deterministic_and_data_only() -> None:
+    manifest = _load_manifest()
+    first_archive = _archive_bytes(manifest)
+    second_archive = _archive_bytes(manifest)
+
+    assert first_archive == second_archive
+    with tarfile.open(fileobj=io.BytesIO(first_archive), mode="r:") as archive:
+        members = archive.getmembers()
+        names = tuple(sorted(member.name for member in members))
+        payloads = {
+            member.name: archive.extractfile(member).read()
+            for member in members
+            if archive.extractfile(member) is not None
+        }
+
+    assert names == _member_paths(manifest)
+    assert not any(name.endswith((".py", ".pyc")) for name in names)
+    assert payloads["manifest.json"] == (PACKAGE_ROOT / "manifest.json").read_bytes()
+    for member in members:
+        assert member.uid == 0
+        assert member.gid == 0
+        assert member.uname == ""
+        assert member.gname == ""
+        assert member.mtime == 0
+        assert member.mode == 0o644

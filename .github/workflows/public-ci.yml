@@ -1,0 +1,55 @@
+name: Public CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  public-validation:
+    name: Public standalone validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Public standalone tests
+        run: |
+          env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with hatchling pytest -q \
+            tests/test_package_metadata.py \
+            tests/test_official_package_layout_plan.py \
+            tests/test_workflow_package_manifest.py \
+            tests/test_workflow_package_installed_smoke.py \
+            tests/test_public_package_boundary.py
+
+      - name: Build distribution
+        run: |
+          rm -rf /tmp/millrace-plus-build
+          PYTHONDONTWRITEBYTECODE=1 uv build --out-dir /tmp/millrace-plus-build --force-pep517
+
+      - name: No millrace runtime package shipped
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          wheel = next(Path('/tmp/millrace-plus-build').glob('*.whl'))
+          with zipfile.ZipFile(wheel) as archive:
+              names = sorted(archive.namelist())
+          assert not any(name.startswith('millrace/') for name in names)
+          assert any(name.startswith('millrace_plus/') for name in names)
+          assert any(name.startswith('millrace_workflow_package/') for name in names)
+          PY
+
+      - name: Lint
+        run: uv run --no-project --with ruff ruff check src tests
+
+      - name: Diff whitespace
+        run: git diff --check
