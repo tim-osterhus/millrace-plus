@@ -16060,8 +16060,8 @@
   },
   "manifest_digest": "sha256:7658b10f7db0127c56d8f38d237d5a361d878ca6b62ba1e22c686810e64accbb",
   "non_authoritative_metadata": {
-    "plus_packet": "PLUS-0002F",
-    "status": "official_simple_loop_lad_execution_lad_planning_full_lad_and_vendor_selection_workflow_package",
+    "plus_packet": "PLUS-0002.9",
+    "status": "final_official_simple_loop_lad_execution_lad_planning_full_lad_and_vendor_selection_workflow_package",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",
     "unselected_catalog_disposition": "lad_planning.workflow_source_with_unselected_catalog() inspected; unselected_catalog excluded from shipped selected authority and package assets",
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",

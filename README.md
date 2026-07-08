@@ -4,10 +4,12 @@
 Millrace. It is separate from the base runtime package: `millrace-ai` remains
 the lightweight runtime, and the runtime does not depend on `millrace-plus`.
 
-The current shipped package root is `millrace.plus.official` at package version `0.0.0`.
-It includes `simple_loop`, `execution.lad`, `execution.lad_integrator`,
-`planning.lad`, `lad.full`, and `vendor_selection` as official public
-workflow entries and keeps package data non-executable.
+The current shipped package root is `millrace.plus.official` at package
+version `0.0.0`; in other words, the current package version `0.0.0` is the
+final PLUS-0002.9 handoff version. PLUS-0002.9 closes final package conformance for
+`simple_loop`, `execution.lad`, `execution.lad_integrator`, `planning.lad`,
+`lad.full`, and `vendor_selection` as official public workflow entries and
+keeps package data non-executable.
 
 ## Package Data
 
@@ -46,6 +48,10 @@ WPKG discovery reads these files as bytes through the package contract. It must
 not import `millrace_plus`, load entry points, register extensions, or execute
 package setup/runtime code. The package data is non-executable.
 
+Final package conformance is recorded in
+`docs/PLUS-0002.9-implementation-review.md`. That review is the downstream
+handoff for E2E, DOCS, META, and CUT packets.
+
 ## Runtime Boundary
 
 `millrace-plus` owns package metadata, release docs, and non-executable package
@@ -66,7 +72,7 @@ PYTHONPATH=../../source/millrace-rewrite/src PYTHONDONTWRITEBYTECODE=1 uv run --
 Build the local package with:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 uv build
+PYTHONDONTWRITEBYTECODE=1 uv build --out-dir /tmp/millrace-plus-build --force-pep517
 ```
 
 The package is buildable locally, but publication remains a separate release
