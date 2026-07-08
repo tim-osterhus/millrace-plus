@@ -1,0 +1,147 @@
+{
+  "record_kind": "millrace.workflow_package_manifest",
+  "manifest_format_version": "1",
+  "package": {
+    "package_id": "millrace.plus.test_fixture",
+    "package_version": "0.0.0",
+    "package_format_version": "1",
+    "package_role": "workflow_package",
+    "publisher": "Millrace",
+    "base_millrace_compatibility": ">=0.22,<0.23",
+    "publication_scope": "test",
+    "license": "Apache-2.0",
+    "display": {
+      "name": "Millrace Plus Compileable Test Fixture",
+      "role": "test-only conformance fixture"
+    }
+  },
+  "workflows": [
+    {
+      "workflow_id": "millrace.plus.test_fixture.workflow",
+      "workflow_version": "1",
+      "visibility": "test_only",
+      "entrypoints": [
+        "default"
+      ],
+      "selected_authority": {
+        "lineage_policy": "root_from_external_enqueue",
+        "workflow": {
+          "id": "millrace.plus.test_fixture.workflow",
+          "version": "1",
+          "name": "Millrace Plus Test Fixture Workflow",
+          "compatibility_profile": null,
+          "required_extensions": []
+        },
+        "graphs": [
+          {
+            "id": "graph.test_fixture",
+            "node_ids": [
+              "node.start"
+            ]
+          }
+        ],
+        "partitions": [
+          {
+            "id": "partition.test_fixture",
+            "kind": "workflow"
+          }
+        ],
+        "queue_families": [
+          {
+            "id": "input",
+            "external_enqueue": true
+          }
+        ],
+        "external_enqueue_routes": [
+          {
+            "id": "route.input",
+            "queue_family_id": "input",
+            "graph_node_id": "node.start",
+            "stage_kind_id": "stage.test_fixture",
+            "runner_binding_id": "runner.test_fixture"
+          }
+        ],
+        "artifact_schemas": [],
+        "stage_kinds": [
+          {
+            "id": "stage.test_fixture",
+            "partition_id": "partition.test_fixture",
+            "runner_binding_id": "runner.test_fixture",
+            "input_queue_family_ids": [
+              "input"
+            ],
+            "output_queue_family_ids": [],
+            "artifact_schema_ids": [],
+            "asset_ids": [
+              "millrace.plus.test_fixture.prompt"
+            ],
+            "declared_outcome_ids": [
+              "outcome.done"
+            ]
+          }
+        ],
+        "terminal_outcomes": [
+          {
+            "id": "outcome.done",
+            "stage_kind_id": "stage.test_fixture",
+            "marker": "DONE"
+          }
+        ],
+        "terminal_actions": [
+          {
+            "id": "action.close",
+            "stage_kind_id": "stage.test_fixture",
+            "outcome_id": "outcome.done",
+            "kind": "close"
+          }
+        ],
+        "runner_bindings": [
+          {
+            "id": "runner.test_fixture",
+            "adapter_kind": "fake_local",
+            "stage_kind_ids": [
+              "stage.test_fixture"
+            ]
+          }
+        ]
+      },
+      "required_assets": [
+        {
+          "asset_id": "millrace.plus.test_fixture.prompt",
+          "content_digest": "sha256:cd91f06e99f41867818d50e5c1709879689ed9bca78c9db28862f1b85b796dcc"
+        }
+      ],
+      "required_dependencies": [],
+      "display": {
+        "name": "Millrace Plus Test Fixture Workflow"
+      }
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "millrace.plus.test_fixture.prompt",
+      "asset_kind": "entrypoint_prompt",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:cd91f06e99f41867818d50e5c1709879689ed9bca78c9db28862f1b85b796dcc",
+      "byte_length": 133,
+      "package_path": "assets/test_prompt.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    }
+  ],
+  "dependencies": [],
+  "compatibility": {
+    "base_millrace": ">=0.22,<0.23",
+    "package_contract": "v0.22"
+  },
+  "canonicalization": {
+    "algorithm": "millrace-json-v1",
+    "hash": "sha256"
+  },
+  "manifest_digest": "sha256:a115424e176048e2d668cf6f7186e4194380f49690cf95ac7aed8140634e3d2a",
+  "non_authoritative_metadata": {
+    "plus_packet": "PLUS-0002A",
+    "status": "test_only_compileable_fixture"
+  }
+}

@@ -66,6 +66,6 @@
   "manifest_digest": "sha256:29beae84b3652d59feaffdd1155d84e88116a4c1f9dfa1062d07c86d1c84dc9f",
   "non_authoritative_metadata": {
     "plus_packet": "PLUS-0001",
-    "status": "scaffold_smoke_fixture"
+    "status": "temporary_non_official_scaffold_until_PLUS_0002B"
   }
 }
