@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from millrace.compiler.canonical import authority_fingerprint
+from millrace.compiler.runner_bindings import RUNNER_ADAPTER_KIND_DEFAULTED
 from millrace.compiler.workflow_package_sources import (
     read_archive_workflow_package_source,
     read_path_workflow_package_source,
@@ -174,6 +175,95 @@ def _expected_selected_asset_pins(
     )
 
 
+def _workflow_index(manifest: dict[str, Any], workflow_id: str) -> int:
+    for index, workflow in enumerate(
+        cast(list[dict[str, object]], manifest["workflows"]),
+    ):
+        if workflow["workflow_id"] == workflow_id:
+            return index
+    raise AssertionError(f"missing workflow {workflow_id}")
+
+
+def _invalid_selected_runner_bindings(
+    manifest: dict[str, Any],
+    workflow_id: str,
+) -> tuple[tuple[int, dict[str, object]], ...]:
+    workflow = _workflows_by_id(manifest)[workflow_id]
+    selected_authority = cast(dict[str, object], workflow["selected_authority"])
+    return tuple(
+        (index, binding)
+        for index, binding in enumerate(
+            cast(list[dict[str, object]], selected_authority["runner_bindings"]),
+        )
+        if binding.get("adapter_kind") != "codex"
+    )
+
+
+def _package_source_kind(import_operation_id: str) -> str:
+    if import_operation_id == "package.import_installed":
+        return "installed_python_package"
+    return import_operation_id.removeprefix("package.import_")
+
+
+def _assert_runner_defaulting_warnings(
+    result: object,
+    *,
+    manifest: dict[str, Any],
+    expectation: WorkflowExpectation,
+    package_source_kind: str,
+) -> None:
+    warnings = [
+        diagnostic
+        for diagnostic in result.diagnostics
+        if diagnostic.code == RUNNER_ADAPTER_KIND_DEFAULTED
+    ]
+    expected_bindings = _invalid_selected_runner_bindings(
+        manifest,
+        expectation.workflow_id,
+    )
+    workflow_index = _workflow_index(manifest, expectation.workflow_id)
+
+    assert len(warnings) == len(expected_bindings)
+    assert len(warnings) > 0
+    for warning, (binding_index, binding) in zip(
+        warnings,
+        expected_bindings,
+        strict=True,
+    ):
+        assert warning.severity == "warning"
+        assert warning.declaration_path == (
+            f"workflows[{workflow_index}].selected_authority."
+            f"runner_bindings[{binding_index}].adapter_kind"
+        )
+        assert warning.hint is not None
+        assert "daemon will not remap" in warning.hint
+        assert warning.context["runner_binding_id"] == binding["id"]
+        assert warning.context["original_adapter_kind"] == binding["adapter_kind"]
+        assert warning.context["default_adapter_kind"] == "codex"
+        assert warning.context["workflow_id"] == expectation.workflow_id
+        assert warning.context["workflow_version"] == expectation.workflow_version
+        assert warning.context["source_kind"] == "workflow_package_selection"
+        assert warning.context["package_id"] == PACKAGE_ID
+        assert warning.context["package_version"] == PACKAGE_VERSION
+        assert warning.context["entrypoint"] == "default"
+        assert warning.context["package_source_kind"] == package_source_kind
+        for key in (
+            "package_source_digest",
+            "package_import_digest",
+            "package_manifest_digest",
+            "package_digest",
+        ):
+            assert warning.context[key]
+
+
+def _assert_selected_runner_authority(plan: object) -> None:
+    assert plan is not None
+    assert {runner.adapter_kind for runner in plan.runner_bindings} == {"codex"}
+    authority_text = canonical_authority_bytes(plan).decode("utf-8")
+    assert '"adapter_kind":"fake_local"' not in authority_text
+    assert '"adapter_kind":"codex"' in authority_text
+
+
 def _store(tmp_path: Path) -> tuple[SQLiteRuntimeStore, ContentAddressedByteStore]:
     tmp_path.mkdir(parents=True, exist_ok=True)
     return (
@@ -218,6 +308,7 @@ def _enable_select_verify_all_workflows(
     selected_by_workflow: dict[str, object] = {}
     package_root = cast(Path, mutation_kwargs.get("package_root", PACKAGE_ROOT))
     manifest = _load_manifest(package_root)
+    package_source_kind = _package_source_kind(import_operation_id)
 
     for expectation in _workflow_expectations():
         safe_id = expectation.workflow_id.replace(".", "-")
@@ -250,6 +341,31 @@ def _enable_select_verify_all_workflows(
         assert verified.plan_ready
         assert selected.outcome == "succeeded"
         assert selected.plan is not None
+        _assert_runner_defaulting_warnings(
+            verified,
+            manifest=manifest,
+            expectation=expectation,
+            package_source_kind=package_source_kind,
+        )
+        _assert_runner_defaulting_warnings(
+            selected,
+            manifest=manifest,
+            expectation=expectation,
+            package_source_kind=package_source_kind,
+        )
+        warning_count = len(
+            _invalid_selected_runner_bindings(manifest, expectation.workflow_id),
+        )
+        diagnostics_summary = (
+            f"diagnostics:{warning_count} errors:0 warnings:{warning_count}"
+        )
+        assert selected.command_audit.diagnostics_summary == (
+            diagnostics_summary
+        )
+        assert verified.command_audit.diagnostics_summary == (
+            diagnostics_summary
+        )
+        _assert_selected_runner_authority(selected.plan)
         conformance.assert_selected_package_pin(
             selected.plan,
             package_id=PACKAGE_ID,
