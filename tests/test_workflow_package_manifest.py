@@ -37,8 +37,11 @@ def _manifest_source() -> dict[str, object]:
 
 def _workflow_record(manifest: dict[str, object]) -> dict[str, object]:
     workflows = cast(list[object], manifest["workflows"])
-    assert len(workflows) == 1
-    return cast(dict[str, object], workflows[0])
+    for workflow in workflows:
+        workflow_record = cast(dict[str, object], workflow)
+        if workflow_record["workflow_id"] == WORKFLOW_ID:
+            return workflow_record
+    raise AssertionError(f"missing workflow {WORKFLOW_ID}")
 
 
 def _assets(manifest: dict[str, object]) -> list[dict[str, object]]:
@@ -123,7 +126,7 @@ def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
     assert workflow["visibility"] == "public"
     assert workflow["entrypoints"] == ["default"]
     assert "assets" not in cast(dict[str, object], workflow["selected_authority"])
-    assert len(assets) == 8
+    assert len(assets) == 24
     assert {asset["asset_kind"] for asset in assets} == {
         "entrypoint_prompt",
         "stage_skill",

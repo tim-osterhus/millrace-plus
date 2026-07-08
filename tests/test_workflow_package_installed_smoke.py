@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import zipfile
 from pathlib import Path
+from typing import cast
 
 from millrace.compiler.workflow_package_sources import (
     read_installed_workflow_package_source,
@@ -25,11 +26,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.0.0"
-WORKFLOW_ID = "simple_loop"
-WORKFLOW_VERSION = "0.1"
 DIST_NAME = "millrace-plus"
 IMPORT_PACKAGE = "millrace_plus"
 RESOURCE_ROOT = "millrace_workflow_package"
+WORKFLOW_SELECTORS = (
+    ("simple_loop", "0.1"),
+    ("execution.lad", "0.1"),
+    ("execution.lad_integrator", "0.1"),
+)
 
 
 def _member_paths() -> tuple[str, ...]:
@@ -45,6 +49,26 @@ def _member_paths() -> tuple[str, ...]:
             )
         )
     )
+
+
+def _workflow_record(
+    manifest: dict[str, object],
+    workflow_id: str,
+) -> dict[str, object]:
+    for workflow in cast(list[dict[str, object]], manifest["workflows"]):
+        workflow_record = dict(workflow)
+        if workflow_record["workflow_id"] == workflow_id:
+            return workflow_record
+    raise AssertionError(f"missing workflow {workflow_id}")
+
+
+def _asset_records_by_id(
+    manifest: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    return {
+        str(asset["asset_id"]): asset
+        for asset in cast(list[dict[str, object]], manifest["assets"])
+    }
 
 
 def _store(tmp_path: Path) -> tuple[SQLiteRuntimeStore, ContentAddressedByteStore]:
@@ -104,7 +128,28 @@ def test_installed_discovery_reads_bytes_without_importing_package_code(
     assert source.member_paths == _member_paths()
 
 
-def test_installed_package_imports_selects_and_verifies_simple_loop(
+def _expected_selected_asset_pins(
+    manifest: dict[str, object],
+    workflow_id: str,
+) -> tuple[tuple[object, str], ...]:
+    workflow = _workflow_record(manifest, workflow_id)
+    assets_by_id = _asset_records_by_id(manifest)
+    return tuple(
+        (
+            required_asset["asset_id"],
+            conformance.asset_digest_for_package_path(
+                PACKAGE_ROOT,
+                str(assets_by_id[str(required_asset["asset_id"])]["package_path"]),
+            ),
+        )
+        for required_asset in sorted(
+            workflow["required_assets"],
+            key=lambda item: str(item["asset_id"]),
+        )
+    )
+
+
+def test_installed_package_imports_selects_and_verifies_all_workflows(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -141,30 +186,6 @@ def test_installed_package_imports_selects_and_verifies_simple_loop(
             package_version=PACKAGE_VERSION,
         ),
     )
-    verified = execute_package_verify_command(
-        store,
-        cas_store,
-        PackageWorkflowVerifyCommand(
-            command_id="cmd-verify-installed",
-            actor_id="operator:test",
-            package_id=PACKAGE_ID,
-            package_version=PACKAGE_VERSION,
-            workflow_id=WORKFLOW_ID,
-            workflow_version=WORKFLOW_VERSION,
-        ),
-    )
-    selected = execute_package_workflow_selection_command(
-        store,
-        cas_store,
-        PackageWorkflowSelectionCommand(
-            command_id="cmd-select-installed",
-            actor_id="operator:test",
-            package_id=PACKAGE_ID,
-            package_version=PACKAGE_VERSION,
-            workflow_id=WORKFLOW_ID,
-            workflow_version=WORKFLOW_VERSION,
-        ),
-    )
     listed = execute_package_read_export_command(
         store,
         cas_store,
@@ -180,30 +201,49 @@ def test_installed_package_imports_selects_and_verifies_simple_loop(
     assert imported.package_record is not None
     assert imported.package_record.source_kind == "installed_python_package"
     assert enabled.outcome == "succeeded"
-    assert verified.outcome == "succeeded"
-    assert verified.plan_ready
-    assert selected.outcome == "succeeded"
-    assert selected.plan is not None
-    conformance.assert_selected_package_pin(
-        selected.plan,
-        package_id=PACKAGE_ID,
-        package_version=PACKAGE_VERSION,
-        workflow_id=WORKFLOW_ID,
-        workflow_version=WORKFLOW_VERSION,
-        selected_asset_pins=tuple(
-            (
-                asset["asset_id"],
-                conformance.asset_digest_for_package_path(
-                    PACKAGE_ROOT,
-                    str(asset["package_path"]),
-                ),
+    manifest = conformance.load_manifest_source(PACKAGE_ROOT)
+    for workflow_id, workflow_version in WORKFLOW_SELECTORS:
+        safe_id = workflow_id.replace(".", "-")
+        verified = execute_package_verify_command(
+            store,
+            cas_store,
+            PackageWorkflowVerifyCommand(
+                command_id=f"cmd-verify-installed-{safe_id}",
+                actor_id="operator:test",
+                package_id=PACKAGE_ID,
+                package_version=PACKAGE_VERSION,
+                workflow_id=workflow_id,
+                workflow_version=workflow_version,
             )
-            for asset in sorted(
-                conformance.load_manifest_source(PACKAGE_ROOT)["assets"],
-                key=lambda item: str(item["asset_id"]),
-            )
-        ),
-    )
+        )
+        selected = execute_package_workflow_selection_command(
+            store,
+            cas_store,
+            PackageWorkflowSelectionCommand(
+                command_id=f"cmd-select-installed-{safe_id}",
+                actor_id="operator:test",
+                package_id=PACKAGE_ID,
+                package_version=PACKAGE_VERSION,
+                workflow_id=workflow_id,
+                workflow_version=workflow_version,
+            ),
+        )
+
+        assert verified.outcome == "succeeded"
+        assert verified.plan_ready
+        assert selected.outcome == "succeeded"
+        assert selected.plan is not None
+        conformance.assert_selected_package_pin(
+            selected.plan,
+            package_id=PACKAGE_ID,
+            package_version=PACKAGE_VERSION,
+            workflow_id=workflow_id,
+            workflow_version=workflow_version,
+            selected_asset_pins=_expected_selected_asset_pins(
+                manifest,
+                workflow_id,
+            ),
+        )
     assert listed.outcome == "succeeded"
     assert [package.package_id for package in listed.packages] == [PACKAGE_ID]
     assert IMPORT_PACKAGE not in sys.modules

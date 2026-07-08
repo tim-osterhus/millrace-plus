@@ -72,12 +72,23 @@ def _load_manifest(package_root: Path = PACKAGE_ROOT) -> dict[str, Any]:
 
 def _workflow_record(manifest: dict[str, Any]) -> dict[str, object]:
     workflows = cast(list[dict[str, object]], manifest["workflows"])
-    assert len(workflows) == 1
-    return workflows[0]
+    for workflow in workflows:
+        if workflow["workflow_id"] == WORKFLOW_ID:
+            return workflow
+    raise AssertionError(f"missing workflow {WORKFLOW_ID}")
 
 
 def _asset_records(manifest: dict[str, Any]) -> list[dict[str, object]]:
     return cast(list[dict[str, object]], manifest["assets"])
+
+
+def _simple_loop_asset_records(manifest: dict[str, Any]) -> list[dict[str, object]]:
+    expected_asset_ids = set(_expected_asset_ids())
+    return [
+        asset
+        for asset in _asset_records(manifest)
+        if str(asset["asset_id"]) in expected_asset_ids
+    ]
 
 
 def _donor_prompt_assets() -> list[dict[str, object]]:
@@ -269,7 +280,7 @@ def test_shipped_package_root_is_official_simple_loop_package() -> None:
 def test_manifest_assets_match_donor_prompts_plus_core_stage_skills() -> None:
     manifest = conformance.assert_manifest_and_asset_digests(PACKAGE_ROOT)
     workflow = _workflow_record(manifest)
-    assets = _asset_records(manifest)
+    assets = _simple_loop_asset_records(manifest)
     asset_ids = tuple(str(asset["asset_id"]) for asset in assets)
     paths_by_id = _expected_asset_paths_by_id()
 
@@ -295,28 +306,34 @@ def test_manifest_assets_match_donor_prompts_plus_core_stage_skills() -> None:
     donor_bodies = {
         str(asset["id"]): str(asset["body"]) for asset in _donor_prompt_assets()
     }
-    asset_texts = {
+    asset_texts_by_path = {
         str(asset["package_path"]): (
             PACKAGE_ROOT / str(asset["package_path"])
         ).read_text()
         for asset in assets
     }
+    asset_texts_by_id = {
+        str(asset["asset_id"]): (
+            PACKAGE_ROOT / str(asset["package_path"])
+        ).read_text()
+        for asset in assets
+    }
     for asset_id, donor_body in donor_bodies.items():
-        prompt_text = asset_texts[paths_by_id[asset_id]]
+        prompt_text = asset_texts_by_path[paths_by_id[asset_id]]
         assert donor_body in prompt_text
         for heading in _ENTRYPOINT_HEADINGS:
             assert heading in prompt_text
 
     for asset_id in _STAGE_SKILL_ASSET_IDS.values():
-        skill_text = asset_texts[paths_by_id[asset_id]]
+        skill_text = asset_texts_by_path[paths_by_id[asset_id]]
         for heading in _CORE_SKILL_HEADINGS:
             assert heading in skill_text
 
-    conformance.assert_no_runtime_authority_claims(asset_texts)
-    conformance.assert_no_undeclared_selected_artifact_kind_mentions(
-        asset_texts,
-        declared_artifact_schema_ids=conformance.selected_artifact_schema_ids(
-            manifest,
+    conformance.assert_no_runtime_authority_claims(asset_texts_by_path)
+    conformance.assert_no_unscoped_selected_artifact_kind_mentions(
+        asset_texts_by_id,
+        declared_artifact_schema_ids_by_asset_id=(
+            conformance.selected_artifact_schema_ids_by_asset_id(manifest)
         ),
     )
 

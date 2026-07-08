@@ -120,6 +120,50 @@ def test_helpers_refuse_undeclared_selected_artifact_kind_mentions() -> None:
     assert "simple_loop.review_result" in str(exc_info.value)
 
 
+def test_helpers_refuse_artifact_kind_mentions_outside_asset_scope() -> None:
+    conformance = _conformance()
+
+    with pytest.raises(AssertionError) as exc_info:
+        conformance.assert_no_unscoped_selected_artifact_kind_mentions(
+            {
+                "simple_loop.reviewer_core_skill": (
+                    "| `artifact_kind` | yes | string | "
+                    "Use `execution.artifacts.report`. |"
+                )
+            },
+            declared_artifact_schema_ids_by_asset_id={
+                "simple_loop.reviewer_core_skill": frozenset(
+                    {"simple_loop.gap_packet"},
+                )
+            },
+        )
+
+    assert "simple_loop.reviewer_core_skill" in str(exc_info.value)
+    assert "execution.artifacts.report" in str(exc_info.value)
+
+
+def test_helpers_allow_shared_asset_mentions_for_its_selecting_workflows() -> None:
+    conformance = _conformance()
+
+    conformance.assert_no_unscoped_selected_artifact_kind_mentions(
+        {
+            "execution.skills.builder_core": (
+                "| `artifact_kind` | yes | string | "
+                "Use `execution.artifacts.builder_summary`. |"
+            )
+        },
+        declared_artifact_schema_ids_by_asset_id={
+            "execution.skills.builder_core": frozenset(
+                {
+                    "execution.artifacts.stage_result",
+                    "execution.artifacts.report",
+                    "execution.artifacts.builder_summary",
+                }
+            )
+        },
+    )
+
+
 def test_helpers_select_compileable_fixture_and_assert_selected_pin(
     tmp_path: Path,
 ) -> None:

@@ -17,7 +17,7 @@ def _shipped_manifest() -> dict[str, object]:
     )
 
 
-def test_readme_documents_plus_0002b_official_simple_loop_package_plan() -> None:
+def test_readme_documents_plus_0002c_official_workflow_package_plan() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text()
 
     for required in (
@@ -26,6 +26,8 @@ def test_readme_documents_plus_0002b_official_simple_loop_package_plan() -> None
         "package version `0.0.0`",
         "installed resource root `millrace_workflow_package`",
         "`simple_loop`",
+        "`execution.lad`",
+        "`execution.lad_integrator`",
         "package data is non-executable",
     ):
         assert required in readme
@@ -46,5 +48,7 @@ def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
         cast(dict[str, object], workflow)["visibility"] == "public"
         for workflow in workflows
     )
-    assert metadata["plus_packet"] == "PLUS-0002B"
-    assert metadata["status"] == "official_simple_loop_workflow_package"
+    assert metadata["plus_packet"] == "PLUS-0002C"
+    assert metadata["status"] == (
+        "official_simple_loop_and_lad_execution_workflow_package"
+    )

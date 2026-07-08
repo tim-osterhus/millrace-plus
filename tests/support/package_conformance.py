@@ -35,20 +35,21 @@ from millrace.substrate.package_archives import export_workflow_package_director
 _RUNTIME_AUTHORITY_PATTERNS = (
     re.compile(
         r"\breturn\s+`?[A-Z_]+`?\s+to\s+"
-        r"(?:route|move|close|retry|select|authorize|enable|grant|mutate|update)\b",
+        r"(?:route|move|close|retry|quarantine|select|authorize|approve|"
+        r"enable|grant|mutate|update)\b",
         re.IGNORECASE,
     ),
     re.compile(
         r"\b(?:this prompt|this skill|the prompt|the skill|filename|marker)\s+"
         r"(?:routes|moves|closes|retries|selects|authorizes|enables|grants|"
-        r"mutates|updates)\b",
+        r"approves|quarantines|mutates|updates)\b",
         re.IGNORECASE,
     ),
     re.compile(
         r"\b(?:will|shall)\s+"
-        r"(?:route|move queues?|close|retry|select packages?|authorize effects?|"
-        r"enable capabilities?|grant capabilities?|mutate durable state|"
-        r"update durable state)\b",
+        r"(?:route|move queues?|close|retry|quarantine|select packages?|"
+        r"authorize effects?|approve effects?|enable capabilities?|"
+        r"grant capabilities?|mutate durable state|update durable state)\b",
         re.IGNORECASE,
     ),
 )
@@ -341,19 +342,62 @@ def assert_no_runtime_authority_claims(asset_texts: Mapping[str, str]) -> None:
     assert violations == [], violations
 
 
+def selected_artifact_schema_ids_for_workflow(
+    manifest: dict[str, Any],
+    workflow_id: str,
+) -> frozenset[str]:
+    for workflow in _workflows(manifest):
+        if workflow["workflow_id"] == workflow_id:
+            return _selected_artifact_schema_ids_for_workflow(workflow)
+    raise AssertionError(f"missing workflow {workflow_id}")
+
+
+def selected_artifact_schema_ids_by_asset_id(
+    manifest: dict[str, Any],
+) -> dict[str, frozenset[str]]:
+    schema_ids_by_asset_id: dict[str, set[str]] = {}
+    for workflow in _workflows(manifest):
+        workflow_schema_ids = _selected_artifact_schema_ids_for_workflow(workflow)
+        for required_asset in cast(
+            list[dict[str, object]],
+            workflow["required_assets"],
+        ):
+            asset_id = str(required_asset["asset_id"])
+            schema_ids_by_asset_id.setdefault(asset_id, set()).update(
+                workflow_schema_ids,
+            )
+    return {
+        asset_id: frozenset(schema_ids)
+        for asset_id, schema_ids in schema_ids_by_asset_id.items()
+    }
+
+
 def selected_artifact_schema_ids(manifest: dict[str, Any]) -> frozenset[str]:
     schema_ids: set[str] = set()
     for workflow in _workflows(manifest):
-        selected_authority = cast(
-            dict[str, object],
-            workflow["selected_authority"],
-        )
-        artifact_schemas = cast(
-            list[dict[str, object]],
-            selected_authority["artifact_schemas"],
-        )
-        schema_ids.update(str(schema["id"]) for schema in artifact_schemas)
+        schema_ids.update(_selected_artifact_schema_ids_for_workflow(workflow))
     return frozenset(schema_ids)
+
+
+def assert_no_unscoped_selected_artifact_kind_mentions(
+    asset_texts_by_asset_id: Mapping[str, str],
+    *,
+    declared_artifact_schema_ids_by_asset_id: Mapping[str, frozenset[str]],
+) -> None:
+    violations: list[str] = []
+    for asset_id, text in asset_texts_by_asset_id.items():
+        declared_artifact_schema_ids = declared_artifact_schema_ids_by_asset_id[
+            asset_id
+        ]
+        violations.extend(
+            _undeclared_artifact_kind_mentions(
+                text,
+                asset_name=asset_id,
+                declared_artifact_schema_ids=declared_artifact_schema_ids,
+            )
+        )
+
+    assert violations == [], violations
 
 
 def assert_no_undeclared_selected_artifact_kind_mentions(
@@ -363,14 +407,45 @@ def assert_no_undeclared_selected_artifact_kind_mentions(
 ) -> None:
     violations: list[str] = []
     for asset_name, text in asset_texts.items():
-        for line_number, line in enumerate(text.splitlines(), start=1):
-            if _ARTIFACT_KIND_LINE_PATTERN.search(line) is None:
-                continue
-            for reference in _DOTTED_IDENTIFIER_PATTERN.findall(line):
-                if reference not in declared_artifact_schema_ids:
-                    violations.append(f"{asset_name}:{line_number}: {reference}")
+        violations.extend(
+            _undeclared_artifact_kind_mentions(
+                text,
+                asset_name=asset_name,
+                declared_artifact_schema_ids=declared_artifact_schema_ids,
+            )
+        )
 
     assert violations == [], violations
+
+
+def _selected_artifact_schema_ids_for_workflow(
+    workflow: dict[str, object],
+) -> frozenset[str]:
+    selected_authority = cast(
+        dict[str, object],
+        workflow["selected_authority"],
+    )
+    artifact_schemas = cast(
+        list[dict[str, object]],
+        selected_authority["artifact_schemas"],
+    )
+    return frozenset(str(schema["id"]) for schema in artifact_schemas)
+
+
+def _undeclared_artifact_kind_mentions(
+    text: str,
+    *,
+    asset_name: str,
+    declared_artifact_schema_ids: frozenset[str],
+) -> list[str]:
+    violations: list[str] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if _ARTIFACT_KIND_LINE_PATTERN.search(line) is None:
+            continue
+        for reference in _DOTTED_IDENTIFIER_PATTERN.findall(line):
+            if reference not in declared_artifact_schema_ids:
+                violations.append(f"{asset_name}:{line_number}: {reference}")
+    return violations
 
 
 def _assets(manifest: dict[str, Any]) -> list[dict[str, object]]:

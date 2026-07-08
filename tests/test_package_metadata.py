@@ -73,7 +73,7 @@ def test_source_tree_does_not_shadow_runtime_or_import_private_runtime_code() ->
         assert forbidden not in source_text
 
 
-def test_official_package_data_does_not_claim_lad_or_vendor_workflow_content() -> None:
+def test_official_package_data_does_not_claim_unported_workflow_content() -> None:
     manifest_path = PROJECT_ROOT / "millrace_workflow_package" / "manifest.json"
     package_data_text = ""
     package_root = PROJECT_ROOT / "millrace_workflow_package"
@@ -81,10 +81,8 @@ def test_official_package_data_does_not_claim_lad_or_vendor_workflow_content() -
         package_data_text += path.read_text()
 
     for forbidden in (
-        "LAD",
         "vendor_selection",
         "Planning",
-        "Execution",
         "Learning",
     ):
         assert forbidden not in package_data_text
