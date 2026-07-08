@@ -126,7 +126,7 @@ def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
     assert workflow["visibility"] == "public"
     assert workflow["entrypoints"] == ["default"]
     assert "assets" not in cast(dict[str, object], workflow["selected_authority"])
-    assert len(assets) == 24
+    assert len(assets) == 36
     assert {asset["asset_kind"] for asset in assets} == {
         "entrypoint_prompt",
         "stage_skill",

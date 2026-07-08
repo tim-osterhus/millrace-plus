@@ -273,6 +273,7 @@ def test_lad_workflow_identities_match_donor_sources() -> None:
         "simple_loop",
         "execution.lad",
         "execution.lad_integrator",
+        "planning.lad",
     }
     for workflow_id, donor in _LAD_DONORS.items():
         source = donor()

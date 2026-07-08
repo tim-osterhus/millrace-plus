@@ -5,9 +5,9 @@ Millrace. It is separate from the base runtime package: `millrace-ai` remains
 the lightweight runtime, and the runtime does not depend on `millrace-plus`.
 
 The current shipped package root is `millrace.plus.official` at package version `0.0.0`.
-It includes `simple_loop`, `execution.lad`, and
-`execution.lad_integrator` as official public workflow entries and keeps
-package data non-executable.
+It includes `simple_loop`, `execution.lad`, `execution.lad_integrator`, and
+`planning.lad` as official public workflow entries and keeps package data
+non-executable.
 
 ## Package Data
 
@@ -15,7 +15,8 @@ Workflow package data lives under `millrace_workflow_package/`:
 
 - `manifest.json` declares package ID `millrace.plus.official`, package
   version `0.0.0`, and public workflow entries for `simple_loop` / `0.1`,
-  `execution.lad` / `0.1`, and `execution.lad_integrator` / `0.1`.
+  `execution.lad` / `0.1`, `execution.lad_integrator` / `0.1`, and
+  `planning.lad` / `0.1`.
 - `assets/workflows/simple_loop/entrypoints/` contains the selected
   entrypoint prompt assets.
 - `assets/workflows/simple_loop/skills/` contains the paired core stage skill
@@ -26,6 +27,10 @@ Workflow package data lives under `millrace_workflow_package/`:
 - `assets/workflows/execution.lad_integrator/entrypoints/` and
   `assets/workflows/execution.lad_integrator/skills/` contain the
   Integrator-only assets reused by the integrator workflow variant.
+- `assets/workflows/planning.lad/entrypoints/` and
+  `assets/workflows/planning.lad/skills/` contain LAD Planning entrypoint and
+  core stage skill assets. The Planning workflow also selects inherited
+  Execution assets through their existing package paths and digest pins.
 
 The installed resource root `millrace_workflow_package` remains unchanged.
 

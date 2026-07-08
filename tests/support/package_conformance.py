@@ -46,6 +46,14 @@ _RUNTIME_AUTHORITY_PATTERNS = (
         re.IGNORECASE,
     ),
     re.compile(
+        r"\b(?:this prompt|this skill|the prompt|the skill|planning assets?|"
+        r"asset text|marker)\s+"
+        r"(?:creates?|becomes?|become|acts? as)\s+"
+        r"(?:hidden\s+)?(?:queue aliases?|default global inbox(?: router)?|"
+        r"(?:default\s+)?task-kind router)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
         r"\b(?:will|shall)\s+"
         r"(?:route|move queues?|close|retry|quarantine|select packages?|"
         r"authorize effects?|approve effects?|enable capabilities?|"

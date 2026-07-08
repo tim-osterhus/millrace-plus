@@ -31,7 +31,7 @@ include = [
     "src/millrace_plus",
     "millrace_workflow_package",
     "tests",
-    "docs/release.md",
+    "docs/*.md",
 ]
 
 [tool.pytest.ini_options]

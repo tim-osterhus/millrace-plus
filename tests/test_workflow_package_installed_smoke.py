@@ -33,6 +33,7 @@ WORKFLOW_SELECTORS = (
     ("simple_loop", "0.1"),
     ("execution.lad", "0.1"),
     ("execution.lad_integrator", "0.1"),
+    ("planning.lad", "0.1"),
 )
 
 

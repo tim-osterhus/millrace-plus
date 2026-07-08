@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
+import tarfile
 import tomllib
 from importlib import import_module
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+IMPLEMENTATION_REVIEW_DOCS = (
+    "docs/PLUS-0002C-implementation-review.md",
+    "docs/PLUS-0002D-implementation-review.md",
+)
 
 
 def test_millrace_plus_import_is_metadata_only(monkeypatch) -> None:
@@ -47,12 +54,42 @@ def test_pyproject_declares_narrow_distribution_metadata() -> None:
     assert pyproject["tool"]["hatch"]["build"]["targets"]["wheel"][
         "force-include"
     ] == {"millrace_workflow_package": "millrace_workflow_package"}
+    assert "docs/*.md" in pyproject["tool"]["hatch"]["build"]["targets"][
+        "sdist"
+    ]["include"]
 
     project_metadata = pyproject["project"]
     assert "scripts" not in project_metadata
     assert "gui-scripts" not in project_metadata
     assert "entry-points" not in project_metadata
     assert "entry-points" not in pyproject.get("project", {})
+
+
+def test_sdist_includes_package_local_review_docs(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env.pop("PYTHONPATH", None)
+    subprocess.run(
+        [
+            "uv",
+            "build",
+            "--sdist",
+            "--out-dir",
+            str(tmp_path),
+            "--clear",
+        ],
+        cwd=PROJECT_ROOT,
+        check=True,
+        env=env,
+    )
+    sdists = sorted(tmp_path.glob("*.tar.gz"))
+    assert len(sdists) == 1
+
+    with tarfile.open(sdists[0]) as archive:
+        names = set(archive.getnames())
+
+    for doc_path in IMPLEMENTATION_REVIEW_DOCS:
+        assert any(name.endswith(f"/{doc_path}") for name in names)
 
 
 def test_source_tree_does_not_shadow_runtime_or_import_private_runtime_code() -> None:
@@ -82,7 +119,6 @@ def test_official_package_data_does_not_claim_unported_workflow_content() -> Non
 
     for forbidden in (
         "vendor_selection",
-        "Planning",
         "Learning",
     ):
         assert forbidden not in package_data_text
