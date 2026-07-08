@@ -289,6 +289,7 @@ def test_planning_workflow_identity_matches_donor_source() -> None:
         "execution.lad_integrator",
         WORKFLOW_ID,
         "lad.full",
+        "vendor_selection",
     }
     assert workflow["workflow_id"] == source_identity["id"]
     assert workflow["workflow_version"] == source_identity["version"]

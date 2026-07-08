@@ -13,6 +13,7 @@ IMPLEMENTATION_REVIEW_DOCS = (
     "docs/PLUS-0002C-implementation-review.md",
     "docs/PLUS-0002D-implementation-review.md",
     "docs/PLUS-0002E-implementation-review.md",
+    "docs/PLUS-0002F-implementation-review.md",
 )
 
 
@@ -111,14 +112,12 @@ def test_source_tree_does_not_shadow_runtime_or_import_private_runtime_code() ->
         assert forbidden not in source_text
 
 
-def test_official_package_data_does_not_claim_unported_workflow_content() -> None:
+def test_official_package_data_declares_asset_free_vendor_selection() -> None:
     manifest_path = PROJECT_ROOT / "millrace_workflow_package" / "manifest.json"
     package_data_text = ""
     package_root = PROJECT_ROOT / "millrace_workflow_package"
     for path in (manifest_path, *package_root.rglob("*.md")):
         package_data_text += path.read_text()
 
-    for forbidden in (
-        "vendor_selection",
-    ):
-        assert forbidden not in package_data_text
+    assert "vendor_selection" in package_data_text
+    assert not (package_root / "assets" / "workflows" / "vendor_selection").exists()

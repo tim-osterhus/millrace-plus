@@ -6,8 +6,8 @@ the lightweight runtime, and the runtime does not depend on `millrace-plus`.
 
 The current shipped package root is `millrace.plus.official` at package version `0.0.0`.
 It includes `simple_loop`, `execution.lad`, `execution.lad_integrator`,
-`planning.lad`, and `lad.full` as official public workflow entries and keeps
-package data non-executable.
+`planning.lad`, `lad.full`, and `vendor_selection` as official public
+workflow entries and keeps package data non-executable.
 
 ## Package Data
 
@@ -16,7 +16,8 @@ Workflow package data lives under `millrace_workflow_package/`:
 - `manifest.json` declares package ID `millrace.plus.official`, package
   version `0.0.0`, and public workflow entries for `simple_loop` / `0.1`,
   `execution.lad` / `0.1`, `execution.lad_integrator` / `0.1`, and
-  `planning.lad` / `0.1`, and `lad.full` / `0.1`.
+  `planning.lad` / `0.1`, `lad.full` / `0.1`, and `vendor_selection` /
+  `0.1`.
 - `assets/workflows/simple_loop/entrypoints/` contains the selected
   entrypoint prompt assets.
 - `assets/workflows/simple_loop/skills/` contains the paired core stage skill
@@ -35,6 +36,9 @@ Workflow package data lives under `millrace_workflow_package/`:
   `assets/workflows/lad.full/skills/` contain LAD Learning entrypoint and core
   stage skill assets. The full LAD workflow also selects inherited Planning and
   Execution assets through their existing package paths and digest pins.
+- `vendor_selection` is asset-free in this package. Its selected workflow data
+  lives in `manifest.json`, and its selected package pin has no selected asset
+  pins.
 
 The installed resource root `millrace_workflow_package` remains unchanged.
 
