@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import copy
 import json
+import re
 import shutil
 from dataclasses import asdict
 from pathlib import Path
@@ -13,7 +15,7 @@ from millrace.contracts.workflow_package import (
     asset_digest_for_bytes,
     manifest_digest_for_manifest,
 )
-from millrace.workflows import lad_planning
+from millrace.workflows import lad_learning
 
 from support import package_conformance as conformance
 
@@ -21,8 +23,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.0.0"
-WORKFLOW_ID = "planning.lad"
-REVIEW_PATH = PROJECT_ROOT / "docs" / "PLUS-0002D-implementation-review.md"
+WORKFLOW_ID = "lad.full"
+REVIEW_PATH = PROJECT_ROOT / "docs" / "PLUS-0002E-implementation-review.md"
 
 _ENTRYPOINT_HEADINGS = (
     "Role:",
@@ -44,90 +46,64 @@ _CORE_SKILL_HEADINGS = (
     "## Validation Checklist",
     "## Completion Criteria",
 )
-_PLANNING_STAGE_PAIRS = (
+_LEARNING_STAGE_PAIRS = (
     (
-        "recon",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/recon.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "recon-core/SKILL.md",
-        "planning.entrypoints.recon",
-        "planning.skills.recon_core",
+        "analyst",
+        "dev/source/millrace/src/millrace_ai/assets/entrypoints/learning/"
+        "analyst.md",
+        "dev/source/millrace/src/millrace_ai/assets/skills/stage/learning/"
+        "analyst-core/SKILL.md",
+        "learning.entrypoints.analyst",
+        "learning.skills.analyst_core",
     ),
     (
-        "lad_planner",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "lad_planner.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "planner-core/SKILL.md",
-        "planning.entrypoints.lad_planner",
-        "planning.skills.planner_core",
+        "professor",
+        "dev/source/millrace/src/millrace_ai/assets/entrypoints/learning/"
+        "professor.md",
+        "dev/source/millrace/src/millrace_ai/assets/skills/stage/learning/"
+        "professor-core/SKILL.md",
+        "learning.entrypoints.professor",
+        "learning.skills.professor_core",
     ),
     (
-        "lad_manager",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "lad_manager.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "manager-core/SKILL.md",
-        "planning.entrypoints.lad_manager",
-        "planning.skills.manager_core",
+        "curator",
+        "dev/source/millrace/src/millrace_ai/assets/entrypoints/learning/"
+        "curator.md",
+        "dev/source/millrace/src/millrace_ai/assets/skills/stage/learning/"
+        "curator-core/SKILL.md",
+        "learning.entrypoints.curator",
+        "learning.skills.curator_core",
     ),
     (
-        "lad_mechanic",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "lad_mechanic.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "mechanic-core/SKILL.md",
-        "planning.entrypoints.lad_mechanic",
-        "planning.skills.mechanic_core",
-    ),
-    (
-        "lad_auditor",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "lad_auditor.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "auditor-core/SKILL.md",
-        "planning.entrypoints.lad_auditor",
-        "planning.skills.auditor_core",
-    ),
-    (
-        "lad_arbiter",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "lad_arbiter.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "arbiter-core/SKILL.md",
-        "planning.entrypoints.lad_arbiter",
-        "planning.skills.arbiter_core",
+        "librarian",
+        "dev/source/millrace/src/millrace_ai/assets/entrypoints/learning/"
+        "librarian.md",
+        "dev/source/millrace/src/millrace_ai/assets/skills/stage/learning/"
+        "librarian-core/SKILL.md",
+        "learning.entrypoints.librarian",
+        "learning.skills.librarian_core",
     ),
 )
-_BLUEPRINT_PAIRS = (
-    (
-        "contractor_blueprint",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "contractor_blueprint.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "contractor-blueprint-core/SKILL.md",
-    ),
-    (
-        "evaluator_blueprint",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "evaluator_blueprint.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "evaluator-blueprint-core/SKILL.md",
-    ),
-    (
-        "manager_blueprint",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "manager_blueprint.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "manager-blueprint-core/SKILL.md",
-    ),
-    (
-        "mechanic_blueprint",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "mechanic_blueprint.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "mechanic-blueprint-core/SKILL.md",
-    ),
+_PROVIDER_EFFECT_REFS = (
+    "learning.effect.curator.workspace_skill_update",
+    "learning.effect.librarian.workspace_skill_install_report",
+    "provider.fake_local.workspace",
+    "policy.fake_local.no_real_side_effects",
+)
+_SECRET_VALUE_PATTERN = re.compile(
+    r"\b(?:api[_-]?key|oauth[_-]?token|provider[_-]?secret|"
+    r"client[_-]?secret|password)\b\s*[:=]\s*['\"][^'\"]+['\"]",
+    re.IGNORECASE,
+)
+_PROVIDER_CODE_PATTERNS = (
+    "subprocess.run(",
+    "requests.",
+    "httpx.",
+    "import requests",
+    "import httpx",
+    "mcp.server",
+    "native_runner",
+    "provider_adapter",
 )
 
 
@@ -163,7 +139,15 @@ def _donor_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
     return tuple(str(asset["id"]) for asset in _donor_assets(source))
 
 
-def _planning_owned_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
+def _learning_owned_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
+    return tuple(
+        asset_id
+        for asset_id in _donor_asset_ids(source)
+        if asset_id.startswith("learning.")
+    )
+
+
+def _inherited_planning_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
     return tuple(
         asset_id
         for asset_id in _donor_asset_ids(source)
@@ -179,7 +163,21 @@ def _inherited_execution_asset_ids(source: dict[str, object]) -> tuple[str, ...]
     )
 
 
-def _package_path_for_planning_asset(asset_id: str) -> str:
+def _required_asset_digests(workflow: dict[str, object]) -> dict[str, str]:
+    return {
+        str(asset["asset_id"]): str(asset["content_digest"])
+        for asset in cast(list[dict[str, object]], workflow["required_assets"])
+    }
+
+
+def _package_path_for_full_lad_asset(asset_id: str) -> str:
+    if asset_id.startswith("learning.entrypoints."):
+        stage_id = asset_id.removeprefix("learning.entrypoints.")
+        return f"assets/workflows/lad.full/entrypoints/{stage_id}.md"
+    if asset_id.startswith("learning.skills."):
+        skill_id = asset_id.removeprefix("learning.skills.")
+        skill_name = skill_id.removesuffix("_core").replace("_", "-")
+        return f"assets/workflows/lad.full/skills/{skill_name}-core.md"
     if asset_id.startswith("planning.entrypoints."):
         stage_id = asset_id.removeprefix("planning.entrypoints.")
         return f"assets/workflows/planning.lad/entrypoints/{stage_id}.md"
@@ -194,10 +192,10 @@ def _package_path_for_planning_asset(asset_id: str) -> str:
         skill_id = asset_id.removeprefix("execution.skills.")
         skill_name = skill_id.removesuffix("_core").replace("_", "-")
         return f"assets/workflows/execution.lad/skills/{skill_name}-core.md"
-    raise AssertionError(f"unexpected Planning asset id: {asset_id}")
+    raise AssertionError(f"unexpected full LAD asset id: {asset_id}")
 
 
-def _expected_planning_asset_pins(
+def _expected_full_lad_asset_pins(
     package_root: Path,
     source: dict[str, object],
 ) -> tuple[tuple[str, str], ...]:
@@ -206,7 +204,7 @@ def _expected_planning_asset_pins(
             asset_id,
             conformance.asset_digest_for_package_path(
                 package_root,
-                _package_path_for_planning_asset(asset_id),
+                _package_path_for_full_lad_asset(asset_id),
             ),
         )
         for asset_id in sorted(_donor_asset_ids(source))
@@ -236,33 +234,29 @@ def _refresh_manifest_digests(package_root: Path) -> None:
     )
 
 
-def _copy_pruned_package_without_planning(tmp_path: Path) -> Path:
-    pruned_root = tmp_path / "without-planning"
+def _copy_pruned_package_without_learning(tmp_path: Path) -> Path:
+    pruned_root = tmp_path / "without-learning"
     shutil.copytree(PACKAGE_ROOT, pruned_root)
     manifest = _load_manifest(pruned_root)
     workflows = _workflows_by_id(manifest)
-    planning_source = lad_planning.workflow_source()
-    planning_owned_asset_ids = set(_planning_owned_asset_ids(planning_source))
+    source = lad_learning.workflow_source()
+    learning_asset_ids = set(_learning_owned_asset_ids(source))
 
     manifest["workflows"] = [
         workflow
         for workflow in workflows.values()
-        if workflow["workflow_id"] not in {WORKFLOW_ID, "lad.full"}
+        if workflow["workflow_id"] != WORKFLOW_ID
     ]
     manifest["assets"] = [
         asset
         for asset in cast(list[dict[str, object]], manifest["assets"])
-        if (
-            str(asset["asset_id"]) not in planning_owned_asset_ids
-            and not str(asset["asset_id"]).startswith("learning.")
-        )
+        if str(asset["asset_id"]) not in learning_asset_ids
     ]
     metadata = cast(dict[str, object], manifest["non_authoritative_metadata"])
-    metadata["plus_packet"] = "PLUS-0002C"
-    metadata["status"] = "official_simple_loop_and_lad_execution_workflow_package"
-    planning_asset_dir = pruned_root / "assets" / "workflows" / "planning.lad"
-    if planning_asset_dir.exists():
-        shutil.rmtree(planning_asset_dir)
+    metadata["plus_packet"] = "PLUS-0002D"
+    metadata["status"] = (
+        "official_simple_loop_lad_execution_and_lad_planning_workflow_package"
+    )
     learning_asset_dir = pruned_root / "assets" / "workflows" / "lad.full"
     if learning_asset_dir.exists():
         shutil.rmtree(learning_asset_dir)
@@ -274,12 +268,38 @@ def _copy_pruned_package_without_planning(tmp_path: Path) -> Path:
     return pruned_root
 
 
-def test_planning_workflow_identity_matches_donor_source() -> None:
+def _asset_texts_by_id(
+    manifest: dict[str, Any],
+    asset_ids: tuple[str, ...],
+) -> dict[str, str]:
+    assets_by_id = _assets_by_id(manifest)
+    return {
+        asset_id: (
+            PACKAGE_ROOT / str(assets_by_id[asset_id]["package_path"])
+        ).read_text()
+        for asset_id in asset_ids
+    }
+
+
+def _asset_texts_by_path(
+    manifest: dict[str, Any],
+    asset_ids: tuple[str, ...],
+) -> dict[str, str]:
+    assets_by_id = _assets_by_id(manifest)
+    return {
+        str(assets_by_id[asset_id]["package_path"]): (
+            PACKAGE_ROOT / str(assets_by_id[asset_id]["package_path"])
+        ).read_text()
+        for asset_id in asset_ids
+    }
+
+
+def test_full_lad_workflow_identity_matches_learning_donor_source() -> None:
     manifest = _load_manifest()
     workflows = _workflows_by_id(manifest)
     source_identity = cast(
         dict[str, object],
-        lad_planning.workflow_source()["workflow"],
+        lad_learning.workflow_source()["workflow"],
     )
     workflow = workflows[WORKFLOW_ID]
 
@@ -287,8 +307,8 @@ def test_planning_workflow_identity_matches_donor_source() -> None:
         "simple_loop",
         "execution.lad",
         "execution.lad_integrator",
+        "planning.lad",
         WORKFLOW_ID,
-        "lad.full",
     }
     assert workflow["workflow_id"] == source_identity["id"]
     assert workflow["workflow_version"] == source_identity["version"]
@@ -296,25 +316,21 @@ def test_planning_workflow_identity_matches_donor_source() -> None:
     assert workflow["entrypoints"] == ["default"]
 
 
-def test_planning_selected_authority_matches_donor_without_assets_or_catalog() -> None:
+def test_full_lad_selected_authority_matches_donor_without_assets() -> None:
     manifest = _load_manifest()
     workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
     selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    source = lad_planning.workflow_source()
+    source = lad_learning.workflow_source()
 
     assert "assets" not in selected_authority
-    assert "unselected_catalog" not in selected_authority
     assert selected_authority == _source_as_selected_authority(source)
-    assert "unselected_catalog" in (
-        lad_planning.workflow_source_with_unselected_catalog()
-    )
 
 
-def test_planning_assets_required_assets_and_digests_match_donor_closure() -> None:
+def test_full_lad_assets_required_assets_and_digests_match_donor_closure() -> None:
     manifest = conformance.assert_manifest_and_asset_digests(PACKAGE_ROOT)
     workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
     assets_by_id = _assets_by_id(manifest)
-    source = lad_planning.workflow_source()
+    source = lad_learning.workflow_source()
     donor_asset_ids = _donor_asset_ids(source)
 
     assert {
@@ -330,7 +346,7 @@ def test_planning_assets_required_assets_and_digests_match_donor_closure() -> No
 
     for asset_id in donor_asset_ids:
         asset = assets_by_id[asset_id]
-        assert asset["package_path"] == _package_path_for_planning_asset(asset_id)
+        assert asset["package_path"] == _package_path_for_full_lad_asset(asset_id)
         assert asset["selected_authority_participation"] == "yes"
         if ".entrypoints." in asset_id:
             assert asset["asset_kind"] == "entrypoint_prompt"
@@ -338,41 +354,43 @@ def test_planning_assets_required_assets_and_digests_match_donor_closure() -> No
             assert asset["asset_kind"] == "stage_skill"
 
 
-def test_planning_inherited_execution_assets_reuse_plus_0002c_package_bytes() -> None:
+def test_full_lad_inherited_assets_reuse_planning_and_execution_package_bytes() -> None:
     manifest = conformance.assert_manifest_and_asset_digests(PACKAGE_ROOT)
     workflows = _workflows_by_id(manifest)
     assets_by_id = _assets_by_id(manifest)
-    planning_required = {
-        str(asset["asset_id"]): str(asset["content_digest"])
-        for asset in cast(
-            list[dict[str, object]],
-            workflows[WORKFLOW_ID]["required_assets"],
-        )
-    }
-    execution_required = {
-        str(asset["asset_id"]): str(asset["content_digest"])
-        for asset in cast(
-            list[dict[str, object]],
-            workflows["execution.lad"]["required_assets"],
-        )
-    }
+    source = lad_learning.workflow_source()
+    full_required = _required_asset_digests(workflows[WORKFLOW_ID])
+    planning_required = _required_asset_digests(workflows["planning.lad"])
+    execution_required = _required_asset_digests(workflows["execution.lad"])
 
-    for asset_id in _inherited_execution_asset_ids(lad_planning.workflow_source()):
+    for asset_id in _inherited_planning_asset_ids(source):
         asset = assets_by_id[asset_id]
         package_path = str(asset["package_path"])
         asset_bytes = (PACKAGE_ROOT / package_path).read_bytes()
 
-        assert package_path == _package_path_for_planning_asset(asset_id)
-        assert planning_required[asset_id] == execution_required[asset_id]
+        assert package_path == _package_path_for_full_lad_asset(asset_id)
+        assert full_required[asset_id] == planning_required[asset_id]
+        assert asset["content_digest"] == planning_required[asset_id]
+        assert asset["content_digest"] == asset_digest_for_bytes(asset_bytes)
+        assert asset["byte_length"] == len(asset_bytes)
+
+    for asset_id in _inherited_execution_asset_ids(source):
+        asset = assets_by_id[asset_id]
+        package_path = str(asset["package_path"])
+        asset_bytes = (PACKAGE_ROOT / package_path).read_bytes()
+
+        assert package_path == _package_path_for_full_lad_asset(asset_id)
+        assert full_required[asset_id] == planning_required[asset_id]
+        assert full_required[asset_id] == execution_required[asset_id]
         assert asset["content_digest"] == execution_required[asset_id]
         assert asset["content_digest"] == asset_digest_for_bytes(asset_bytes)
         assert asset["byte_length"] == len(asset_bytes)
 
 
-def test_planning_path_archive_selection_compiles_and_selects_asset_pins(
+def test_full_lad_path_archive_selection_compiles_and_selects_asset_pins(
     tmp_path: Path,
 ) -> None:
-    source = lad_planning.workflow_source()
+    source = lad_learning.workflow_source()
     path_result, archive_result = conformance.select_package_from_path_and_archive(
         tmp_path / "selection",
         PACKAGE_ROOT,
@@ -381,7 +399,7 @@ def test_planning_path_archive_selection_compiles_and_selects_asset_pins(
         workflow_id=WORKFLOW_ID,
         workflow_version=str(cast(dict[str, object], source["workflow"])["version"]),
     )
-    expected_asset_pins = _expected_planning_asset_pins(PACKAGE_ROOT, source)
+    expected_asset_pins = _expected_full_lad_asset_pins(PACKAGE_ROOT, source)
 
     for result in (path_result, archive_result):
         conformance.assert_selected_package_pin(
@@ -393,9 +411,9 @@ def test_planning_path_archive_selection_compiles_and_selects_asset_pins(
             selected_asset_pins=expected_asset_pins,
         )
         assert result.plan is not None
-        assert "unselected_catalog" not in (
-            canonical_authority_bytes(result.plan).decode("utf-8")
-        )
+        authority_text = canonical_authority_bytes(result.plan).decode("utf-8")
+        for selected_ref in _PROVIDER_EFFECT_REFS:
+            assert selected_ref in authority_text
         assert asdict(result.plan.workflow_package_pin) == {
             "package_id": PACKAGE_ID,
             "package_version": PACKAGE_VERSION,
@@ -417,22 +435,47 @@ def test_planning_path_archive_selection_compiles_and_selects_asset_pins(
     )
 
 
-def test_planning_assets_follow_entrypoint_authoring_boundaries() -> None:
+def test_full_lad_effect_provider_refs_are_selected_data_only() -> None:
     manifest = _load_manifest()
-    assets_by_id = _assets_by_id(manifest)
-    donor_asset_ids = _donor_asset_ids(lad_planning.workflow_source())
-    asset_texts_by_path = {
-        str(assets_by_id[asset_id]["package_path"]): (
-            PACKAGE_ROOT / str(assets_by_id[asset_id]["package_path"])
-        ).read_text()
-        for asset_id in donor_asset_ids
-    }
-    asset_texts_by_id = {
-        asset_id: (
-            PACKAGE_ROOT / str(assets_by_id[asset_id]["package_path"])
-        ).read_text()
-        for asset_id in donor_asset_ids
-    }
+    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
+    source = lad_learning.workflow_source()
+    learning_asset_ids = _learning_owned_asset_ids(source)
+    asset_text = "\n".join(
+        _asset_texts_by_id(manifest, learning_asset_ids).values(),
+    )
+    manifest_without_authority = copy.deepcopy(manifest)
+    for record in cast(
+        list[dict[str, object]],
+        manifest_without_authority["workflows"],
+    ):
+        record.pop("selected_authority")
+
+    selected_authority_text = json.dumps(
+        workflow["selected_authority"],
+        sort_keys=True,
+    )
+    non_authority_manifest_text = json.dumps(
+        manifest_without_authority,
+        sort_keys=True,
+    )
+
+    for selected_ref in _PROVIDER_EFFECT_REFS:
+        assert selected_ref in selected_authority_text
+        assert selected_ref not in non_authority_manifest_text
+        assert selected_ref not in asset_text
+
+    assert not any(PACKAGE_ROOT.rglob("*.py"))
+    assert _SECRET_VALUE_PATTERN.search(asset_text) is None
+    for provider_code_pattern in _PROVIDER_CODE_PATTERNS:
+        assert provider_code_pattern not in asset_text
+
+
+def test_full_lad_assets_follow_entrypoint_authoring_boundaries() -> None:
+    manifest = _load_manifest()
+    source = lad_learning.workflow_source()
+    donor_asset_ids = _donor_asset_ids(source)
+    asset_texts_by_path = _asset_texts_by_path(manifest, donor_asset_ids)
+    asset_texts_by_id = _asset_texts_by_id(manifest, donor_asset_ids)
 
     for asset_id in donor_asset_ids:
         headings = (
@@ -443,7 +486,12 @@ def test_planning_assets_follow_entrypoint_authoring_boundaries() -> None:
         for heading in headings:
             assert heading in asset_texts_by_id[asset_id]
 
-    conformance.assert_no_runtime_authority_claims(asset_texts_by_path)
+    conformance.assert_no_runtime_authority_claims(
+        {
+            **asset_texts_by_path,
+            "manifest.json": (PACKAGE_ROOT / "manifest.json").read_text(),
+        },
+    )
     conformance.assert_no_unscoped_selected_artifact_kind_mentions(
         asset_texts_by_id,
         declared_artifact_schema_ids_by_asset_id=(
@@ -455,24 +503,23 @@ def test_planning_assets_follow_entrypoint_authoring_boundaries() -> None:
 @pytest.mark.parametrize(
     "text",
     (
-        "This prompt creates queue aliases.",
-        "This skill routes work.",
-        "Return `MANAGER_COMPLETE` to close work.",
-        "The marker retries work.",
-        "This prompt mutates runtime state.",
-        "This skill grants authority.",
-        "This prompt approves effects.",
-        "The skill selects packages.",
-        "Planning assets become default global inbox router.",
-        "Planning assets become default task-kind router.",
+        "This package grants provider credentials.",
+        "The manifest ships provider execution code.",
+        "This skill runs MCP tool execution.",
+        "This prompt invokes native runner behavior.",
+        "The asset text persists durable state.",
+        "This package reconciles effects.",
+        "The manifest grants capability grants.",
+        "Return `CURATOR_COMPLETE` to approve effects.",
+        "Return `LIBRARIAN_COMPLETE` to mutate runtime state.",
     ),
 )
-def test_boundary_lint_refuses_planning_runtime_authority_claims(text: str) -> None:
+def test_boundary_lint_refuses_full_lad_runtime_authority_claims(text: str) -> None:
     with pytest.raises(AssertionError):
-        conformance.assert_no_runtime_authority_claims({"bad-planning.md": text})
+        conformance.assert_no_runtime_authority_claims({"bad-learning.md": text})
 
 
-def test_parity_exception_matrix_documents_v021_planning_and_blueprint_pairs() -> None:
+def test_parity_exception_matrix_documents_v021_learning_pairs() -> None:
     review = REVIEW_PATH.read_text()
 
     for (
@@ -481,34 +528,29 @@ def test_parity_exception_matrix_documents_v021_planning_and_blueprint_pairs() -
         skill_path,
         entrypoint_asset_id,
         skill_asset_id,
-    ) in _PLANNING_STAGE_PAIRS:
+    ) in _LEARNING_STAGE_PAIRS:
         row = next(line for line in review.splitlines() if entrypoint_path in line)
 
         assert stage_id in row
         assert f"`{skill_path}`" in row
         assert f"`{entrypoint_asset_id}`" in row
         assert f"`{skill_asset_id}`" in row
-        assert "planning.lad" in row
+        assert WORKFLOW_ID in row
         assert "packaged_rewritten" in row
         assert "boundary-clean" in row
-        assert "tests/test_lad_planning_official_package.py" in row
-
-    for stage_id, entrypoint_path, skill_path in _BLUEPRINT_PAIRS:
-        row = next(line for line in review.splitlines() if entrypoint_path in line)
-
-        assert stage_id in row
-        assert f"`{skill_path}`" in row
-        assert "planning.blueprint" in row
-        assert "deferred_post_cutover" in row
-        assert "CKPT-0001" in row
-        assert "not packaged" in row
+        assert "tests/test_lad_learning_official_package.py" in row
 
 
-def test_existing_workflow_fingerprints_stay_stable_when_planning_is_added(
+def test_existing_workflow_fingerprints_stay_stable_when_learning_is_added(
     tmp_path: Path,
 ) -> None:
-    pruned_root = _copy_pruned_package_without_planning(tmp_path)
-    for workflow_id in ("simple_loop", "execution.lad", "execution.lad_integrator"):
+    pruned_root = _copy_pruned_package_without_learning(tmp_path)
+    for workflow_id in (
+        "simple_loop",
+        "execution.lad",
+        "execution.lad_integrator",
+        "planning.lad",
+    ):
         full_result = conformance.select_package_from_path(
             tmp_path / f"full-{workflow_id.replace('.', '-')}",
             PACKAGE_ROOT,

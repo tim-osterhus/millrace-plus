@@ -34,6 +34,7 @@ WORKFLOW_SELECTORS = (
     ("execution.lad", "0.1"),
     ("execution.lad_integrator", "0.1"),
     ("planning.lad", "0.1"),
+    ("lad.full", "0.1"),
 )
 
 

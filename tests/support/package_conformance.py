@@ -60,6 +60,35 @@ _RUNTIME_AUTHORITY_PATTERNS = (
         r"grant capabilities?|mutate durable state|update durable state)\b",
         re.IGNORECASE,
     ),
+    re.compile(
+        r"\b(?:this package|this manifest|this prompt|this skill|"
+        r"the package|the manifest|the prompt|the skill|package assets?|"
+        r"asset text)\s+"
+        r"(?:provides?|ships?|contains?|bundles?|grants?|supplies?)\s+"
+        r"(?:provider\s+)?credentials?\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:this package|this manifest|this prompt|this skill|"
+        r"the package|the manifest|the prompt|the skill|package assets?|"
+        r"asset text)\s+"
+        r"(?:executes?|runs?|invokes?|implements?|ships?|contains?|bundles?)\s+"
+        r"(?:provider execution|providers?|plugin execution|plugins?|"
+        r"MCP(?:\s+server|\s+tool|\s+execution)?|native runners?|"
+        r"tool execution)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:this package|this manifest|this prompt|this skill|"
+        r"the package|the manifest|the prompt|the skill|package assets?|"
+        r"asset text|marker)\s+"
+        r"(?:performs?|applies?|approves?|reconciles?|persists?|grants?|"
+        r"enables?)\s+"
+        r"(?:effects?|effect approval|effect reconciliation|"
+        r"provider execution|capabilities?|capability grants?|"
+        r"runtime state|durable state|persistence authority)\b",
+        re.IGNORECASE,
+    ),
 )
 _ARTIFACT_KIND_LINE_PATTERN = re.compile(
     r"\bartifact[_ -]?kind\b",

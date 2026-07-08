@@ -17,7 +17,7 @@ def _shipped_manifest() -> dict[str, object]:
     )
 
 
-def test_readme_documents_plus_0002d_official_workflow_package_plan() -> None:
+def test_readme_documents_plus_0002e_official_workflow_package_plan() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text()
 
     for required in (
@@ -29,24 +29,29 @@ def test_readme_documents_plus_0002d_official_workflow_package_plan() -> None:
         "`execution.lad`",
         "`execution.lad_integrator`",
         "`planning.lad`",
+        "`lad.full`",
         "package data is non-executable",
     ):
         assert required in readme
+    assert "current shipped package root" in readme
+    assert "PLUS-0002D" not in readme
 
 
-def test_release_notes_document_plus_0002d_workflow_package_plan() -> None:
+def test_release_notes_document_plus_0002e_workflow_package_plan() -> None:
     release_notes = (PROJECT_ROOT / "docs" / "release.md").read_text()
 
     for required in (
-        "PLUS-0002D",
+        "PLUS-0002E",
         "`simple_loop` / `0.1`",
         "`execution.lad` / `0.1`",
         "`execution.lad_integrator` / `0.1`",
         "`planning.lad` / `0.1`",
+        "`lad.full` / `0.1`",
         "dependency-free",
     ):
         assert required in release_notes
     assert "PLUS-0002C keeps" not in release_notes
+    assert "PLUS-0002D keeps" not in release_notes
 
 
 def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
@@ -64,7 +69,7 @@ def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
         cast(dict[str, object], workflow)["visibility"] == "public"
         for workflow in workflows
     )
-    assert metadata["plus_packet"] == "PLUS-0002D"
+    assert metadata["plus_packet"] == "PLUS-0002E"
     assert metadata["status"] == (
-        "official_simple_loop_lad_execution_and_lad_planning_workflow_package"
+        "official_simple_loop_lad_execution_lad_planning_and_full_lad_workflow_package"
     )

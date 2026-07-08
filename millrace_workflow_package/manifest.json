@@ -9073,6 +9073,4998 @@
           "content_digest": "sha256:45248383572d967fd7ce82d72fef2e7b66a6ae1873bed1a03164bb40e6f61ac2"
         }
       ]
+    },
+    {
+      "workflow_id": "lad.full",
+      "workflow_version": "0.1",
+      "visibility": "public",
+      "entrypoints": [
+        "default"
+      ],
+      "required_assets": [
+        {
+          "asset_id": "planning.entrypoints.recon",
+          "content_digest": "sha256:ac7b3d4da9abbade7f064a295f5ea7b6f6519f17fec2db5ece92144d56fe9ca9"
+        },
+        {
+          "asset_id": "planning.skills.recon_core",
+          "content_digest": "sha256:2ca33f45fa68a02006563e9fbe17e8fe624621247e2d3c00799606508b75f4a0"
+        },
+        {
+          "asset_id": "planning.entrypoints.lad_planner",
+          "content_digest": "sha256:b19bab14716d77c8c47b4a500b09768f9ded919605d674b629776eb78ab01007"
+        },
+        {
+          "asset_id": "planning.skills.planner_core",
+          "content_digest": "sha256:1a3b2d525ae027e1864c4f926cf87f47d990eab687133339c5b33671781fb73a"
+        },
+        {
+          "asset_id": "planning.entrypoints.lad_manager",
+          "content_digest": "sha256:22e162c4819c9fde2276894c7aa06dbc5a77c2a3c83a622cebd6cfaf3755bc70"
+        },
+        {
+          "asset_id": "planning.skills.manager_core",
+          "content_digest": "sha256:e7e7c52292c05283ab42e642b2418264bd91a971b964a7d2afc8e1880b707e43"
+        },
+        {
+          "asset_id": "planning.entrypoints.lad_mechanic",
+          "content_digest": "sha256:fc52905a1612bc35ada255c0f79ec3b4f2d2f5b0fd5095a70618763575e78e98"
+        },
+        {
+          "asset_id": "planning.skills.mechanic_core",
+          "content_digest": "sha256:23d2a563355368d9e0a75428cec58bf58f595f04e67fb610c1d8a49188e6d2f3"
+        },
+        {
+          "asset_id": "planning.entrypoints.lad_auditor",
+          "content_digest": "sha256:b4123ed550a882a2f78763609d89aa10cc544e9b52dae108f39d1464eed21652"
+        },
+        {
+          "asset_id": "planning.skills.auditor_core",
+          "content_digest": "sha256:b549918a3ecfcca98ef7c99bccd2ff2cf2d0e65188b25ed43dbe4a023b723eac"
+        },
+        {
+          "asset_id": "planning.entrypoints.lad_arbiter",
+          "content_digest": "sha256:2070e14b3797fc8c359ee72aa9c1d9c35534684ee21f5f776a66977a1a9809e5"
+        },
+        {
+          "asset_id": "planning.skills.arbiter_core",
+          "content_digest": "sha256:92464892cbb0d575374d17b3fadc935abdbda29181d61cfc377d2394cc43ddbc"
+        },
+        {
+          "asset_id": "execution.entrypoints.lad_builder",
+          "content_digest": "sha256:19a156cb712c90a0fbb9b05e615888924a18b2f91c56e28c6139ab6f87728d96"
+        },
+        {
+          "asset_id": "execution.skills.builder_core",
+          "content_digest": "sha256:f36388c774a90472973eb76ed7d6299ef4bade7e5ea2803a6a888dc214db17b0"
+        },
+        {
+          "asset_id": "execution.entrypoints.lad_checker",
+          "content_digest": "sha256:3e8e6de621e39777dcf29ec541aec64f0dff49f88a1beb2adda6539458312e2e"
+        },
+        {
+          "asset_id": "execution.skills.checker_core",
+          "content_digest": "sha256:980118b3a7a25af854fd4ec3e713339a90e3ad33cb4c88f43da8c4dace32aea7"
+        },
+        {
+          "asset_id": "execution.entrypoints.lad_fixer",
+          "content_digest": "sha256:b4fda612930a57de459286aa2c4e7bf34668398661609178d026e472bc7ff539"
+        },
+        {
+          "asset_id": "execution.skills.fixer_core",
+          "content_digest": "sha256:4d50ae7da3d72a86e199d273ab2177044a93480d1a0fdcd24a50c4f1191cfd44"
+        },
+        {
+          "asset_id": "execution.entrypoints.lad_doublechecker",
+          "content_digest": "sha256:fcc3e335bc80281fabec9a90811cd71de71013aeb38ed7b49a83227f8e08d5b6"
+        },
+        {
+          "asset_id": "execution.skills.doublechecker_core",
+          "content_digest": "sha256:ea3d1e139a619851e23542bdbf5d707259fe0fd0f3b044ac43d0ae47224c1bf5"
+        },
+        {
+          "asset_id": "execution.entrypoints.lad_updater",
+          "content_digest": "sha256:970e595a57836a50ac4bb283bcc89e2723b529f89182308b4ebc07c72d56ae3e"
+        },
+        {
+          "asset_id": "execution.skills.updater_core",
+          "content_digest": "sha256:6a6995fcfd4113100ddfebbe2991e0e5e6e1c14a28ce6fd90348eafba133e37b"
+        },
+        {
+          "asset_id": "execution.entrypoints.lad_troubleshooter",
+          "content_digest": "sha256:6323f1c2a0bcc6ed4d3111ff38c1eca3b0415422ad6582559cc5f10b003aa669"
+        },
+        {
+          "asset_id": "execution.skills.troubleshooter_core",
+          "content_digest": "sha256:752bae8b7588e765af3856189e593ee748c4088ee37da3f7823988e50f6f1cab"
+        },
+        {
+          "asset_id": "execution.entrypoints.lad_consultant",
+          "content_digest": "sha256:0d0835e20be607f87c0d36dea5efa5590f53fb1fd6925be3e077d7968247944e"
+        },
+        {
+          "asset_id": "execution.skills.consultant_core",
+          "content_digest": "sha256:45248383572d967fd7ce82d72fef2e7b66a6ae1873bed1a03164bb40e6f61ac2"
+        },
+        {
+          "asset_id": "learning.entrypoints.analyst",
+          "content_digest": "sha256:fa5f82bbc70fb577fc9e4ac30ff084b186987dd539d7a68db00420f2a4d1c4b3"
+        },
+        {
+          "asset_id": "learning.skills.analyst_core",
+          "content_digest": "sha256:40b01f7999c7abe3df70d91955f72339722c6179fbc9ff1aeda229afc1741ba4"
+        },
+        {
+          "asset_id": "learning.entrypoints.professor",
+          "content_digest": "sha256:d3be1952ff0f32bdbe84ac2826e9d239c3879977c4526ed5b466f86091210ec9"
+        },
+        {
+          "asset_id": "learning.skills.professor_core",
+          "content_digest": "sha256:64e00675ce975e29495eec23ae77f27a6ec159d3a42ebf5edead099d956eec18"
+        },
+        {
+          "asset_id": "learning.entrypoints.curator",
+          "content_digest": "sha256:215a96936e2ff62ebe70f85abec623389a154afc1598be754af1d516db05b1d2"
+        },
+        {
+          "asset_id": "learning.skills.curator_core",
+          "content_digest": "sha256:5a5d0fe3516535e35bb0f9a477ab3de6809c8054b34a470c70eb3ecbbd7a6a5c"
+        },
+        {
+          "asset_id": "learning.entrypoints.librarian",
+          "content_digest": "sha256:e2c607fb0d6c389c3f661fa763917c9ee36fa5c0dfbef45f246703ae0202023c"
+        },
+        {
+          "asset_id": "learning.skills.librarian_core",
+          "content_digest": "sha256:69ca888947b4bd9d04036b15965381beeb67541462a1398066870462b05b9a67"
+        }
+      ],
+      "selected_authority": {
+        "lineage_policy": "root_from_external_enqueue",
+        "workflow": {
+          "id": "lad.full",
+          "version": "0.1",
+          "name": "Full LAD",
+          "compatibility_profile": null,
+          "required_extensions": []
+        },
+        "graphs": [
+          {
+            "id": "planning.lad.graph",
+            "node_ids": [
+              "planning.lad.recon.start",
+              "planning.lad.planner.start",
+              "planning.lad.manager.start",
+              "planning.lad.mechanic.start",
+              "planning.lad.auditor.start",
+              "planning.lad.arbiter.start"
+            ],
+            "presentation": {
+              "display_name": "LAD Planning Graph"
+            }
+          },
+          {
+            "id": "execution.lad.graph",
+            "node_ids": [
+              "execution.lad.builder.start",
+              "execution.lad.checker.start",
+              "execution.lad.fixer.start",
+              "execution.lad.doublechecker.start",
+              "execution.lad.updater.start",
+              "execution.lad.troubleshooter.start",
+              "execution.lad.consultant.start"
+            ],
+            "presentation": {
+              "display_name": "LAD Execution Graph"
+            }
+          },
+          {
+            "id": "learning.standard.graph",
+            "node_ids": [
+              "learning.standard.analyst",
+              "learning.standard.professor",
+              "learning.standard.curator",
+              "learning.standard.librarian"
+            ],
+            "presentation": {
+              "display_name": "Learning Standard Graph"
+            }
+          }
+        ],
+        "partitions": [
+          {
+            "id": "planning",
+            "kind": "plane",
+            "presentation": {
+              "display_name": "Planning"
+            }
+          },
+          {
+            "id": "execution",
+            "kind": "plane",
+            "presentation": {
+              "display_name": "Execution"
+            }
+          },
+          {
+            "id": "learning",
+            "kind": "plane",
+            "presentation": {
+              "display_name": "Learning"
+            }
+          }
+        ],
+        "queue_families": [
+          {
+            "id": "spec",
+            "external_enqueue": true,
+            "presentation": {
+              "display_name": "Spec"
+            }
+          },
+          {
+            "id": "probe",
+            "external_enqueue": true,
+            "presentation": {
+              "display_name": "Probe"
+            }
+          },
+          {
+            "id": "incident",
+            "external_enqueue": true,
+            "presentation": {
+              "display_name": "Incident"
+            }
+          },
+          {
+            "id": "stage_result",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Stage result"
+            }
+          },
+          {
+            "id": "recon_packet",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Recon packet"
+            }
+          },
+          {
+            "id": "generated_task",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Generated task"
+            }
+          },
+          {
+            "id": "generated_spec",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Generated spec"
+            }
+          },
+          {
+            "id": "planner_disposition",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Planner disposition"
+            }
+          },
+          {
+            "id": "task_cards",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Task cards"
+            }
+          },
+          {
+            "id": "incident_report",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Incident report"
+            }
+          },
+          {
+            "id": "report",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Report"
+            }
+          },
+          {
+            "id": "rubric",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Rubric"
+            }
+          },
+          {
+            "id": "verdict",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "Verdict"
+            }
+          },
+          {
+            "id": "task",
+            "external_enqueue": true,
+            "presentation": {
+              "display_name": "Task"
+            }
+          },
+          {
+            "id": "learning_request",
+            "external_enqueue": true,
+            "presentation": {
+              "display_name": "Learning request"
+            }
+          }
+        ],
+        "external_enqueue_routes": [
+          {
+            "id": "spec",
+            "queue_family_id": "spec",
+            "graph_node_id": "planning.lad.planner.start",
+            "stage_kind_id": "lad_planner",
+            "runner_binding_id": "planning.lad.local_runner",
+            "payload_schema_id": "planning.intake.spec"
+          },
+          {
+            "id": "probe",
+            "queue_family_id": "probe",
+            "graph_node_id": "planning.lad.recon.start",
+            "stage_kind_id": "recon",
+            "runner_binding_id": "planning.lad.local_runner",
+            "payload_schema_id": "planning.intake.probe"
+          },
+          {
+            "id": "incident",
+            "queue_family_id": "incident",
+            "graph_node_id": "planning.lad.auditor.start",
+            "stage_kind_id": "lad_auditor",
+            "runner_binding_id": "planning.lad.local_runner",
+            "payload_schema_id": "planning.intake.incident"
+          },
+          {
+            "id": "execution.lad.task",
+            "queue_family_id": "task",
+            "graph_node_id": "execution.lad.builder.start",
+            "stage_kind_id": "lad_builder",
+            "runner_binding_id": "execution.lad.local_runner",
+            "payload_schema_id": "execution.artifacts.task"
+          },
+          {
+            "id": "learning_request",
+            "queue_family_id": "learning_request",
+            "graph_node_id": "learning.standard.analyst",
+            "stage_kind_id": "analyst",
+            "runner_binding_id": "learning.standard.local_runner",
+            "payload_schema_id": "learning.intake.request"
+          }
+        ],
+        "generated_work_routes": [
+          {
+            "id": "learning.trigger.analyst",
+            "queue_family_id": "learning_request",
+            "graph_node_id": "learning.standard.analyst",
+            "stage_kind_id": "analyst",
+            "runner_binding_id": "learning.standard.local_runner",
+            "payload_schema_id": "learning.intake.request"
+          },
+          {
+            "id": "learning.trigger.librarian",
+            "queue_family_id": "learning_request",
+            "graph_node_id": "learning.standard.librarian",
+            "stage_kind_id": "librarian",
+            "runner_binding_id": "learning.standard.local_runner",
+            "payload_schema_id": "learning.intake.request"
+          }
+        ],
+        "artifact_schemas": [
+          {
+            "id": "planning.artifacts.stage_result",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "planning.artifacts.stage_result"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "learning_requests": {
+                  "type": "array",
+                  "min_items": 1,
+                  "unique_by": "request_id",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "request_id",
+                      "body",
+                      "root_source"
+                    ],
+                    "properties": {
+                      "request_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "body": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "root_source": {
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "source_id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "min_length": 1
+                          },
+                          "source_id": {
+                            "type": "string",
+                            "min_length": 1
+                          }
+                        }
+                      },
+                      "target_skill_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "preferred_output_paths": {
+                        "type": "array",
+                        "min_items": 1,
+                        "items": {
+                          "type": "string",
+                          "min_length": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Stage result"
+            }
+          },
+          {
+            "id": "planning.artifacts.recon_packet",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "planning.artifacts.recon_packet"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Recon packet"
+            }
+          },
+          {
+            "id": "planning.artifacts.generated_task",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "task_id",
+                "body"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "planning.artifacts.generated_task"
+                },
+                "task_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "body": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Generated task"
+            }
+          },
+          {
+            "id": "planning.artifacts.generated_spec",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "spec_id",
+                "body"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "planning.artifacts.generated_spec"
+                },
+                "spec_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "body": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Generated spec"
+            }
+          },
+          {
+            "id": "planning.artifacts.planner_disposition",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "planning.artifacts.planner_disposition"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Planner disposition"
+            }
+          },
+          {
+            "id": "planning.artifacts.spec",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "planning.artifacts.spec"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Spec"
+            }
+          },
+          {
+            "id": "planning.artifacts.incident_report",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "planning.artifacts.incident_report"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Incident report"
+            }
+          },
+          {
+            "id": "planning.artifacts.task_cards",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "cards"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "task_cards"
+                },
+                "cards": {
+                  "type": "array",
+                  "min_items": 1,
+                  "unique_by": "task_card_id",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "task_card_id",
+                      "title",
+                      "body"
+                    ],
+                    "properties": {
+                      "task_card_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "title": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "body": {
+                        "type": "string",
+                        "min_length": 1
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Task cards"
+            }
+          },
+          {
+            "id": "planning.artifacts.report",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "planning.artifacts.report"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Report"
+            }
+          },
+          {
+            "id": "planning.artifacts.rubric",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "planning.artifacts.rubric"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Rubric"
+            }
+          },
+          {
+            "id": "planning.artifacts.verdict",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "planning.artifacts.verdict"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Verdict"
+            }
+          },
+          {
+            "id": "planning.intake.spec",
+            "schema": {
+              "type": "object",
+              "required": [
+                "title",
+                "body",
+                "root_source"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "body": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "root_source": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "source_id"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "idea",
+                        "spec"
+                      ]
+                    },
+                    "source_id": {
+                      "type": "string",
+                      "min_length": 1
+                    }
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Spec intake"
+            }
+          },
+          {
+            "id": "planning.intake.probe",
+            "schema": {
+              "type": "object",
+              "required": [
+                "title",
+                "body",
+                "root_source"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "body": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "root_source": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "source_id"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "probe"
+                    },
+                    "source_id": {
+                      "type": "string",
+                      "min_length": 1
+                    }
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Probe intake"
+            }
+          },
+          {
+            "id": "planning.intake.incident",
+            "schema": {
+              "type": "object",
+              "required": [
+                "title",
+                "body",
+                "root_source"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "body": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "root_source": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "source_id"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "incident"
+                    },
+                    "source_id": {
+                      "type": "string",
+                      "min_length": 1
+                    }
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Incident intake"
+            }
+          },
+          {
+            "id": "execution.artifacts.task",
+            "schema": {
+              "type": "object",
+              "required": [
+                "task_id",
+                "body"
+              ],
+              "properties": {
+                "task_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "body": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Task"
+            }
+          },
+          {
+            "id": "execution.artifacts.stage_result",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "execution.artifacts.stage_result"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "learning_requests": {
+                  "type": "array",
+                  "min_items": 1,
+                  "unique_by": "request_id",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "request_id",
+                      "body",
+                      "root_source"
+                    ],
+                    "properties": {
+                      "request_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "body": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "root_source": {
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "source_id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "min_length": 1
+                          },
+                          "source_id": {
+                            "type": "string",
+                            "min_length": 1
+                          }
+                        }
+                      },
+                      "target_skill_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "preferred_output_paths": {
+                        "type": "array",
+                        "min_items": 1,
+                        "items": {
+                          "type": "string",
+                          "min_length": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Stage result"
+            }
+          },
+          {
+            "id": "execution.artifacts.report",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "execution.artifacts.report"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "learning_requests": {
+                  "type": "array",
+                  "min_items": 1,
+                  "unique_by": "request_id",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "request_id",
+                      "body",
+                      "root_source"
+                    ],
+                    "properties": {
+                      "request_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "body": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "root_source": {
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "source_id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "min_length": 1
+                          },
+                          "source_id": {
+                            "type": "string",
+                            "min_length": 1
+                          }
+                        }
+                      },
+                      "target_skill_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "preferred_output_paths": {
+                        "type": "array",
+                        "min_items": 1,
+                        "items": {
+                          "type": "string",
+                          "min_length": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Report"
+            }
+          },
+          {
+            "id": "execution.artifacts.incident_report",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "execution.artifacts.incident_report"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "learning_requests": {
+                  "type": "array",
+                  "min_items": 1,
+                  "unique_by": "request_id",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "request_id",
+                      "body",
+                      "root_source"
+                    ],
+                    "properties": {
+                      "request_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "body": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "root_source": {
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "source_id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "min_length": 1
+                          },
+                          "source_id": {
+                            "type": "string",
+                            "min_length": 1
+                          }
+                        }
+                      },
+                      "target_skill_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "preferred_output_paths": {
+                        "type": "array",
+                        "min_items": 1,
+                        "items": {
+                          "type": "string",
+                          "min_length": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Incident report"
+            }
+          },
+          {
+            "id": "learning.intake.request",
+            "schema": {
+              "type": "object",
+              "required": [
+                "request_id",
+                "body",
+                "root_source"
+              ],
+              "properties": {
+                "request_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "body": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "root_source": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "source_id"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "min_length": 1
+                    },
+                    "source_id": {
+                      "type": "string",
+                      "min_length": 1
+                    }
+                  }
+                },
+                "target_skill_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "preferred_output_paths": {
+                  "type": "array",
+                  "min_items": 1,
+                  "items": {
+                    "type": "string",
+                    "min_length": 1
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Learning request"
+            }
+          },
+          {
+            "id": "learning.artifacts.stage_result",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "learning.artifacts.stage_result"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Learning stage result"
+            }
+          },
+          {
+            "id": "learning.artifacts.research_packet",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary",
+                "research_notes"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "learning.artifacts.research_packet"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "research_notes": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Learning research packet"
+            }
+          },
+          {
+            "id": "learning.artifacts.skill_candidate",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary",
+                "skill_id",
+                "candidate_body"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "learning.artifacts.skill_candidate"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "skill_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "candidate_body": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Learning skill candidate"
+            }
+          },
+          {
+            "id": "learning.artifacts.professor_notes",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary",
+                "notes"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "learning.artifacts.professor_notes"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "notes": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Learning professor notes"
+            }
+          },
+          {
+            "id": "learning.artifacts.skill_update",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary",
+                "target_skill_id",
+                "update_body"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "learning.artifacts.skill_update"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "target_skill_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "update_body": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Learning skill update"
+            }
+          },
+          {
+            "id": "learning.artifacts.curator_decision",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary",
+                "decision"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "learning.artifacts.curator_decision"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "decision": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Learning curator decision"
+            }
+          },
+          {
+            "id": "learning.artifacts.skill_install_report",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary",
+                "target_skill_id",
+                "installed_path"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "learning.artifacts.skill_install_report"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "target_skill_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "installed_path": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Learning skill install report"
+            }
+          },
+          {
+            "id": "learning.artifacts.report",
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "learning.artifacts.report"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "Learning blocked report"
+            }
+          }
+        ],
+        "stage_kinds": [
+          {
+            "id": "recon",
+            "partition_id": "planning",
+            "runner_binding_id": "planning.lad.local_runner",
+            "input_queue_family_ids": [
+              "probe",
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result",
+              "recon_packet",
+              "task",
+              "spec",
+              "report"
+            ],
+            "artifact_schema_ids": [
+              "planning.artifacts.stage_result",
+              "planning.artifacts.recon_packet",
+              "planning.artifacts.generated_task",
+              "execution.artifacts.task",
+              "planning.artifacts.generated_spec",
+              "planning.artifacts.report"
+            ],
+            "asset_ids": [
+              "planning.entrypoints.recon",
+              "planning.skills.recon_core"
+            ],
+            "declared_outcome_ids": [
+              "planning.recon.to_execution",
+              "planning.recon.to_planning",
+              "planning.recon.noop",
+              "planning.recon.recon_blocked",
+              "planning.recon.blocked"
+            ],
+            "presentation": {
+              "display_name": "LAD Recon",
+              "details": {
+                "node_id": "recon",
+                "graph_order": 10
+              }
+            }
+          },
+          {
+            "id": "lad_planner",
+            "partition_id": "planning",
+            "runner_binding_id": "planning.lad.local_runner",
+            "input_queue_family_ids": [
+              "spec",
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result",
+              "planner_disposition",
+              "spec"
+            ],
+            "artifact_schema_ids": [
+              "planning.artifacts.stage_result",
+              "planning.artifacts.generated_spec",
+              "planning.artifacts.planner_disposition",
+              "planning.artifacts.spec"
+            ],
+            "asset_ids": [
+              "planning.entrypoints.lad_planner",
+              "planning.skills.planner_core"
+            ],
+            "declared_outcome_ids": [
+              "planning.lad_planner.complete",
+              "planning.lad_planner.blocked",
+              "planning.lad_planner.blocked_threshold_recovery"
+            ],
+            "presentation": {
+              "display_name": "LAD Planner",
+              "details": {
+                "node_id": "planner",
+                "graph_order": 20
+              }
+            }
+          },
+          {
+            "id": "lad_manager",
+            "partition_id": "planning",
+            "runner_binding_id": "planning.lad.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result",
+              "task_cards"
+            ],
+            "artifact_schema_ids": [
+              "planning.artifacts.stage_result",
+              "planning.artifacts.task_cards",
+              "planning.artifacts.report"
+            ],
+            "asset_ids": [
+              "planning.entrypoints.lad_manager",
+              "planning.skills.manager_core"
+            ],
+            "declared_outcome_ids": [
+              "planning.lad_manager.complete",
+              "planning.lad_manager.blocked",
+              "planning.lad_manager.blocked_threshold_recovery"
+            ],
+            "presentation": {
+              "display_name": "LAD Manager",
+              "details": {
+                "node_id": "manager",
+                "graph_order": 30
+              }
+            }
+          },
+          {
+            "id": "lad_mechanic",
+            "partition_id": "planning",
+            "runner_binding_id": "planning.lad.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result",
+              "report"
+            ],
+            "artifact_schema_ids": [
+              "planning.artifacts.stage_result",
+              "planning.artifacts.report"
+            ],
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic",
+              "planning.skills.mechanic_core"
+            ],
+            "declared_outcome_ids": [
+              "planning.lad_mechanic.complete",
+              "planning.lad_mechanic.blocked",
+              "planning.lad_mechanic.blocked_threshold_recovery",
+              "planning.lad_mechanic.recovered",
+              "planning.lad_mechanic.quarantine"
+            ],
+            "presentation": {
+              "display_name": "LAD Mechanic",
+              "details": {
+                "node_id": "mechanic",
+                "graph_order": 40
+              }
+            }
+          },
+          {
+            "id": "lad_auditor",
+            "partition_id": "planning",
+            "runner_binding_id": "planning.lad.local_runner",
+            "input_queue_family_ids": [
+              "incident",
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result",
+              "incident_report"
+            ],
+            "artifact_schema_ids": [
+              "planning.artifacts.stage_result",
+              "planning.artifacts.incident_report"
+            ],
+            "asset_ids": [
+              "planning.entrypoints.lad_auditor",
+              "planning.skills.auditor_core"
+            ],
+            "declared_outcome_ids": [
+              "planning.lad_auditor.complete",
+              "planning.lad_auditor.blocked",
+              "planning.lad_auditor.blocked_threshold_recovery"
+            ],
+            "presentation": {
+              "display_name": "LAD Auditor",
+              "details": {
+                "node_id": "auditor",
+                "graph_order": 50
+              }
+            }
+          },
+          {
+            "id": "lad_arbiter",
+            "partition_id": "planning",
+            "runner_binding_id": "planning.lad.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result",
+              "rubric",
+              "verdict",
+              "report"
+            ],
+            "artifact_schema_ids": [
+              "planning.artifacts.stage_result",
+              "planning.artifacts.rubric",
+              "planning.artifacts.verdict",
+              "planning.artifacts.report",
+              "planning.artifacts.incident_report"
+            ],
+            "asset_ids": [
+              "planning.entrypoints.lad_arbiter",
+              "planning.skills.arbiter_core"
+            ],
+            "declared_outcome_ids": [
+              "planning.lad_arbiter.complete",
+              "planning.lad_arbiter.remediation_needed",
+              "planning.lad_arbiter.blocked"
+            ],
+            "presentation": {
+              "display_name": "LAD Arbiter",
+              "details": {
+                "node_id": "arbiter",
+                "graph_order": 60
+              }
+            }
+          },
+          {
+            "id": "lad_builder",
+            "partition_id": "execution",
+            "runner_binding_id": "execution.lad.local_runner",
+            "input_queue_family_ids": [
+              "task",
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result"
+            ],
+            "artifact_schema_ids": [
+              "execution.artifacts.task",
+              "execution.artifacts.stage_result",
+              "execution.artifacts.report"
+            ],
+            "asset_ids": [
+              "execution.entrypoints.lad_builder",
+              "execution.skills.builder_core"
+            ],
+            "declared_outcome_ids": [
+              "execution.lad_builder.complete",
+              "execution.lad_builder.blocked",
+              "execution.lad_builder.runtime_failed",
+              "execution.lad_builder.runtime_failed_exhausted"
+            ],
+            "presentation": {
+              "display_name": "LAD Builder",
+              "details": {
+                "node_id": "builder",
+                "graph_order": 10
+              }
+            }
+          },
+          {
+            "id": "lad_checker",
+            "partition_id": "execution",
+            "runner_binding_id": "execution.lad.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result"
+            ],
+            "artifact_schema_ids": [
+              "execution.artifacts.stage_result",
+              "execution.artifacts.report"
+            ],
+            "asset_ids": [
+              "execution.entrypoints.lad_checker",
+              "execution.skills.checker_core"
+            ],
+            "declared_outcome_ids": [
+              "execution.lad_checker.pass",
+              "execution.lad_checker.fix_needed",
+              "execution.lad_checker.blocked",
+              "execution.lad_checker.runtime_failed",
+              "execution.lad_checker.runtime_failed_exhausted"
+            ],
+            "presentation": {
+              "display_name": "LAD Checker",
+              "details": {
+                "node_id": "checker",
+                "graph_order": 30
+              }
+            }
+          },
+          {
+            "id": "lad_fixer",
+            "partition_id": "execution",
+            "runner_binding_id": "execution.lad.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result"
+            ],
+            "artifact_schema_ids": [
+              "execution.artifacts.stage_result",
+              "execution.artifacts.report"
+            ],
+            "asset_ids": [
+              "execution.entrypoints.lad_fixer",
+              "execution.skills.fixer_core"
+            ],
+            "declared_outcome_ids": [
+              "execution.lad_fixer.complete",
+              "execution.lad_fixer.blocked",
+              "execution.lad_fixer.runtime_failed",
+              "execution.lad_fixer.runtime_failed_exhausted"
+            ],
+            "presentation": {
+              "display_name": "LAD Fixer",
+              "details": {
+                "node_id": "fixer",
+                "graph_order": 40
+              }
+            }
+          },
+          {
+            "id": "lad_doublechecker",
+            "partition_id": "execution",
+            "runner_binding_id": "execution.lad.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result"
+            ],
+            "artifact_schema_ids": [
+              "execution.artifacts.stage_result",
+              "execution.artifacts.report"
+            ],
+            "asset_ids": [
+              "execution.entrypoints.lad_doublechecker",
+              "execution.skills.doublechecker_core"
+            ],
+            "declared_outcome_ids": [
+              "execution.lad_doublechecker.pass",
+              "execution.lad_doublechecker.fix_needed",
+              "execution.lad_doublechecker.blocked",
+              "execution.lad_doublechecker.runtime_failed",
+              "execution.lad_doublechecker.runtime_failed_exhausted"
+            ],
+            "presentation": {
+              "display_name": "LAD Doublechecker",
+              "details": {
+                "node_id": "doublechecker",
+                "graph_order": 50
+              }
+            }
+          },
+          {
+            "id": "lad_updater",
+            "partition_id": "execution",
+            "runner_binding_id": "execution.lad.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result"
+            ],
+            "artifact_schema_ids": [
+              "execution.artifacts.stage_result",
+              "execution.artifacts.report"
+            ],
+            "asset_ids": [
+              "execution.entrypoints.lad_updater",
+              "execution.skills.updater_core"
+            ],
+            "declared_outcome_ids": [
+              "execution.lad_updater.complete",
+              "execution.lad_updater.blocked",
+              "execution.lad_updater.runtime_failed",
+              "execution.lad_updater.runtime_failed_exhausted"
+            ],
+            "presentation": {
+              "display_name": "LAD Updater",
+              "details": {
+                "node_id": "updater",
+                "graph_order": 60
+              }
+            }
+          },
+          {
+            "id": "lad_troubleshooter",
+            "partition_id": "execution",
+            "runner_binding_id": "execution.lad.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result"
+            ],
+            "artifact_schema_ids": [
+              "execution.artifacts.stage_result",
+              "execution.artifacts.report"
+            ],
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter",
+              "execution.skills.troubleshooter_core"
+            ],
+            "declared_outcome_ids": [
+              "execution.lad_troubleshooter.complete",
+              "execution.lad_troubleshooter.blocked",
+              "execution.lad_troubleshooter.recovered",
+              "execution.lad_troubleshooter.recovery_blocked",
+              "execution.lad_troubleshooter.runtime_failed",
+              "execution.lad_troubleshooter.runtime_failed_exhausted"
+            ],
+            "presentation": {
+              "display_name": "LAD Troubleshooter",
+              "details": {
+                "node_id": "troubleshooter",
+                "graph_order": 70
+              }
+            }
+          },
+          {
+            "id": "lad_consultant",
+            "partition_id": "execution",
+            "runner_binding_id": "execution.lad.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result"
+            ],
+            "artifact_schema_ids": [
+              "execution.artifacts.stage_result",
+              "execution.artifacts.report",
+              "execution.artifacts.incident_report"
+            ],
+            "asset_ids": [
+              "execution.entrypoints.lad_consultant",
+              "execution.skills.consultant_core"
+            ],
+            "declared_outcome_ids": [
+              "execution.lad_consultant.complete",
+              "execution.lad_consultant.needs_plan",
+              "execution.lad_consultant.blocked",
+              "execution.lad_consultant.recovered",
+              "execution.lad_consultant.quarantine"
+            ],
+            "presentation": {
+              "display_name": "LAD Consultant",
+              "details": {
+                "node_id": "consultant",
+                "graph_order": 80
+              }
+            }
+          },
+          {
+            "id": "analyst",
+            "partition_id": "learning",
+            "runner_binding_id": "learning.standard.local_runner",
+            "input_queue_family_ids": [
+              "learning_request",
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result",
+              "learning_request"
+            ],
+            "artifact_schema_ids": [
+              "learning.intake.request",
+              "learning.artifacts.research_packet",
+              "learning.artifacts.report"
+            ],
+            "asset_ids": [
+              "learning.entrypoints.analyst",
+              "learning.skills.analyst_core"
+            ],
+            "declared_outcome_ids": [
+              "learning.analyst.complete",
+              "learning.analyst.noop",
+              "learning.analyst.blocked"
+            ],
+            "presentation": {
+              "display_name": "Learning Analyst",
+              "details": {
+                "node_id": "analyst",
+                "graph_order": 10
+              }
+            }
+          },
+          {
+            "id": "professor",
+            "partition_id": "learning",
+            "runner_binding_id": "learning.standard.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result",
+              "learning_request"
+            ],
+            "artifact_schema_ids": [
+              "learning.intake.request",
+              "learning.artifacts.research_packet",
+              "learning.artifacts.skill_candidate",
+              "learning.artifacts.professor_notes",
+              "learning.artifacts.report"
+            ],
+            "asset_ids": [
+              "learning.entrypoints.professor",
+              "learning.skills.professor_core"
+            ],
+            "declared_outcome_ids": [
+              "learning.professor.complete",
+              "learning.professor.noop",
+              "learning.professor.blocked"
+            ],
+            "presentation": {
+              "display_name": "Learning Professor",
+              "details": {
+                "node_id": "professor",
+                "graph_order": 20
+              }
+            }
+          },
+          {
+            "id": "curator",
+            "partition_id": "learning",
+            "runner_binding_id": "learning.standard.local_runner",
+            "input_queue_family_ids": [
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result",
+              "learning_request"
+            ],
+            "artifact_schema_ids": [
+              "learning.intake.request",
+              "learning.artifacts.skill_candidate",
+              "learning.artifacts.skill_update",
+              "learning.artifacts.curator_decision",
+              "learning.artifacts.report"
+            ],
+            "asset_ids": [
+              "learning.entrypoints.curator",
+              "learning.skills.curator_core"
+            ],
+            "declared_outcome_ids": [
+              "learning.curator.complete",
+              "learning.curator.noop",
+              "learning.curator.blocked"
+            ],
+            "presentation": {
+              "display_name": "Learning Curator",
+              "details": {
+                "node_id": "curator",
+                "graph_order": 30
+              }
+            }
+          },
+          {
+            "id": "librarian",
+            "partition_id": "learning",
+            "runner_binding_id": "learning.standard.local_runner",
+            "input_queue_family_ids": [
+              "learning_request",
+              "stage_result"
+            ],
+            "output_queue_family_ids": [
+              "stage_result",
+              "learning_request"
+            ],
+            "artifact_schema_ids": [
+              "learning.intake.request",
+              "learning.artifacts.skill_install_report",
+              "learning.artifacts.report"
+            ],
+            "asset_ids": [
+              "learning.entrypoints.librarian",
+              "learning.skills.librarian_core"
+            ],
+            "declared_outcome_ids": [
+              "learning.librarian.complete",
+              "learning.librarian.noop",
+              "learning.librarian.blocked"
+            ],
+            "presentation": {
+              "display_name": "Learning Librarian",
+              "details": {
+                "node_id": "librarian",
+                "graph_order": 40
+              }
+            }
+          }
+        ],
+        "terminal_outcomes": [
+          {
+            "id": "planning.recon.to_execution",
+            "stage_kind_id": "recon",
+            "marker": "RECON_TO_EXECUTION",
+            "presentation": {
+              "display_name": "Recon to execution"
+            }
+          },
+          {
+            "id": "planning.recon.to_planning",
+            "stage_kind_id": "recon",
+            "marker": "RECON_TO_PLANNING",
+            "presentation": {
+              "display_name": "Recon to planning"
+            }
+          },
+          {
+            "id": "planning.recon.noop",
+            "stage_kind_id": "recon",
+            "marker": "RECON_NOOP",
+            "presentation": {
+              "display_name": "Recon no-op"
+            }
+          },
+          {
+            "id": "planning.recon.recon_blocked",
+            "stage_kind_id": "recon",
+            "marker": "RECON_BLOCKED",
+            "presentation": {
+              "display_name": "Recon blocked"
+            }
+          },
+          {
+            "id": "planning.recon.blocked",
+            "stage_kind_id": "recon",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Recon generic blocked"
+            }
+          },
+          {
+            "id": "planning.lad_planner.complete",
+            "stage_kind_id": "lad_planner",
+            "marker": "PLANNER_COMPLETE",
+            "presentation": {
+              "display_name": "Planner complete"
+            }
+          },
+          {
+            "id": "planning.lad_planner.blocked",
+            "stage_kind_id": "lad_planner",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Planner blocked"
+            }
+          },
+          {
+            "id": "planning.lad_planner.blocked_threshold_recovery",
+            "stage_kind_id": "lad_planner",
+            "marker": "",
+            "presentation": {
+              "display_name": "Planner blocked threshold recovery"
+            }
+          },
+          {
+            "id": "planning.lad_manager.complete",
+            "stage_kind_id": "lad_manager",
+            "marker": "MANAGER_COMPLETE",
+            "presentation": {
+              "display_name": "Manager complete"
+            }
+          },
+          {
+            "id": "planning.lad_manager.blocked",
+            "stage_kind_id": "lad_manager",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Manager blocked"
+            }
+          },
+          {
+            "id": "planning.lad_manager.blocked_threshold_recovery",
+            "stage_kind_id": "lad_manager",
+            "marker": "",
+            "presentation": {
+              "display_name": "Manager blocked threshold recovery"
+            }
+          },
+          {
+            "id": "planning.lad_mechanic.complete",
+            "stage_kind_id": "lad_mechanic",
+            "marker": "MECHANIC_COMPLETE",
+            "presentation": {
+              "display_name": "Mechanic complete"
+            }
+          },
+          {
+            "id": "planning.lad_mechanic.blocked",
+            "stage_kind_id": "lad_mechanic",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Mechanic blocked"
+            }
+          },
+          {
+            "id": "planning.lad_mechanic.blocked_threshold_recovery",
+            "stage_kind_id": "lad_mechanic",
+            "marker": "",
+            "presentation": {
+              "display_name": "Mechanic blocked threshold recovery"
+            }
+          },
+          {
+            "id": "planning.lad_mechanic.recovered",
+            "stage_kind_id": "lad_mechanic",
+            "marker": "MECHANIC_RECOVERED",
+            "presentation": {
+              "display_name": "Mechanic recovered"
+            }
+          },
+          {
+            "id": "planning.lad_mechanic.quarantine",
+            "stage_kind_id": "lad_mechanic",
+            "marker": "MECHANIC_QUARANTINE",
+            "presentation": {
+              "display_name": "Mechanic quarantine"
+            }
+          },
+          {
+            "id": "planning.lad_auditor.complete",
+            "stage_kind_id": "lad_auditor",
+            "marker": "AUDITOR_COMPLETE",
+            "presentation": {
+              "display_name": "Auditor complete"
+            }
+          },
+          {
+            "id": "planning.lad_auditor.blocked",
+            "stage_kind_id": "lad_auditor",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Auditor blocked"
+            }
+          },
+          {
+            "id": "planning.lad_auditor.blocked_threshold_recovery",
+            "stage_kind_id": "lad_auditor",
+            "marker": "",
+            "presentation": {
+              "display_name": "Auditor blocked threshold recovery"
+            }
+          },
+          {
+            "id": "planning.lad_arbiter.complete",
+            "stage_kind_id": "lad_arbiter",
+            "marker": "ARBITER_COMPLETE",
+            "presentation": {
+              "display_name": "Arbiter complete"
+            }
+          },
+          {
+            "id": "planning.lad_arbiter.remediation_needed",
+            "stage_kind_id": "lad_arbiter",
+            "marker": "REMEDIATION_NEEDED",
+            "presentation": {
+              "display_name": "Remediation needed"
+            }
+          },
+          {
+            "id": "planning.lad_arbiter.blocked",
+            "stage_kind_id": "lad_arbiter",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Arbiter blocked"
+            }
+          },
+          {
+            "id": "execution.lad_builder.complete",
+            "stage_kind_id": "lad_builder",
+            "marker": "BUILDER_COMPLETE",
+            "presentation": {
+              "display_name": "Builder complete"
+            }
+          },
+          {
+            "id": "execution.lad_builder.blocked",
+            "stage_kind_id": "lad_builder",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Builder blocked"
+            }
+          },
+          {
+            "id": "execution.lad_checker.pass",
+            "stage_kind_id": "lad_checker",
+            "marker": "CHECKER_PASS",
+            "presentation": {
+              "display_name": "Checker pass"
+            }
+          },
+          {
+            "id": "execution.lad_checker.fix_needed",
+            "stage_kind_id": "lad_checker",
+            "marker": "FIX_NEEDED",
+            "presentation": {
+              "display_name": "Fix needed"
+            }
+          },
+          {
+            "id": "execution.lad_checker.fix_threshold_recovery",
+            "stage_kind_id": "lad_checker",
+            "marker": "",
+            "presentation": {
+              "display_name": "Checker fix threshold recovery"
+            }
+          },
+          {
+            "id": "execution.lad_checker.blocked",
+            "stage_kind_id": "lad_checker",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Checker blocked"
+            }
+          },
+          {
+            "id": "execution.lad_fixer.complete",
+            "stage_kind_id": "lad_fixer",
+            "marker": "FIXER_COMPLETE",
+            "presentation": {
+              "display_name": "Fixer complete"
+            }
+          },
+          {
+            "id": "execution.lad_fixer.blocked",
+            "stage_kind_id": "lad_fixer",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Fixer blocked"
+            }
+          },
+          {
+            "id": "execution.lad_doublechecker.pass",
+            "stage_kind_id": "lad_doublechecker",
+            "marker": "DOUBLECHECK_PASS",
+            "presentation": {
+              "display_name": "Doublecheck pass"
+            }
+          },
+          {
+            "id": "execution.lad_doublechecker.fix_needed",
+            "stage_kind_id": "lad_doublechecker",
+            "marker": "FIX_NEEDED",
+            "presentation": {
+              "display_name": "Doublecheck fix needed"
+            }
+          },
+          {
+            "id": "execution.lad_doublechecker.fix_threshold_recovery",
+            "stage_kind_id": "lad_doublechecker",
+            "marker": "",
+            "presentation": {
+              "display_name": "Doublechecker fix threshold recovery"
+            }
+          },
+          {
+            "id": "execution.lad_doublechecker.blocked",
+            "stage_kind_id": "lad_doublechecker",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Doublechecker blocked"
+            }
+          },
+          {
+            "id": "execution.lad_updater.complete",
+            "stage_kind_id": "lad_updater",
+            "marker": "UPDATE_COMPLETE",
+            "presentation": {
+              "display_name": "Update complete"
+            }
+          },
+          {
+            "id": "execution.lad_updater.blocked",
+            "stage_kind_id": "lad_updater",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Updater blocked"
+            }
+          },
+          {
+            "id": "execution.lad_troubleshooter.complete",
+            "stage_kind_id": "lad_troubleshooter",
+            "marker": "TROUBLESHOOT_COMPLETE",
+            "presentation": {
+              "display_name": "Troubleshoot complete"
+            }
+          },
+          {
+            "id": "execution.lad_troubleshooter.blocked",
+            "stage_kind_id": "lad_troubleshooter",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Troubleshooter blocked"
+            }
+          },
+          {
+            "id": "execution.lad_troubleshooter.recovered",
+            "stage_kind_id": "lad_troubleshooter",
+            "marker": "TROUBLESHOOT_RECOVERED",
+            "presentation": {
+              "display_name": "Troubleshooter recovered source"
+            }
+          },
+          {
+            "id": "execution.lad_troubleshooter.recovery_blocked",
+            "stage_kind_id": "lad_troubleshooter",
+            "marker": "TROUBLESHOOT_QUARANTINE",
+            "presentation": {
+              "display_name": "Troubleshooter recovery blocked"
+            }
+          },
+          {
+            "id": "execution.lad_consultant.complete",
+            "stage_kind_id": "lad_consultant",
+            "marker": "CONSULT_COMPLETE",
+            "presentation": {
+              "display_name": "Consult complete"
+            }
+          },
+          {
+            "id": "execution.lad_consultant.needs_plan",
+            "stage_kind_id": "lad_consultant",
+            "marker": "NEEDS_PLANNING",
+            "presentation": {
+              "display_name": "Needs plan"
+            }
+          },
+          {
+            "id": "execution.lad_consultant.blocked",
+            "stage_kind_id": "lad_consultant",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "Consultant blocked"
+            }
+          },
+          {
+            "id": "execution.lad_consultant.recovered",
+            "stage_kind_id": "lad_consultant",
+            "marker": "CONSULT_RECOVERED",
+            "presentation": {
+              "display_name": "Consultant recovered source"
+            }
+          },
+          {
+            "id": "execution.lad_consultant.quarantine",
+            "stage_kind_id": "lad_consultant",
+            "marker": "CONSULT_QUARANTINE",
+            "presentation": {
+              "display_name": "Consultant quarantine"
+            }
+          },
+          {
+            "id": "execution.lad_builder.blocked_threshold_recovery",
+            "stage_kind_id": "lad_builder",
+            "marker": "",
+            "presentation": {
+              "display_name": "Builder blocked threshold recovery"
+            }
+          },
+          {
+            "id": "execution.lad_builder.runtime_failed",
+            "stage_kind_id": "lad_builder",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Builder runtime failure"
+            }
+          },
+          {
+            "id": "execution.lad_builder.runtime_failed_exhausted",
+            "stage_kind_id": "lad_builder",
+            "marker": "RUNTIME_FAILURE_ESCALATE",
+            "presentation": {
+              "display_name": "Builder runtime failure escalation"
+            }
+          },
+          {
+            "id": "execution.lad_checker.blocked_threshold_recovery",
+            "stage_kind_id": "lad_checker",
+            "marker": "",
+            "presentation": {
+              "display_name": "Checker blocked threshold recovery"
+            }
+          },
+          {
+            "id": "execution.lad_checker.runtime_failed",
+            "stage_kind_id": "lad_checker",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Checker runtime failure"
+            }
+          },
+          {
+            "id": "execution.lad_checker.runtime_failed_exhausted",
+            "stage_kind_id": "lad_checker",
+            "marker": "RUNTIME_FAILURE_ESCALATE",
+            "presentation": {
+              "display_name": "Checker runtime failure escalation"
+            }
+          },
+          {
+            "id": "execution.lad_fixer.blocked_threshold_recovery",
+            "stage_kind_id": "lad_fixer",
+            "marker": "",
+            "presentation": {
+              "display_name": "Fixer blocked threshold recovery"
+            }
+          },
+          {
+            "id": "execution.lad_fixer.runtime_failed",
+            "stage_kind_id": "lad_fixer",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Fixer runtime failure"
+            }
+          },
+          {
+            "id": "execution.lad_fixer.runtime_failed_exhausted",
+            "stage_kind_id": "lad_fixer",
+            "marker": "RUNTIME_FAILURE_ESCALATE",
+            "presentation": {
+              "display_name": "Fixer runtime failure escalation"
+            }
+          },
+          {
+            "id": "execution.lad_doublechecker.blocked_threshold_recovery",
+            "stage_kind_id": "lad_doublechecker",
+            "marker": "",
+            "presentation": {
+              "display_name": "Doublechecker blocked threshold recovery"
+            }
+          },
+          {
+            "id": "execution.lad_doublechecker.runtime_failed",
+            "stage_kind_id": "lad_doublechecker",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Doublechecker runtime failure"
+            }
+          },
+          {
+            "id": "execution.lad_doublechecker.runtime_failed_exhausted",
+            "stage_kind_id": "lad_doublechecker",
+            "marker": "RUNTIME_FAILURE_ESCALATE",
+            "presentation": {
+              "display_name": "Doublechecker runtime failure escalation"
+            }
+          },
+          {
+            "id": "execution.lad_updater.blocked_threshold_recovery",
+            "stage_kind_id": "lad_updater",
+            "marker": "",
+            "presentation": {
+              "display_name": "Updater blocked threshold recovery"
+            }
+          },
+          {
+            "id": "execution.lad_updater.runtime_failed",
+            "stage_kind_id": "lad_updater",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Updater runtime failure"
+            }
+          },
+          {
+            "id": "execution.lad_updater.runtime_failed_exhausted",
+            "stage_kind_id": "lad_updater",
+            "marker": "RUNTIME_FAILURE_ESCALATE",
+            "presentation": {
+              "display_name": "Updater runtime failure escalation"
+            }
+          },
+          {
+            "id": "execution.lad_troubleshooter.blocked_threshold_recovery",
+            "stage_kind_id": "lad_troubleshooter",
+            "marker": "",
+            "presentation": {
+              "display_name": "Troubleshooter blocked threshold recovery"
+            }
+          },
+          {
+            "id": "execution.lad_troubleshooter.runtime_failed",
+            "stage_kind_id": "lad_troubleshooter",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Troubleshooter runtime failure"
+            }
+          },
+          {
+            "id": "execution.lad_troubleshooter.runtime_failed_exhausted",
+            "stage_kind_id": "lad_troubleshooter",
+            "marker": "RUNTIME_FAILURE_ESCALATE",
+            "presentation": {
+              "display_name": "Troubleshooter runtime failure escalation"
+            }
+          },
+          {
+            "id": "learning.analyst.complete",
+            "stage_kind_id": "analyst",
+            "marker": "ANALYST_COMPLETE",
+            "presentation": {
+              "display_name": "ANALYST_COMPLETE"
+            }
+          },
+          {
+            "id": "learning.analyst.noop",
+            "stage_kind_id": "analyst",
+            "marker": "ANALYST_NOOP",
+            "presentation": {
+              "display_name": "ANALYST_NOOP"
+            }
+          },
+          {
+            "id": "learning.analyst.blocked",
+            "stage_kind_id": "analyst",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "BLOCKED"
+            }
+          },
+          {
+            "id": "learning.professor.complete",
+            "stage_kind_id": "professor",
+            "marker": "PROFESSOR_COMPLETE",
+            "presentation": {
+              "display_name": "PROFESSOR_COMPLETE"
+            }
+          },
+          {
+            "id": "learning.professor.noop",
+            "stage_kind_id": "professor",
+            "marker": "PROFESSOR_NOOP",
+            "presentation": {
+              "display_name": "PROFESSOR_NOOP"
+            }
+          },
+          {
+            "id": "learning.professor.blocked",
+            "stage_kind_id": "professor",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "BLOCKED"
+            }
+          },
+          {
+            "id": "learning.curator.complete",
+            "stage_kind_id": "curator",
+            "marker": "CURATOR_COMPLETE",
+            "presentation": {
+              "display_name": "CURATOR_COMPLETE"
+            }
+          },
+          {
+            "id": "learning.curator.noop",
+            "stage_kind_id": "curator",
+            "marker": "CURATOR_NOOP",
+            "presentation": {
+              "display_name": "CURATOR_NOOP"
+            }
+          },
+          {
+            "id": "learning.curator.blocked",
+            "stage_kind_id": "curator",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "BLOCKED"
+            }
+          },
+          {
+            "id": "learning.librarian.complete",
+            "stage_kind_id": "librarian",
+            "marker": "LIBRARIAN_COMPLETE",
+            "presentation": {
+              "display_name": "LIBRARIAN_COMPLETE"
+            }
+          },
+          {
+            "id": "learning.librarian.noop",
+            "stage_kind_id": "librarian",
+            "marker": "LIBRARIAN_NOOP",
+            "presentation": {
+              "display_name": "LIBRARIAN_NOOP"
+            }
+          },
+          {
+            "id": "learning.librarian.blocked",
+            "stage_kind_id": "librarian",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "BLOCKED"
+            }
+          }
+        ],
+        "terminal_actions": [
+          {
+            "id": "planning.recon_enqueue_task",
+            "stage_kind_id": "recon",
+            "outcome_id": "planning.recon.to_execution",
+            "kind": "route",
+            "target_stage_kind_id": "lad_builder",
+            "target_graph_node_id": "execution.lad.builder.start",
+            "emitted_queue_family_id": "task",
+            "artifact_schema_id": "execution.artifacts.task",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_builder",
+              "execution.skills.builder_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "planning.recon_enqueue_task"
+            }
+          },
+          {
+            "id": "planning.recon_enqueue_spec",
+            "stage_kind_id": "recon",
+            "outcome_id": "planning.recon.to_planning",
+            "kind": "route",
+            "target_stage_kind_id": "lad_planner",
+            "target_graph_node_id": "planning.lad.planner.start",
+            "emitted_queue_family_id": "spec",
+            "artifact_schema_id": "planning.artifacts.generated_spec",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_planner",
+              "planning.skills.planner_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "planning.recon_enqueue_spec"
+            }
+          },
+          {
+            "id": "planning.recon_noop",
+            "stage_kind_id": "recon",
+            "outcome_id": "planning.recon.noop",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "planning.artifacts.recon_packet",
+            "presentation": {
+              "display_name": "planning.recon_noop"
+            }
+          },
+          {
+            "id": "planning.recon_block_work_item",
+            "stage_kind_id": "recon",
+            "outcome_id": "planning.recon.recon_blocked",
+            "kind": "block_work_item",
+            "artifact_schema_id": "planning.artifacts.report",
+            "presentation": {
+              "display_name": "planning.recon_block_work_item"
+            }
+          },
+          {
+            "id": "planning.recon_blocked",
+            "stage_kind_id": "recon",
+            "outcome_id": "planning.recon.blocked",
+            "kind": "block_work_item",
+            "artifact_schema_id": "planning.artifacts.report",
+            "presentation": {
+              "display_name": "planning.recon_blocked"
+            }
+          },
+          {
+            "id": "planning.route_planner_complete",
+            "stage_kind_id": "lad_planner",
+            "outcome_id": "planning.lad_planner.complete",
+            "kind": "route",
+            "target_stage_kind_id": "lad_manager",
+            "target_graph_node_id": "planning.lad.manager.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "planning.artifacts.stage_result",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_manager",
+              "planning.skills.manager_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "planning.route_planner_complete"
+            }
+          },
+          {
+            "id": "planning.route_planner_blocked",
+            "stage_kind_id": "lad_planner",
+            "outcome_id": "planning.lad_planner.blocked",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "presentation": {
+              "display_name": "planning.route_planner_blocked"
+            }
+          },
+          {
+            "id": "planning.escalate_planner_blocked_exhausted",
+            "stage_kind_id": "lad_planner",
+            "outcome_id": "planning.lad_planner.blocked_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "presentation": {
+              "display_name": "planning.escalate_planner_blocked_exhausted"
+            }
+          },
+          {
+            "id": "planning.close_manager_complete",
+            "stage_kind_id": "lad_manager",
+            "outcome_id": "planning.lad_manager.complete",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "planning.artifacts.task_cards",
+            "presentation": {
+              "display_name": "planning.close_manager_complete"
+            }
+          },
+          {
+            "id": "planning.route_manager_blocked",
+            "stage_kind_id": "lad_manager",
+            "outcome_id": "planning.lad_manager.blocked",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "presentation": {
+              "display_name": "planning.route_manager_blocked"
+            }
+          },
+          {
+            "id": "planning.escalate_manager_blocked_exhausted",
+            "stage_kind_id": "lad_manager",
+            "outcome_id": "planning.lad_manager.blocked_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "presentation": {
+              "display_name": "planning.escalate_manager_blocked_exhausted"
+            }
+          },
+          {
+            "id": "planning.route_mechanic_complete",
+            "stage_kind_id": "lad_mechanic",
+            "outcome_id": "planning.lad_mechanic.complete",
+            "kind": "route",
+            "target_stage_kind_id": "lad_planner",
+            "target_graph_node_id": "planning.lad.planner.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "planning.artifacts.stage_result",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_planner",
+              "planning.skills.planner_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "planning.route_mechanic_complete"
+            },
+            "dynamic_target_selector": {
+              "kind": "observation_payload_route_target",
+              "field_names": [
+                "resume_stage"
+              ],
+              "disallowed_targets": [
+                "mechanic"
+              ],
+              "targets": {
+                "planner": {
+                  "target_stage_kind_id": "lad_planner",
+                  "target_graph_node_id": "planning.lad.planner.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "planning.lad.local_runner"
+                },
+                "manager": {
+                  "target_stage_kind_id": "lad_manager",
+                  "target_graph_node_id": "planning.lad.manager.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "planning.lad.local_runner"
+                },
+                "auditor": {
+                  "target_stage_kind_id": "lad_auditor",
+                  "target_graph_node_id": "planning.lad.auditor.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "planning.lad.local_runner"
+                }
+              }
+            }
+          },
+          {
+            "id": "planning.route_mechanic_blocked",
+            "stage_kind_id": "lad_mechanic",
+            "outcome_id": "planning.lad_mechanic.blocked",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "presentation": {
+              "display_name": "planning.route_mechanic_blocked"
+            }
+          },
+          {
+            "id": "planning.escalate_mechanic_blocked_exhausted",
+            "stage_kind_id": "lad_mechanic",
+            "outcome_id": "planning.lad_mechanic.blocked_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "presentation": {
+              "display_name": "planning.escalate_mechanic_blocked_exhausted"
+            }
+          },
+          {
+            "id": "planning.return_mechanic_recovered",
+            "stage_kind_id": "lad_mechanic",
+            "outcome_id": "planning.lad_mechanic.recovered",
+            "kind": "return_to_recorded_source",
+            "artifact_schema_id": "planning.artifacts.report",
+            "presentation": {
+              "display_name": "planning.return_mechanic_recovered"
+            }
+          },
+          {
+            "id": "planning.quarantine_mechanic_blocked",
+            "stage_kind_id": "lad_mechanic",
+            "outcome_id": "planning.lad_mechanic.quarantine",
+            "kind": "quarantine_lineage",
+            "artifact_schema_id": "planning.artifacts.report",
+            "presentation": {
+              "display_name": "planning.quarantine_mechanic_blocked"
+            }
+          },
+          {
+            "id": "planning.route_auditor_complete",
+            "stage_kind_id": "lad_auditor",
+            "outcome_id": "planning.lad_auditor.complete",
+            "kind": "route",
+            "target_stage_kind_id": "lad_planner",
+            "target_graph_node_id": "planning.lad.planner.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "planning.artifacts.stage_result",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_planner",
+              "planning.skills.planner_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "planning.route_auditor_complete"
+            }
+          },
+          {
+            "id": "planning.route_auditor_blocked",
+            "stage_kind_id": "lad_auditor",
+            "outcome_id": "planning.lad_auditor.blocked",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "presentation": {
+              "display_name": "planning.route_auditor_blocked"
+            }
+          },
+          {
+            "id": "planning.escalate_auditor_blocked_exhausted",
+            "stage_kind_id": "lad_auditor",
+            "outcome_id": "planning.lad_auditor.blocked_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "runner_binding_id": "planning.lad.local_runner",
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "presentation": {
+              "display_name": "planning.escalate_auditor_blocked_exhausted"
+            }
+          },
+          {
+            "id": "planning.close_arbiter_complete",
+            "stage_kind_id": "lad_arbiter",
+            "outcome_id": "planning.lad_arbiter.complete",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "planning.artifacts.verdict",
+            "presentation": {
+              "display_name": "planning.close_arbiter_complete"
+            }
+          },
+          {
+            "id": "planning.closure_gap",
+            "stage_kind_id": "lad_arbiter",
+            "outcome_id": "planning.lad_arbiter.remediation_needed",
+            "kind": "closure_gap",
+            "artifact_schema_id": "planning.artifacts.incident_report",
+            "presentation": {
+              "display_name": "planning.closure_gap"
+            }
+          },
+          {
+            "id": "planning.close_arbiter_blocked",
+            "stage_kind_id": "lad_arbiter",
+            "outcome_id": "planning.lad_arbiter.blocked",
+            "kind": "block_work_item",
+            "artifact_schema_id": "planning.artifacts.report",
+            "presentation": {
+              "display_name": "planning.close_arbiter_blocked"
+            }
+          },
+          {
+            "id": "execution.route_builder_complete",
+            "stage_kind_id": "lad_builder",
+            "outcome_id": "execution.lad_builder.complete",
+            "kind": "route",
+            "target_stage_kind_id": "lad_checker",
+            "target_graph_node_id": "execution.lad.checker.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_checker",
+              "execution.skills.checker_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_builder_complete"
+            }
+          },
+          {
+            "id": "execution.route_builder_blocked",
+            "stage_kind_id": "lad_builder",
+            "outcome_id": "execution.lad_builder.blocked",
+            "kind": "route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter",
+              "execution.skills.troubleshooter_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_builder_blocked"
+            }
+          },
+          {
+            "id": "execution.route_checker_pass",
+            "stage_kind_id": "lad_checker",
+            "outcome_id": "execution.lad_checker.pass",
+            "kind": "route",
+            "target_stage_kind_id": "lad_updater",
+            "target_graph_node_id": "execution.lad.updater.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_updater",
+              "execution.skills.updater_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_checker_pass"
+            }
+          },
+          {
+            "id": "execution.route_checker_fix_needed",
+            "stage_kind_id": "lad_checker",
+            "outcome_id": "execution.lad_checker.fix_needed",
+            "kind": "route",
+            "target_stage_kind_id": "lad_fixer",
+            "target_graph_node_id": "execution.lad.fixer.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_fixer",
+              "execution.skills.fixer_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_checker_fix_needed"
+            }
+          },
+          {
+            "id": "execution.route_checker_blocked",
+            "stage_kind_id": "lad_checker",
+            "outcome_id": "execution.lad_checker.blocked",
+            "kind": "route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter",
+              "execution.skills.troubleshooter_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_checker_blocked"
+            }
+          },
+          {
+            "id": "execution.route_fixer_complete",
+            "stage_kind_id": "lad_fixer",
+            "outcome_id": "execution.lad_fixer.complete",
+            "kind": "route",
+            "target_stage_kind_id": "lad_doublechecker",
+            "target_graph_node_id": "execution.lad.doublechecker.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_doublechecker",
+              "execution.skills.doublechecker_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_fixer_complete"
+            }
+          },
+          {
+            "id": "execution.route_fixer_blocked",
+            "stage_kind_id": "lad_fixer",
+            "outcome_id": "execution.lad_fixer.blocked",
+            "kind": "route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter",
+              "execution.skills.troubleshooter_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_fixer_blocked"
+            }
+          },
+          {
+            "id": "execution.route_doublechecker_pass",
+            "stage_kind_id": "lad_doublechecker",
+            "outcome_id": "execution.lad_doublechecker.pass",
+            "kind": "route",
+            "target_stage_kind_id": "lad_updater",
+            "target_graph_node_id": "execution.lad.updater.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_updater",
+              "execution.skills.updater_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_doublechecker_pass"
+            }
+          },
+          {
+            "id": "execution.route_doublechecker_fix_needed",
+            "stage_kind_id": "lad_doublechecker",
+            "outcome_id": "execution.lad_doublechecker.fix_needed",
+            "kind": "route",
+            "target_stage_kind_id": "lad_fixer",
+            "target_graph_node_id": "execution.lad.fixer.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_fixer",
+              "execution.skills.fixer_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_doublechecker_fix_needed"
+            }
+          },
+          {
+            "id": "execution.route_doublechecker_blocked",
+            "stage_kind_id": "lad_doublechecker",
+            "outcome_id": "execution.lad_doublechecker.blocked",
+            "kind": "route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter",
+              "execution.skills.troubleshooter_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_doublechecker_blocked"
+            }
+          },
+          {
+            "id": "execution.close_updater_complete",
+            "stage_kind_id": "lad_updater",
+            "outcome_id": "execution.lad_updater.complete",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "execution.artifacts.report",
+            "presentation": {
+              "display_name": "execution.close_updater_complete"
+            }
+          },
+          {
+            "id": "execution.route_updater_blocked",
+            "stage_kind_id": "lad_updater",
+            "outcome_id": "execution.lad_updater.blocked",
+            "kind": "route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter",
+              "execution.skills.troubleshooter_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_updater_blocked"
+            }
+          },
+          {
+            "id": "execution.return_troubleshooter_complete",
+            "stage_kind_id": "lad_troubleshooter",
+            "outcome_id": "execution.lad_troubleshooter.complete",
+            "kind": "route",
+            "target_stage_kind_id": "lad_builder",
+            "target_graph_node_id": "execution.lad.builder.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.report",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_builder",
+              "execution.skills.builder_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.return_troubleshooter_complete"
+            },
+            "dynamic_target_selector": {
+              "kind": "observation_payload_route_target",
+              "field_names": [
+                "resume_stage"
+              ],
+              "disallowed_targets": [
+                "consultant"
+              ],
+              "targets": {
+                "builder": {
+                  "target_stage_kind_id": "lad_builder",
+                  "target_graph_node_id": "execution.lad.builder.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                },
+                "checker": {
+                  "target_stage_kind_id": "lad_checker",
+                  "target_graph_node_id": "execution.lad.checker.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                },
+                "fixer": {
+                  "target_stage_kind_id": "lad_fixer",
+                  "target_graph_node_id": "execution.lad.fixer.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                },
+                "doublechecker": {
+                  "target_stage_kind_id": "lad_doublechecker",
+                  "target_graph_node_id": "execution.lad.doublechecker.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                },
+                "updater": {
+                  "target_stage_kind_id": "lad_updater",
+                  "target_graph_node_id": "execution.lad.updater.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                }
+              }
+            }
+          },
+          {
+            "id": "execution.route_troubleshooter_blocked",
+            "stage_kind_id": "lad_troubleshooter",
+            "outcome_id": "execution.lad_troubleshooter.blocked",
+            "kind": "route",
+            "target_stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.consultant.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_consultant",
+              "execution.skills.consultant_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_troubleshooter_blocked"
+            }
+          },
+          {
+            "id": "execution.route_consultant_complete",
+            "stage_kind_id": "lad_consultant",
+            "outcome_id": "execution.lad_consultant.complete",
+            "kind": "route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "execution.artifacts.report",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter",
+              "execution.skills.troubleshooter_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "execution.route_consultant_complete"
+            },
+            "dynamic_target_selector": {
+              "kind": "observation_payload_route_target",
+              "field_names": [
+                "target_stage",
+                "resume_stage"
+              ],
+              "disallowed_targets": [
+                "consultant"
+              ],
+              "targets": {
+                "builder": {
+                  "target_stage_kind_id": "lad_builder",
+                  "target_graph_node_id": "execution.lad.builder.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                },
+                "checker": {
+                  "target_stage_kind_id": "lad_checker",
+                  "target_graph_node_id": "execution.lad.checker.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                },
+                "fixer": {
+                  "target_stage_kind_id": "lad_fixer",
+                  "target_graph_node_id": "execution.lad.fixer.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                },
+                "doublechecker": {
+                  "target_stage_kind_id": "lad_doublechecker",
+                  "target_graph_node_id": "execution.lad.doublechecker.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                },
+                "updater": {
+                  "target_stage_kind_id": "lad_updater",
+                  "target_graph_node_id": "execution.lad.updater.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                },
+                "troubleshooter": {
+                  "target_stage_kind_id": "lad_troubleshooter",
+                  "target_graph_node_id": "execution.lad.troubleshooter.start",
+                  "emitted_queue_family_id": "stage_result",
+                  "runner_binding_id": "execution.lad.local_runner"
+                }
+              }
+            }
+          },
+          {
+            "id": "execution.close_consultant_needs_plan",
+            "stage_kind_id": "lad_consultant",
+            "outcome_id": "execution.lad_consultant.needs_plan",
+            "kind": "close_with_escalation",
+            "artifact_schema_id": "execution.artifacts.incident_report",
+            "presentation": {
+              "display_name": "execution.close_consultant_needs_plan"
+            }
+          },
+          {
+            "id": "execution.close_consultant_blocked",
+            "stage_kind_id": "lad_consultant",
+            "outcome_id": "execution.lad_consultant.blocked",
+            "kind": "block_work_item",
+            "artifact_schema_id": "execution.artifacts.report",
+            "presentation": {
+              "display_name": "execution.close_consultant_blocked"
+            }
+          },
+          {
+            "id": "execution.escalate_checker_fix_exhausted",
+            "stage_kind_id": "lad_checker",
+            "outcome_id": "execution.lad_checker.fix_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "presentation": {
+              "display_name": "execution.escalate_checker_fix_exhausted"
+            }
+          },
+          {
+            "id": "execution.escalate_doublechecker_fix_exhausted",
+            "stage_kind_id": "lad_doublechecker",
+            "outcome_id": "execution.lad_doublechecker.fix_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "presentation": {
+              "display_name": "execution.escalate_doublechecker_fix_exhausted"
+            }
+          },
+          {
+            "id": "execution.return_troubleshooter_recovered",
+            "stage_kind_id": "lad_troubleshooter",
+            "outcome_id": "execution.lad_troubleshooter.recovered",
+            "kind": "return_to_recorded_source",
+            "artifact_schema_id": "execution.artifacts.report",
+            "presentation": {
+              "display_name": "execution.return_troubleshooter_recovered"
+            }
+          },
+          {
+            "id": "execution.quarantine_troubleshooter_blocked",
+            "stage_kind_id": "lad_troubleshooter",
+            "outcome_id": "execution.lad_troubleshooter.recovery_blocked",
+            "kind": "quarantine_lineage",
+            "artifact_schema_id": "execution.artifacts.report",
+            "presentation": {
+              "display_name": "execution.quarantine_troubleshooter_blocked"
+            }
+          },
+          {
+            "id": "execution.return_consultant_recovered",
+            "stage_kind_id": "lad_consultant",
+            "outcome_id": "execution.lad_consultant.recovered",
+            "kind": "return_to_recorded_source",
+            "artifact_schema_id": "execution.artifacts.report",
+            "presentation": {
+              "display_name": "execution.return_consultant_recovered"
+            }
+          },
+          {
+            "id": "execution.quarantine_consultant_blocked",
+            "stage_kind_id": "lad_consultant",
+            "outcome_id": "execution.lad_consultant.quarantine",
+            "kind": "quarantine_lineage",
+            "artifact_schema_id": "execution.artifacts.report",
+            "presentation": {
+              "display_name": "execution.quarantine_consultant_blocked"
+            }
+          },
+          {
+            "id": "execution.escalate_builder_blocked_exhausted",
+            "stage_kind_id": "lad_builder",
+            "outcome_id": "execution.lad_builder.blocked_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.consultant.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_consultant"
+            ],
+            "presentation": {
+              "display_name": "execution.escalate_builder_blocked_exhausted"
+            }
+          },
+          {
+            "id": "execution.recover_builder_runtime_failure",
+            "stage_kind_id": "lad_builder",
+            "outcome_id": "execution.lad_builder.runtime_failed",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "presentation": {
+              "display_name": "execution.recover_builder_runtime_failure"
+            }
+          },
+          {
+            "id": "execution.close_builder_runtime_failure_exhausted",
+            "stage_kind_id": "lad_builder",
+            "outcome_id": "execution.lad_builder.runtime_failed_exhausted",
+            "kind": "block_work_item",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "presentation": {
+              "display_name": "execution.close_builder_runtime_failure_exhausted"
+            }
+          },
+          {
+            "id": "execution.escalate_checker_blocked_exhausted",
+            "stage_kind_id": "lad_checker",
+            "outcome_id": "execution.lad_checker.blocked_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.consultant.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_consultant"
+            ],
+            "presentation": {
+              "display_name": "execution.escalate_checker_blocked_exhausted"
+            }
+          },
+          {
+            "id": "execution.recover_checker_runtime_failure",
+            "stage_kind_id": "lad_checker",
+            "outcome_id": "execution.lad_checker.runtime_failed",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "presentation": {
+              "display_name": "execution.recover_checker_runtime_failure"
+            }
+          },
+          {
+            "id": "execution.close_checker_runtime_failure_exhausted",
+            "stage_kind_id": "lad_checker",
+            "outcome_id": "execution.lad_checker.runtime_failed_exhausted",
+            "kind": "block_work_item",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "presentation": {
+              "display_name": "execution.close_checker_runtime_failure_exhausted"
+            }
+          },
+          {
+            "id": "execution.escalate_fixer_blocked_exhausted",
+            "stage_kind_id": "lad_fixer",
+            "outcome_id": "execution.lad_fixer.blocked_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.consultant.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_consultant"
+            ],
+            "presentation": {
+              "display_name": "execution.escalate_fixer_blocked_exhausted"
+            }
+          },
+          {
+            "id": "execution.recover_fixer_runtime_failure",
+            "stage_kind_id": "lad_fixer",
+            "outcome_id": "execution.lad_fixer.runtime_failed",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "presentation": {
+              "display_name": "execution.recover_fixer_runtime_failure"
+            }
+          },
+          {
+            "id": "execution.close_fixer_runtime_failure_exhausted",
+            "stage_kind_id": "lad_fixer",
+            "outcome_id": "execution.lad_fixer.runtime_failed_exhausted",
+            "kind": "block_work_item",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "presentation": {
+              "display_name": "execution.close_fixer_runtime_failure_exhausted"
+            }
+          },
+          {
+            "id": "execution.escalate_doublechecker_blocked_exhausted",
+            "stage_kind_id": "lad_doublechecker",
+            "outcome_id": "execution.lad_doublechecker.blocked_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.consultant.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_consultant"
+            ],
+            "presentation": {
+              "display_name": "execution.escalate_doublechecker_blocked_exhausted"
+            }
+          },
+          {
+            "id": "execution.recover_doublechecker_runtime_failure",
+            "stage_kind_id": "lad_doublechecker",
+            "outcome_id": "execution.lad_doublechecker.runtime_failed",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "presentation": {
+              "display_name": "execution.recover_doublechecker_runtime_failure"
+            }
+          },
+          {
+            "id": "execution.close_doublechecker_runtime_failure_exhausted",
+            "stage_kind_id": "lad_doublechecker",
+            "outcome_id": "execution.lad_doublechecker.runtime_failed_exhausted",
+            "kind": "block_work_item",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "presentation": {
+              "display_name": "execution.close_doublechecker_runtime_failure_exhausted"
+            }
+          },
+          {
+            "id": "execution.escalate_updater_blocked_exhausted",
+            "stage_kind_id": "lad_updater",
+            "outcome_id": "execution.lad_updater.blocked_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.consultant.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_consultant"
+            ],
+            "presentation": {
+              "display_name": "execution.escalate_updater_blocked_exhausted"
+            }
+          },
+          {
+            "id": "execution.recover_updater_runtime_failure",
+            "stage_kind_id": "lad_updater",
+            "outcome_id": "execution.lad_updater.runtime_failed",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "presentation": {
+              "display_name": "execution.recover_updater_runtime_failure"
+            }
+          },
+          {
+            "id": "execution.close_updater_runtime_failure_exhausted",
+            "stage_kind_id": "lad_updater",
+            "outcome_id": "execution.lad_updater.runtime_failed_exhausted",
+            "kind": "block_work_item",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "presentation": {
+              "display_name": "execution.close_updater_runtime_failure_exhausted"
+            }
+          },
+          {
+            "id": "execution.escalate_troubleshooter_blocked_exhausted",
+            "stage_kind_id": "lad_troubleshooter",
+            "outcome_id": "execution.lad_troubleshooter.blocked_threshold_recovery",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.consultant.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_consultant"
+            ],
+            "presentation": {
+              "display_name": "execution.escalate_troubleshooter_blocked_exhausted"
+            }
+          },
+          {
+            "id": "execution.recover_troubleshooter_runtime_failure",
+            "stage_kind_id": "lad_troubleshooter",
+            "outcome_id": "execution.lad_troubleshooter.runtime_failed",
+            "kind": "recovery_route",
+            "target_stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "runner_binding_id": "execution.lad.local_runner",
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "presentation": {
+              "display_name": "execution.recover_troubleshooter_runtime_failure"
+            }
+          },
+          {
+            "id": "execution.close_troubleshooter_runtime_failure_exhausted",
+            "stage_kind_id": "lad_troubleshooter",
+            "outcome_id": "execution.lad_troubleshooter.runtime_failed_exhausted",
+            "kind": "block_work_item",
+            "artifact_schema_id": "execution.artifacts.stage_result",
+            "presentation": {
+              "display_name": "execution.close_troubleshooter_runtime_failure_exhausted"
+            }
+          },
+          {
+            "id": "learning.route_analyst_complete",
+            "stage_kind_id": "analyst",
+            "outcome_id": "learning.analyst.complete",
+            "kind": "route",
+            "target_stage_kind_id": "professor",
+            "target_graph_node_id": "learning.standard.professor",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "learning.artifacts.research_packet",
+            "runner_binding_id": "learning.standard.local_runner",
+            "asset_ids": [
+              "learning.entrypoints.professor",
+              "learning.skills.professor_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "learning.route_analyst_complete"
+            }
+          },
+          {
+            "id": "learning.route_professor_complete",
+            "stage_kind_id": "professor",
+            "outcome_id": "learning.professor.complete",
+            "kind": "route",
+            "target_stage_kind_id": "curator",
+            "target_graph_node_id": "learning.standard.curator",
+            "emitted_queue_family_id": "stage_result",
+            "artifact_schema_id": "learning.artifacts.skill_candidate",
+            "runner_binding_id": "learning.standard.local_runner",
+            "asset_ids": [
+              "learning.entrypoints.curator",
+              "learning.skills.curator_core"
+            ],
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            },
+            "presentation": {
+              "display_name": "learning.route_professor_complete"
+            }
+          },
+          {
+            "id": "learning.close_curator_complete",
+            "stage_kind_id": "curator",
+            "outcome_id": "learning.curator.complete",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "learning.artifacts.skill_update",
+            "presentation": {
+              "display_name": "learning.close_curator_complete"
+            }
+          },
+          {
+            "id": "learning.close_librarian_complete",
+            "stage_kind_id": "librarian",
+            "outcome_id": "learning.librarian.complete",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "learning.artifacts.skill_install_report",
+            "presentation": {
+              "display_name": "learning.close_librarian_complete"
+            }
+          },
+          {
+            "id": "learning.close_analyst_noop",
+            "stage_kind_id": "analyst",
+            "outcome_id": "learning.analyst.noop",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "learning.artifacts.research_packet",
+            "presentation": {
+              "display_name": "learning.close_analyst_noop"
+            }
+          },
+          {
+            "id": "learning.close_analyst_blocked",
+            "stage_kind_id": "analyst",
+            "outcome_id": "learning.analyst.blocked",
+            "kind": "operator_wait",
+            "artifact_schema_id": "learning.artifacts.report",
+            "presentation": {
+              "display_name": "learning.close_analyst_blocked"
+            }
+          },
+          {
+            "id": "learning.close_professor_noop",
+            "stage_kind_id": "professor",
+            "outcome_id": "learning.professor.noop",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "learning.artifacts.professor_notes",
+            "presentation": {
+              "display_name": "learning.close_professor_noop"
+            }
+          },
+          {
+            "id": "learning.close_professor_blocked",
+            "stage_kind_id": "professor",
+            "outcome_id": "learning.professor.blocked",
+            "kind": "operator_wait",
+            "artifact_schema_id": "learning.artifacts.report",
+            "presentation": {
+              "display_name": "learning.close_professor_blocked"
+            }
+          },
+          {
+            "id": "learning.close_curator_noop",
+            "stage_kind_id": "curator",
+            "outcome_id": "learning.curator.noop",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "learning.artifacts.curator_decision",
+            "presentation": {
+              "display_name": "learning.close_curator_noop"
+            }
+          },
+          {
+            "id": "learning.close_curator_blocked",
+            "stage_kind_id": "curator",
+            "outcome_id": "learning.curator.blocked",
+            "kind": "operator_wait",
+            "artifact_schema_id": "learning.artifacts.report",
+            "presentation": {
+              "display_name": "learning.close_curator_blocked"
+            }
+          },
+          {
+            "id": "learning.close_librarian_noop",
+            "stage_kind_id": "librarian",
+            "outcome_id": "learning.librarian.noop",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "learning.artifacts.skill_install_report",
+            "presentation": {
+              "display_name": "learning.close_librarian_noop"
+            }
+          },
+          {
+            "id": "learning.close_librarian_blocked",
+            "stage_kind_id": "librarian",
+            "outcome_id": "learning.librarian.blocked",
+            "kind": "operator_wait",
+            "artifact_schema_id": "learning.artifacts.report",
+            "presentation": {
+              "display_name": "learning.close_librarian_blocked"
+            }
+          }
+        ],
+        "effect_declarations": [
+          {
+            "id": "learning.effect.curator.workspace_skill_update",
+            "terminal_action_id": "learning.close_curator_complete",
+            "artifact_schema_id": "learning.artifacts.skill_update",
+            "provider_ref": "provider.fake_local.workspace",
+            "capability_policy_ref": "policy.fake_local.no_real_side_effects",
+            "target_ref_kind": "workspace_skill_update",
+            "target_ref_schema": "learning.effects.target.workspace_skill_update.v1",
+            "allowed_reconciliation_statuses": [
+              "applied",
+              "no_op",
+              "refused"
+            ],
+            "real_side_effects_allowed": false
+          },
+          {
+            "id": "learning.effect.librarian.workspace_skill_install_report",
+            "terminal_action_id": "learning.close_librarian_complete",
+            "artifact_schema_id": "learning.artifacts.skill_install_report",
+            "provider_ref": "provider.fake_local.workspace",
+            "capability_policy_ref": "policy.fake_local.no_real_side_effects",
+            "target_ref_kind": "workspace_skill_install_report",
+            "target_ref_schema": "learning.effects.target.workspace_skill_install_report.v1",
+            "allowed_reconciliation_statuses": [
+              "applied",
+              "no_op",
+              "refused"
+            ],
+            "real_side_effects_allowed": false
+          }
+        ],
+        "fanout_declarations": [
+          {
+            "id": "planning.manager.task_cards_to_execution",
+            "source_action_id": "planning.close_manager_complete",
+            "source_artifact_schema_id": "planning.artifacts.task_cards",
+            "item_source_path": [
+              "cards"
+            ],
+            "item_id_key": "task_card_id",
+            "target_route_id": "execution.lad.task",
+            "target_payload_schema_id": "execution.artifacts.task",
+            "target_payload_mapping": {
+              "task_id": [
+                "task_card_id"
+              ],
+              "body": [
+                "body"
+              ]
+            },
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "depends_on_source_work_item"
+          },
+          {
+            "id": "learning.trigger.execution.doublechecker_pass",
+            "source_action_id": "execution.route_doublechecker_pass",
+            "source_artifact_schema_id": "execution.artifacts.stage_result",
+            "item_source_path": [
+              "learning_requests"
+            ],
+            "item_id_key": "request_id",
+            "target_route_id": "learning.trigger.analyst",
+            "target_payload_schema_id": "learning.intake.request",
+            "target_payload_mapping": {
+              "request_id": [
+                "request_id"
+              ],
+              "body": [
+                "body"
+              ],
+              "root_source": [
+                "root_source"
+              ]
+            },
+            "source_state_policy": "accepted_terminal_observation",
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "none"
+          },
+          {
+            "id": "learning.trigger.execution.troubleshooter_complete",
+            "source_action_id": "execution.return_troubleshooter_complete",
+            "source_artifact_schema_id": "execution.artifacts.report",
+            "item_source_path": [
+              "learning_requests"
+            ],
+            "item_id_key": "request_id",
+            "target_route_id": "learning.trigger.analyst",
+            "target_payload_schema_id": "learning.intake.request",
+            "target_payload_mapping": {
+              "request_id": [
+                "request_id"
+              ],
+              "body": [
+                "body"
+              ],
+              "root_source": [
+                "root_source"
+              ]
+            },
+            "source_state_policy": "accepted_terminal_observation",
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "none"
+          },
+          {
+            "id": "learning.trigger.execution.troubleshooter_blocked",
+            "source_action_id": "execution.route_troubleshooter_blocked",
+            "source_artifact_schema_id": "execution.artifacts.stage_result",
+            "item_source_path": [
+              "learning_requests"
+            ],
+            "item_id_key": "request_id",
+            "target_route_id": "learning.trigger.analyst",
+            "target_payload_schema_id": "learning.intake.request",
+            "target_payload_mapping": {
+              "request_id": [
+                "request_id"
+              ],
+              "body": [
+                "body"
+              ],
+              "root_source": [
+                "root_source"
+              ]
+            },
+            "source_state_policy": "accepted_terminal_observation",
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "none"
+          },
+          {
+            "id": "learning.trigger.execution.consultant_complete",
+            "source_action_id": "execution.route_consultant_complete",
+            "source_artifact_schema_id": "execution.artifacts.report",
+            "item_source_path": [
+              "learning_requests"
+            ],
+            "item_id_key": "request_id",
+            "target_route_id": "learning.trigger.analyst",
+            "target_payload_schema_id": "learning.intake.request",
+            "target_payload_mapping": {
+              "request_id": [
+                "request_id"
+              ],
+              "body": [
+                "body"
+              ],
+              "root_source": [
+                "root_source"
+              ]
+            },
+            "source_state_policy": "accepted_terminal_observation",
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "none"
+          },
+          {
+            "id": "learning.trigger.execution.consultant_blocked",
+            "source_action_id": "execution.close_consultant_blocked",
+            "source_artifact_schema_id": "execution.artifacts.report",
+            "item_source_path": [
+              "learning_requests"
+            ],
+            "item_id_key": "request_id",
+            "target_route_id": "learning.trigger.analyst",
+            "target_payload_schema_id": "learning.intake.request",
+            "target_payload_mapping": {
+              "request_id": [
+                "request_id"
+              ],
+              "body": [
+                "body"
+              ],
+              "root_source": [
+                "root_source"
+              ]
+            },
+            "source_state_policy": "accepted_terminal_observation",
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "none"
+          },
+          {
+            "id": "learning.trigger.execution.needs_planning",
+            "source_action_id": "execution.close_consultant_needs_plan",
+            "source_artifact_schema_id": "execution.artifacts.incident_report",
+            "item_source_path": [
+              "learning_requests"
+            ],
+            "item_id_key": "request_id",
+            "target_route_id": "learning.trigger.analyst",
+            "target_payload_schema_id": "learning.intake.request",
+            "target_payload_mapping": {
+              "request_id": [
+                "request_id"
+              ],
+              "body": [
+                "body"
+              ],
+              "root_source": [
+                "root_source"
+              ]
+            },
+            "source_state_policy": "accepted_terminal_observation",
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "none"
+          },
+          {
+            "id": "learning.trigger.planning.planner_complete",
+            "source_action_id": "planning.route_planner_complete",
+            "source_artifact_schema_id": "planning.artifacts.stage_result",
+            "item_source_path": [
+              "learning_requests"
+            ],
+            "item_id_key": "request_id",
+            "target_route_id": "learning.trigger.librarian",
+            "target_payload_schema_id": "learning.intake.request",
+            "target_payload_mapping": {
+              "request_id": [
+                "request_id"
+              ],
+              "body": [
+                "body"
+              ],
+              "root_source": [
+                "root_source"
+              ],
+              "target_skill_id": [
+                "target_skill_id"
+              ],
+              "preferred_output_paths": [
+                "preferred_output_paths"
+              ]
+            },
+            "source_state_policy": "accepted_terminal_observation",
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "none"
+          }
+        ],
+        "concurrency_policies": [
+          {
+            "id": "foreground.planning",
+            "partition_id": "planning",
+            "max_active_runs": 1,
+            "coexist_partition_ids": [
+              "learning"
+            ]
+          },
+          {
+            "id": "foreground.execution",
+            "partition_id": "execution",
+            "max_active_runs": 1,
+            "coexist_partition_ids": [
+              "learning"
+            ]
+          },
+          {
+            "id": "learning.standard",
+            "partition_id": "learning",
+            "max_active_runs": 1,
+            "coexist_partition_ids": [
+              "planning",
+              "execution"
+            ]
+          }
+        ],
+        "recovery_policies": [
+          {
+            "id": "planning.blocked.recovery",
+            "source_recovery_action_ids": [
+              "planning.route_planner_blocked",
+              "planning.route_manager_blocked",
+              "planning.route_mechanic_blocked",
+              "planning.route_auditor_blocked"
+            ],
+            "return_action_ids": [
+              "planning.return_mechanic_recovered"
+            ],
+            "quarantine_action_ids": [
+              "planning.quarantine_mechanic_blocked"
+            ],
+            "recovery_stage_kind_id": "lad_mechanic",
+            "recorded_source_selector": "latest_recovery_attempt_for_lineage",
+            "attempt_scope": "lineage",
+            "immediate_recovery_limit": 1,
+            "cooldown_starts_at_attempt": 2,
+            "quarantine_threshold_attempt": 2,
+            "threshold_behavior": "runtime_quarantine_at_threshold",
+            "return_allowed_phases": [
+              "active_recovery",
+              "quarantine_eligible"
+            ],
+            "reset_trigger_action_ids": [
+              "planning.route_planner_complete",
+              "planning.close_manager_complete",
+              "planning.route_auditor_complete"
+            ],
+            "default_cooldown_seconds": 900,
+            "cooldown_wait_state_id": "planning.blocked.recovery.cooldown"
+          },
+          {
+            "id": "execution.fix_needed_recovery",
+            "source_recovery_action_ids": [
+              "execution.route_checker_fix_needed",
+              "execution.route_doublechecker_fix_needed"
+            ],
+            "return_action_ids": [
+              "execution.return_troubleshooter_recovered"
+            ],
+            "quarantine_action_ids": [
+              "execution.quarantine_troubleshooter_blocked"
+            ],
+            "recovery_stage_kind_id": "lad_troubleshooter",
+            "recorded_source_selector": "latest_recovery_attempt_for_lineage",
+            "attempt_scope": "lineage",
+            "immediate_recovery_limit": 1,
+            "cooldown_starts_at_attempt": 2,
+            "quarantine_threshold_attempt": 3,
+            "threshold_behavior": "runtime_quarantine_at_threshold",
+            "return_allowed_phases": [
+              "active_recovery",
+              "quarantine_eligible"
+            ],
+            "reset_trigger_action_ids": [
+              "execution.route_checker_pass",
+              "execution.route_fixer_complete",
+              "execution.route_doublechecker_pass",
+              "execution.close_updater_complete"
+            ],
+            "default_cooldown_seconds": 900,
+            "cooldown_wait_state_id": "execution.fix_needed_recovery.cooldown"
+          },
+          {
+            "id": "execution.blocked_recovery",
+            "source_recovery_action_ids": [
+              "execution.route_builder_blocked",
+              "execution.route_checker_blocked",
+              "execution.route_fixer_blocked",
+              "execution.route_doublechecker_blocked",
+              "execution.route_updater_blocked",
+              "execution.route_troubleshooter_blocked"
+            ],
+            "return_action_ids": [
+              "execution.return_consultant_recovered"
+            ],
+            "quarantine_action_ids": [
+              "execution.quarantine_consultant_blocked"
+            ],
+            "recovery_stage_kind_id": "lad_consultant",
+            "recorded_source_selector": "latest_recovery_attempt_for_lineage",
+            "attempt_scope": "lineage",
+            "immediate_recovery_limit": 1,
+            "cooldown_starts_at_attempt": 2,
+            "quarantine_threshold_attempt": 3,
+            "threshold_behavior": "runtime_quarantine_at_threshold",
+            "return_allowed_phases": [
+              "active_recovery",
+              "quarantine_eligible"
+            ],
+            "reset_trigger_action_ids": [
+              "execution.route_builder_complete",
+              "execution.route_checker_pass",
+              "execution.route_fixer_complete",
+              "execution.route_doublechecker_pass",
+              "execution.close_updater_complete",
+              "execution.return_troubleshooter_complete"
+            ],
+            "default_cooldown_seconds": 900,
+            "cooldown_wait_state_id": "execution.blocked_recovery.cooldown"
+          },
+          {
+            "id": "execution.runtime_failure_recovery",
+            "source_recovery_action_ids": [
+              "execution.recover_builder_runtime_failure",
+              "execution.recover_checker_runtime_failure",
+              "execution.recover_fixer_runtime_failure",
+              "execution.recover_doublechecker_runtime_failure",
+              "execution.recover_updater_runtime_failure",
+              "execution.recover_troubleshooter_runtime_failure"
+            ],
+            "return_action_ids": [
+              "execution.return_troubleshooter_recovered"
+            ],
+            "quarantine_action_ids": [
+              "execution.quarantine_troubleshooter_blocked"
+            ],
+            "recovery_stage_kind_id": "lad_troubleshooter",
+            "recorded_source_selector": "latest_recovery_attempt_for_lineage",
+            "attempt_scope": "lineage",
+            "immediate_recovery_limit": 1,
+            "cooldown_starts_at_attempt": 2,
+            "quarantine_threshold_attempt": 3,
+            "threshold_behavior": "runtime_quarantine_at_threshold",
+            "return_allowed_phases": [
+              "active_recovery",
+              "quarantine_eligible"
+            ],
+            "reset_trigger_action_ids": [
+              "execution.route_builder_complete",
+              "execution.route_checker_pass",
+              "execution.route_fixer_complete",
+              "execution.route_doublechecker_pass",
+              "execution.close_updater_complete",
+              "execution.return_troubleshooter_complete"
+            ],
+            "default_cooldown_seconds": 900,
+            "cooldown_wait_state_id": "execution.runtime_failure_recovery.cooldown"
+          }
+        ],
+        "wait_states": [
+          {
+            "id": "planning.blocked.recovery.cooldown",
+            "kind": "timer",
+            "policy_id": "planning.blocked.recovery",
+            "starts_at_attempt": 2,
+            "duration_seconds": 900
+          },
+          {
+            "id": "execution.fix_needed_recovery.cooldown",
+            "kind": "timer",
+            "policy_id": "execution.fix_needed_recovery",
+            "starts_at_attempt": 2,
+            "duration_seconds": 900
+          },
+          {
+            "id": "execution.blocked_recovery.cooldown",
+            "kind": "timer",
+            "policy_id": "execution.blocked_recovery",
+            "starts_at_attempt": 2,
+            "duration_seconds": 900
+          },
+          {
+            "id": "execution.runtime_failure_recovery.cooldown",
+            "kind": "timer",
+            "policy_id": "execution.runtime_failure_recovery",
+            "starts_at_attempt": 2,
+            "duration_seconds": 900
+          }
+        ],
+        "counters": [
+          {
+            "id": "planning.mechanic_attempt_count.planner",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_planner",
+            "increment_action_id": "planning.route_planner_blocked",
+            "threshold_action_id": "planning.escalate_planner_blocked_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "planning.mechanic_attempt_count.manager",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_manager",
+            "increment_action_id": "planning.route_manager_blocked",
+            "threshold_action_id": "planning.escalate_manager_blocked_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "planning.mechanic_attempt_count.mechanic",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_mechanic",
+            "increment_action_id": "planning.route_mechanic_blocked",
+            "threshold_action_id": "planning.escalate_mechanic_blocked_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "planning.mechanic_attempt_count.auditor",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_auditor",
+            "increment_action_id": "planning.route_auditor_blocked",
+            "threshold_action_id": "planning.escalate_auditor_blocked_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.fix_cycle_count.checker",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_checker",
+            "increment_action_id": "execution.route_checker_fix_needed",
+            "threshold_action_id": "execution.escalate_checker_fix_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.fix_cycle_count.doublechecker",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_doublechecker",
+            "increment_action_id": "execution.route_doublechecker_fix_needed",
+            "threshold_action_id": "execution.escalate_doublechecker_fix_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.troubleshoot_attempt_count.builder",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_builder",
+            "increment_action_id": "execution.route_builder_blocked",
+            "threshold_action_id": "execution.escalate_builder_blocked_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.runtime_failure_count.builder",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_builder",
+            "increment_action_id": "execution.recover_builder_runtime_failure",
+            "threshold_action_id": "execution.close_builder_runtime_failure_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.troubleshoot_attempt_count.checker",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_checker",
+            "increment_action_id": "execution.route_checker_blocked",
+            "threshold_action_id": "execution.escalate_checker_blocked_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.runtime_failure_count.checker",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_checker",
+            "increment_action_id": "execution.recover_checker_runtime_failure",
+            "threshold_action_id": "execution.close_checker_runtime_failure_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.troubleshoot_attempt_count.fixer",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_fixer",
+            "increment_action_id": "execution.route_fixer_blocked",
+            "threshold_action_id": "execution.escalate_fixer_blocked_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.runtime_failure_count.fixer",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_fixer",
+            "increment_action_id": "execution.recover_fixer_runtime_failure",
+            "threshold_action_id": "execution.close_fixer_runtime_failure_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.troubleshoot_attempt_count.doublechecker",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_doublechecker",
+            "increment_action_id": "execution.route_doublechecker_blocked",
+            "threshold_action_id": "execution.escalate_doublechecker_blocked_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.runtime_failure_count.doublechecker",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_doublechecker",
+            "increment_action_id": "execution.recover_doublechecker_runtime_failure",
+            "threshold_action_id": "execution.close_doublechecker_runtime_failure_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.troubleshoot_attempt_count.updater",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_updater",
+            "increment_action_id": "execution.route_updater_blocked",
+            "threshold_action_id": "execution.escalate_updater_blocked_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.runtime_failure_count.updater",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_updater",
+            "increment_action_id": "execution.recover_updater_runtime_failure",
+            "threshold_action_id": "execution.close_updater_runtime_failure_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.troubleshoot_attempt_count.troubleshooter",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_troubleshooter",
+            "increment_action_id": "execution.route_troubleshooter_blocked",
+            "threshold_action_id": "execution.escalate_troubleshooter_blocked_exhausted",
+            "threshold_count": 2
+          },
+          {
+            "id": "execution.runtime_failure_count.troubleshooter",
+            "kind": "lineage_terminal_action_counter",
+            "scope": "lineage",
+            "stage_kind_id": "lad_troubleshooter",
+            "increment_action_id": "execution.recover_troubleshooter_runtime_failure",
+            "threshold_action_id": "execution.close_troubleshooter_runtime_failure_exhausted",
+            "threshold_count": 2
+          }
+        ],
+        "completion_behaviors": [
+          {
+            "id": "planning.closure.completion",
+            "trigger": "backlog_drained",
+            "readiness_rule": "no_open_lineage_work",
+            "request_kind": "closure_target",
+            "target_selector": "active_closure_target",
+            "target_stage_kind_id": "lad_arbiter",
+            "target_graph_node_id": "planning.lad.arbiter.start",
+            "runner_binding_id": "planning.lad.local_runner",
+            "request_queue_family_id": "stage_result",
+            "pass_action_id": "planning.close_arbiter_complete",
+            "gap_action_id": "planning.closure_gap",
+            "blocked_action_id": "planning.close_arbiter_blocked",
+            "verdict_artifact_schema_id": "planning.artifacts.verdict",
+            "remediation_policy_id": "planning.closure.remediation",
+            "accepted_root_source_kinds": [
+              "idea",
+              "probe",
+              "manual",
+              "spec",
+              "incident"
+            ],
+            "root_source_resolution": "runtime_inventory",
+            "evidence_window_policy": "lineage",
+            "rubric_policy": "reuse_or_create",
+            "blocked_work_policy": "suppress",
+            "skip_if_closed": true,
+            "presentation": {
+              "display_name": "LAD closure completion"
+            }
+          }
+        ],
+        "remediation_policies": [
+          {
+            "id": "planning.closure.remediation",
+            "source_action_id": "planning.closure_gap",
+            "target_queue_family_id": "incident",
+            "target_stage_kind_id": "lad_auditor",
+            "target_graph_node_id": "planning.lad.auditor.start",
+            "target_runner_binding_id": "planning.lad.local_runner",
+            "payload_schema_id": "planning.intake.incident",
+            "guidance_source": "source_artifact",
+            "dedupe_key": "closure_target_and_source_artifact",
+            "duplicate_policy": "refuse",
+            "suppression_policy": "suppress_repeated_same_evidence",
+            "root_source_kind": "incident",
+            "presentation": {
+              "display_name": "LAD closure remediation"
+            }
+          }
+        ],
+        "intervention_options": [
+          {
+            "id": "planning.blocked.resume_lineage",
+            "policy_id": "planning.blocked.recovery",
+            "kind": "resume_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "resume_target_selector": "recorded_source",
+            "close_behavior": null,
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "target_activation_id",
+              "empty_payload"
+            ]
+          },
+          {
+            "id": "planning.blocked.close_lineage",
+            "policy_id": "planning.blocked.recovery",
+            "kind": "close_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "resume_target_selector": null,
+            "close_behavior": "close_ready_or_active_work_in_lineage",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "closed_work_item_ids",
+              "closed_activation_ids",
+              "closed_run_ids",
+              "empty_payload"
+            ]
+          },
+          {
+            "id": "planning.blocked.revise_lineage",
+            "policy_id": "planning.blocked.recovery",
+            "kind": "revise_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "resume_target_selector": null,
+            "close_behavior": null,
+            "payload_schema_id": "planning.intake.spec",
+            "target_queue_family_id": "spec",
+            "target_stage_kind_id": "lad_planner",
+            "target_graph_node_id": "planning.lad.planner.start",
+            "target_runner_binding_id": "planning.lad.local_runner",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "recovery_attempt_count",
+              "target_work_item_id",
+              "target_activation_id",
+              "payload_digest",
+              "payload_reference"
+            ]
+          },
+          {
+            "id": "execution.fix_needed.resume_lineage",
+            "policy_id": "execution.fix_needed_recovery",
+            "kind": "resume_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "resume_target_selector": "recorded_source",
+            "close_behavior": null,
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "target_activation_id",
+              "empty_payload"
+            ]
+          },
+          {
+            "id": "execution.fix_needed.close_lineage",
+            "policy_id": "execution.fix_needed_recovery",
+            "kind": "close_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "resume_target_selector": null,
+            "close_behavior": "close_ready_or_active_work_in_lineage",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "closed_work_item_ids",
+              "closed_activation_ids",
+              "closed_run_ids",
+              "empty_payload"
+            ]
+          },
+          {
+            "id": "execution.fix_needed.revise_lineage",
+            "policy_id": "execution.fix_needed_recovery",
+            "kind": "revise_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "resume_target_selector": null,
+            "close_behavior": null,
+            "payload_schema_id": "execution.artifacts.task",
+            "target_queue_family_id": "task",
+            "target_stage_kind_id": "lad_builder",
+            "target_graph_node_id": "execution.lad.builder.start",
+            "target_runner_binding_id": "execution.lad.local_runner",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "recovery_attempt_count",
+              "target_work_item_id",
+              "target_activation_id",
+              "payload_digest",
+              "payload_reference"
+            ]
+          },
+          {
+            "id": "execution.blocked.resume_lineage",
+            "policy_id": "execution.blocked_recovery",
+            "kind": "resume_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "resume_target_selector": "recorded_source",
+            "close_behavior": null,
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "target_activation_id",
+              "empty_payload"
+            ]
+          },
+          {
+            "id": "execution.blocked.close_lineage",
+            "policy_id": "execution.blocked_recovery",
+            "kind": "close_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "resume_target_selector": null,
+            "close_behavior": "close_ready_or_active_work_in_lineage",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "closed_work_item_ids",
+              "closed_activation_ids",
+              "closed_run_ids",
+              "empty_payload"
+            ]
+          },
+          {
+            "id": "execution.blocked.revise_lineage",
+            "policy_id": "execution.blocked_recovery",
+            "kind": "revise_lineage",
+            "legal_source_state": "active_lineage_quarantine",
+            "target_selector": "selected_quarantine_or_active_quarantine_by_lineage",
+            "supersede_behavior": "supersede_quarantine",
+            "attempt_effect": "resolve_attempt",
+            "actor_kind": "local_operator",
+            "resume_target_selector": null,
+            "close_behavior": null,
+            "payload_schema_id": "execution.artifacts.task",
+            "target_queue_family_id": "task",
+            "target_stage_kind_id": "lad_builder",
+            "target_graph_node_id": "execution.lad.builder.start",
+            "target_runner_binding_id": "execution.lad.local_runner",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "reason",
+              "option_id",
+              "policy_id",
+              "lineage_id",
+              "quarantine_id",
+              "recovery_attempt_record_id",
+              "recovery_attempt_count",
+              "target_work_item_id",
+              "target_activation_id",
+              "payload_digest",
+              "payload_reference"
+            ]
+          }
+        ],
+        "operator_waits": [
+          {
+            "id": "learning.analyst_blocked_wait",
+            "source_action_ids": [
+              "learning.close_analyst_blocked"
+            ],
+            "wait_scope": "lineage",
+            "source_work_item_behavior": "leave_open",
+            "unrelated_lineages_continue": true,
+            "allowed_resolution_kinds": [
+              "resume_recorded_source",
+              "close_recorded_source",
+              "revise_recorded_source"
+            ],
+            "payload_schema_id": "learning.intake.request",
+            "target_queue_family_id": "learning_request",
+            "target_stage_kind_id": "analyst",
+            "target_graph_node_id": "learning.standard.analyst",
+            "target_runner_binding_id": "learning.standard.local_runner",
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "wait_id",
+              "operator_wait_id",
+              "lineage_id",
+              "target_activation_id",
+              "empty_payload",
+              "closed_work_item_ids",
+              "target_work_item_id",
+              "payload_digest",
+              "payload_reference"
+            ],
+            "correlation_key": "wait_id",
+            "idempotency": "input_receipt_and_active_wait_status",
+            "timeout_policy": "none",
+            "expiry_policy": "none",
+            "cancellation_policy": "selected_resolution_only",
+            "status_effect": "operator_wait_active"
+          },
+          {
+            "id": "learning.professor_blocked_wait",
+            "source_action_ids": [
+              "learning.close_professor_blocked"
+            ],
+            "wait_scope": "lineage",
+            "source_work_item_behavior": "leave_open",
+            "unrelated_lineages_continue": true,
+            "allowed_resolution_kinds": [
+              "resume_recorded_source",
+              "close_recorded_source",
+              "revise_recorded_source"
+            ],
+            "payload_schema_id": "learning.intake.request",
+            "target_queue_family_id": "learning_request",
+            "target_stage_kind_id": "analyst",
+            "target_graph_node_id": "learning.standard.analyst",
+            "target_runner_binding_id": "learning.standard.local_runner",
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "wait_id",
+              "operator_wait_id",
+              "lineage_id",
+              "target_activation_id",
+              "empty_payload",
+              "closed_work_item_ids",
+              "target_work_item_id",
+              "payload_digest",
+              "payload_reference"
+            ],
+            "correlation_key": "wait_id",
+            "idempotency": "input_receipt_and_active_wait_status",
+            "timeout_policy": "none",
+            "expiry_policy": "none",
+            "cancellation_policy": "selected_resolution_only",
+            "status_effect": "operator_wait_active"
+          },
+          {
+            "id": "learning.curator_blocked_wait",
+            "source_action_ids": [
+              "learning.close_curator_blocked"
+            ],
+            "wait_scope": "lineage",
+            "source_work_item_behavior": "leave_open",
+            "unrelated_lineages_continue": true,
+            "allowed_resolution_kinds": [
+              "resume_recorded_source",
+              "close_recorded_source",
+              "revise_recorded_source"
+            ],
+            "payload_schema_id": "learning.intake.request",
+            "target_queue_family_id": "learning_request",
+            "target_stage_kind_id": "analyst",
+            "target_graph_node_id": "learning.standard.analyst",
+            "target_runner_binding_id": "learning.standard.local_runner",
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "wait_id",
+              "operator_wait_id",
+              "lineage_id",
+              "target_activation_id",
+              "empty_payload",
+              "closed_work_item_ids",
+              "target_work_item_id",
+              "payload_digest",
+              "payload_reference"
+            ],
+            "correlation_key": "wait_id",
+            "idempotency": "input_receipt_and_active_wait_status",
+            "timeout_policy": "none",
+            "expiry_policy": "none",
+            "cancellation_policy": "selected_resolution_only",
+            "status_effect": "operator_wait_active"
+          },
+          {
+            "id": "learning.librarian_blocked_wait",
+            "source_action_ids": [
+              "learning.close_librarian_blocked"
+            ],
+            "wait_scope": "lineage",
+            "source_work_item_behavior": "leave_open",
+            "unrelated_lineages_continue": true,
+            "allowed_resolution_kinds": [
+              "resume_recorded_source",
+              "close_recorded_source",
+              "revise_recorded_source"
+            ],
+            "payload_schema_id": "learning.intake.request",
+            "target_queue_family_id": "learning_request",
+            "target_stage_kind_id": "analyst",
+            "target_graph_node_id": "learning.standard.analyst",
+            "target_runner_binding_id": "learning.standard.local_runner",
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "wait_id",
+              "operator_wait_id",
+              "lineage_id",
+              "target_activation_id",
+              "empty_payload",
+              "closed_work_item_ids",
+              "target_work_item_id",
+              "payload_digest",
+              "payload_reference"
+            ],
+            "correlation_key": "wait_id",
+            "idempotency": "input_receipt_and_active_wait_status",
+            "timeout_policy": "none",
+            "expiry_policy": "none",
+            "cancellation_policy": "selected_resolution_only",
+            "status_effect": "operator_wait_active"
+          }
+        ],
+        "runner_bindings": [
+          {
+            "id": "planning.lad.local_runner",
+            "adapter_kind": "fake_local",
+            "stage_kind_ids": [
+              "recon",
+              "lad_planner",
+              "lad_manager",
+              "lad_mechanic",
+              "lad_auditor",
+              "lad_arbiter"
+            ],
+            "required_capability_ids": [
+              "capability.runner.invoke"
+            ],
+            "presentation": {
+              "display_name": "Local LAD Planning runner"
+            }
+          },
+          {
+            "id": "execution.lad.local_runner",
+            "adapter_kind": "fake_local",
+            "stage_kind_ids": [
+              "lad_builder",
+              "lad_checker",
+              "lad_fixer",
+              "lad_doublechecker",
+              "lad_updater",
+              "lad_troubleshooter",
+              "lad_consultant"
+            ],
+            "required_capability_ids": [
+              "capability.runner.invoke"
+            ],
+            "presentation": {
+              "display_name": "Local LAD runner"
+            }
+          },
+          {
+            "id": "learning.standard.local_runner",
+            "adapter_kind": "fake_local",
+            "stage_kind_ids": [
+              "analyst",
+              "professor",
+              "curator",
+              "librarian"
+            ],
+            "presentation": {
+              "display_name": "Learning runner"
+            },
+            "required_capability_ids": [
+              "capability.runner.invoke"
+            ]
+          }
+        ],
+        "capabilities": [
+          {
+            "id": "capability.runner.invoke",
+            "kind": "runner.invoke",
+            "support_status": "supported",
+            "grant_status": "granted",
+            "approval_policy_id": null
+          }
+        ]
+      }
     }
   ],
   "assets": [
@@ -9471,6 +14463,94 @@
       "package_path": "assets/workflows/planning.lad/skills/arbiter-core.md",
       "selection": "required",
       "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "learning.entrypoints.analyst",
+      "asset_kind": "entrypoint_prompt",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:fa5f82bbc70fb577fc9e4ac30ff084b186987dd539d7a68db00420f2a4d1c4b3",
+      "byte_length": 2280,
+      "package_path": "assets/workflows/lad.full/entrypoints/analyst.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "learning.skills.analyst_core",
+      "asset_kind": "stage_skill",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:40b01f7999c7abe3df70d91955f72339722c6179fbc9ff1aeda229afc1741ba4",
+      "byte_length": 3558,
+      "package_path": "assets/workflows/lad.full/skills/analyst-core.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "learning.entrypoints.professor",
+      "asset_kind": "entrypoint_prompt",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:d3be1952ff0f32bdbe84ac2826e9d239c3879977c4526ed5b466f86091210ec9",
+      "byte_length": 2353,
+      "package_path": "assets/workflows/lad.full/entrypoints/professor.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "learning.skills.professor_core",
+      "asset_kind": "stage_skill",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:64e00675ce975e29495eec23ae77f27a6ec159d3a42ebf5edead099d956eec18",
+      "byte_length": 3668,
+      "package_path": "assets/workflows/lad.full/skills/professor-core.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "learning.entrypoints.curator",
+      "asset_kind": "entrypoint_prompt",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:215a96936e2ff62ebe70f85abec623389a154afc1598be754af1d516db05b1d2",
+      "byte_length": 2479,
+      "package_path": "assets/workflows/lad.full/entrypoints/curator.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "learning.skills.curator_core",
+      "asset_kind": "stage_skill",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:5a5d0fe3516535e35bb0f9a477ab3de6809c8054b34a470c70eb3ecbbd7a6a5c",
+      "byte_length": 3708,
+      "package_path": "assets/workflows/lad.full/skills/curator-core.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "learning.entrypoints.librarian",
+      "asset_kind": "entrypoint_prompt",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:e2c607fb0d6c389c3f661fa763917c9ee36fa5c0dfbef45f246703ae0202023c",
+      "byte_length": 2622,
+      "package_path": "assets/workflows/lad.full/entrypoints/librarian.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
+    },
+    {
+      "asset_id": "learning.skills.librarian_core",
+      "asset_kind": "stage_skill",
+      "media_type": "text/markdown; charset=utf-8",
+      "encoding": "utf-8",
+      "content_digest": "sha256:69ca888947b4bd9d04036b15965381beeb67541462a1398066870462b05b9a67",
+      "byte_length": 3695,
+      "package_path": "assets/workflows/lad.full/skills/librarian-core.md",
+      "selection": "required",
+      "selected_authority_participation": "yes"
     }
   ],
   "dependencies": [],
@@ -9482,11 +14562,12 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:b1140ff10480bfc25a6716500e5f0ed1342a7b711adf7c810df34886bced3152",
+  "manifest_digest": "sha256:7566e83f8376de72ef604f90eed7d0e3f28a8b1896fb6f647fcf85cf1168a594",
   "non_authoritative_metadata": {
-    "plus_packet": "PLUS-0002D",
-    "status": "official_simple_loop_lad_execution_and_lad_planning_workflow_package",
-    "ops_skill_evidence": "entrypoint-authoring skill and references used for LAD planning asset rewrite review",
-    "unselected_catalog_disposition": "lad_planning.workflow_source_with_unselected_catalog() inspected; unselected_catalog excluded from shipped selected authority and package assets"
+    "plus_packet": "PLUS-0002E",
+    "status": "official_simple_loop_lad_execution_lad_planning_and_full_lad_workflow_package",
+    "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",
+    "unselected_catalog_disposition": "lad_planning.workflow_source_with_unselected_catalog() inspected; unselected_catalog excluded from shipped selected authority and package assets",
+    "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code"
   }
 }

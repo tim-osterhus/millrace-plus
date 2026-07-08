@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 IMPLEMENTATION_REVIEW_DOCS = (
     "docs/PLUS-0002C-implementation-review.md",
     "docs/PLUS-0002D-implementation-review.md",
+    "docs/PLUS-0002E-implementation-review.md",
 )
 
 
@@ -119,6 +120,5 @@ def test_official_package_data_does_not_claim_unported_workflow_content() -> Non
 
     for forbidden in (
         "vendor_selection",
-        "Learning",
     ):
         assert forbidden not in package_data_text
