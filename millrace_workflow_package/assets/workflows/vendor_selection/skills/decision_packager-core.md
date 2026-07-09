@@ -2,113 +2,99 @@
 
 ## Stage Contract
 Stage ID: `decision_packager`.
-Responsibility: Produce the final DecisionPack from selected authorization or decision-pack inputs without external commitments.
+Responsibility: Package the final selected decision using runtime-provided operator decision input as read-only input when present.
 
 ## Artifact Schemas
-- AwardDecision: object; required [bundle_id, decision_kind, selected_candidate_id, required_evidence_refs, operator_gate_required, reason]; allowed [bundle_id, decision_kind, selected_candidate_id, required_evidence_refs, operator_gate_required, reason]
-  - bundle_id: string; min_length 1
-  - decision_kind: enum [award, re_source, reject, operator_required, blocked]
-  - selected_candidate_id: enum [vendor_alpha, vendor_beta, vendor_gamma, null]
-  - required_evidence_refs: object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref];   - rubric_report_ref: string; min_length 1;   - conflict_report_ref: string; min_length 1
-  - operator_gate_required: boolean
-  - reason: string; min_length 1
-- OperatorDecision: object; required [gate_id, bundle_id, decision, actor_kind, audit_reason]; allowed [gate_id, bundle_id, decision, actor_kind, audit_reason]
-  - gate_id: string; min_length 1
-  - bundle_id: string; min_length 1
-  - decision: enum [approve, reject]
-  - actor_kind: const `local_operator`
-  - audit_reason: string; min_length 1
-- DecisionPack: object; required [source_request_id, bundle_id, selected_candidate_id, final_refusal_reason, evidence_refs, selected_plan_id, selected_plan_fingerprint, close_reason]; allowed [source_request_id, bundle_id, selected_candidate_id, final_refusal_reason, evidence_refs, selected_plan_id, selected_plan_fingerprint, close_reason]
-  - source_request_id: string; min_length 1
-  - bundle_id: string; min_length 1
-  - selected_candidate_id: enum [vendor_alpha, vendor_beta, vendor_gamma, null]
-  - final_refusal_reason: enum [policy_blocked, no_viable_vendor, operator_rejected, blocked, null]
-  - evidence_refs: object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref, operator_decision_ref];   - rubric_report_ref: string; min_length 1;   - conflict_report_ref: string; min_length 1;   - operator_decision_ref: string; min_length 1
-  - selected_plan_id: string; min_length 1
-  - selected_plan_fingerprint: string; min_length 1
-  - close_reason: enum [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked]
+Selected schemas for this stage. Treat each schema as closed.
+
+`DecisionPack`
+
+| Field | Required | Type | Meaning |
+| --- | --- | --- | --- |
+| `source_request_id` | yes | string; min_length 1 | Selected-schema field. |
+| `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
+| `selected_candidate_id` | yes | enum [vendor_alpha, vendor_beta, vendor_gamma, null] | Selected value from [vendor_alpha, vendor_beta, vendor_gamma, null]. |
+| `final_refusal_reason` | yes | enum [policy_blocked, no_viable_vendor, operator_rejected, blocked, null] | Selected value from [policy_blocked, no_viable_vendor, operator_rejected, blocked, null]. |
+| `evidence_refs` | yes | object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref, operator_decision_ref] | Nested selected-schema object. |
+| `selected_plan_id` | yes | string; min_length 1 | Selected-schema field. |
+| `selected_plan_fingerprint` | yes | string; min_length 1 | Selected-schema field. |
+| `close_reason` | yes | enum [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked] | Selected value from [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked]. |
+
+Operator decision boundary:
+- Runtime-provided `OperatorDecision` context is read-only input.
+- Do not fabricate `OperatorDecision`; package the final decision only from selected upstream artifacts and runtime-provided operator decision evidence when present.
+
+
+`OperatorDecision` (read-only runtime-provided input for decision packaging; do not fabricate it)
+
+| Field | Required | Type | Meaning |
+| --- | --- | --- | --- |
+| `gate_id` | yes | string; min_length 1 | Runtime-provided operator decision field. |
+| `bundle_id` | yes | string; min_length 1 | Runtime-provided operator decision field. |
+| `decision` | yes | enum [approve, reject] | Runtime-provided operator decision field. |
+| `actor_kind` | yes | string const `local_operator` | Runtime-provided operator decision field. |
+| `audit_reason` | yes | string; min_length 1 | Runtime-provided operator decision field. |
 
 ## Marker Artifact Protocol
 - DECISION_PACK_READY: selected action `vendor_selection.decision_packager.decision_pack_ready`; action kind `complete_work_item`; artifact schema `DecisionPack`; emitted queue `none`; target stage `none`.
 
 ## Handoff Format
-Use this envelope for every artifact:
-- `artifact_id`: stable local artifact identifier.
-- `artifact_kind`: one selected schema ID declared for this stage.
-- `produced_by_stage`: `decision_packager`.
-- `source_work_item_id`: copied from dispatch.
-- `source_run_id`: copied from dispatch.
-- `terminal_marker`: one legal marker rendered for this stage.
-- `fields`: schema-compatible artifact fields only.
-- `evidence`: selected input checks and selected package references.
-- `assumptions`: explicit assumptions, empty when none.
-- `next_stage_context`: selected IDs and evidence references for downstream context.
+Return:
+1. `terminal_marker`: one legal marker rendered for this stage.
+2. `artifact`: the exact selected artifact JSON object for that marker.
+3. Runner evidence/report text for selected checks, assumptions, dispatch IDs, package pins, and downstream context that are not selected artifact fields.
 
+Do not use a generic artifact envelope as the artifact body. Fields such as identity, source IDs, evidence, assumptions, selected action IDs, or downstream context are runner evidence/report facts unless the selected schema declares them.
 
-Operator decision input boundary:
-- `OperatorDecision` is runtime-owned local-operator resolution payload.
-- Treat a runtime-provided `OperatorDecision` as read-only input after recorded wait resolution.
-- Preserve `wait_id`, `operator_wait_id`, `actor_kind`, `resolution_kind`, `payload_reference`, and audit evidence when present.
-- Do not produce, approve, reject, settle, or fabricate `OperatorDecision`.
 ## Valid Example
-Valid example:
+Valid examples:
 ```json
-{
-  "artifact_id": "decision_packager-example-001",
-  "artifact_kind": "DecisionPack",
-  "produced_by_stage": "decision_packager",
-  "source_work_item_id": "source-work-item-id",
-  "source_run_id": "source-run-id",
-  "terminal_marker": "DECISION_PACK_READY",
-  "fields": {
-    "source_request_id": "request-001",
-    "bundle_id": "bundle-001",
-    "selected_candidate_id": "vendor_alpha",
-    "final_refusal_reason": null,
-    "evidence_refs": {
-      "rubric_report_ref": "rubric-report-001",
-      "conflict_report_ref": "conflict-report-001",
-      "operator_decision_ref": "operator-decision-001"
-    },
-    "selected_plan_id": "vendor_selection",
-    "selected_plan_fingerprint": "sha256:example-selected-plan-fingerprint",
-    "close_reason": "awarded"
-  },
-  "evidence": [
-    "selected input checked",
-    "selected package data used"
-  ],
-  "assumptions": [],
-  "next_stage_context": {
-    "selected_action_id": "vendor_selection.decision_packager.decision_pack_ready"
+[
+  {
+    "terminal_marker": "DECISION_PACK_READY",
+    "artifact": {
+      "source_request_id": "e2e-vendor-selection-001",
+      "bundle_id": "bundle-e2e-vendor-selection-001",
+      "selected_candidate_id": "vendor_alpha",
+      "final_refusal_reason": null,
+      "evidence_refs": {
+        "rubric_report_ref": "rubric-report-e2e-vendor-selection-001",
+        "conflict_report_ref": "conflict-report-e2e-vendor-selection-001"
+      },
+      "selected_plan_id": "selected-plan-e2e-vendor-selection",
+      "selected_plan_fingerprint": "sha256:selected-plan-fingerprint",
+      "close_reason": "awarded"
+    }
   }
-}
+]
 ```
 
 ## Invalid Example
 Invalid example:
 ```json
 {
-  "artifact_id": "bad-decision_packager",
-  "artifact_kind": "DecisionPack",
-  "produced_by_stage": "decision_packager",
   "terminal_marker": "DECISION_PACK_READY",
-  "fields": {"unsupported_field": "invented"},
-  "evidence": ["external data was assumed"]
+  "artifact": {
+    "artifact_id": "bad-decision_packager-wrapper",
+    "artifact_kind": "DecisionPack",
+    "fields": {
+      "unsupported_field": "invented"
+    },
+    "evidence": [
+      "external data was assumed"
+    ]
+  }
 }
 ```
-Reason invalid: it uses an unsupported field, lacks required handoff fields, or depends on unselected data.
+Reason invalid: `artifact` is a generic wrapper-as-artifact body. The selected schema requires the artifact body itself, with no undeclared wrapper keys.
 
 ## Validation Checklist
-- The terminal marker appears in this stage's rendered legal marker list.
-- The artifact schema matches the marker protocol above.
-- Required schema fields are present and unsupported fields are absent.
-- `approval_policy_hint` is preserved as evidence/handoff context when present.
-- Evidence references selected package data or dispatch data only.
-- The artifact does not claim external service access, private contacts, credentials, remote actions, external catalog searches, provider invocation, purchase actions, or payment actions.
-- The artifact does not claim model authority over local operator review.
+- Marker spelling exactly matches the selected marker list above.
+- The artifact body matches the schema selected by that marker.
+- Required selected fields are present and unsupported artifact fields are absent.
+- Evidence and assumptions live in runner evidence/report text unless the selected schema declares them.
+- No artifact text claims route, queue, approval, capability, effect, package, provider, purchase, payment, or durable-state behavior by itself.
+- No artifact or evidence includes credentials or private contact details.
 
 ## Completion Criteria
-- Return one selected terminal marker with one schema-compatible artifact.
-- Include enough evidence for audit and downstream context.
-- Stop without a success marker when required selected evidence is missing or contradictory.
+Return one selected terminal marker with one exact selected artifact JSON object and enough runner evidence/report text for audit.

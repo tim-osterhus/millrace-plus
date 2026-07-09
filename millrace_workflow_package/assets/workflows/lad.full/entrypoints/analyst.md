@@ -37,7 +37,7 @@ Forbidden claims:
 - Do not include API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
 How to return evidence:
-Return the artifact summary, evidence checked, assumptions, and exactly one legal terminal marker.
+Return exactly one legal terminal marker plus the exact selected artifact JSON object, or no artifact when the selected marker has no artifact schema. Keep evidence and assumptions in runner evidence/report text unless the selected schema declares them.
 
 When to stop:
 Stop and return `BLOCKED` when the selected request, required evidence, or selected schema context is missing or unsafe to interpret.

@@ -1,113 +1,112 @@
 ---
 name: planning-recon-core
-description: Use when executing the Recon stage for the selected Millrace planning workflow.
+description: Use when executing the recon stage for the selected Millrace planning workflow.
 ---
 
 # Recon Core Skill
 
 ## Artifact Schema
 
-Produce one selected artifact declared for the active Recon run. The selected dispatch context decides which schema is legal for the current run.
-
-`planning.artifacts.stage_result`
-
-| Field | Required | Type | Meaning |
-| --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `planning.artifacts.stage_result`. |
-| `summary` | yes | string | Concise Recon result. |
-
-`planning.artifacts.recon_packet`
-
-| Field | Required | Type | Meaning |
-| --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `planning.artifacts.recon_packet`. |
-| `summary` | yes | string | Classification evidence and risk summary. |
-
-`planning.artifacts.generated_task`
-
-| Field | Required | Type | Meaning |
-| --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `planning.artifacts.generated_task`. |
-| `task_id` | yes | string | Stable generated task identifier. |
-| `body` | yes | string | Execution-ready task body. |
-
-`execution.artifacts.task`
-
-| Field | Required | Type | Meaning |
-| --- | --- | --- | --- |
-| `task_id` | yes | string | Stable execution task identifier. |
-| `body` | yes | string | Execution-ready task body. |
+Selected-schema first. Return the exact selected artifact JSON object for the chosen marker, or no artifact/null when the selected marker has no artifact schema. Evidence and assumptions belong in runner evidence/report text unless the selected schema declares them.
 
 `planning.artifacts.generated_spec`
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `planning.artifacts.generated_spec`. |
-| `spec_id` | yes | string | Stable generated spec identifier. |
-| `body` | yes | string | Planning-ready spec body. |
+| `artifact_kind` | yes | string const `planning.artifacts.generated_spec` | Must be `planning.artifacts.generated_spec`. |
+| `spec_id` | yes | string; min_length 1 | Stable generated spec identifier. |
+| `body` | yes | string; min_length 1 | Generated planning spec body. |
 
-`planning.artifacts.report`
-
-| Field | Required | Type | Meaning |
-| --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `planning.artifacts.report`. |
-| `summary` | yes | string | Blocked, no-op, or supporting report. |
-
-Evidence and assumptions belong in the runner evidence envelope unless the selected schema explicitly includes them.
+No additional artifact keys are allowed beyond the dispatch-selected `planning.artifacts.generated_spec` schema. If dispatch selects another legal Recon marker, use that marker's selected schema instead.
 
 ## Handoff Format
 
-```text
-artifact_id:
-artifact_kind:
-produced_by_stage: recon
-source_work_item_id:
-source_run_id:
-terminal_marker:
-summary:
-fields:
-evidence:
-assumptions:
-next_stage_context:
-```
+Return:
+1. The exact selected terminal marker spelling from dispatch.
+2. `artifact` as the exact selected artifact JSON object.
+3. `observation_payload` as the exact same selected artifact JSON object when the runtime/wrapper asks for an observation or fanout payload candidate for this successful marker, unless dispatch provides a different selected observation schema.
+4. Narrative evidence/report text for checks and assumptions outside the runtime artifact/observation JSON candidates.
+
+Do not put generic wrapper keys, source IDs, selected action IDs, outcome IDs, route targets, route metadata, evidence arrays, assumptions arrays, or downstream context into the runtime artifact body or observation/fanout payload candidate unless the selected schema declares them.
 
 ## Valid Example
 
-```text
-artifact_id: recon-result-1
-artifact_kind: planning.artifacts.generated_spec
-produced_by_stage: recon
-source_work_item_id: work-1
-source_run_id: run-1
-terminal_marker: RECON_TO_PLANNING
-summary: The probe needs a Planning spec because scope and acceptance are not yet execution-ready.
-fields:
-  artifact_kind: planning.artifacts.generated_spec
-  spec_id: spec-from-probe-1
-  body: Summarized spec body grounded in checked evidence.
-evidence:
-  - Dispatch input and selected schema were checked.
-assumptions: []
-next_stage_context:
-  selected_context_only: true
+```json
+{
+  "terminal_marker": "RECON_TO_PLANNING",
+  "artifact": {
+    "artifact_kind": "planning.artifacts.generated_spec",
+    "spec_id": "generated-spec-001",
+    "body": "Planning synthesis is required before execution."
+  },
+  "observation_payload": {
+    "artifact_kind": "planning.artifacts.generated_spec",
+    "spec_id": "generated-spec-001",
+    "body": "Planning synthesis is required before execution."
+  }
+}
 ```
 
 ## Invalid Examples
 
-- Missing `artifact_kind`: invalid when the selected schema requires it.
-- Unsupported marker: invalid because the marker is not declared for this selected stage.
-- Claims that Recon chose runtime aftermath instead of returning selected evidence.
-- Runtime claim in artifact text: invalid because selected workflow data defines aftermath.
+Generic wrapper-as-fanout payload:
+
+```json
+{
+  "terminal_marker": "RECON_TO_PLANNING",
+  "artifact": {
+    "artifact_id": "bad-recon-wrapper",
+    "artifact_kind": "planning.artifacts.generated_spec",
+    "fields": {
+      "artifact_kind": "planning.artifacts.generated_spec",
+      "spec_id": "generated-spec-001",
+      "body": "Planning synthesis is required before execution."
+    },
+    "next_stage_context": {
+      "selected_action_id": "planning.recon_enqueue_spec"
+    }
+  }
+}
+```
+
+Invalid because `artifact` is not the exact `planning.artifacts.generated_spec` object selected for the successful marker.
+
+Missing required field:
+
+```json
+{
+  "terminal_marker": "RECON_TO_PLANNING",
+  "artifact": {
+    "artifact_kind": "planning.artifacts.generated_spec",
+    "spec_id": "generated-spec-001"
+  }
+}
+```
+
+Type mismatch:
+
+```json
+{
+  "terminal_marker": "RECON_TO_PLANNING",
+  "artifact": {
+    "artifact_kind": "planning.artifacts.generated_spec",
+    "spec_id": "generated-spec-001",
+    "body": ["not a string"]
+  }
+}
+```
 
 ## Validation Checklist
 
-- Required fields for the selected artifact schema are present.
-- Evidence supports the classification and marker choice.
-- Assumptions and missing data are explicit.
+- Required selected fields are present.
+- No artifact field is present unless the selected schema declares it.
+- The successful artifact body and observation/fanout payload candidate are schema-identical when the selected route or fanout validates the stage result payload.
+- Observation/fanout payload candidates contain no source IDs, selected action IDs, outcome IDs, route targets, route metadata, evidence arrays, assumptions arrays, or downstream context unless selected schema declares them.
+- Evidence supports the summary and marker choice.
 - Terminal marker is legal for `recon` in the selected workflow.
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
 ## Completion Criteria
 
-Recon is complete only when it returns one selected artifact or evidence envelope, supporting evidence, assumptions, and one legal terminal marker.
+Recon is complete only when it returns one legal terminal marker, one exact selected artifact body when required, and runner evidence/report text supporting the marker.

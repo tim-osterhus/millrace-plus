@@ -1,95 +1,126 @@
 ---
 name: planning-manager-core
-description: Use when executing the Manager stage for the selected Millrace planning workflow.
+description: Use when executing the lad_manager stage for the selected Millrace planning workflow.
 ---
 
-# Manager Core Skill
+# Lad Manager Core Skill
 
 ## Artifact Schema
 
-Produce one selected artifact declared for the active Manager run. The selected dispatch context decides which schema is legal for the current run.
-
-`planning.artifacts.stage_result`
-
-| Field | Required | Type | Meaning |
-| --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `planning.artifacts.stage_result`. |
-| `summary` | yes | string | Concise Manager result. |
+Selected-schema first. Return the exact selected artifact JSON object for the chosen marker, or no artifact/null when the selected marker has no artifact schema. Evidence and assumptions belong in runner evidence/report text unless the selected schema declares them.
 
 `planning.artifacts.task_cards`
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `task_cards`. |
-| `cards` | yes | array | One or more task-card objects. |
-| `cards[].task_card_id` | yes | string | Stable task-card identifier. |
-| `cards[].title` | yes | string | Human-readable task-card title. |
-| `cards[].body` | yes | string | Execution-ready task-card body. |
+| `artifact_kind` | yes | string const `task_cards` | Must be `task_cards`. |
+| `cards` | yes | array; min_items 1; unique by `task_card_id` | Selected task cards. |
 
-`planning.artifacts.report`
+Each `cards` item:
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `planning.artifacts.report`. |
-| `summary` | yes | string | Manager supporting or blocked report. |
+| `task_card_id` | yes | string; min_length 1 | Stable task-card identifier. |
+| `title` | yes | string; min_length 1 | Short task title. |
+| `body` | yes | string; min_length 1 | Complete task instruction and verification detail. |
 
-Evidence and assumptions belong in the runner evidence envelope unless the selected schema explicitly includes them.
+No additional artifact keys are allowed beyond the dispatch-selected `planning.artifacts.task_cards` schema. Put owner stages, dependencies, acceptance criteria, verification notes, assumptions, and evidence in each card `body` or runner report text; do not add undeclared JSON fields for them.
 
 ## Handoff Format
 
-```text
-artifact_id:
-artifact_kind:
-produced_by_stage: lad_manager
-source_work_item_id:
-source_run_id:
-terminal_marker:
-summary:
-fields:
-evidence:
-assumptions:
-next_stage_context:
-```
+Return:
+1. The exact selected terminal marker spelling from dispatch.
+2. `artifact` as the exact selected artifact JSON object.
+3. `observation_payload` as the exact same selected artifact JSON object when the runtime/wrapper asks for an observation or fanout payload candidate for this successful marker, unless dispatch provides a different selected observation schema.
+4. Narrative evidence/report text for checks and assumptions outside the runtime artifact/observation JSON candidates.
+
+Do not put generic wrapper keys, source IDs, selected action IDs, outcome IDs, route targets, route metadata, evidence arrays, assumptions arrays, or downstream context into the runtime artifact body or observation/fanout payload candidate unless the selected schema declares them.
 
 ## Valid Example
 
-```text
-artifact_id: manager-result-1
-artifact_kind: planning.artifacts.task_cards
-produced_by_stage: lad_manager
-source_work_item_id: work-1
-source_run_id: run-1
-terminal_marker: MANAGER_COMPLETE
-summary: Produced two ordered task cards grounded in the selected spec.
-fields:
-  artifact_kind: task_cards
-  cards:
-    - task_card_id: task-card-1
-      title: Implement the focused change
-      body: Execution-ready task details.
-evidence:
-  - Dispatch input and selected schema were checked.
-assumptions: []
-next_stage_context:
-  selected_context_only: true
+```json
+{
+  "terminal_marker": "MANAGER_COMPLETE",
+  "artifact": {
+    "artifact_kind": "task_cards",
+    "cards": [
+      {
+        "task_card_id": "create-e2e-planning-result",
+        "title": "Create E2E planning result file",
+        "body": "Create e2e-planning-result.txt in the assigned workspace with the exact requested content. Verify the file exists, the full content matches exactly, and no paths outside the assigned workspace are used."
+      }
+    ]
+  },
+  "observation_payload": {
+    "artifact_kind": "task_cards",
+    "cards": [
+      {
+        "task_card_id": "create-e2e-planning-result",
+        "title": "Create E2E planning result file",
+        "body": "Create e2e-planning-result.txt in the assigned workspace with the exact requested content. Verify the file exists, the full content matches exactly, and no paths outside the assigned workspace are used."
+      }
+    ]
+  }
+}
 ```
 
 ## Invalid Examples
 
-- Missing `cards`: invalid for `planning.artifacts.task_cards`.
-- Duplicate `task_card_id`: invalid because selected schema requires unique card identifiers.
-- Unsupported marker: invalid because the marker is not declared for this selected stage.
-- Runtime claim in artifact text: invalid because selected workflow data defines aftermath.
+Generic wrapper-as-artifact payload:
+
+```json
+{
+  "terminal_marker": "MANAGER_COMPLETE",
+  "artifact": {
+    "artifact_id": "bad-lad_manager-wrapper",
+    "artifact_kind": "task_cards",
+    "fields": {
+      "artifact_kind": "task_cards",
+      "cards": []
+    },
+    "next_stage_context": {
+      "selected_action_id": "planning.close_manager_complete"
+    }
+  }
+}
+```
+
+Invalid because `artifact` is not the exact `planning.artifacts.task_cards` object selected for the successful marker.
+
+Missing required field:
+
+```json
+{
+  "terminal_marker": "MANAGER_COMPLETE",
+  "artifact": {
+    "artifact_kind": "task_cards"
+  }
+}
+```
+
+Type mismatch:
+
+```json
+{
+  "terminal_marker": "MANAGER_COMPLETE",
+  "artifact": {
+    "artifact_kind": "task_cards",
+    "cards": "not an array"
+  }
+}
+```
 
 ## Validation Checklist
 
-- Required fields for the selected artifact schema are present.
-- Evidence supports the task-card shape and marker choice.
-- Assumptions and missing data are explicit.
+- Required selected fields are present.
+- No artifact field is present unless the selected schema declares it.
+- The successful artifact body and observation payload candidate are schema-identical when the wrapper asks for an observation payload candidate.
+- Observation payload candidates contain no source IDs, selected action IDs, outcome IDs, route targets, route metadata, evidence arrays, assumptions arrays, owner-stage fields, dependency arrays, or downstream context unless selected schema declares them.
+- Evidence supports the task-card content and marker choice.
 - Terminal marker is legal for `lad_manager` in the selected workflow.
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
 ## Completion Criteria
 
-Manager is complete only when it returns one selected artifact or evidence envelope, supporting evidence, assumptions, and one legal terminal marker.
+Lad Manager is complete only when it returns one legal terminal marker, one exact selected artifact body when required, and runner evidence/report text supporting the marker.

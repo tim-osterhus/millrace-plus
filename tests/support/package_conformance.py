@@ -19,6 +19,7 @@ from millrace.compiler.workflow_package_sources import (
     read_installed_workflow_package_source,
     read_path_workflow_package_source,
 )
+from millrace.contracts.schema import validate_schema
 from millrace.contracts.workflow_package import (
     asset_digest_for_bytes,
     manifest_digest_for_manifest,
@@ -31,6 +32,20 @@ from millrace.operator.packages import (
 )
 from millrace.substrate import ContentAddressedByteStore, SQLiteRuntimeStore
 from millrace.substrate.package_archives import export_workflow_package_directory
+
+GENERIC_ARTIFACT_ENVELOPE_FIELDS = frozenset(
+    {
+        "artifact_id",
+        "produced_by_stage",
+        "source_work_item_id",
+        "source_run_id",
+        "terminal_marker",
+        "fields",
+        "evidence",
+        "assumptions",
+        "next_stage_context",
+    },
+)
 
 _RUNTIME_AUTHORITY_PATTERNS = (
     re.compile(
@@ -453,6 +468,57 @@ def assert_no_undeclared_selected_artifact_kind_mentions(
         )
 
     assert violations == [], violations
+
+
+def assert_schema_value(value: object, schema: dict[str, object]) -> None:
+    result = validate_schema(schema, value)
+    assert result.accepted, result.issues
+
+
+def assert_marker_artifact_example_matches_selected_schema(
+    example: Mapping[str, object],
+    *,
+    stage_id: str,
+    marker_schema_by_stage: Mapping[str, Mapping[str, str]],
+    schemas_by_id: Mapping[str, dict[str, object]],
+) -> None:
+    assert {"terminal_marker", "artifact"} <= set(example) <= {
+        "terminal_marker",
+        "artifact",
+        "observation_payload",
+    }
+    marker = str(example["terminal_marker"])
+    schema_id = marker_schema_by_stage[stage_id][marker]
+    artifact = example["artifact"]
+    assert isinstance(artifact, dict)
+    schema = schemas_by_id[schema_id]
+    assert_schema_value(artifact, schema)
+    if "observation_payload" in example:
+        observation_payload = example["observation_payload"]
+        assert isinstance(observation_payload, dict)
+        assert_schema_value(observation_payload, schema)
+
+
+def assert_not_generic_artifact_envelope_body(artifact: Mapping[str, object]) -> None:
+    assert GENERIC_ARTIFACT_ENVELOPE_FIELDS.isdisjoint(artifact), artifact
+
+
+def markdown_json_examples(
+    text: str,
+    *,
+    section_heading: str,
+) -> tuple[dict[str, object], ...]:
+    match = re.search(
+        rf"{re.escape(section_heading)}\n(?:.*?\n)?```json\n(?P<json>.*?)\n```",
+        text,
+        re.DOTALL,
+    )
+    assert match is not None
+    parsed = json.loads(match.group("json"))
+    if isinstance(parsed, list):
+        return tuple(cast(list[dict[str, object]], parsed))
+    assert isinstance(parsed, dict)
+    return (cast(dict[str, object], parsed),)
 
 
 def _selected_artifact_schema_ids_for_workflow(

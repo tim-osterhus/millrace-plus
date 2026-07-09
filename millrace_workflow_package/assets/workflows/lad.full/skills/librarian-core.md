@@ -7,91 +7,121 @@ description: Use when executing the Librarian stage for the selected full LAD wo
 
 ## Artifact Schema
 
-Produce `learning_librarian_install_report` with this exact schema:
+Selected-schema first. Return the exact selected artifact JSON object for the chosen marker, or no artifact/null when the selected marker has no artifact schema. Evidence, assumptions, request IDs, target skill IDs, preferred output paths, recommendations, and route hints belong in runner evidence/report text unless the selected schema declares them.
+
+`learning.artifacts.skill_install_report`
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
-| `artifact_id` | yes | string | Stable artifact ID. |
-| `artifact_kind` | yes | string | `learning.artifacts.skill_install_report`. |
-| `source_work_item_id` | yes | string | Work item from dispatch. |
-| `source_run_id` | yes | string | Run id from dispatch. |
-| `stage_id` | yes | string | `librarian`. |
-| `status` | yes | string | `complete`, `noop`, or `blocked`. |
-| `summary` | yes | string | Selection result. |
-| `installed_path` | no | string | Workspace-local path reported by evidence when an install occurred. |
-| `installed_skill_ids` | yes | array | Skill ids installed or already available as selected evidence. |
-| `selected_skill_ids` | yes | array | Relevant uninstalled candidates selected for installation. |
-| `skipped_skill_ids` | yes | array | Candidates skipped with reasons. |
-| `evidence` | yes | array | Planner, installed-index, remote-index, and command evidence. |
-| `assumptions` | yes | array | Missing data and confidence limits. |
+| `artifact_kind` | yes | string const `learning.artifacts.skill_install_report` | Must be `learning.artifacts.skill_install_report`. |
+| `summary` | yes | string; min_length 1 | Selected-schema field. |
+| `target_skill_id` | yes | string; min_length 1 | Selected-schema field. |
+| `installed_path` | yes | string; min_length 1 | Selected-schema field. |
 
-For `BLOCKED`, produce `learning_librarian_blocked_report` with `artifact_kind: learning.artifacts.report`, `summary`, `evidence`, and `assumptions`.
+`learning.artifacts.report`
+
+| Field | Required | Type | Meaning |
+| --- | --- | --- | --- |
+| `artifact_kind` | yes | string const `learning.artifacts.report` | Must be `learning.artifacts.report`. |
+| `summary` | yes | string; min_length 1 | Selected-schema field. |
 
 ## Handoff Format
 
-```text
-artifact_id:
-produced_by_stage: librarian
-source_work_item_id:
-source_run_id:
-terminal_marker:
-fields:
-  artifact_kind:
-  summary:
-  installed_path:
-  installed_skill_ids:
-  selected_skill_ids:
-  skipped_skill_ids:
-evidence:
-assumptions:
-next_stage_context:
-  planner_spec:
-  remote_index_source:
-```
+Return:
+1. The exact selected terminal marker spelling from dispatch.
+2. `artifact` as the exact selected artifact JSON object.
+3. Runner evidence/report text for inspected evidence, assumptions, source IDs, target paths, recommendations, and downstream context that are not selected artifact fields.
+
+Do not put generic wrapper keys or Learning context fields into the runtime artifact body unless the selected schema declares them.
 
 ## Valid Example
 
-```text
-artifact_id: librarian-report-6
-produced_by_stage: librarian
-source_work_item_id: learning-6
-source_run_id: run-librarian-6
-terminal_marker: LIBRARIAN_NOOP
-fields:
-  artifact_kind: learning.artifacts.skill_install_report
-  summary: No relevant uninstalled optional skill was available.
-  installed_path:
-  installed_skill_ids:
-    - millrace-code-diet
-  selected_skill_ids: []
-  skipped_skill_ids:
-    - skill_id: broad-dev-helper
-      reason: weak match to Planner spec
-evidence:
-  - Planner spec targeted package workflow docs only.
-assumptions: []
-next_stage_context:
-  planner_spec: spec-42.md
-  remote_index_source: supported remote index evidence from dispatch
+```json
+[
+  {
+    "terminal_marker": "LIBRARIAN_COMPLETE",
+    "artifact": {
+      "artifact_kind": "learning.artifacts.skill_install_report",
+      "summary": "Selected skill install report prepared from package-local evidence.",
+      "target_skill_id": "millrace-review-and-qa-loop",
+      "installed_path": "skills/millrace-review-and-qa-loop/SKILL.md"
+    }
+  },
+  {
+    "terminal_marker": "LIBRARIAN_NOOP",
+    "artifact": {
+      "artifact_kind": "learning.artifacts.skill_install_report",
+      "summary": "Selected skill install report prepared from package-local evidence.",
+      "target_skill_id": "millrace-review-and-qa-loop",
+      "installed_path": "skills/millrace-review-and-qa-loop/SKILL.md"
+    }
+  },
+  {
+    "terminal_marker": "BLOCKED",
+    "artifact": {
+      "artifact_kind": "learning.artifacts.report",
+      "summary": "Learning stage blocked because selected input was missing or contradictory."
+    }
+  }
+]
 ```
 
 ## Invalid Examples
 
-- Missing required field: no `selected_skill_ids`.
-- Unsupported assumption: chooses a remote skill without comparing it to the Planner spec.
-- Runtime claim in artifact text: says Librarian output installs unlisted skills, performs provider execution, or persists state.
+Learning context fields embedded in the artifact body:
+
+```json
+{
+  "terminal_marker": "LIBRARIAN_COMPLETE",
+  "artifact": {
+    "artifact_kind": "learning.artifacts.skill_install_report",
+    "summary": "Selected skill install report prepared from package-local evidence.",
+    "target_skill_id": "invented-target",
+    "installed_path": "skills/millrace-review-and-qa-loop/SKILL.md",
+    "request_id": "learning-request-001",
+    "preferred_output_paths": [
+      "skills/example/SKILL.md"
+    ],
+    "recommended_learning_action": "draft_skill_patch",
+    "route_target_graph_node_id": "learning.standard.professor"
+  }
+}
+```
+
+Invalid because selected schemas do not declare the extra Learning context fields shown above.
+
+Missing required field:
+
+```json
+{
+  "terminal_marker": "LIBRARIAN_COMPLETE",
+  "artifact": {
+    "artifact_kind": "learning.artifacts.skill_install_report"
+  }
+}
+```
+
+Type mismatch:
+
+```json
+{
+  "terminal_marker": "LIBRARIAN_COMPLETE",
+  "artifact": {
+    "artifact_kind": "learning.artifacts.skill_install_report",
+    "summary": ["not a string"]
+  }
+}
+```
 
 ## Validation Checklist
 
-- Required fields are present.
-- Planner spec or summary evidence was inspected.
-- Installed skills are considered before remote candidates.
-- Selected candidates are relevant and bounded.
-- No-op is used when no relevant uninstalled candidate is available.
-- Terminal marker is legal for the selected Librarian stage.
-- No artifact text claims route, queue, approval, capability, effect, provider, package, plugin/MCP, native runner, reconciliation, remote index implementation, installation authority, persistence, or durable-state behavior.
+- Required selected fields are present.
+- No artifact field is present unless the selected schema declares it.
+- Evidence supports the selected marker and lives in runner evidence/report text unless selected as an artifact field.
+- Terminal marker is legal for `librarian` in the selected full LAD workflow.
+- No artifact text claims route, queue, approval, capability, effect, provider, package, plugin execution, reconciliation, persistence, or durable-state behavior.
 - No artifact text includes API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
 ## Completion Criteria
 
-The stage is complete only when the selection report records Planner evidence, installed-skill evidence, remote candidates considered, selected or skipped ids, command evidence when available, and a supported complete or no-op outcome.
+Librarian is complete only when it returns one legal terminal marker, one exact selected artifact body when required, and runner evidence/report text supporting the selected marker.

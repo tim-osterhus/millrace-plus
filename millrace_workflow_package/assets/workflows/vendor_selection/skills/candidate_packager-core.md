@@ -2,95 +2,98 @@
 
 ## Stage Contract
 Stage ID: `candidate_packager`.
-Responsibility: Package candidate bundle evidence for fanout while preserving source requirement and bundle identity.
+Responsibility: Package the selected candidate bundle for parallel rubric and conflict checks.
 
 ## Artifact Schemas
-- CandidateBundle: object; required [source_requirement_id, bundle_id, candidate_vendors, deterministic_source_refs]; allowed [source_requirement_id, bundle_id, candidate_vendors, deterministic_source_refs]
-  - source_requirement_id: string; min_length 1
-  - bundle_id: string; min_length 1
-  - candidate_vendors: array; min_items 1; unique_by `candidate_id`; items object; required [candidate_id, vendor_label, capabilities, budget_band, catalog_ref]; allowed [candidate_id, vendor_label, capabilities, budget_band, catalog_ref];     - candidate_id: string; min_length 1;     - vendor_label: string; min_length 1;     - capabilities: array; min_items 1; items string; min_length 1;     - budget_band: string; min_length 1;     - catalog_ref: string; min_length 1
-  - deterministic_source_refs: array; min_items 1; items string; min_length 1
+Selected schemas for this stage. Treat each schema as closed.
+
+`CandidateBundle`
+
+| Field | Required | Type | Meaning |
+| --- | --- | --- | --- |
+| `source_requirement_id` | yes | string; min_length 1 | Selected-schema field. |
+| `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
+| `candidate_vendors` | yes | array; min_items 1; items object; unique_by `candidate_id` | Selected-schema array. |
+| `deterministic_source_refs` | yes | array; min_items 1; items string | Selected-schema array. |
 
 ## Marker Artifact Protocol
 - CANDIDATES_READY: selected action `vendor_selection.candidate_packager.candidates_ready`; action kind `complete_work_item`; artifact schema `CandidateBundle`; emitted queue `none`; target stage `none`.
 
 ## Handoff Format
-Use this envelope for every artifact:
-- `artifact_id`: stable local artifact identifier.
-- `artifact_kind`: one selected schema ID declared for this stage.
-- `produced_by_stage`: `candidate_packager`.
-- `source_work_item_id`: copied from dispatch.
-- `source_run_id`: copied from dispatch.
-- `terminal_marker`: one legal marker rendered for this stage.
-- `fields`: schema-compatible artifact fields only.
-- `evidence`: selected input checks and selected package references.
-- `assumptions`: explicit assumptions, empty when none.
-- `next_stage_context`: selected IDs and evidence references for downstream context.
+Return:
+1. `terminal_marker`: one legal marker rendered for this stage.
+2. `artifact`: the exact selected artifact JSON object for that marker.
+3. Runner evidence/report text for selected checks, assumptions, dispatch IDs, package pins, and downstream context that are not selected artifact fields.
+
+Do not use a generic artifact envelope as the artifact body. Fields such as identity, source IDs, evidence, assumptions, selected action IDs, or downstream context are runner evidence/report facts unless the selected schema declares them.
 
 ## Valid Example
-Valid example:
+Valid examples:
 ```json
-{
-  "artifact_id": "candidate_packager-example-001",
-  "artifact_kind": "CandidateBundle",
-  "produced_by_stage": "candidate_packager",
-  "source_work_item_id": "source-work-item-id",
-  "source_run_id": "source-run-id",
-  "terminal_marker": "CANDIDATES_READY",
-  "fields": {
-    "source_requirement_id": "request-001",
-    "bundle_id": "bundle-001",
-    "candidate_vendors": [
-      {
-        "candidate_id": "vendor_alpha",
-        "vendor_label": "Alpha Stationery",
-        "capabilities": [
-          "standard_office_supplies",
-          "net30_invoice"
-        ],
-        "budget_band": "low",
-        "catalog_ref": "selected_catalog:vendor_alpha"
-      }
-    ],
-    "deterministic_source_refs": [
-      "selected_catalog:vendor_alpha"
-    ]
-  },
-  "evidence": [
-    "selected input checked",
-    "selected package data used"
-  ],
-  "assumptions": [],
-  "next_stage_context": {
-    "selected_action_id": "vendor_selection.candidate_packager.candidates_ready"
+[
+  {
+    "terminal_marker": "CANDIDATES_READY",
+    "artifact": {
+      "source_requirement_id": "e2e-vendor-selection-001",
+      "bundle_id": "bundle-e2e-vendor-selection-001",
+      "candidate_vendors": [
+        {
+          "candidate_id": "vendor_alpha",
+          "vendor_label": "Alpha Stationery",
+          "capabilities": [
+            "standard_office_supplies",
+            "net30_invoice"
+          ],
+          "budget_band": "low",
+          "catalog_ref": "selected-catalog:vendor_alpha"
+        },
+        {
+          "candidate_id": "vendor_gamma",
+          "vendor_label": "Gamma Office",
+          "capabilities": [
+            "standard_office_supplies",
+            "net30_invoice",
+            "rush_delivery"
+          ],
+          "budget_band": "medium",
+          "catalog_ref": "selected-catalog:vendor_gamma"
+        }
+      ],
+      "deterministic_source_refs": [
+        "selected-catalog:vendor_alpha",
+        "selected-catalog:vendor_gamma"
+      ]
+    }
   }
-}
+]
 ```
 
 ## Invalid Example
 Invalid example:
 ```json
 {
-  "artifact_id": "bad-candidate_packager",
-  "artifact_kind": "CandidateBundle",
-  "produced_by_stage": "candidate_packager",
   "terminal_marker": "CANDIDATES_READY",
-  "fields": {"unsupported_field": "invented"},
-  "evidence": ["external data was assumed"]
+  "artifact": {
+    "artifact_id": "bad-candidate_packager-wrapper",
+    "artifact_kind": "CandidateBundle",
+    "fields": {
+      "unsupported_field": "invented"
+    },
+    "evidence": [
+      "external data was assumed"
+    ]
+  }
 }
 ```
-Reason invalid: it uses an unsupported field, lacks required handoff fields, or depends on unselected data.
+Reason invalid: `artifact` is a generic wrapper-as-artifact body. The selected schema requires the artifact body itself, with no undeclared wrapper keys.
 
 ## Validation Checklist
-- The terminal marker appears in this stage's rendered legal marker list.
-- The artifact schema matches the marker protocol above.
-- Required schema fields are present and unsupported fields are absent.
-- `approval_policy_hint` is preserved as evidence/handoff context when present.
-- Evidence references selected package data or dispatch data only.
-- The artifact does not claim external service access, private contacts, credentials, remote actions, external catalog searches, provider invocation, purchase actions, or payment actions.
-- The artifact does not claim model authority over local operator review.
+- Marker spelling exactly matches the selected marker list above.
+- The artifact body matches the schema selected by that marker.
+- Required selected fields are present and unsupported artifact fields are absent.
+- Evidence and assumptions live in runner evidence/report text unless the selected schema declares them.
+- No artifact text claims route, queue, approval, capability, effect, package, provider, purchase, payment, or durable-state behavior by itself.
+- No artifact or evidence includes credentials or private contact details.
 
 ## Completion Criteria
-- Return one selected terminal marker with one schema-compatible artifact.
-- Include enough evidence for audit and downstream context.
-- Stop without a success marker when required selected evidence is missing or contradictory.
+Return one selected terminal marker with one exact selected artifact JSON object and enough runner evidence/report text for audit.

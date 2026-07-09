@@ -131,6 +131,48 @@ def _assets_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
     }
 
 
+def _schemas_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
+    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
+    selected_authority = cast(dict[str, object], workflow["selected_authority"])
+    return {
+        str(schema["id"]): cast(dict[str, object], schema["schema"])
+        for schema in cast(
+            list[dict[str, object]], selected_authority["artifact_schemas"]
+        )
+    }
+
+
+def _marker_schema_by_stage(manifest: dict[str, Any]) -> dict[str, dict[str, str]]:
+    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
+    selected_authority = cast(dict[str, object], workflow["selected_authority"])
+    outcomes = {
+        str(outcome["id"]): (
+            str(outcome["stage_kind_id"]),
+            str(outcome["marker"]),
+        )
+        for outcome in cast(
+            list[dict[str, object]],
+            selected_authority["terminal_outcomes"],
+        )
+        if "marker" in outcome
+    }
+    marker_schema_by_stage: dict[str, dict[str, str]] = {}
+    for action in cast(
+        list[dict[str, object]],
+        selected_authority["terminal_actions"],
+    ):
+        if "artifact_schema_id" not in action:
+            continue
+        outcome_id = str(action["outcome_id"])
+        if outcome_id not in outcomes:
+            continue
+        stage_id, marker = outcomes[outcome_id]
+        marker_schema_by_stage.setdefault(stage_id, {})[marker] = str(
+            action["artifact_schema_id"]
+        )
+    return marker_schema_by_stage
+
+
 def _source_as_selected_authority(source: dict[str, object]) -> dict[str, object]:
     selected = cast(dict[str, object], json.loads(json.dumps(source)))
     selected.pop("assets")
@@ -505,6 +547,169 @@ def test_full_lad_assets_follow_entrypoint_authoring_boundaries() -> None:
             conformance.selected_artifact_schema_ids_by_asset_id(manifest)
         ),
     )
+
+
+def test_full_lad_core_skill_examples_match_selected_schemas_for_all_stages() -> None:
+    manifest = _load_manifest()
+    schemas_by_id = _schemas_by_id(manifest)
+    marker_schema_by_stage = _marker_schema_by_stage(manifest)
+
+    for stage_id, _, _, _, core_asset_id in _LEARNING_STAGE_PAIRS:
+        skill_text = (
+            PACKAGE_ROOT / _package_path_for_full_lad_asset(core_asset_id)
+        ).read_text()
+        valid_examples = conformance.markdown_json_examples(
+            skill_text,
+            section_heading="## Valid Example",
+        )
+        invalid_example = conformance.markdown_json_examples(
+            skill_text,
+            section_heading="## Invalid Examples",
+        )[0]
+
+        assert valid_examples
+        for valid_example in valid_examples:
+            conformance.assert_marker_artifact_example_matches_selected_schema(
+                valid_example,
+                stage_id=stage_id,
+                marker_schema_by_stage=marker_schema_by_stage,
+                schemas_by_id=schemas_by_id,
+            )
+            artifact = cast(dict[str, object], valid_example["artifact"])
+            conformance.assert_not_generic_artifact_envelope_body(artifact)
+            if "observation_payload" in valid_example:
+                observation_payload = cast(
+                    dict[str, object],
+                    valid_example["observation_payload"],
+                )
+                conformance.assert_not_generic_artifact_envelope_body(
+                    observation_payload
+                )
+
+        with pytest.raises(AssertionError):
+            conformance.assert_marker_artifact_example_matches_selected_schema(
+                invalid_example,
+                stage_id=stage_id,
+                marker_schema_by_stage=marker_schema_by_stage,
+                schemas_by_id=schemas_by_id,
+            )
+
+
+def test_full_lad_analyst_complete_example_is_research_packet_payload() -> None:
+    manifest = _load_manifest()
+    schemas_by_id = _schemas_by_id(manifest)
+    marker_schema_by_stage = _marker_schema_by_stage(manifest)
+    skill_text = (
+        PACKAGE_ROOT / "assets/workflows/lad.full/skills/analyst-core.md"
+    ).read_text()
+    prompt_text = (
+        PACKAGE_ROOT / "assets/workflows/lad.full/entrypoints/analyst.md"
+    ).read_text()
+
+    valid_example = conformance.markdown_json_examples(
+        skill_text,
+        section_heading="## Valid Example",
+    )[0]
+    invalid_example = conformance.markdown_json_examples(
+        skill_text,
+        section_heading="## Invalid Examples",
+    )[0]
+
+    conformance.assert_marker_artifact_example_matches_selected_schema(
+        valid_example,
+        stage_id="analyst",
+        marker_schema_by_stage=marker_schema_by_stage,
+        schemas_by_id=schemas_by_id,
+    )
+    assert valid_example == {
+        "terminal_marker": "ANALYST_COMPLETE",
+        "artifact": {
+            "artifact_kind": "learning.artifacts.research_packet",
+            "summary": "Learning request summary.",
+            "research_notes": "Grounded notes for the next Learning stage.",
+        },
+    }
+    conformance.assert_not_generic_artifact_envelope_body(
+        cast(dict[str, object], valid_example["artifact"])
+    )
+
+    with pytest.raises(AssertionError):
+        conformance.assert_marker_artifact_example_matches_selected_schema(
+            invalid_example,
+            stage_id="analyst",
+            marker_schema_by_stage=marker_schema_by_stage,
+            schemas_by_id=schemas_by_id,
+        )
+    invalid_artifact = cast(dict[str, object], invalid_example["artifact"])
+    for forbidden_field in (
+        "request_id",
+        "target_skill_id",
+        "preferred_output_paths",
+        "recommended_learning_action",
+        "route_target_graph_node_id",
+    ):
+        assert forbidden_field in invalid_artifact
+        assert forbidden_field not in cast(dict[str, object], valid_example["artifact"])
+
+    assert "Learning context fields embedded in the artifact body" in skill_text
+    assert "exact selected artifact JSON object" in prompt_text
+
+
+def test_full_lad_planner_complete_example_satisfies_learning_fanout() -> None:
+    manifest = _load_manifest()
+    schemas_by_id = _schemas_by_id(manifest)
+    marker_schema_by_stage = _marker_schema_by_stage(manifest)
+    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
+    selected_authority = cast(dict[str, object], workflow["selected_authority"])
+    fanout = next(
+        fanout
+        for fanout in cast(
+            list[dict[str, object]],
+            selected_authority["fanout_declarations"],
+        )
+        if fanout["source_action_id"] == "planning.route_planner_complete"
+    )
+    skill_text = (
+        PACKAGE_ROOT / "assets/workflows/planning.lad/skills/planner-core.md"
+    ).read_text()
+    prompt_text = (
+        PACKAGE_ROOT / "assets/workflows/planning.lad/entrypoints/lad_planner.md"
+    ).read_text()
+
+    valid_example = conformance.markdown_json_examples(
+        skill_text,
+        section_heading="## Full LAD Fanout Example",
+    )[0]
+
+    conformance.assert_marker_artifact_example_matches_selected_schema(
+        valid_example,
+        stage_id="lad_planner",
+        marker_schema_by_stage=marker_schema_by_stage,
+        schemas_by_id=schemas_by_id,
+    )
+    artifact = cast(dict[str, object], valid_example["artifact"])
+    observation_payload = cast(dict[str, object], valid_example["observation_payload"])
+    learning_requests = cast(list[dict[str, object]], artifact["learning_requests"])
+
+    assert fanout["item_source_path"] == ["learning_requests"]
+    assert fanout["source_artifact_schema_id"] == "planning.artifacts.stage_result"
+    assert fanout["target_payload_schema_id"] == "learning.intake.request"
+    assert observation_payload == artifact
+    assert len(learning_requests) == 1
+    assert set(learning_requests[0]) == {
+        "request_id",
+        "body",
+        "root_source",
+        "target_skill_id",
+        "preferred_output_paths",
+    }
+    conformance.assert_not_generic_artifact_envelope_body(artifact)
+    conformance.assert_not_generic_artifact_envelope_body(observation_payload)
+
+    assert "Full LAD extension" in skill_text
+    assert "learning_requests" in skill_text
+    assert "invalid_fanout_payload" in skill_text
+    assert "selected full-LAD fanout reads it" in prompt_text
 
 
 @pytest.mark.parametrize(

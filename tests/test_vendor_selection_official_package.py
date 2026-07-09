@@ -351,9 +351,11 @@ def _marker_protocol_rows_from_text(text: str) -> tuple[dict[str, str], ...]:
     return tuple(rows)
 
 
-def _core_skill_examples(text: str) -> tuple[dict[str, object], dict[str, object]]:
+def _core_skill_examples(
+    text: str,
+) -> tuple[tuple[dict[str, object], ...], dict[str, object]]:
     valid_match = re.search(
-        r"## Valid Example\nValid example:\n```json\n(?P<json>.*?)\n```",
+        r"## Valid Example\nValid examples:\n```json\n(?P<json>.*?)\n```",
         text,
         re.DOTALL,
     )
@@ -364,8 +366,10 @@ def _core_skill_examples(text: str) -> tuple[dict[str, object], dict[str, object
     )
     assert valid_match is not None
     assert invalid_match is not None
+    valid_examples = json.loads(valid_match.group("json"))
+    assert isinstance(valid_examples, list)
     return (
-        cast(dict[str, object], json.loads(valid_match.group("json"))),
+        tuple(cast(list[dict[str, object]], valid_examples)),
         cast(dict[str, object], json.loads(invalid_match.group("json"))),
     )
 
@@ -377,68 +381,12 @@ def _assert_example_matches_selected_schema(
     marker_schema_by_stage: dict[str, dict[str, str]],
     schemas_by_id: dict[str, dict[str, object]],
 ) -> None:
-    for field in (
-        "artifact_id",
-        "artifact_kind",
-        "produced_by_stage",
-        "source_work_item_id",
-        "source_run_id",
-        "terminal_marker",
-        "fields",
-        "evidence",
-        "assumptions",
-        "next_stage_context",
-    ):
-        assert field in example
-    assert example["produced_by_stage"] == stage_id
-    marker = str(example["terminal_marker"])
-    schema_id = marker_schema_by_stage[stage_id][marker]
-    assert example["artifact_kind"] == schema_id
-    fields = example["fields"]
-    assert isinstance(fields, dict)
-    _assert_schema_value(fields, schemas_by_id[schema_id])
-
-
-def _assert_schema_value(value: object, schema: dict[str, object]) -> None:
-    if "enum" in schema:
-        assert value in cast(list[object], schema["enum"])
-        return
-    if "const" in schema:
-        assert value == schema["const"]
-        return
-
-    schema_type = schema.get("type")
-    if schema_type == "object":
-        assert isinstance(value, dict)
-        required = set(cast(list[str], schema.get("required", [])))
-        properties = cast(dict[str, object], schema.get("properties", {}))
-        assert required <= set(value)
-        assert set(value) <= set(properties)
-        for field, nested_value in value.items():
-            _assert_schema_value(
-                nested_value,
-                cast(dict[str, object], properties[field]),
-            )
-        return
-    if schema_type == "array":
-        assert isinstance(value, list)
-        assert len(value) >= int(schema.get("min_items", 0))
-        item_schema = cast(dict[str, object], schema["items"])
-        for item in value:
-            _assert_schema_value(item, item_schema)
-        return
-    if schema_type == "string":
-        assert isinstance(value, str)
-        if int(schema.get("min_length", 0)) > 0:
-            assert value
-        return
-    if schema_type == "integer":
-        assert type(value) is int
-        return
-    if schema_type == "boolean":
-        assert type(value) is bool
-        return
-    raise AssertionError(f"unsupported schema in example check: {schema!r}")
+    conformance.assert_marker_artifact_example_matches_selected_schema(
+        example,
+        stage_id=stage_id,
+        marker_schema_by_stage=marker_schema_by_stage,
+        schemas_by_id=schemas_by_id,
+    )
 
 
 def _store(tmp_path: Path) -> tuple[SQLiteRuntimeStore, ContentAddressedByteStore]:
@@ -945,20 +893,13 @@ def test_vendor_selection_asset_text_uses_two_layer_contract() -> None:
             assert heading in prompt_text
         for heading in CORE_SKILL_HEADINGS:
             assert heading in skill_text
-        for field in (
-            "artifact_id",
-            "artifact_kind",
-            "produced_by_stage",
-            "source_work_item_id",
-            "source_run_id",
-            "terminal_marker",
-            "fields",
-            "evidence",
-            "assumptions",
-            "next_stage_context",
-        ):
-            assert field in prompt_text
-            assert field in skill_text
+        for text in (prompt_text, skill_text):
+            assert "exact selected artifact JSON object" in text
+            assert "runner evidence/report" in text
+            assert "Use this envelope for every artifact" not in text
+            assert "Include `artifact_id`" not in text
+            assert "`next_stage_context`" not in text
+            assert "`fields`" not in text
 
     conformance.assert_no_runtime_authority_claims(asset_paths)
     conformance.assert_no_unscoped_selected_artifact_kind_mentions(
@@ -1015,14 +956,21 @@ def test_vendor_selection_core_skill_examples_match_selected_schemas() -> None:
 
     for stage_id in VENDOR_STAGE_IDS:
         skill_text = asset_texts[_expected_core_skill_asset_id(stage_id)]
-        valid_example, invalid_example = _core_skill_examples(skill_text)
+        valid_examples, invalid_example = _core_skill_examples(skill_text)
 
-        _assert_example_matches_selected_schema(
-            valid_example,
-            stage_id=stage_id,
-            marker_schema_by_stage=marker_schema_by_stage,
-            schemas_by_id=schemas_by_id,
-        )
+        seen_markers: set[str] = set()
+        for valid_example in valid_examples:
+            _assert_example_matches_selected_schema(
+                valid_example,
+                stage_id=stage_id,
+                marker_schema_by_stage=marker_schema_by_stage,
+                schemas_by_id=schemas_by_id,
+            )
+            seen_markers.add(str(valid_example["terminal_marker"]))
+            artifact = cast(dict[str, object], valid_example["artifact"])
+            conformance.assert_not_generic_artifact_envelope_body(artifact)
+
+        assert seen_markers == set(marker_schema_by_stage[stage_id])
         with pytest.raises(AssertionError):
             _assert_example_matches_selected_schema(
                 invalid_example,
@@ -1031,20 +979,58 @@ def test_vendor_selection_core_skill_examples_match_selected_schemas() -> None:
                 schemas_by_id=schemas_by_id,
             )
 
-        valid_fields = cast(dict[str, object], valid_example["fields"])
-        assert "selected_schema" not in valid_fields
+        invalid_artifact = cast(dict[str, object], invalid_example["artifact"])
+        assert "fields" in invalid_artifact
+
+    request_examples, _ = _core_skill_examples(
+        asset_texts["vendor_selection.skills.request_intake_core"],
+    )
+    request_ready = next(
+        example
+        for example in request_examples
+        if example["terminal_marker"] == "REQUEST_READY"
+    )
+    assert request_ready["artifact"] == {
+        "request_id": "e2e-vendor-selection-001",
+        "requester_label": "local-e2e-operator",
+        "category": "synthetic_office_supplies",
+        "budget_band": "low",
+        "required_capabilities": [
+            "standard_office_supplies",
+            "net30_invoice",
+        ],
+        "disallowed_vendors": ["Beta Supplies"],
+        "approval_policy_hint": "operator_required",
+    }
+
+    award_examples, _ = _core_skill_examples(
+        asset_texts["vendor_selection.skills.award_decider_core"],
+    )
+    operator_required = next(
+        example
+        for example in award_examples
+        if example["terminal_marker"] == "OPERATOR_REQUIRED"
+    )
+    assert operator_required["artifact"] == {
+        "bundle_id": "bundle-e2e-vendor-selection-001",
+        "decision_kind": "operator_required",
+        "selected_candidate_id": "vendor_alpha",
+        "required_evidence_refs": {
+            "rubric_report_ref": "rubric-report-e2e-vendor-selection-001",
+            "conflict_report_ref": "conflict-report-e2e-vendor-selection-001",
+        },
+        "operator_gate_required": True,
+        "reason": "Selected evidence requires local-operator confirmation.",
+    }
 
     selected_schema_canary = {
-        "artifact_id": "bad-selected-schema-canary",
-        "artifact_kind": "PurchaseRequest",
-        "produced_by_stage": "request_intake",
-        "source_work_item_id": "source-work-item-id",
-        "source_run_id": "source-run-id",
         "terminal_marker": "REQUEST_READY",
-        "fields": {"selected_schema": "PurchaseRequest"},
-        "evidence": [],
-        "assumptions": [],
-        "next_stage_context": {},
+        "artifact": {
+            "artifact_id": "bad-selected-schema-canary",
+            "artifact_kind": "PurchaseRequest",
+            "fields": {"selected_schema": "PurchaseRequest"},
+            "evidence": [],
+        },
     }
     with pytest.raises(AssertionError):
         _assert_example_matches_selected_schema(
@@ -1052,6 +1038,31 @@ def test_vendor_selection_core_skill_examples_match_selected_schemas() -> None:
             stage_id="request_intake",
             marker_schema_by_stage=marker_schema_by_stage,
             schemas_by_id=schemas_by_id,
+        )
+
+
+def test_package_example_schema_helper_rejects_unique_by_duplicates() -> None:
+    schema = {
+        "type": "array",
+        "min_items": 1,
+        "unique_by": "candidate_id",
+        "items": {
+            "type": "object",
+            "required": ["candidate_id", "vendor_label"],
+            "properties": {
+                "candidate_id": {"type": "string", "min_length": 1},
+                "vendor_label": {"type": "string", "min_length": 1},
+            },
+        },
+    }
+
+    with pytest.raises(AssertionError):
+        conformance.assert_schema_value(
+            [
+                {"candidate_id": "vendor_alpha", "vendor_label": "Alpha"},
+                {"candidate_id": "vendor_alpha", "vendor_label": "Alpha duplicate"},
+            ],
+            schema,
         )
 
 
@@ -1073,10 +1084,11 @@ def test_vendor_selection_core_skill_schema_sections_include_constraints() -> No
         "array; min_items 1",
         "unique_by `candidate_id`",
         (
-            "- required_evidence_refs: object; required "
+            "`required_evidence_refs` | yes | object; required "
             "[rubric_report_ref, conflict_report_ref]"
         ),
-        "- evidence_refs: object; required [rubric_report_ref, conflict_report_ref]",
+        "`evidence_refs` | yes | object; required "
+        "[rubric_report_ref, conflict_report_ref]",
     ):
         assert required_snippet in core_skill_text
 

@@ -155,6 +155,48 @@ def _assets_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
     }
 
 
+def _schemas_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
+    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
+    selected_authority = cast(dict[str, object], workflow["selected_authority"])
+    return {
+        str(schema["id"]): cast(dict[str, object], schema["schema"])
+        for schema in cast(
+            list[dict[str, object]], selected_authority["artifact_schemas"]
+        )
+    }
+
+
+def _marker_schema_by_stage(manifest: dict[str, Any]) -> dict[str, dict[str, str]]:
+    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
+    selected_authority = cast(dict[str, object], workflow["selected_authority"])
+    outcomes = {
+        str(outcome["id"]): (
+            str(outcome["stage_kind_id"]),
+            str(outcome["marker"]),
+        )
+        for outcome in cast(
+            list[dict[str, object]],
+            selected_authority["terminal_outcomes"],
+        )
+        if "marker" in outcome
+    }
+    marker_schema_by_stage: dict[str, dict[str, str]] = {}
+    for action in cast(
+        list[dict[str, object]],
+        selected_authority["terminal_actions"],
+    ):
+        if "artifact_schema_id" not in action:
+            continue
+        outcome_id = str(action["outcome_id"])
+        if outcome_id not in outcomes:
+            continue
+        stage_id, marker = outcomes[outcome_id]
+        marker_schema_by_stage.setdefault(stage_id, {})[marker] = str(
+            action["artifact_schema_id"]
+        )
+    return marker_schema_by_stage
+
+
 def _source_as_selected_authority(source: dict[str, object]) -> dict[str, object]:
     selected = cast(dict[str, object], json.loads(json.dumps(source)))
     selected.pop("assets")
@@ -457,6 +499,182 @@ def test_planning_assets_follow_entrypoint_authoring_boundaries() -> None:
             conformance.selected_artifact_schema_ids_by_asset_id(manifest)
         ),
     )
+
+
+def test_planning_core_skill_examples_match_selected_schemas_for_all_stages() -> None:
+    manifest = _load_manifest()
+    schemas_by_id = _schemas_by_id(manifest)
+    marker_schema_by_stage = _marker_schema_by_stage(manifest)
+
+    for stage_id, _, _, _, core_asset_id in _PLANNING_STAGE_PAIRS:
+        skill_text = (
+            PACKAGE_ROOT / _package_path_for_planning_asset(core_asset_id)
+        ).read_text()
+        valid_examples = conformance.markdown_json_examples(
+            skill_text,
+            section_heading="## Valid Example",
+        )
+        invalid_example = conformance.markdown_json_examples(
+            skill_text,
+            section_heading="## Invalid Examples",
+        )[0]
+
+        assert valid_examples
+        for valid_example in valid_examples:
+            conformance.assert_marker_artifact_example_matches_selected_schema(
+                valid_example,
+                stage_id=stage_id,
+                marker_schema_by_stage=marker_schema_by_stage,
+                schemas_by_id=schemas_by_id,
+            )
+            artifact = cast(dict[str, object], valid_example["artifact"])
+            conformance.assert_not_generic_artifact_envelope_body(artifact)
+            if "observation_payload" in valid_example:
+                observation_payload = cast(
+                    dict[str, object],
+                    valid_example["observation_payload"],
+                )
+                conformance.assert_not_generic_artifact_envelope_body(
+                    observation_payload
+                )
+
+        with pytest.raises(AssertionError):
+            conformance.assert_marker_artifact_example_matches_selected_schema(
+                invalid_example,
+                stage_id=stage_id,
+                marker_schema_by_stage=marker_schema_by_stage,
+                schemas_by_id=schemas_by_id,
+            )
+
+
+def test_planning_planner_complete_example_is_stage_result_artifact_payload() -> None:
+    manifest = _load_manifest()
+    schemas_by_id = _schemas_by_id(manifest)
+    marker_schema_by_stage = _marker_schema_by_stage(manifest)
+    skill_text = (
+        PACKAGE_ROOT / "assets/workflows/planning.lad/skills/planner-core.md"
+    ).read_text()
+    prompt_text = (
+        PACKAGE_ROOT / "assets/workflows/planning.lad/entrypoints/lad_planner.md"
+    ).read_text()
+
+    valid_example = conformance.markdown_json_examples(
+        skill_text,
+        section_heading="## Valid Example",
+    )[0]
+    invalid_example = conformance.markdown_json_examples(
+        skill_text,
+        section_heading="## Invalid Examples",
+    )[0]
+
+    conformance.assert_marker_artifact_example_matches_selected_schema(
+        valid_example,
+        stage_id="lad_planner",
+        marker_schema_by_stage=marker_schema_by_stage,
+        schemas_by_id=schemas_by_id,
+    )
+    assert valid_example == {
+        "terminal_marker": "PLANNER_COMPLETE",
+        "artifact": {
+            "artifact_kind": "planning.artifacts.stage_result",
+            "summary": "Planner summary.",
+        },
+        "observation_payload": {
+            "artifact_kind": "planning.artifacts.stage_result",
+            "summary": "Planner summary.",
+        },
+    }
+    assert valid_example["observation_payload"] == valid_example["artifact"]
+    conformance.assert_not_generic_artifact_envelope_body(
+        cast(dict[str, object], valid_example["artifact"])
+    )
+    conformance.assert_not_generic_artifact_envelope_body(
+        cast(dict[str, object], valid_example["observation_payload"])
+    )
+
+    with pytest.raises(AssertionError):
+        conformance.assert_marker_artifact_example_matches_selected_schema(
+            invalid_example,
+            stage_id="lad_planner",
+            marker_schema_by_stage=marker_schema_by_stage,
+            schemas_by_id=schemas_by_id,
+        )
+    with pytest.raises(AssertionError):
+        conformance.assert_marker_artifact_example_matches_selected_schema(
+            {
+                "terminal_marker": "PLANNER_COMPLETE",
+                "artifact": valid_example["artifact"],
+                "observation_payload": {
+                    "report": "Planner evidence.",
+                    "source_id": "e2e-full-lad-spec-001",
+                    "selected_action_id": "planning.route_planner_complete",
+                    "outcome_id": "planning.lad_planner.complete",
+                    "downstream_context": "execution.lad.builder.start",
+                },
+            },
+            stage_id="lad_planner",
+            marker_schema_by_stage=marker_schema_by_stage,
+            schemas_by_id=schemas_by_id,
+        )
+
+    assert "observation/fanout payload candidate" in skill_text
+    assert "source IDs, selected action IDs, outcome IDs" in skill_text
+    assert "generic wrapper keys" in skill_text
+    assert "`next_stage_context`" not in skill_text
+    assert "`fields`" not in skill_text
+    assert "exact selected artifact JSON object" in prompt_text
+    assert "same exact selected artifact object" in prompt_text
+    assert "not extra JSON fields" in prompt_text
+
+
+def test_planning_manager_complete_example_is_task_cards_payload() -> None:
+    manifest = _load_manifest()
+    schemas_by_id = _schemas_by_id(manifest)
+    marker_schema_by_stage = _marker_schema_by_stage(manifest)
+    skill_text = (
+        PACKAGE_ROOT / "assets/workflows/planning.lad/skills/manager-core.md"
+    ).read_text()
+    prompt_text = (
+        PACKAGE_ROOT / "assets/workflows/planning.lad/entrypoints/lad_manager.md"
+    ).read_text()
+
+    valid_example = conformance.markdown_json_examples(
+        skill_text,
+        section_heading="## Valid Example",
+    )[0]
+    invalid_example = conformance.markdown_json_examples(
+        skill_text,
+        section_heading="## Invalid Examples",
+    )[0]
+
+    conformance.assert_marker_artifact_example_matches_selected_schema(
+        valid_example,
+        stage_id="lad_manager",
+        marker_schema_by_stage=marker_schema_by_stage,
+        schemas_by_id=schemas_by_id,
+    )
+    artifact = cast(dict[str, object], valid_example["artifact"])
+    observation_payload = cast(dict[str, object], valid_example["observation_payload"])
+    card = cast(list[dict[str, object]], artifact["cards"])[0]
+
+    assert observation_payload == artifact
+    assert artifact["artifact_kind"] == "task_cards"
+    assert set(card) == {"task_card_id", "title", "body"}
+    conformance.assert_not_generic_artifact_envelope_body(artifact)
+    conformance.assert_not_generic_artifact_envelope_body(observation_payload)
+
+    with pytest.raises(AssertionError):
+        conformance.assert_marker_artifact_example_matches_selected_schema(
+            invalid_example,
+            stage_id="lad_manager",
+            marker_schema_by_stage=marker_schema_by_stage,
+            schemas_by_id=schemas_by_id,
+        )
+
+    assert "planning.artifacts.task_cards" in skill_text
+    assert "owner stages, dependencies, acceptance criteria" in skill_text
+    assert "same exact selected task-card object" in prompt_text
+    assert "undeclared task-card JSON fields" in prompt_text
 
 
 @pytest.mark.parametrize(

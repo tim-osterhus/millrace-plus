@@ -7,91 +7,128 @@ description: Use when executing the Curator stage for the selected full LAD work
 
 ## Artifact Schema
 
-Produce `learning_curator_skill_update` with this exact schema for accepted `CURATOR_COMPLETE` updates:
+Selected-schema first. Return the exact selected artifact JSON object for the chosen marker, or no artifact/null when the selected marker has no artifact schema. Evidence, assumptions, request IDs, target skill IDs, preferred output paths, recommendations, and route hints belong in runner evidence/report text unless the selected schema declares them.
+
+`learning.artifacts.skill_update`
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
-| `artifact_id` | yes | string | Stable artifact ID. |
-| `artifact_kind` | yes | string | `learning.artifacts.skill_update`. |
-| `source_work_item_id` | yes | string | Work item from dispatch. |
-| `source_run_id` | yes | string | Run id from dispatch. |
-| `stage_id` | yes | string | `curator`. |
-| `status` | yes | string | `accepted`, `rejected`, `noop`, or `blocked`. |
-| `summary` | yes | string | Decision summary. |
-| `target_skill_id` | yes | string | Skill being curated. |
-| `update_body` | yes | string | Accepted workspace-local update body or patch summary. |
-| `decision` | yes | string | Accepted, rejected, no-op, or blocked rationale. |
-| `validation` | yes | array | Checks performed or skipped with reason. |
-| `evidence` | yes | array | Candidate, research, and request evidence reviewed. |
-| `assumptions` | yes | array | Residual risks and limits. |
+| `artifact_kind` | yes | string const `learning.artifacts.skill_update` | Must be `learning.artifacts.skill_update`. |
+| `summary` | yes | string; min_length 1 | Selected-schema field. |
+| `target_skill_id` | yes | string; min_length 1 | Selected-schema field. |
+| `update_body` | yes | string; min_length 1 | Selected-schema field. |
 
-For `CURATOR_NOOP`, produce `learning_curator_decision` with `artifact_kind: learning.artifacts.curator_decision`, `summary`, `decision`, `evidence`, and `assumptions`.
+`learning.artifacts.curator_decision`
 
-For `BLOCKED`, produce `learning_curator_blocked_report` with `artifact_kind: learning.artifacts.report`, `summary`, `evidence`, and `assumptions`.
+| Field | Required | Type | Meaning |
+| --- | --- | --- | --- |
+| `artifact_kind` | yes | string const `learning.artifacts.curator_decision` | Must be `learning.artifacts.curator_decision`. |
+| `summary` | yes | string; min_length 1 | Selected-schema field. |
+| `decision` | yes | string; min_length 1 | Selected-schema field. |
+
+`learning.artifacts.report`
+
+| Field | Required | Type | Meaning |
+| --- | --- | --- | --- |
+| `artifact_kind` | yes | string const `learning.artifacts.report` | Must be `learning.artifacts.report`. |
+| `summary` | yes | string; min_length 1 | Selected-schema field. |
 
 ## Handoff Format
 
-```text
-artifact_id:
-produced_by_stage: curator
-source_work_item_id:
-source_run_id:
-terminal_marker:
-fields:
-  artifact_kind:
-  summary:
-  target_skill_id:
-  update_body:
-  decision:
-  validation:
-evidence:
-assumptions:
-next_stage_context:
-  accepted_destination:
-  source_promotion_note:
-```
+Return:
+1. The exact selected terminal marker spelling from dispatch.
+2. `artifact` as the exact selected artifact JSON object.
+3. Runner evidence/report text for inspected evidence, assumptions, source IDs, target paths, recommendations, and downstream context that are not selected artifact fields.
+
+Do not put generic wrapper keys or Learning context fields into the runtime artifact body unless the selected schema declares them.
 
 ## Valid Example
 
-```text
-artifact_id: curator-update-8
-produced_by_stage: curator
-source_work_item_id: learning-8
-source_run_id: run-curator-8
-terminal_marker: CURATOR_COMPLETE
-fields:
-  artifact_kind: learning.artifacts.skill_update
-  summary: Accepted scoped package-review checklist patch.
-  target_skill_id: millrace-review-and-qa-loop
-  update_body: Add a package-local selected-data evidence checklist.
-  decision: accepted because Analyst evidence and Professor patch match.
-  validation:
-    - check: boundary wording
-      result: passed
-evidence:
-  - Professor candidate matched the Analyst packet.
-assumptions: []
-next_stage_context:
-  accepted_destination: workspace-installed skill
-  source_promotion_note: later operator decision only
+```json
+[
+  {
+    "terminal_marker": "CURATOR_COMPLETE",
+    "artifact": {
+      "artifact_kind": "learning.artifacts.skill_update",
+      "summary": "Curated bounded skill update from selected candidate evidence.",
+      "target_skill_id": "millrace-review-and-qa-loop",
+      "update_body": "Patch text scoped to selected evidence."
+    }
+  },
+  {
+    "terminal_marker": "CURATOR_NOOP",
+    "artifact": {
+      "artifact_kind": "learning.artifacts.curator_decision",
+      "summary": "Curator no-op decision from selected evidence.",
+      "decision": "no_update_needed"
+    }
+  },
+  {
+    "terminal_marker": "BLOCKED",
+    "artifact": {
+      "artifact_kind": "learning.artifacts.report",
+      "summary": "Learning stage blocked because selected input was missing or contradictory."
+    }
+  }
+]
 ```
 
 ## Invalid Examples
 
-- Missing required field: no `target_skill_id`.
-- Unsupported assumption: accepts a polished candidate with no evidence.
-- Runtime claim in artifact text: says Curator output publishes, promotes, approves effects, or persists state.
+Learning context fields embedded in the artifact body:
+
+```json
+{
+  "terminal_marker": "CURATOR_COMPLETE",
+  "artifact": {
+    "artifact_kind": "learning.artifacts.skill_update",
+    "summary": "Curated bounded skill update from selected candidate evidence.",
+    "target_skill_id": "invented-target",
+    "update_body": "Patch text scoped to selected evidence.",
+    "request_id": "learning-request-001",
+    "preferred_output_paths": [
+      "skills/example/SKILL.md"
+    ],
+    "recommended_learning_action": "draft_skill_patch",
+    "route_target_graph_node_id": "learning.standard.professor"
+  }
+}
+```
+
+Invalid because selected schemas do not declare the extra Learning context fields shown above.
+
+Missing required field:
+
+```json
+{
+  "terminal_marker": "CURATOR_COMPLETE",
+  "artifact": {
+    "artifact_kind": "learning.artifacts.skill_update"
+  }
+}
+```
+
+Type mismatch:
+
+```json
+{
+  "terminal_marker": "CURATOR_COMPLETE",
+  "artifact": {
+    "artifact_kind": "learning.artifacts.skill_update",
+    "summary": ["not a string"]
+  }
+}
+```
 
 ## Validation Checklist
 
-- Required fields are present for the selected marker.
-- Decision follows from candidate, research, and request evidence.
-- Destination is explicit when an update is accepted.
-- No-op or rejection includes a concrete rationale.
-- Terminal marker is legal for the selected Curator stage.
-- No artifact text claims route, queue, approval, capability, effect, provider, package, plugin/MCP, native runner, reconciliation, persistence, source promotion, publication, or durable-state behavior.
+- Required selected fields are present.
+- No artifact field is present unless the selected schema declares it.
+- Evidence supports the selected marker and lives in runner evidence/report text unless selected as an artifact field.
+- Terminal marker is legal for `curator` in the selected full LAD workflow.
+- No artifact text claims route, queue, approval, capability, effect, provider, package, plugin execution, reconciliation, persistence, or durable-state behavior.
 - No artifact text includes API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
 ## Completion Criteria
 
-The stage is complete only when the decision record names the evidence reviewed, the target skill or no-op rationale, validation performed or skipped, and the residual promotion or rollback context.
+Curator is complete only when it returns one legal terminal marker, one exact selected artifact body when required, and runner evidence/report text supporting the selected marker.

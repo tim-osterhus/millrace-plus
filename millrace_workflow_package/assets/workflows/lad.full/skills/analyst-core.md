@@ -7,88 +7,118 @@ description: Use when executing the Analyst stage for the selected full LAD work
 
 ## Artifact Schema
 
-Produce `learning_analyst_research_packet` with this exact schema:
+Selected-schema first. Return the exact selected artifact JSON object for the chosen marker, or no artifact/null when the selected marker has no artifact schema. Evidence, assumptions, request IDs, target skill IDs, preferred output paths, recommendations, and route hints belong in runner evidence/report text unless the selected schema declares them.
+
+`learning.artifacts.research_packet`
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
-| `artifact_id` | yes | string | Stable artifact ID. |
-| `artifact_kind` | yes | string | `learning.artifacts.research_packet` for complete or no-op outcomes. |
-| `source_work_item_id` | yes | string | Work item from dispatch. |
-| `source_run_id` | yes | string | Run id from dispatch. |
-| `stage_id` | yes | string | `analyst`. |
-| `status` | yes | string | `complete`, `noop`, or `blocked`. |
-| `summary` | yes | string | Concise research result. |
-| `research_notes` | yes | string | Evidence-backed notes and inspected sources. |
-| `existing_skill_matches` | yes | array | Nearby skills and why they do or do not cover the request. |
-| `recommendation` | yes | string | Professor, Curator, no-op, or blocked recommendation. |
-| `evidence` | yes | array | Evidence supporting the recommendation. |
-| `assumptions` | yes | array | Assumptions, missing evidence, and confidence limits. |
+| `artifact_kind` | yes | string const `learning.artifacts.research_packet` | Must be `learning.artifacts.research_packet`. |
+| `summary` | yes | string; min_length 1 | Selected-schema field. |
+| `research_notes` | yes | string; min_length 1 | Selected-schema field. |
 
-For `BLOCKED`, produce `learning_analyst_blocked_report` with `artifact_kind: learning.artifacts.report`, `summary`, `evidence`, and `assumptions`.
+`learning.artifacts.report`
+
+| Field | Required | Type | Meaning |
+| --- | --- | --- | --- |
+| `artifact_kind` | yes | string const `learning.artifacts.report` | Must be `learning.artifacts.report`. |
+| `summary` | yes | string; min_length 1 | Selected-schema field. |
 
 ## Handoff Format
 
-```text
-artifact_id:
-produced_by_stage: analyst
-source_work_item_id:
-source_run_id:
-terminal_marker:
-fields:
-  artifact_kind:
-  summary:
-  research_notes:
-  existing_skill_matches:
-  recommendation:
-evidence:
-assumptions:
-next_stage_context:
-  recommended_learning_action:
-  target_skill_id:
-  preferred_output_paths:
-```
+Return:
+1. The exact selected terminal marker spelling from dispatch.
+2. `artifact` as the exact selected artifact JSON object.
+3. Runner evidence/report text for inspected evidence, assumptions, source IDs, target paths, recommendations, and downstream context that are not selected artifact fields.
+
+Do not put generic wrapper keys or Learning context fields into the runtime artifact body unless the selected schema declares them.
 
 ## Valid Example
 
-```text
-artifact_id: analyst-request-14
-produced_by_stage: analyst
-source_work_item_id: learning-14
-source_run_id: run-analyst-14
-terminal_marker: ANALYST_COMPLETE
-fields:
-  artifact_kind: learning.artifacts.research_packet
-  summary: Existing skill lacks review-loop evidence guidance.
-  research_notes: Compared linked incident notes with installed skill index.
-  existing_skill_matches:
-    - skill_id: millrace-review-and-qa-loop
-      gap: Missing package-local effect boundary evidence reminder.
-  recommendation: Professor draft a scoped skill improvement.
-evidence:
-  - Linked incident named the missing boundary proof.
-assumptions: []
-next_stage_context:
-  recommended_learning_action: draft_skill_patch
-  target_skill_id: millrace-review-and-qa-loop
-  preferred_output_paths: []
+```json
+[
+  {
+    "terminal_marker": "ANALYST_COMPLETE",
+    "artifact": {
+      "artifact_kind": "learning.artifacts.research_packet",
+      "summary": "Learning request summary.",
+      "research_notes": "Grounded notes for the next Learning stage."
+    }
+  },
+  {
+    "terminal_marker": "ANALYST_NOOP",
+    "artifact": {
+      "artifact_kind": "learning.artifacts.research_packet",
+      "summary": "Learning request summary.",
+      "research_notes": "Grounded notes for the next Learning stage."
+    }
+  },
+  {
+    "terminal_marker": "BLOCKED",
+    "artifact": {
+      "artifact_kind": "learning.artifacts.report",
+      "summary": "Learning stage blocked because selected input was missing or contradictory."
+    }
+  }
+]
 ```
 
 ## Invalid Examples
 
-- Missing required field: no `research_notes`.
-- Unsupported assumption: recommends a new skill without checking existing skills.
-- Runtime claim in artifact text: says the artifact routes work or approves effects.
+Learning context fields embedded in the artifact body:
+
+```json
+{
+  "terminal_marker": "ANALYST_COMPLETE",
+  "artifact": {
+    "artifact_kind": "learning.artifacts.research_packet",
+    "summary": "Learning request summary.",
+    "research_notes": "Grounded notes for the next Learning stage.",
+    "request_id": "learning-request-001",
+    "target_skill_id": "invented-target",
+    "preferred_output_paths": [
+      "skills/example/SKILL.md"
+    ],
+    "recommended_learning_action": "draft_skill_patch",
+    "route_target_graph_node_id": "learning.standard.professor"
+  }
+}
+```
+
+Invalid because selected schemas do not declare the extra Learning context fields shown above.
+
+Missing required field:
+
+```json
+{
+  "terminal_marker": "ANALYST_COMPLETE",
+  "artifact": {
+    "artifact_kind": "learning.artifacts.research_packet"
+  }
+}
+```
+
+Type mismatch:
+
+```json
+{
+  "terminal_marker": "ANALYST_COMPLETE",
+  "artifact": {
+    "artifact_kind": "learning.artifacts.research_packet",
+    "summary": ["not a string"]
+  }
+}
+```
 
 ## Validation Checklist
 
-- Required fields are present.
-- Every recommendation is tied to dispatch-provided or readable evidence.
-- Existing skill coverage was checked before recommending new authoring.
-- No-op is used when evidence does not justify a skill change.
-- Terminal marker is legal for the selected Analyst stage.
-- No artifact text claims route, queue, approval, capability, effect, provider, package, plugin/MCP, native runner, reconciliation, persistence, or durable-state behavior.
+- Required selected fields are present.
+- No artifact field is present unless the selected schema declares it.
+- Evidence supports the selected marker and lives in runner evidence/report text unless selected as an artifact field.
+- Terminal marker is legal for `analyst` in the selected full LAD workflow.
+- No artifact text claims route, queue, approval, capability, effect, provider, package, plugin execution, reconciliation, persistence, or durable-state behavior.
 - No artifact text includes API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
 ## Completion Criteria
 
-The stage is complete only when the research packet names the request, cites inspected evidence, records skill matches or gaps, and gives a recommendation that follows from that evidence.
+Analyst is complete only when it returns one legal terminal marker, one exact selected artifact body when required, and runner evidence/report text supporting the selected marker.

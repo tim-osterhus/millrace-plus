@@ -2,101 +2,114 @@
 
 ## Stage Contract
 Stage ID: `request_intake`.
-Responsibility: Validate the selected PurchaseRequest payload and prepare either a request-ready handoff or clarification evidence.
+Responsibility: Validate the selected PurchaseRequest payload and either prepare an exact request-ready handoff or clarification decision pack.
 
 ## Artifact Schemas
-- PurchaseRequest: object; required [request_id, requester_label, category, budget_band, required_capabilities, disallowed_vendors, approval_policy_hint]; allowed [request_id, requester_label, category, budget_band, required_capabilities, disallowed_vendors, approval_policy_hint]
-  - request_id: string; min_length 1
-  - requester_label: string; min_length 1
-  - category: string; min_length 1
-  - budget_band: string; min_length 1
-  - required_capabilities: array; min_items 1; items string; min_length 1
-  - disallowed_vendors: array; min_items 0; items string; min_length 1
-  - approval_policy_hint: enum [none, operator_required]
-- DecisionPack: object; required [source_request_id, bundle_id, selected_candidate_id, final_refusal_reason, evidence_refs, selected_plan_id, selected_plan_fingerprint, close_reason]; allowed [source_request_id, bundle_id, selected_candidate_id, final_refusal_reason, evidence_refs, selected_plan_id, selected_plan_fingerprint, close_reason]
-  - source_request_id: string; min_length 1
-  - bundle_id: string; min_length 1
-  - selected_candidate_id: enum [vendor_alpha, vendor_beta, vendor_gamma, null]
-  - final_refusal_reason: enum [policy_blocked, no_viable_vendor, operator_rejected, blocked, null]
-  - evidence_refs: object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref, operator_decision_ref];   - rubric_report_ref: string; min_length 1;   - conflict_report_ref: string; min_length 1;   - operator_decision_ref: string; min_length 1
-  - selected_plan_id: string; min_length 1
-  - selected_plan_fingerprint: string; min_length 1
-  - close_reason: enum [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked]
+Selected schemas for this stage. Treat each schema as closed.
+
+`PurchaseRequest`
+
+| Field | Required | Type | Meaning |
+| --- | --- | --- | --- |
+| `request_id` | yes | string; min_length 1 | Selected-schema field. |
+| `requester_label` | yes | string; min_length 1 | Selected-schema field. |
+| `category` | yes | string; min_length 1 | Selected-schema field. |
+| `budget_band` | yes | string; min_length 1 | Selected-schema field. |
+| `required_capabilities` | yes | array; min_items 1; items string | Selected-schema array. |
+| `disallowed_vendors` | yes | array; min_items 0; items string | Selected-schema array. |
+| `approval_policy_hint` | yes | enum [none, operator_required] | Selected value from [none, operator_required]. |
+
+`DecisionPack`
+
+| Field | Required | Type | Meaning |
+| --- | --- | --- | --- |
+| `source_request_id` | yes | string; min_length 1 | Selected-schema field. |
+| `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
+| `selected_candidate_id` | yes | enum [vendor_alpha, vendor_beta, vendor_gamma, null] | Selected value from [vendor_alpha, vendor_beta, vendor_gamma, null]. |
+| `final_refusal_reason` | yes | enum [policy_blocked, no_viable_vendor, operator_rejected, blocked, null] | Selected value from [policy_blocked, no_viable_vendor, operator_rejected, blocked, null]. |
+| `evidence_refs` | yes | object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref, operator_decision_ref] | Nested selected-schema object. |
+| `selected_plan_id` | yes | string; min_length 1 | Selected-schema field. |
+| `selected_plan_fingerprint` | yes | string; min_length 1 | Selected-schema field. |
+| `close_reason` | yes | enum [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked] | Selected value from [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked]. |
 
 ## Marker Artifact Protocol
 - REQUEST_READY: selected action `vendor_selection.request_intake.request_ready`; action kind `route`; artifact schema `PurchaseRequest`; emitted queue `purchase_request`; target stage `policy_screener`.
 - REQUEST_NEEDS_CLARIFICATION: selected action `vendor_selection.request_intake.needs_clarification`; action kind `close`; artifact schema `DecisionPack`; emitted queue `none`; target stage `none`.
 
 ## Handoff Format
-Use this envelope for every artifact:
-- `artifact_id`: stable local artifact identifier.
-- `artifact_kind`: one selected schema ID declared for this stage.
-- `produced_by_stage`: `request_intake`.
-- `source_work_item_id`: copied from dispatch.
-- `source_run_id`: copied from dispatch.
-- `terminal_marker`: one legal marker rendered for this stage.
-- `fields`: schema-compatible artifact fields only.
-- `evidence`: selected input checks and selected package references.
-- `assumptions`: explicit assumptions, empty when none.
-- `next_stage_context`: selected IDs and evidence references for downstream context.
+Return:
+1. `terminal_marker`: one legal marker rendered for this stage.
+2. `artifact`: the exact selected artifact JSON object for that marker.
+3. Runner evidence/report text for selected checks, assumptions, dispatch IDs, package pins, and downstream context that are not selected artifact fields.
+
+Do not use a generic artifact envelope as the artifact body. Fields such as identity, source IDs, evidence, assumptions, selected action IDs, or downstream context are runner evidence/report facts unless the selected schema declares them.
 
 ## Valid Example
-Valid example:
+Valid examples:
 ```json
-{
-  "artifact_id": "request_intake-example-001",
-  "artifact_kind": "PurchaseRequest",
-  "produced_by_stage": "request_intake",
-  "source_work_item_id": "source-work-item-id",
-  "source_run_id": "source-run-id",
-  "terminal_marker": "REQUEST_READY",
-  "fields": {
-    "request_id": "request-001",
-    "requester_label": "local operator",
-    "category": "office_supplies",
-    "budget_band": "medium",
-    "required_capabilities": [
-      "standard_office_supplies",
-      "net30_invoice"
-    ],
-    "disallowed_vendors": [],
-    "approval_policy_hint": "operator_required"
+[
+  {
+    "terminal_marker": "REQUEST_READY",
+    "artifact": {
+      "request_id": "e2e-vendor-selection-001",
+      "requester_label": "local-e2e-operator",
+      "category": "synthetic_office_supplies",
+      "budget_band": "low",
+      "required_capabilities": [
+        "standard_office_supplies",
+        "net30_invoice"
+      ],
+      "disallowed_vendors": [
+        "Beta Supplies"
+      ],
+      "approval_policy_hint": "operator_required"
+    }
   },
-  "evidence": [
-    "selected input checked",
-    "selected package data used"
-  ],
-  "assumptions": [],
-  "next_stage_context": {
-    "selected_action_id": "vendor_selection.request_intake.request_ready"
+  {
+    "terminal_marker": "REQUEST_NEEDS_CLARIFICATION",
+    "artifact": {
+      "source_request_id": "e2e-vendor-selection-001",
+      "bundle_id": "bundle-e2e-vendor-selection-001",
+      "selected_candidate_id": null,
+      "final_refusal_reason": "blocked",
+      "evidence_refs": {
+        "rubric_report_ref": "rubric-report-e2e-vendor-selection-001",
+        "conflict_report_ref": "conflict-report-e2e-vendor-selection-001"
+      },
+      "selected_plan_id": "selected-plan-e2e-vendor-selection",
+      "selected_plan_fingerprint": "sha256:selected-plan-fingerprint",
+      "close_reason": "blocked"
+    }
   }
-}
+]
 ```
 
 ## Invalid Example
 Invalid example:
 ```json
 {
-  "artifact_id": "bad-request_intake",
-  "artifact_kind": "PurchaseRequest",
-  "produced_by_stage": "request_intake",
   "terminal_marker": "REQUEST_READY",
-  "fields": {"unsupported_field": "invented"},
-  "evidence": ["external data was assumed"]
+  "artifact": {
+    "artifact_id": "bad-request_intake-wrapper",
+    "artifact_kind": "PurchaseRequest",
+    "fields": {
+      "unsupported_field": "invented"
+    },
+    "evidence": [
+      "external data was assumed"
+    ]
+  }
 }
 ```
-Reason invalid: it uses an unsupported field, lacks required handoff fields, or depends on unselected data.
+Reason invalid: `artifact` is a generic wrapper-as-artifact body. The selected schema requires the artifact body itself, with no undeclared wrapper keys.
 
 ## Validation Checklist
-- The terminal marker appears in this stage's rendered legal marker list.
-- The artifact schema matches the marker protocol above.
-- Required schema fields are present and unsupported fields are absent.
-- `approval_policy_hint` is preserved as evidence/handoff context when present.
-- Evidence references selected package data or dispatch data only.
-- The artifact does not claim external service access, private contacts, credentials, remote actions, external catalog searches, provider invocation, purchase actions, or payment actions.
-- The artifact does not claim model authority over local operator review.
+- Marker spelling exactly matches the selected marker list above.
+- The artifact body matches the schema selected by that marker.
+- Required selected fields are present and unsupported artifact fields are absent.
+- Evidence and assumptions live in runner evidence/report text unless the selected schema declares them.
+- No artifact text claims route, queue, approval, capability, effect, package, provider, purchase, payment, or durable-state behavior by itself.
+- No artifact or evidence includes credentials or private contact details.
 
 ## Completion Criteria
-- Return one selected terminal marker with one schema-compatible artifact.
-- Include enough evidence for audit and downstream context.
-- Stop without a success marker when required selected evidence is missing or contradictory.
+Return one selected terminal marker with one exact selected artifact JSON object and enough runner evidence/report text for audit.

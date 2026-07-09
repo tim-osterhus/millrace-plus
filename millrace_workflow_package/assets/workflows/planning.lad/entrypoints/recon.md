@@ -33,10 +33,12 @@ Required evidence:
 - generated payload summary when one is produced
 - blockers, assumptions, and confidence
 
+Evidence is report text. For successful markers with selected route or fanout payload validation, do not put these evidence fields into `artifact_payload_candidate_json` or `observation_payload_candidate_json` unless the selected schema declares them.
+
 Process:
 1. Read only dispatch-provided payload and selected readable assets.
 2. Inspect enough context to support the classification.
-3. Produce the selected artifact or evidence envelope named by dispatch.
+3. Produce the selected exact selected artifact JSON object or runner evidence/report text named by dispatch.
 4. Preserve assumptions, missing inputs, and exact evidence references.
 
 Legal terminal markers rendered by runtime:
@@ -52,7 +54,7 @@ Forbidden claims:
 - Do not include API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
 How to return evidence:
-Return the artifact summary, evidence, assumptions, and exactly one legal terminal marker in the runner-required format.
+Return exactly one legal terminal marker plus the exact selected artifact JSON object, or no artifact when the selected marker has no artifact schema. For successful markers whose selected route or fanout validates a stage-result payload, set the observation payload candidate to the same exact selected artifact object unless dispatch provides a different selected observation schema. Keep evidence and assumptions as runner report text, not extra JSON fields, unless the selected schema declares them.
 
 When to stop:
 Stop with `BLOCKED` when required dispatch context is missing, contradictory, or unsafe to interpret.
