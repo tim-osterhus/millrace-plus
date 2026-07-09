@@ -40,9 +40,11 @@ Workflow package data lives under `millrace_workflow_package/`:
   `assets/workflows/lad.full/skills/` contain LAD Learning entrypoint and core
   stage skill assets. The full LAD workflow also selects inherited Planning and
   Execution assets through their existing package paths and digest pins.
-- `vendor_selection` is asset-free in this package. Its selected workflow data
-  lives in `manifest.json`, and its selected package pin has no selected asset
-  pins.
+- `vendor_selection` was asset-free at the PLUS-0002.9 internal handoff. That
+  state is historical graph/package proof evidence only, not live
+  actual-model readiness. Live E2E readiness is governed by PLUS-0003D, which
+  adds selected `vendor_selection` entrypoint prompts and stage-core skills
+  before the vendor-selection live row may run.
 
 The installed resource root `millrace_workflow_package` remains unchanged.
 

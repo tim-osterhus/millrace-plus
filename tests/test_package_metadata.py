@@ -113,7 +113,7 @@ def test_source_tree_does_not_shadow_runtime_or_import_private_runtime_code() ->
         assert forbidden not in source_text
 
 
-def test_official_package_data_declares_asset_free_vendor_selection() -> None:
+def test_official_package_data_declares_selected_vendor_selection_assets() -> None:
     manifest_path = PROJECT_ROOT / "millrace_workflow_package" / "manifest.json"
     package_data_text = ""
     package_root = PROJECT_ROOT / "millrace_workflow_package"
@@ -121,4 +121,6 @@ def test_official_package_data_declares_asset_free_vendor_selection() -> None:
         package_data_text += path.read_text()
 
     assert "vendor_selection" in package_data_text
-    assert not (package_root / "assets" / "workflows" / "vendor_selection").exists()
+    vendor_asset_root = package_root / "assets" / "workflows" / "vendor_selection"
+    assert vendor_asset_root.is_dir()
+    assert len(tuple(vendor_asset_root.rglob("*.md"))) == 18

@@ -94,9 +94,9 @@ def _manifest_digest(manifest: dict[str, Any]) -> str:
         separators=(",", ":"),
         sort_keys=True,
     ).encode("utf-8")
-    return "sha256:" + sha256(
-        _MANIFEST_DIGEST_DOMAIN_BYTES + canonical_bytes
-    ).hexdigest()
+    return (
+        "sha256:" + sha256(_MANIFEST_DIGEST_DOMAIN_BYTES + canonical_bytes).hexdigest()
+    )
 
 
 def _manifest_mapping_authority(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -238,7 +238,7 @@ def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
         str(asset["asset_id"]): str(asset["content_digest"])
         for asset in _assets(manifest)
     }
-    assert len(asset_digests) == 44
+    assert len(asset_digests) == 62
     assert {asset["asset_kind"] for asset in _assets(manifest)} == {
         "entrypoint_prompt",
         "stage_skill",

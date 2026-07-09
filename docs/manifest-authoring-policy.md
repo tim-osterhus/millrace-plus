@@ -52,8 +52,8 @@ authority.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:7658b10f7db0127c56d8f38d237d5a361d878ca6b62ba1e22c686810e64accbb",
-  "package_digest": "sha256:bc5472c4b62a970379ffa549ba8eafec41408c8c35f20bba17e30fd10bd2cf26",
+  "manifest_digest": "sha256:2950bf242303246992a56eb03dfb3584418f100513ce2c630c1176599a60ad68",
+  "package_digest": "sha256:5f2db51de3028e647de583154453cd56c8214a456d9d78a8952ae1c477bb948f",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
     "package_version": "0.0.0",
@@ -65,7 +65,7 @@ authority.
     "lad.full@0.1": "sha256:43a39019580a0676f1d2fe10cc13220388894309ab849808563d8aab019d6b37",
     "planning.lad@0.1": "sha256:0b7e6fc82bea2ecb8b9de0ae3a16afdd420ddb22d2eeb205f895a9f5fb2dbfb1",
     "simple_loop@0.1": "sha256:dd0e916f646f062b1fcc7d2f8b49c0f1076c43d1883cd7c2297ad38ceff7bb5f",
-    "vendor_selection@0.1": "sha256:9f5de543be2e3ada3ebda1753fa5c9d3b55b7167046b0cfc23764a7e7334a2ab"
+    "vendor_selection@0.1": "sha256:84102abdd6020eb7c80c93df4a8db0ab2f5bc850bcfeb4a24cd6b2e1fa2bdc23"
   },
   "asset_pins": [
     {
@@ -287,6 +287,96 @@ authority.
       "asset_id": "simple_loop.worker_prompt",
       "content_digest": "sha256:82f4ba7b804926b9730f69f0a19194b38f7611d5d5bb7bdcd7619b1394b51022",
       "package_path": "assets/workflows/simple_loop/entrypoints/worker.md"
+    },
+    {
+      "asset_id": "vendor_selection.entrypoints.award_decider",
+      "content_digest": "sha256:8e6c8d0cda846bd396735751542a2726e28a27dfd6e76fbc68d6086002613167",
+      "package_path": "assets/workflows/vendor_selection/entrypoints/award_decider.md"
+    },
+    {
+      "asset_id": "vendor_selection.entrypoints.candidate_packager",
+      "content_digest": "sha256:8de88dd722eb495f2d4120fe90614661a559fbf1068b38da0efba8b75d250b94",
+      "package_path": "assets/workflows/vendor_selection/entrypoints/candidate_packager.md"
+    },
+    {
+      "asset_id": "vendor_selection.entrypoints.catalog_sourcer",
+      "content_digest": "sha256:5a9e53d4d1ad2b7b99bbaae79e9c8586d74333fb17497dee65018558f9c634b1",
+      "package_path": "assets/workflows/vendor_selection/entrypoints/catalog_sourcer.md"
+    },
+    {
+      "asset_id": "vendor_selection.entrypoints.conflict_checker",
+      "content_digest": "sha256:6061913c19edafd7b94a9cd911f8edd8e899a3d341dc7cea78c77cad010c7848",
+      "package_path": "assets/workflows/vendor_selection/entrypoints/conflict_checker.md"
+    },
+    {
+      "asset_id": "vendor_selection.entrypoints.decision_packager",
+      "content_digest": "sha256:d05abefe60d6a32f462ea576fa9b828df857cdf2247788643f92c9a1bc0b1bf6",
+      "package_path": "assets/workflows/vendor_selection/entrypoints/decision_packager.md"
+    },
+    {
+      "asset_id": "vendor_selection.entrypoints.policy_screener",
+      "content_digest": "sha256:db1e61db69d20a6ac939f9f5a138daf61f3b2600588b63bdd94b7d9c8e49a1b4",
+      "package_path": "assets/workflows/vendor_selection/entrypoints/policy_screener.md"
+    },
+    {
+      "asset_id": "vendor_selection.entrypoints.request_intake",
+      "content_digest": "sha256:3a718972c4a8559952cc68b31e5d9a6bd299cfd27386df3013df4c024a1f6b37",
+      "package_path": "assets/workflows/vendor_selection/entrypoints/request_intake.md"
+    },
+    {
+      "asset_id": "vendor_selection.entrypoints.requirement_freezer",
+      "content_digest": "sha256:45b3deeee853e9fa0e39c29eb840a70c4a1f446cab6cd18645475cd1b4a9848f",
+      "package_path": "assets/workflows/vendor_selection/entrypoints/requirement_freezer.md"
+    },
+    {
+      "asset_id": "vendor_selection.entrypoints.rubric_evaluator",
+      "content_digest": "sha256:91c07b8f4c57d05d2fa9a8037242c737996c0f60a5ff30c74b8cb73caf63f003",
+      "package_path": "assets/workflows/vendor_selection/entrypoints/rubric_evaluator.md"
+    },
+    {
+      "asset_id": "vendor_selection.skills.award_decider_core",
+      "content_digest": "sha256:a0e4b49cdb84bb2d9be7126c45537c34ea1ce444352ca8160ce60fb45b56263e",
+      "package_path": "assets/workflows/vendor_selection/skills/award_decider-core.md"
+    },
+    {
+      "asset_id": "vendor_selection.skills.candidate_packager_core",
+      "content_digest": "sha256:a15a9175741eade236f33877fe4df76ba4547b2acd166ac3e0283cd97e7f4140",
+      "package_path": "assets/workflows/vendor_selection/skills/candidate_packager-core.md"
+    },
+    {
+      "asset_id": "vendor_selection.skills.catalog_sourcer_core",
+      "content_digest": "sha256:9c0bb02d8ba3194d03ef5c8345f31154e78c44ad4e9b47b346a9fb178fe8eac6",
+      "package_path": "assets/workflows/vendor_selection/skills/catalog_sourcer-core.md"
+    },
+    {
+      "asset_id": "vendor_selection.skills.conflict_checker_core",
+      "content_digest": "sha256:94be3012f9af32fdd9e3b6523f8a4128dd9357baab3aacc7d168b64ed2cc9455",
+      "package_path": "assets/workflows/vendor_selection/skills/conflict_checker-core.md"
+    },
+    {
+      "asset_id": "vendor_selection.skills.decision_packager_core",
+      "content_digest": "sha256:f3f0fff6aace8e8d0e4b081849934a52a7b2b24245383a8fd8c7dd1e89d4c1b1",
+      "package_path": "assets/workflows/vendor_selection/skills/decision_packager-core.md"
+    },
+    {
+      "asset_id": "vendor_selection.skills.policy_screener_core",
+      "content_digest": "sha256:1c964838f85e58f5c5d4e96c61c31fca0e2d67aca18907c7553dd13b1b3f4618",
+      "package_path": "assets/workflows/vendor_selection/skills/policy_screener-core.md"
+    },
+    {
+      "asset_id": "vendor_selection.skills.request_intake_core",
+      "content_digest": "sha256:4d7f836be75b65597d9af1654cb6cfa4004069f1665ef5b9c4b2f3de07123304",
+      "package_path": "assets/workflows/vendor_selection/skills/request_intake-core.md"
+    },
+    {
+      "asset_id": "vendor_selection.skills.requirement_freezer_core",
+      "content_digest": "sha256:111249bfbe7d59c5a90de67f9c774b1e1710d6aca5a775d02950576615574100",
+      "package_path": "assets/workflows/vendor_selection/skills/requirement_freezer-core.md"
+    },
+    {
+      "asset_id": "vendor_selection.skills.rubric_evaluator_core",
+      "content_digest": "sha256:315dd498cb9fa96d797e9a382e5439b4dc374d7efda8fc2dbce1ddeb161cef2c",
+      "package_path": "assets/workflows/vendor_selection/skills/rubric_evaluator-core.md"
     }
   ]
 }

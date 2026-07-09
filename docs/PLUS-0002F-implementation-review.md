@@ -2,6 +2,13 @@
 
 ## Scope
 
+Supersession note, 2026-07-08 HST: this review remains valid historical
+PLUS-0002F graph/package proof evidence only. Its asset-free
+`vendor_selection` state and `selected_asset_pins=()` are superseded for live
+actual-model readiness by PLUS-0003D, which owns adding selected
+`vendor_selection` entrypoint prompt and stage-core skill assets before
+E2E-0005 may run.
+
 PLUS-0002F adds `vendor_selection` / `0.1` as a public workflow entry in the
 `millrace.plus.official` package. The implementation is asset-free: the donor
 `vendor_selection.source()` assets are empty, the package adds no

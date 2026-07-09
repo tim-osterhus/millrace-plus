@@ -38,7 +38,6 @@ from millrace.workflows import (
     lad_learning,
     lad_planning,
     simple_loop,
-    vendor_selection,
 )
 
 from support import package_conformance as conformance
@@ -59,6 +58,17 @@ SIMPLE_LOOP_STAGE_SKILL_ASSET_IDS = (
     "simple_loop.worker_core_skill",
     "simple_loop.reviewer_core_skill",
     "simple_loop.troubleshooter_core_skill",
+)
+VENDOR_SELECTION_STAGE_IDS = (
+    "request_intake",
+    "policy_screener",
+    "requirement_freezer",
+    "catalog_sourcer",
+    "candidate_packager",
+    "rubric_evaluator",
+    "conflict_checker",
+    "award_decider",
+    "decision_packager",
 )
 
 
@@ -101,8 +111,7 @@ def _assets_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
 
 def _donor_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
     return tuple(
-        str(asset["id"])
-        for asset in cast(list[dict[str, object]], source["assets"])
+        str(asset["id"]) for asset in cast(list[dict[str, object]], source["assets"])
     )
 
 
@@ -111,6 +120,14 @@ def _simple_loop_expected_asset_ids() -> tuple[str, ...]:
         *_donor_asset_ids(simple_loop.workflow_source()),
         *SIMPLE_LOOP_STAGE_SKILL_ASSET_IDS,
     )
+
+
+def _vendor_selection_expected_asset_ids() -> tuple[str, ...]:
+    asset_ids: list[str] = []
+    for stage_id in VENDOR_SELECTION_STAGE_IDS:
+        asset_ids.append(f"vendor_selection.entrypoints.{stage_id}")
+        asset_ids.append(f"vendor_selection.skills.{stage_id}_core")
+    return tuple(asset_ids)
 
 
 def _workflow_expectations() -> tuple[WorkflowExpectation, ...]:
@@ -148,8 +165,8 @@ def _workflow_expectations() -> tuple[WorkflowExpectation, ...]:
         WorkflowExpectation(
             "vendor_selection",
             "0.1",
-            _donor_asset_ids(vendor_selection.source()),
-            "PLUS-0002F",
+            _vendor_selection_expected_asset_ids(),
+            "PLUS-0003D",
         ),
     )
 
@@ -363,12 +380,8 @@ def _enable_select_verify_all_workflows(
         diagnostics_summary = (
             f"diagnostics:{warning_count} errors:0 warnings:{warning_count}"
         )
-        assert selected.command_audit.diagnostics_summary == (
-            diagnostics_summary
-        )
-        assert verified.command_audit.diagnostics_summary == (
-            diagnostics_summary
-        )
+        assert selected.command_audit.diagnostics_summary == (diagnostics_summary)
+        assert verified.command_audit.diagnostics_summary == (diagnostics_summary)
         _assert_selected_runner_authority(selected.plan)
         conformance.assert_selected_package_pin(
             selected.plan,
@@ -401,9 +414,7 @@ def _refresh_manifest_digests(package_root: Path) -> None:
             workflow["required_assets"],
         ):
             asset_id = str(required_asset["asset_id"])
-            required_asset["content_digest"] = assets_by_id[asset_id][
-                "content_digest"
-            ]
+            required_asset["content_digest"] = assets_by_id[asset_id]["content_digest"]
     manifest["manifest_digest"] = manifest_digest_for_manifest(manifest)
     (package_root / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n",
@@ -456,9 +467,7 @@ def _asset_texts_by_path(manifest: dict[str, Any]) -> dict[str, str]:
 
 def _asset_texts_by_id(manifest: dict[str, Any]) -> dict[str, str]:
     return {
-        str(asset["asset_id"]): (
-            PACKAGE_ROOT / str(asset["package_path"])
-        ).read_text()
+        str(asset["asset_id"]): (PACKAGE_ROOT / str(asset["package_path"])).read_text()
         for asset in cast(list[dict[str, object]], manifest["assets"])
     }
 
@@ -753,9 +762,10 @@ def test_unselected_package_content_does_not_affect_selected_fingerprints(
         mutation_kwargs={"package_root": mutated_root},
     )
 
-    assert _load_manifest(mutated_root)["manifest_digest"] != _load_manifest()[
-        "manifest_digest"
-    ]
+    assert (
+        _load_manifest(mutated_root)["manifest_digest"]
+        != _load_manifest()["manifest_digest"]
+    )
     for plan in mutated_plans.values():
         authority_text = canonical_authority_bytes(plan).decode("utf-8")
         assert "PLUS-0002.9 Mutated Catalog Entry" not in authority_text
@@ -811,7 +821,7 @@ def test_boundary_lint_scans_every_shipped_prompt_and_skill_asset() -> None:
     asset_texts_by_path = _asset_texts_by_path(manifest)
     asset_texts_by_id = _asset_texts_by_id(manifest)
 
-    assert len(asset_texts_by_path) == 44
+    assert len(asset_texts_by_path) == 62
     conformance.assert_no_runtime_authority_claims(asset_texts_by_path)
     conformance.assert_no_unscoped_selected_artifact_kind_mentions(
         asset_texts_by_id,
@@ -855,9 +865,7 @@ def test_final_v021_asset_parity_review_closes_all_legacy_pairs() -> None:
     assert len(matrix_rows) == 22
     for expectation in expectations:
         row = next(
-            line
-            for line in matrix_rows
-            if f"`{expectation.entrypoint_path}`" in line
+            line for line in matrix_rows if f"`{expectation.entrypoint_path}`" in line
         )
         assert expectation.stage_id in row
         assert f"`{expectation.skill_path}`" in row
