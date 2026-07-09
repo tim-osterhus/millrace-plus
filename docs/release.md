@@ -34,6 +34,12 @@ separate release decision.
 There is no plugin, marketplace, provider, or native-runner behavior available
 from this package.
 
+Manifest authoring uses the frozen-manifest policy in
+`docs/manifest-authoring-policy.md`. The committed manifest is the source of
+truth; public tests verify its canonical formatting and freeze evidence for
+manifest digest, package digest, selected workflow fingerprints, and asset
+pins.
+
 ## Local Build
 
 ```bash

@@ -24,6 +24,7 @@ clean checkout without a sibling Millrace runtime checkout and without
 ```bash
 env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with hatchling pytest -q \
   tests/test_package_metadata.py \
+  tests/test_manifest_authoring_policy.py \
   tests/test_official_package_layout_plan.py \
   tests/test_workflow_package_manifest.py \
   tests/test_workflow_package_installed_smoke.py \
@@ -44,9 +45,12 @@ git diff --check
 ```
 
 The public tests cover package metadata, dependency policy, docs wording,
-manifest and asset digests, declared package-path containment, deterministic
-data-only archive shape, wheel contents, installed-wheel package-data
-discovery, and the public CI command shape.
+manifest authoring policy, manifest and asset digests, declared package-path
+containment, deterministic data-only archive shape, wheel contents,
+installed-wheel package-data discovery, and the public CI command shape.
+Manifest authoring policy is frozen in `docs/manifest-authoring-policy.md`;
+public tests recompute its evidence from package bytes without donor workflow
+functions or sibling runtime source checkouts.
 
 ## Internal conformance evidence
 

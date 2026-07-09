@@ -25,6 +25,7 @@ jobs:
         run: |
           env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with hatchling pytest -q \
             tests/test_package_metadata.py \
+            tests/test_manifest_authoring_policy.py \
             tests/test_official_package_layout_plan.py \
             tests/test_workflow_package_manifest.py \
             tests/test_workflow_package_installed_smoke.py \

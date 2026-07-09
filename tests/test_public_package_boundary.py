@@ -10,6 +10,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_TESTS = (
     "tests/test_package_metadata.py",
+    "tests/test_manifest_authoring_policy.py",
     "tests/test_official_package_layout_plan.py",
     "tests/test_workflow_package_manifest.py",
     "tests/test_workflow_package_installed_smoke.py",
@@ -118,6 +119,8 @@ def test_public_ci_runs_clean_checkout_boundary_without_sibling_paths() -> None:
         "No millrace runtime package shipped",
     ):
         assert required in workflow
+    for public_test in PUBLIC_TESTS:
+        assert public_test in workflow
     assert "source/" "millrace-rewrite" not in workflow
     assert LEGACY_ASSET_PATH not in workflow
 

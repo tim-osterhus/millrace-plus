@@ -50,6 +50,12 @@ WPKG discovery reads these files as bytes through the package contract. It must
 not import `millrace_plus`, load entry points, register extensions, or execute
 package setup/runtime code. The package data is non-executable.
 
+Manifest authoring is governed by the frozen-manifest policy in
+`docs/manifest-authoring-policy.md`: `millrace_workflow_package/manifest.json`
+is the committed source of truth, not generated from a DSL, and public tests
+recompute the manifest digest, package digest, selected workflow fingerprints,
+and asset pins from package bytes.
+
 Final package conformance is recorded in
 `docs/PLUS-0002.9-implementation-review.md`. That review is internal rewrite
 evidence for E2E, DOCS, META, and CUT packets. Public release readiness still
@@ -84,6 +90,7 @@ diff hygiene:
 ```bash
 env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with hatchling pytest -q \
   tests/test_package_metadata.py \
+  tests/test_manifest_authoring_policy.py \
   tests/test_official_package_layout_plan.py \
   tests/test_workflow_package_manifest.py \
   tests/test_workflow_package_installed_smoke.py \
