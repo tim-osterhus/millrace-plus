@@ -356,3 +356,16 @@ def test_manifest_json_uses_canonical_authoring_format() -> None:
     assert tuple(manifest) == _ROOT_ENVELOPE_FIELDS
     assert manifest["manifest_digest"] == _manifest_digest(manifest)
     assert raw_manifest == json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
+
+
+def test_vendor_selection_examples_use_selected_plan_identity() -> None:
+    skills_root = PACKAGE_ROOT / "assets/workflows/vendor_selection/skills"
+    selected_text = "\n".join(
+        path.read_text() for path in sorted(skills_root.glob("*-core.md"))
+    )
+
+    assert "selected-plan-e2e-vendor-selection" not in selected_text
+    assert re.findall(
+        r'"selected_plan_id": "([^"]+)"',
+        selected_text,
+    ) == ["vendor_selection:0.1"] * 6

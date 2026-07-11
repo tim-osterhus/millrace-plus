@@ -4,6 +4,8 @@
 Stage ID: `conflict_checker`.
 Responsibility: Check selected candidates against the declared conflict rules and catalog conflict status.
 
+Use the runtime-provided `generated_work_source.item_key` to identify the assigned candidate within the full `CandidateBundle` payload. Use only selected `conflict_rules` and the assigned candidate's selected `conflict_status`; do not browse, reconstruct, override, or promote non-authoritative catalog metadata.
+
 ## Artifact Schemas
 Selected schemas for this stage. Treat each schema as closed.
 
@@ -44,23 +46,51 @@ Valid examples:
 ```
 
 ## Invalid Example
-Invalid example:
+Invalid examples:
 ```json
-{
-  "terminal_marker": "CONFLICT_COMPLETE",
-  "artifact": {
-    "artifact_id": "bad-conflict_checker-wrapper",
-    "artifact_kind": "ConflictReport",
-    "fields": {
-      "unsupported_field": "invented"
-    },
-    "evidence": [
-      "external data was assumed"
-    ]
+[
+  {
+    "case": "undeclared_extra_field_wrapper",
+    "example": {
+      "terminal_marker": "CONFLICT_COMPLETE",
+      "artifact": {
+        "artifact_id": "bad-conflict_checker-wrapper",
+        "artifact_kind": "ConflictReport",
+        "fields": {
+          "unsupported_field": "invented"
+        },
+        "evidence": [
+          "external data was assumed"
+        ]
+      }
+    }
+  },
+  {
+    "case": "missing_required_field",
+    "example": {
+      "terminal_marker": "CONFLICT_COMPLETE",
+      "artifact": {
+        "bundle_id": "bundle-e2e-vendor-selection-001",
+        "evaluator_kind": "conflict",
+        "conflict_findings": []
+      }
+    }
+  },
+  {
+    "case": "wrong_type",
+    "example": {
+      "terminal_marker": "CONFLICT_COMPLETE",
+      "artifact": {
+        "bundle_id": "bundle-e2e-vendor-selection-001",
+        "evaluator_kind": "conflict",
+        "conflict_findings": "none",
+        "clearance_result": "clear"
+      }
+    }
   }
-}
+]
 ```
-Reason invalid: `artifact` is a generic wrapper-as-artifact body. The selected schema requires the artifact body itself, with no undeclared wrapper keys.
+Reasons invalid: wrapper keys are undeclared, `clearance_result` is required, and `conflict_findings` must be an array.
 
 ## Validation Checklist
 - Marker spelling exactly matches the selected marker list above.

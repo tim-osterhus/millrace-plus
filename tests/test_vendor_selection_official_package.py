@@ -56,6 +56,14 @@ VENDOR_STAGE_IDS = (
     "award_decider",
     "decision_packager",
 )
+AFFECTED_DECISION_CONTEXT_STAGE_IDS = (
+    "requirement_freezer",
+    "catalog_sourcer",
+    "candidate_packager",
+    "rubric_evaluator",
+    "conflict_checker",
+    "award_decider",
+)
 ENTRYPOINT_HEADINGS = (
     "Role:",
     "Scope:",
@@ -279,6 +287,11 @@ def _schemas_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
     }
 
 
+def _vendor_selected_authority(manifest: dict[str, Any]) -> dict[str, object]:
+    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
+    return cast(dict[str, object], workflow["selected_authority"])
+
+
 def _marker_schema_by_stage(manifest: dict[str, Any]) -> dict[str, dict[str, str]]:
     workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
     selected_authority = cast(dict[str, object], workflow["selected_authority"])
@@ -353,25 +366,54 @@ def _marker_protocol_rows_from_text(text: str) -> tuple[dict[str, str], ...]:
 
 def _core_skill_examples(
     text: str,
-) -> tuple[tuple[dict[str, object], ...], dict[str, object]]:
+) -> tuple[tuple[dict[str, object], ...], tuple[tuple[str, dict[str, object]], ...]]:
     valid_match = re.search(
         r"## Valid Example\nValid examples:\n```json\n(?P<json>.*?)\n```",
         text,
         re.DOTALL,
     )
     invalid_match = re.search(
-        r"## Invalid Example\nInvalid example:\n```json\n(?P<json>.*?)\n```",
+        r"## Invalid Example\nInvalid examples?:\n```json\n(?P<json>.*?)\n```",
         text,
         re.DOTALL,
     )
     assert valid_match is not None
     assert invalid_match is not None
     valid_examples = json.loads(valid_match.group("json"))
+    invalid_examples = json.loads(invalid_match.group("json"))
     assert isinstance(valid_examples, list)
+    if isinstance(invalid_examples, dict):
+        invalid_cases = (
+            (
+                "legacy_undeclared_extra_field_wrapper",
+                cast(dict[str, object], invalid_examples),
+            ),
+        )
+    else:
+        assert isinstance(invalid_examples, list)
+        invalid_cases = tuple(
+            (
+                str(case["case"]),
+                cast(dict[str, object], case["example"]),
+            )
+            for case in cast(list[dict[str, object]], invalid_examples)
+        )
     return (
         tuple(cast(list[dict[str, object]], valid_examples)),
-        cast(dict[str, object], json.loads(invalid_match.group("json"))),
+        invalid_cases,
     )
+
+
+def _award_decider_policy_cases(text: str) -> tuple[dict[str, object], ...]:
+    match = re.search(
+        r"## Decision Policy Cases\nPolicy cases:\n```json\n(?P<json>.*?)\n```",
+        text,
+        re.DOTALL,
+    )
+    assert match is not None
+    parsed = json.loads(match.group("json"))
+    assert isinstance(parsed, list)
+    return tuple(cast(list[dict[str, object]], parsed))
 
 
 def _assert_example_matches_selected_schema(
@@ -707,6 +749,94 @@ def test_vendor_selection_path_archive_selection_compiles_selected_asset_shape(
     )
 
 
+def test_vendor_selection_declares_required_decision_context_handoffs() -> None:
+    manifest = _load_manifest()
+    schemas = _schemas_by_id(manifest)
+    selected_authority = _vendor_selected_authority(manifest)
+
+    requirement_schema = schemas["RequirementPacket"]
+    assert cast(list[str], requirement_schema["required"]) == [
+        "source_request_id",
+        "approval_policy_hint",
+        "frozen_requirements",
+        "policy_status",
+        "selection_rubric_id",
+        "conflict_rules",
+        "candidate_count_min",
+        "candidate_count_max",
+    ]
+    requirement_properties = cast(dict[str, object], requirement_schema["properties"])
+    assert requirement_properties["approval_policy_hint"] == {
+        "enum": ["none", "operator_required"]
+    }
+
+    candidate_schema = schemas["CandidateBundle"]
+    assert cast(list[str], candidate_schema["required"]) == [
+        "source_requirement_id",
+        "bundle_id",
+        "candidate_vendors",
+        "deterministic_source_refs",
+        "approval_policy_hint",
+        "conflict_rules",
+    ]
+    candidate_properties = cast(dict[str, object], candidate_schema["properties"])
+    assert candidate_properties["approval_policy_hint"] == {
+        "enum": ["none", "operator_required"]
+    }
+    assert candidate_properties["conflict_rules"] == {
+        "items": {"min_length": 1, "type": "string"},
+        "min_items": 1,
+        "type": "array",
+    }
+    candidate_items = cast(
+        dict[str, object],
+        cast(dict[str, object], candidate_properties["candidate_vendors"])["items"],
+    )
+    assert cast(list[str], candidate_items["required"]) == [
+        "candidate_id",
+        "vendor_label",
+        "capabilities",
+        "budget_band",
+        "catalog_ref",
+        "conflict_status",
+    ]
+    candidate_item_properties = cast(dict[str, object], candidate_items["properties"])
+    assert candidate_item_properties["conflict_status"] == {
+        "enum": ["clear", "blocked"]
+    }
+
+    expected_mapping = {
+        "source_requirement_id": ["source_requirement_id"],
+        "bundle_id": ["bundle_id"],
+        "candidate_vendors": ["candidate_vendors"],
+        "deterministic_source_refs": ["deterministic_source_refs"],
+        "approval_policy_hint": ["approval_policy_hint"],
+        "conflict_rules": ["conflict_rules"],
+    }
+    fanouts = cast(
+        list[dict[str, object]],
+        selected_authority["fanout_declarations"],
+    )
+    assert [fanout["id"] for fanout in fanouts] == [
+        "vendor_selection.candidate_packager.rubric_fanout",
+        "vendor_selection.candidate_packager.conflict_fanout",
+    ]
+    assert len(fanouts) == 2
+    assert {
+        fanout["target_route_id"] for fanout in fanouts
+    } == {
+        "vendor_selection.rubric_work",
+        "vendor_selection.conflict_work",
+    }
+    for fanout in fanouts:
+        assert cast(dict[str, object], fanout["target_payload_mapping"]) == (
+            expected_mapping
+        )
+        assert set(
+            cast(dict[str, object], fanout["target_payload_mapping"])
+        ) == set(expected_mapping)
+
+
 def test_vendor_selection_unselected_catalog_is_non_selected_authority(
     tmp_path: Path,
 ) -> None:
@@ -956,7 +1086,7 @@ def test_vendor_selection_core_skill_examples_match_selected_schemas() -> None:
 
     for stage_id in VENDOR_STAGE_IDS:
         skill_text = asset_texts[_expected_core_skill_asset_id(stage_id)]
-        valid_examples, invalid_example = _core_skill_examples(skill_text)
+        valid_examples, invalid_cases = _core_skill_examples(skill_text)
 
         seen_markers: set[str] = set()
         for valid_example in valid_examples:
@@ -971,16 +1101,26 @@ def test_vendor_selection_core_skill_examples_match_selected_schemas() -> None:
             conformance.assert_not_generic_artifact_envelope_body(artifact)
 
         assert seen_markers == set(marker_schema_by_stage[stage_id])
-        with pytest.raises(AssertionError):
-            _assert_example_matches_selected_schema(
-                invalid_example,
-                stage_id=stage_id,
-                marker_schema_by_stage=marker_schema_by_stage,
-                schemas_by_id=schemas_by_id,
-            )
-
-        invalid_artifact = cast(dict[str, object], invalid_example["artifact"])
-        assert "fields" in invalid_artifact
+        if stage_id in AFFECTED_DECISION_CONTEXT_STAGE_IDS:
+            assert {case for case, _example in invalid_cases} == {
+                "undeclared_extra_field_wrapper",
+                "missing_required_field",
+                "wrong_type",
+            }
+        for case, invalid_example in invalid_cases:
+            with pytest.raises(AssertionError):
+                _assert_example_matches_selected_schema(
+                    invalid_example,
+                    stage_id=stage_id,
+                    marker_schema_by_stage=marker_schema_by_stage,
+                    schemas_by_id=schemas_by_id,
+                )
+            if case == "undeclared_extra_field_wrapper":
+                invalid_artifact = cast(
+                    dict[str, object],
+                    invalid_example["artifact"],
+                )
+                assert "fields" in invalid_artifact
 
     request_examples, _ = _core_skill_examples(
         asset_texts["vendor_selection.skills.request_intake_core"],
@@ -1091,6 +1231,69 @@ def test_vendor_selection_core_skill_schema_sections_include_constraints() -> No
         "[rubric_report_ref, conflict_report_ref]",
     ):
         assert required_snippet in core_skill_text
+
+
+def test_award_decider_core_skill_declares_parseable_decision_policy_cases() -> None:
+    manifest = _load_manifest()
+    asset_text = _asset_texts_by_id(manifest)[
+        "vendor_selection.skills.award_decider_core"
+    ]
+    marker_schema_by_stage = _marker_schema_by_stage(manifest)
+    cases = _award_decider_policy_cases(asset_text)
+    by_case = {str(case["case"]): case for case in cases}
+
+    expected = {
+        "operator_required_viable_clear": {
+            "approval_policy_hint": "operator_required",
+            "candidate_conflict_status": "clear",
+            "selected_evidence_state": "complete",
+            "expected_marker": "OPERATOR_REQUIRED",
+            "selected_action_id": "vendor_selection.award_decider.operator_required",
+            "artifact_schema_id": "AwardDecision",
+            "operator_wait_aftermath": "selected_wait",
+        },
+        "none_viable_clear": {
+            "approval_policy_hint": "none",
+            "candidate_conflict_status": "clear",
+            "selected_evidence_state": "complete",
+            "expected_marker": "AWARD_READY",
+            "selected_action_id": "vendor_selection.award_decider.award_ready",
+            "artifact_schema_id": "AwardDecision",
+            "operator_wait_aftermath": "no_wait",
+        },
+        "complete_no_viable_evidence": {
+            "selected_evidence_state": "complete_no_viable",
+            "expected_marker": "NO_VIABLE_VENDOR",
+            "selected_action_id": "vendor_selection.award_decider.no_viable_vendor",
+            "artifact_schema_id": "DecisionPack",
+            "operator_wait_aftermath": "no_wait",
+        },
+        "missing_or_contradictory_evidence": {
+            "selected_evidence_state": "missing_or_contradictory",
+            "expected_marker": "BLOCKED",
+            "selected_action_id": "vendor_selection.award_decider.blocked",
+            "artifact_schema_id": "DecisionPack",
+            "operator_wait_aftermath": "no_wait",
+        },
+        "blocked_candidate_rubric_recommended": {
+            "candidate_id": "vendor_beta",
+            "candidate_conflict_status": "blocked",
+            "rubric_recommends_candidate": True,
+            "candidate_viable": False,
+        },
+    }
+    assert set(by_case) == set(expected)
+    for case_id, expected_fields in expected.items():
+        case = by_case[case_id]
+        for field, value in expected_fields.items():
+            assert case[field] == value
+        marker = str(case["expected_marker"])
+        schema_id = marker_schema_by_stage["award_decider"][marker]
+        assert case["artifact_schema_id"] == schema_id
+        assert case["runtime_policy_boundary"] == (
+            "stage_agent_selects_marker_from_selected_evidence; "
+            "runtime_applies_selected_marker_action_schema_wait"
+        )
 
 
 def test_vendor_selection_selected_catalog_is_pinned_stage_authority(

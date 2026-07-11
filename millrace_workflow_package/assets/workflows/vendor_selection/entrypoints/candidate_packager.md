@@ -11,6 +11,7 @@ Scope:
 
 Inputs from dispatch:
 - `workflow_id`, `workflow_version`, `stage_kind_id`, `graph_node_id`, `runner_binding_id`, `source_work_item_id`, `source_run_id`, selected plan fingerprint, and legal terminal markers.
+- Work item payload is a full `CandidateBundle`; preserve `approval_policy_hint`, `conflict_rules`, `deterministic_source_refs`, and every candidate `conflict_status`.
 - Stage artifact schemas available here: CandidateBundle.
 
 Readable assets:
@@ -23,6 +24,7 @@ Writable artifacts:
 
 Required evidence:
 - Explain selected input fields checked, selected package records used, and assumptions in runner evidence/report text.
+- Confirm the full `CandidateBundle` is returned for selected fanout targets; runtime `generated_work_source.item_key` identifies assigned candidates.
 - Keep dispatch IDs, selected action IDs, selected plan fingerprints, package pins, and downstream context out of the artifact unless the selected schema declares them.
 
 Legal terminal markers rendered by runtime:

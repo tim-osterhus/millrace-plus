@@ -9209,11 +9209,11 @@
         },
         {
           "asset_id": "learning.entrypoints.librarian",
-          "content_digest": "sha256:e2c607fb0d6c389c3f661fa763917c9ee36fa5c0dfbef45f246703ae0202023c"
+          "content_digest": "sha256:07c43a588ea413e092789ff4285827b864106e2b4ab7b1fb5b168cb1569b7a1c"
         },
         {
           "asset_id": "learning.skills.librarian_core",
-          "content_digest": "sha256:37c9c29fd3dd899fdcd45caad2f17d840fb7bc8beb1a4da6e695ca07f225191e"
+          "content_digest": "sha256:7e5ec3b7541de1ca4cffb5358fa78e3c937ec2ef1b2085a0e0bc89b4f02ed0be"
         }
       ],
       "selected_authority": {
@@ -10163,6 +10163,41 @@
                 "installed_path"
               ],
               "type": "object"
+            }
+          },
+          {
+            "id": "learning.artifacts.skill_disposition",
+            "presentation": {
+              "display_name": "Learning skill disposition"
+            },
+            "schema": {
+              "type": "object",
+              "required": [
+                "artifact_kind",
+                "summary",
+                "disposition"
+              ],
+              "properties": {
+                "artifact_kind": {
+                  "const": "learning.artifacts.skill_disposition"
+                },
+                "summary": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "disposition": {
+                  "type": "string",
+                  "enum": [
+                    "already_available",
+                    "no_candidate",
+                    "index_unavailable"
+                  ]
+                },
+                "target_skill_id": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
             }
           },
           {
@@ -12117,6 +12152,7 @@
             "artifact_schema_ids": [
               "learning.intake.request",
               "learning.artifacts.skill_install_report",
+              "learning.artifacts.skill_disposition",
               "learning.artifacts.report"
             ],
             "asset_ids": [
@@ -13402,7 +13438,7 @@
             "stage_kind_id": "curator"
           },
           {
-            "artifact_schema_id": "learning.artifacts.skill_install_report",
+            "artifact_schema_id": "learning.artifacts.skill_disposition",
             "id": "learning.close_librarian_noop",
             "kind": "complete_work_item",
             "outcome_id": "learning.librarian.noop",
@@ -14077,7 +14113,7 @@
         },
         {
           "asset_id": "vendor_selection.skills.request_intake_core",
-          "content_digest": "sha256:649b984b2504f84e20bed3bc9d968cfb824f09710be2b794b9e8e64d06363fa7"
+          "content_digest": "sha256:5f9dea6e4ac2074edbd3a288afa1090fb63441f5bc19cc1a66eb8722f6fc02d6"
         },
         {
           "asset_id": "vendor_selection.entrypoints.policy_screener",
@@ -14085,55 +14121,55 @@
         },
         {
           "asset_id": "vendor_selection.skills.policy_screener_core",
-          "content_digest": "sha256:65f50b3da48655c04616b0d4aa2a9768c69862c8efc29422b2c121c108532070"
+          "content_digest": "sha256:1072f31cef10c09da53355030a00ca07affb1c3ab529f5e22331c17b0d6f5bc9"
         },
         {
           "asset_id": "vendor_selection.entrypoints.requirement_freezer",
-          "content_digest": "sha256:98fe63eb6562bb496a7e589261afeb0f1535e4bc92fafbb2950e4867336d72c2"
+          "content_digest": "sha256:134a62ddb8510c87b4bbf93a0b67b33646752caacf810089d2e2c320213ade71"
         },
         {
           "asset_id": "vendor_selection.skills.requirement_freezer_core",
-          "content_digest": "sha256:3eab8f42ea85aa5aa0929e29a011bae5c9a5a01134968a9146811adba6f60e49"
+          "content_digest": "sha256:046cd2c62c7f7d5faa621a7f3b27541126f1cc073855638657afcc81c8fcbfd3"
         },
         {
           "asset_id": "vendor_selection.entrypoints.catalog_sourcer",
-          "content_digest": "sha256:99fd28e93317422dcde306bdea8399ba8d96828b43a0fc10a47d11909c722f5c"
+          "content_digest": "sha256:ce618ae374bfa51dedb67893c4756bebd773b337c63bc8e598849ffd026c471e"
         },
         {
           "asset_id": "vendor_selection.skills.catalog_sourcer_core",
-          "content_digest": "sha256:031e5cba8692160766eae4b553015e28b093004fec332bcbb8cb27cd8647e7ad"
+          "content_digest": "sha256:7365c311c4537aba4abefa0228e7675ed8eb3d20bb890c4c3e0dd160888ba98a"
         },
         {
           "asset_id": "vendor_selection.entrypoints.candidate_packager",
-          "content_digest": "sha256:2d8c448c4fb90e7118f17a292c62434ba35a37624ff8b175a849a805d3233339"
+          "content_digest": "sha256:a267e80ac858381657fb2fa955ebc4a7e09781381b9cf8def328e26a4c5cb15b"
         },
         {
           "asset_id": "vendor_selection.skills.candidate_packager_core",
-          "content_digest": "sha256:e82b01ebbf1c41f6a6be2e5a12da907515c574dd4a1739db1a5bc0f753baecd1"
+          "content_digest": "sha256:5f281f257f1bfd8e64c70754201b00743116705d4493f8bf59c0fb8fecd9febe"
         },
         {
           "asset_id": "vendor_selection.entrypoints.rubric_evaluator",
-          "content_digest": "sha256:946ba01bc27d511801b9459297572bb9534ca77f5675516d73aba8e54a518ec8"
+          "content_digest": "sha256:433df90de96f93a2d47ebe1aac968d0fe72cdde39a2e493872d5c7ab9964e2d0"
         },
         {
           "asset_id": "vendor_selection.skills.rubric_evaluator_core",
-          "content_digest": "sha256:924e49037480df088b9a5998b52dd9ddb99f343f72140a87ab5d6867bf8a9335"
+          "content_digest": "sha256:8f736c7d764e3d31d87e43d9310a4b28116cfec40d1bfe1ec8eec7da36e1b669"
         },
         {
           "asset_id": "vendor_selection.entrypoints.conflict_checker",
-          "content_digest": "sha256:9c0ccf66458b8e542a0b444b7d8430ea43758029fc228132431ebcd8708c04e4"
+          "content_digest": "sha256:2a44e16b041440de0d2eb4d91b340802c63bef396870acf1423dff4d53e8be06"
         },
         {
           "asset_id": "vendor_selection.skills.conflict_checker_core",
-          "content_digest": "sha256:9194aea620cc0f4ecc9463fd192946f66fef0fe8ae1304023a68061c8f0553b3"
+          "content_digest": "sha256:d5460856aef962902801b8ce320b23ef84db3ef6a6242da9e5c5e044bc84a353"
         },
         {
           "asset_id": "vendor_selection.entrypoints.award_decider",
-          "content_digest": "sha256:4621182ce3906517ad71034dbc4b3d8f0269a2e3c93ea35e8f21f39bfcae7b4f"
+          "content_digest": "sha256:88a55ca64c6f0240be1ec0d658cb4405209a7da4a177c0af221903e69225da9f"
         },
         {
           "asset_id": "vendor_selection.skills.award_decider_core",
-          "content_digest": "sha256:a4a89ebc1ce9092bab146714cc8c2df0aea180556dc2cab11aba1989ced6ec05"
+          "content_digest": "sha256:20f0fa7bb75e524da98b37c166b4381230e739dfcc4d3dd24089526cf41ed9ae"
         },
         {
           "asset_id": "vendor_selection.entrypoints.decision_packager",
@@ -14141,669 +14177,18 @@
         },
         {
           "asset_id": "vendor_selection.skills.decision_packager_core",
-          "content_digest": "sha256:45b80b76f4472328989e31d929ca553b5cd3f112d3e7cd4fabc700ebf8be78df"
+          "content_digest": "sha256:e2807c450664bb700682e53c74539f320b225bef5dee1073519d849736d7134d"
         }
       ],
       "selected_authority": {
-        "artifact_schemas": [
-          {
-            "id": "PurchaseRequest",
-            "presentation": {
-              "display_name": "PurchaseRequest"
-            },
-            "schema": {
-              "properties": {
-                "approval_policy_hint": {
-                  "enum": [
-                    "none",
-                    "operator_required"
-                  ]
-                },
-                "budget_band": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "category": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "disallowed_vendors": {
-                  "items": {
-                    "min_length": 1,
-                    "type": "string"
-                  },
-                  "min_items": 0,
-                  "type": "array"
-                },
-                "request_id": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "requester_label": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "required_capabilities": {
-                  "items": {
-                    "min_length": 1,
-                    "type": "string"
-                  },
-                  "min_items": 1,
-                  "type": "array"
-                }
-              },
-              "required": [
-                "request_id",
-                "requester_label",
-                "category",
-                "budget_band",
-                "required_capabilities",
-                "disallowed_vendors",
-                "approval_policy_hint"
-              ],
-              "type": "object"
-            }
-          },
-          {
-            "id": "RequirementPacket",
-            "presentation": {
-              "display_name": "RequirementPacket"
-            },
-            "schema": {
-              "properties": {
-                "candidate_count_max": {
-                  "type": "integer"
-                },
-                "candidate_count_min": {
-                  "type": "integer"
-                },
-                "conflict_rules": {
-                  "items": {
-                    "min_length": 1,
-                    "type": "string"
-                  },
-                  "min_items": 1,
-                  "type": "array"
-                },
-                "frozen_requirements": {
-                  "items": {
-                    "min_length": 1,
-                    "type": "string"
-                  },
-                  "min_items": 1,
-                  "type": "array"
-                },
-                "policy_status": {
-                  "enum": [
-                    "allowed",
-                    "blocked",
-                    "clarification_required"
-                  ]
-                },
-                "selection_rubric_id": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "source_request_id": {
-                  "min_length": 1,
-                  "type": "string"
-                }
-              },
-              "required": [
-                "source_request_id",
-                "frozen_requirements",
-                "policy_status",
-                "selection_rubric_id",
-                "conflict_rules",
-                "candidate_count_min",
-                "candidate_count_max"
-              ],
-              "type": "object"
-            }
-          },
-          {
-            "id": "CandidateBundle",
-            "presentation": {
-              "display_name": "CandidateBundle"
-            },
-            "schema": {
-              "properties": {
-                "bundle_id": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "candidate_vendors": {
-                  "items": {
-                    "properties": {
-                      "budget_band": {
-                        "min_length": 1,
-                        "type": "string"
-                      },
-                      "candidate_id": {
-                        "min_length": 1,
-                        "type": "string"
-                      },
-                      "capabilities": {
-                        "items": {
-                          "min_length": 1,
-                          "type": "string"
-                        },
-                        "min_items": 1,
-                        "type": "array"
-                      },
-                      "catalog_ref": {
-                        "min_length": 1,
-                        "type": "string"
-                      },
-                      "vendor_label": {
-                        "min_length": 1,
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "candidate_id",
-                      "vendor_label",
-                      "capabilities",
-                      "budget_band",
-                      "catalog_ref"
-                    ],
-                    "type": "object"
-                  },
-                  "min_items": 1,
-                  "type": "array",
-                  "unique_by": "candidate_id"
-                },
-                "deterministic_source_refs": {
-                  "items": {
-                    "min_length": 1,
-                    "type": "string"
-                  },
-                  "min_items": 1,
-                  "type": "array"
-                },
-                "source_requirement_id": {
-                  "min_length": 1,
-                  "type": "string"
-                }
-              },
-              "required": [
-                "source_requirement_id",
-                "bundle_id",
-                "candidate_vendors",
-                "deterministic_source_refs"
-              ],
-              "type": "object"
-            }
-          },
-          {
-            "id": "RubricReport",
-            "presentation": {
-              "display_name": "RubricReport"
-            },
-            "schema": {
-              "properties": {
-                "bundle_id": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "evaluator_kind": {
-                  "const": "rubric"
-                },
-                "recommended_candidate_id": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "score_table": {
-                  "items": {
-                    "properties": {
-                      "candidate_id": {
-                        "min_length": 1,
-                        "type": "string"
-                      },
-                      "score": {
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "candidate_id",
-                      "score"
-                    ],
-                    "type": "object"
-                  },
-                  "min_items": 1,
-                  "type": "array",
-                  "unique_by": "candidate_id"
-                },
-                "threshold_result": {
-                  "enum": [
-                    "pass",
-                    "fail"
-                  ]
-                }
-              },
-              "required": [
-                "bundle_id",
-                "evaluator_kind",
-                "score_table",
-                "threshold_result",
-                "recommended_candidate_id"
-              ],
-              "type": "object"
-            }
-          },
-          {
-            "id": "ConflictReport",
-            "presentation": {
-              "display_name": "ConflictReport"
-            },
-            "schema": {
-              "properties": {
-                "bundle_id": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "clearance_result": {
-                  "enum": [
-                    "clear",
-                    "blocked"
-                  ]
-                },
-                "conflict_findings": {
-                  "items": {
-                    "min_length": 1,
-                    "type": "string"
-                  },
-                  "min_items": 0,
-                  "type": "array"
-                },
-                "evaluator_kind": {
-                  "const": "conflict"
-                }
-              },
-              "required": [
-                "bundle_id",
-                "evaluator_kind",
-                "conflict_findings",
-                "clearance_result"
-              ],
-              "type": "object"
-            }
-          },
-          {
-            "id": "AwardDecision",
-            "presentation": {
-              "display_name": "AwardDecision"
-            },
-            "schema": {
-              "properties": {
-                "bundle_id": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "decision_kind": {
-                  "enum": [
-                    "award",
-                    "re_source",
-                    "reject",
-                    "operator_required",
-                    "blocked"
-                  ]
-                },
-                "operator_gate_required": {
-                  "type": "boolean"
-                },
-                "reason": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "required_evidence_refs": {
-                  "properties": {
-                    "conflict_report_ref": {
-                      "min_length": 1,
-                      "type": "string"
-                    },
-                    "rubric_report_ref": {
-                      "min_length": 1,
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "rubric_report_ref",
-                    "conflict_report_ref"
-                  ],
-                  "type": "object"
-                },
-                "selected_candidate_id": {
-                  "enum": [
-                    "vendor_alpha",
-                    "vendor_beta",
-                    "vendor_gamma",
-                    null
-                  ]
-                }
-              },
-              "required": [
-                "bundle_id",
-                "decision_kind",
-                "selected_candidate_id",
-                "required_evidence_refs",
-                "operator_gate_required",
-                "reason"
-              ],
-              "type": "object"
-            }
-          },
-          {
-            "id": "OperatorDecision",
-            "presentation": {
-              "display_name": "OperatorDecision"
-            },
-            "schema": {
-              "properties": {
-                "actor_kind": {
-                  "const": "local_operator"
-                },
-                "audit_reason": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "bundle_id": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "decision": {
-                  "enum": [
-                    "approve",
-                    "reject"
-                  ]
-                },
-                "gate_id": {
-                  "min_length": 1,
-                  "type": "string"
-                }
-              },
-              "required": [
-                "gate_id",
-                "bundle_id",
-                "decision",
-                "actor_kind",
-                "audit_reason"
-              ],
-              "type": "object"
-            }
-          },
-          {
-            "id": "DecisionPack",
-            "presentation": {
-              "display_name": "DecisionPack"
-            },
-            "schema": {
-              "properties": {
-                "bundle_id": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "close_reason": {
-                  "enum": [
-                    "awarded",
-                    "policy_blocked",
-                    "no_viable_vendor",
-                    "operator_rejected",
-                    "blocked"
-                  ]
-                },
-                "evidence_refs": {
-                  "properties": {
-                    "conflict_report_ref": {
-                      "min_length": 1,
-                      "type": "string"
-                    },
-                    "operator_decision_ref": {
-                      "min_length": 1,
-                      "type": "string"
-                    },
-                    "rubric_report_ref": {
-                      "min_length": 1,
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "rubric_report_ref",
-                    "conflict_report_ref"
-                  ],
-                  "type": "object"
-                },
-                "final_refusal_reason": {
-                  "enum": [
-                    "policy_blocked",
-                    "no_viable_vendor",
-                    "operator_rejected",
-                    "blocked",
-                    null
-                  ]
-                },
-                "selected_candidate_id": {
-                  "enum": [
-                    "vendor_alpha",
-                    "vendor_beta",
-                    "vendor_gamma",
-                    null
-                  ]
-                },
-                "selected_plan_fingerprint": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "selected_plan_id": {
-                  "min_length": 1,
-                  "type": "string"
-                },
-                "source_request_id": {
-                  "min_length": 1,
-                  "type": "string"
-                }
-              },
-              "required": [
-                "source_request_id",
-                "bundle_id",
-                "selected_candidate_id",
-                "final_refusal_reason",
-                "evidence_refs",
-                "selected_plan_id",
-                "selected_plan_fingerprint",
-                "close_reason"
-              ],
-              "type": "object"
-            }
-          }
-        ],
-        "capabilities": [
-          {
-            "approval_policy_id": null,
-            "grant_status": "granted",
-            "id": "capability.runner.invoke",
-            "kind": "runner.invoke",
-            "support_status": "supported"
-          }
-        ],
-        "completion_behaviors": [],
-        "concurrency_policies": [
-          {
-            "coexist_partition_ids": [
-              "sourcing",
-              "evaluation",
-              "authorization"
-            ],
-            "id": "requirements.standard",
-            "max_active_runs": 1,
-            "partition_id": "requirements"
-          },
-          {
-            "coexist_partition_ids": [
-              "requirements",
-              "evaluation",
-              "authorization"
-            ],
-            "id": "sourcing.standard",
-            "max_active_runs": 1,
-            "partition_id": "sourcing"
-          },
-          {
-            "coexist_partition_ids": [
-              "requirements",
-              "sourcing",
-              "authorization"
-            ],
-            "id": "evaluation.parallel",
-            "max_active_runs": 2,
-            "partition_id": "evaluation"
-          },
-          {
-            "coexist_partition_ids": [
-              "requirements",
-              "sourcing",
-              "evaluation"
-            ],
-            "id": "authorization.standard",
-            "max_active_runs": 1,
-            "partition_id": "authorization"
-          }
-        ],
-        "counters": [],
-        "external_enqueue_routes": [
-          {
-            "graph_node_id": "vendor_selection.request_intake.start",
-            "id": "vendor_selection.purchase_request",
-            "payload_schema_id": "PurchaseRequest",
-            "queue_family_id": "purchase_request",
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "request_intake"
-          }
-        ],
-        "fanout_declarations": [
-          {
-            "dependency_policy": "depends_on_source_work_item",
-            "duplicate_policy": "refuse",
-            "id": "vendor_selection.candidate_packager.rubric_fanout",
-            "item_id_key": "candidate_id",
-            "item_source_path": [
-              "candidate_vendors"
-            ],
-            "root_lineage_policy": "inherit_source_lineage",
-            "source_action_id": "vendor_selection.candidate_packager.candidates_ready",
-            "source_artifact_schema_id": "CandidateBundle",
-            "target_payload_mapping": {
-              "bundle_id": [
-                "bundle_id"
-              ],
-              "candidate_vendors": [
-                "candidate_vendors"
-              ],
-              "deterministic_source_refs": [
-                "deterministic_source_refs"
-              ],
-              "source_requirement_id": [
-                "source_requirement_id"
-              ]
-            },
-            "target_payload_schema_id": "CandidateBundle",
-            "target_route_id": "vendor_selection.rubric_work"
-          },
-          {
-            "dependency_policy": "depends_on_source_work_item",
-            "duplicate_policy": "refuse",
-            "id": "vendor_selection.candidate_packager.conflict_fanout",
-            "item_id_key": "candidate_id",
-            "item_source_path": [
-              "candidate_vendors"
-            ],
-            "root_lineage_policy": "inherit_source_lineage",
-            "source_action_id": "vendor_selection.candidate_packager.candidates_ready",
-            "source_artifact_schema_id": "CandidateBundle",
-            "target_payload_mapping": {
-              "bundle_id": [
-                "bundle_id"
-              ],
-              "candidate_vendors": [
-                "candidate_vendors"
-              ],
-              "deterministic_source_refs": [
-                "deterministic_source_refs"
-              ],
-              "source_requirement_id": [
-                "source_requirement_id"
-              ]
-            },
-            "target_payload_schema_id": "CandidateBundle",
-            "target_route_id": "vendor_selection.conflict_work"
-          }
-        ],
-        "generated_work_routes": [
-          {
-            "graph_node_id": "vendor_selection.catalog_sourcer.start",
-            "id": "vendor_selection.requirement_packet",
-            "payload_schema_id": "RequirementPacket",
-            "queue_family_id": "requirement_packet",
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "catalog_sourcer"
-          },
-          {
-            "graph_node_id": "vendor_selection.candidate_packager.start",
-            "id": "vendor_selection.candidate_bundle_packaging",
-            "payload_schema_id": "CandidateBundle",
-            "queue_family_id": "candidate_bundle",
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "candidate_packager"
-          },
-          {
-            "graph_node_id": "vendor_selection.rubric_evaluator.start",
-            "id": "vendor_selection.rubric_work",
-            "payload_schema_id": "CandidateBundle",
-            "queue_family_id": "candidate_bundle",
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "rubric_evaluator"
-          },
-          {
-            "graph_node_id": "vendor_selection.conflict_checker.start",
-            "id": "vendor_selection.conflict_work",
-            "payload_schema_id": "CandidateBundle",
-            "queue_family_id": "candidate_bundle",
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "conflict_checker"
-          },
-          {
-            "graph_node_id": "vendor_selection.award_decider.start",
-            "id": "vendor_selection.award_join_work",
-            "payload_schema_id": "CandidateBundle",
-            "queue_family_id": "candidate_bundle",
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "award_decider"
-          },
-          {
-            "graph_node_id": "vendor_selection.decision_packager.start",
-            "id": "vendor_selection.authorization_decision",
-            "payload_schema_id": "AwardDecision",
-            "queue_family_id": "authorization_decision",
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "decision_packager"
-          },
-          {
-            "graph_node_id": "vendor_selection.decision_packager.start",
-            "id": "vendor_selection.operator_decision_payload",
-            "payload_schema_id": "OperatorDecision",
-            "queue_family_id": "decision_pack",
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "decision_packager"
-          },
-          {
-            "graph_node_id": "vendor_selection.decision_packager.start",
-            "id": "vendor_selection.decision_pack",
-            "payload_schema_id": "DecisionPack",
-            "queue_family_id": "decision_pack",
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "decision_packager"
-          }
-        ],
+        "lineage_policy": "root_from_external_enqueue",
+        "workflow": {
+          "id": "vendor_selection",
+          "version": "0.1",
+          "name": "Vendor Selection",
+          "compatibility_profile": null,
+          "required_extensions": []
+        },
         "graphs": [
           {
             "id": "vendor_selection.graph",
@@ -14821,62 +14206,6 @@
             "presentation": {
               "display_name": "Vendor Selection Graph"
             }
-          }
-        ],
-        "intervention_options": [],
-        "join_declarations": [
-          {
-            "correlation_key": "bundle_id",
-            "id": "candidate_evidence_join",
-            "missing_policy": "wait",
-            "required_artifact_schema_ids": [
-              "RubricReport",
-              "ConflictReport"
-            ],
-            "target_stage_kind_id": "award_decider"
-          }
-        ],
-        "lineage_policy": "root_from_external_enqueue",
-        "operator_waits": [
-          {
-            "actor_kind": "local_operator",
-            "allowed_resolution_kinds": [
-              "resume_recorded_source",
-              "revise_recorded_source"
-            ],
-            "audit_metadata_requirements": [
-              "input_id",
-              "input_digest",
-              "selected_plan_fingerprint",
-              "actor_id",
-              "actor_kind",
-              "wait_id",
-              "operator_wait_id",
-              "lineage_id",
-              "target_activation_id",
-              "empty_payload",
-              "target_work_item_id",
-              "payload_digest",
-              "payload_reference"
-            ],
-            "cancellation_policy": "selected_resolution_only",
-            "correlation_key": "wait_id",
-            "expiry_policy": "none",
-            "id": "vendor_selection.award_operator_wait",
-            "idempotency": "input_receipt_and_active_wait_status",
-            "payload_schema_id": "OperatorDecision",
-            "source_action_ids": [
-              "vendor_selection.award_decider.operator_required"
-            ],
-            "source_work_item_behavior": "leave_open",
-            "status_effect": "operator_wait_active",
-            "target_graph_node_id": "vendor_selection.decision_packager.start",
-            "target_queue_family_id": "decision_pack",
-            "target_runner_binding_id": "deterministic_vendor_selection_runner",
-            "target_stage_kind_id": "decision_packager",
-            "timeout_policy": "none",
-            "unrelated_lineages_continue": true,
-            "wait_scope": "lineage"
           }
         ],
         "partitions": [
@@ -14911,82 +14240,645 @@
         ],
         "queue_families": [
           {
-            "external_enqueue": true,
             "id": "purchase_request",
+            "external_enqueue": true,
             "presentation": {
               "display_name": "Purchase Request"
             }
           },
           {
-            "external_enqueue": false,
             "id": "requirement_packet",
+            "external_enqueue": false,
             "presentation": {
               "display_name": "Requirement Packet"
             }
           },
           {
-            "external_enqueue": false,
             "id": "candidate_bundle",
+            "external_enqueue": false,
             "presentation": {
               "display_name": "Candidate Bundle"
             }
           },
           {
-            "external_enqueue": false,
             "id": "evaluation_report",
+            "external_enqueue": false,
             "presentation": {
               "display_name": "Evaluation Report"
             }
           },
           {
-            "external_enqueue": false,
             "id": "authorization_decision",
+            "external_enqueue": false,
             "presentation": {
               "display_name": "Authorization Decision"
             }
           },
           {
-            "external_enqueue": false,
             "id": "operator_decision",
+            "external_enqueue": false,
             "presentation": {
               "display_name": "Operator Decision"
             }
           },
           {
-            "external_enqueue": false,
             "id": "decision_pack",
+            "external_enqueue": false,
             "presentation": {
               "display_name": "Decision Pack"
             }
           }
         ],
-        "recovery_policies": [],
-        "remediation_policies": [],
-        "runner_bindings": [
+        "external_enqueue_routes": [
           {
-            "adapter_kind": "fake_local",
-            "id": "deterministic_vendor_selection_runner",
-            "presentation": {
-              "display_name": "Deterministic vendor runner"
+            "id": "vendor_selection.purchase_request",
+            "queue_family_id": "purchase_request",
+            "graph_node_id": "vendor_selection.request_intake.start",
+            "stage_kind_id": "request_intake",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "payload_schema_id": "PurchaseRequest"
+          }
+        ],
+        "generated_work_routes": [
+          {
+            "id": "vendor_selection.requirement_packet",
+            "queue_family_id": "requirement_packet",
+            "graph_node_id": "vendor_selection.catalog_sourcer.start",
+            "stage_kind_id": "catalog_sourcer",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "payload_schema_id": "RequirementPacket"
+          },
+          {
+            "id": "vendor_selection.candidate_bundle_packaging",
+            "queue_family_id": "candidate_bundle",
+            "graph_node_id": "vendor_selection.candidate_packager.start",
+            "stage_kind_id": "candidate_packager",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "payload_schema_id": "CandidateBundle"
+          },
+          {
+            "id": "vendor_selection.rubric_work",
+            "queue_family_id": "candidate_bundle",
+            "graph_node_id": "vendor_selection.rubric_evaluator.start",
+            "stage_kind_id": "rubric_evaluator",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "payload_schema_id": "CandidateBundle"
+          },
+          {
+            "id": "vendor_selection.conflict_work",
+            "queue_family_id": "candidate_bundle",
+            "graph_node_id": "vendor_selection.conflict_checker.start",
+            "stage_kind_id": "conflict_checker",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "payload_schema_id": "CandidateBundle"
+          },
+          {
+            "id": "vendor_selection.award_join_work",
+            "queue_family_id": "candidate_bundle",
+            "graph_node_id": "vendor_selection.award_decider.start",
+            "stage_kind_id": "award_decider",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "payload_schema_id": "CandidateBundle"
+          },
+          {
+            "id": "vendor_selection.authorization_decision",
+            "queue_family_id": "authorization_decision",
+            "graph_node_id": "vendor_selection.decision_packager.start",
+            "stage_kind_id": "decision_packager",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "payload_schema_id": "AwardDecision"
+          },
+          {
+            "id": "vendor_selection.operator_decision_payload",
+            "queue_family_id": "decision_pack",
+            "graph_node_id": "vendor_selection.decision_packager.start",
+            "stage_kind_id": "decision_packager",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "payload_schema_id": "OperatorDecision"
+          },
+          {
+            "id": "vendor_selection.decision_pack",
+            "queue_family_id": "decision_pack",
+            "graph_node_id": "vendor_selection.decision_packager.start",
+            "stage_kind_id": "decision_packager",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "payload_schema_id": "DecisionPack"
+          }
+        ],
+        "artifact_schemas": [
+          {
+            "id": "PurchaseRequest",
+            "schema": {
+              "type": "object",
+              "required": [
+                "request_id",
+                "requester_label",
+                "category",
+                "budget_band",
+                "required_capabilities",
+                "disallowed_vendors",
+                "approval_policy_hint"
+              ],
+              "properties": {
+                "request_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "requester_label": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "category": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "budget_band": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "required_capabilities": {
+                  "type": "array",
+                  "min_items": 1,
+                  "items": {
+                    "type": "string",
+                    "min_length": 1
+                  }
+                },
+                "disallowed_vendors": {
+                  "type": "array",
+                  "min_items": 0,
+                  "items": {
+                    "type": "string",
+                    "min_length": 1
+                  }
+                },
+                "approval_policy_hint": {
+                  "enum": [
+                    "none",
+                    "operator_required"
+                  ]
+                }
+              }
             },
-            "required_capability_ids": [
-              "capability.runner.invoke"
-            ],
-            "stage_kind_ids": [
-              "request_intake",
-              "policy_screener",
-              "requirement_freezer",
-              "catalog_sourcer",
-              "candidate_packager",
-              "rubric_evaluator",
-              "conflict_checker",
-              "award_decider",
-              "decision_packager"
-            ]
+            "presentation": {
+              "display_name": "PurchaseRequest"
+            }
+          },
+          {
+            "id": "RequirementPacket",
+            "schema": {
+              "type": "object",
+              "required": [
+                "source_request_id",
+                "approval_policy_hint",
+                "frozen_requirements",
+                "policy_status",
+                "selection_rubric_id",
+                "conflict_rules",
+                "candidate_count_min",
+                "candidate_count_max"
+              ],
+              "properties": {
+                "source_request_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "approval_policy_hint": {
+                  "enum": [
+                    "none",
+                    "operator_required"
+                  ]
+                },
+                "frozen_requirements": {
+                  "type": "array",
+                  "min_items": 1,
+                  "items": {
+                    "type": "string",
+                    "min_length": 1
+                  }
+                },
+                "policy_status": {
+                  "enum": [
+                    "allowed",
+                    "blocked",
+                    "clarification_required"
+                  ]
+                },
+                "selection_rubric_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "conflict_rules": {
+                  "type": "array",
+                  "min_items": 1,
+                  "items": {
+                    "type": "string",
+                    "min_length": 1
+                  }
+                },
+                "candidate_count_min": {
+                  "type": "integer"
+                },
+                "candidate_count_max": {
+                  "type": "integer"
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "RequirementPacket"
+            }
+          },
+          {
+            "id": "CandidateBundle",
+            "schema": {
+              "type": "object",
+              "required": [
+                "source_requirement_id",
+                "bundle_id",
+                "candidate_vendors",
+                "deterministic_source_refs",
+                "approval_policy_hint",
+                "conflict_rules"
+              ],
+              "properties": {
+                "source_requirement_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "bundle_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "candidate_vendors": {
+                  "type": "array",
+                  "min_items": 1,
+                  "unique_by": "candidate_id",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "candidate_id",
+                      "vendor_label",
+                      "capabilities",
+                      "budget_band",
+                      "catalog_ref",
+                      "conflict_status"
+                    ],
+                    "properties": {
+                      "candidate_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "vendor_label": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "capabilities": {
+                        "type": "array",
+                        "min_items": 1,
+                        "items": {
+                          "type": "string",
+                          "min_length": 1
+                        }
+                      },
+                      "budget_band": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "catalog_ref": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "conflict_status": {
+                        "enum": [
+                          "clear",
+                          "blocked"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "deterministic_source_refs": {
+                  "type": "array",
+                  "min_items": 1,
+                  "items": {
+                    "type": "string",
+                    "min_length": 1
+                  }
+                },
+                "approval_policy_hint": {
+                  "enum": [
+                    "none",
+                    "operator_required"
+                  ]
+                },
+                "conflict_rules": {
+                  "type": "array",
+                  "min_items": 1,
+                  "items": {
+                    "type": "string",
+                    "min_length": 1
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "CandidateBundle"
+            }
+          },
+          {
+            "id": "RubricReport",
+            "schema": {
+              "type": "object",
+              "required": [
+                "bundle_id",
+                "evaluator_kind",
+                "score_table",
+                "threshold_result",
+                "recommended_candidate_id"
+              ],
+              "properties": {
+                "bundle_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "evaluator_kind": {
+                  "const": "rubric"
+                },
+                "score_table": {
+                  "type": "array",
+                  "min_items": 1,
+                  "unique_by": "candidate_id",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "candidate_id",
+                      "score"
+                    ],
+                    "properties": {
+                      "candidate_id": {
+                        "type": "string",
+                        "min_length": 1
+                      },
+                      "score": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                },
+                "threshold_result": {
+                  "enum": [
+                    "pass",
+                    "fail"
+                  ]
+                },
+                "recommended_candidate_id": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "RubricReport"
+            }
+          },
+          {
+            "id": "ConflictReport",
+            "schema": {
+              "type": "object",
+              "required": [
+                "bundle_id",
+                "evaluator_kind",
+                "conflict_findings",
+                "clearance_result"
+              ],
+              "properties": {
+                "bundle_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "evaluator_kind": {
+                  "const": "conflict"
+                },
+                "conflict_findings": {
+                  "type": "array",
+                  "min_items": 0,
+                  "items": {
+                    "type": "string",
+                    "min_length": 1
+                  }
+                },
+                "clearance_result": {
+                  "enum": [
+                    "clear",
+                    "blocked"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "ConflictReport"
+            }
+          },
+          {
+            "id": "AwardDecision",
+            "schema": {
+              "type": "object",
+              "required": [
+                "bundle_id",
+                "decision_kind",
+                "selected_candidate_id",
+                "required_evidence_refs",
+                "operator_gate_required",
+                "reason"
+              ],
+              "properties": {
+                "bundle_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "decision_kind": {
+                  "enum": [
+                    "award",
+                    "re_source",
+                    "reject",
+                    "operator_required",
+                    "blocked"
+                  ]
+                },
+                "selected_candidate_id": {
+                  "enum": [
+                    "vendor_alpha",
+                    "vendor_beta",
+                    "vendor_gamma",
+                    null
+                  ]
+                },
+                "required_evidence_refs": {
+                  "type": "object",
+                  "required": [
+                    "rubric_report_ref",
+                    "conflict_report_ref"
+                  ],
+                  "properties": {
+                    "rubric_report_ref": {
+                      "type": "string",
+                      "min_length": 1
+                    },
+                    "conflict_report_ref": {
+                      "type": "string",
+                      "min_length": 1
+                    }
+                  }
+                },
+                "operator_gate_required": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "AwardDecision"
+            }
+          },
+          {
+            "id": "OperatorDecision",
+            "schema": {
+              "type": "object",
+              "required": [
+                "gate_id",
+                "bundle_id",
+                "decision",
+                "actor_kind",
+                "audit_reason"
+              ],
+              "properties": {
+                "gate_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "bundle_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "decision": {
+                  "enum": [
+                    "approve",
+                    "reject"
+                  ]
+                },
+                "actor_kind": {
+                  "const": "local_operator"
+                },
+                "audit_reason": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "OperatorDecision"
+            }
+          },
+          {
+            "id": "DecisionPack",
+            "schema": {
+              "type": "object",
+              "required": [
+                "source_request_id",
+                "bundle_id",
+                "selected_candidate_id",
+                "final_refusal_reason",
+                "evidence_refs",
+                "selected_plan_id",
+                "selected_plan_fingerprint",
+                "close_reason"
+              ],
+              "properties": {
+                "source_request_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "bundle_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "selected_candidate_id": {
+                  "enum": [
+                    "vendor_alpha",
+                    "vendor_beta",
+                    "vendor_gamma",
+                    null
+                  ]
+                },
+                "final_refusal_reason": {
+                  "enum": [
+                    "policy_blocked",
+                    "no_viable_vendor",
+                    "operator_rejected",
+                    "blocked",
+                    null
+                  ]
+                },
+                "evidence_refs": {
+                  "type": "object",
+                  "required": [
+                    "rubric_report_ref",
+                    "conflict_report_ref"
+                  ],
+                  "properties": {
+                    "rubric_report_ref": {
+                      "type": "string",
+                      "min_length": 1
+                    },
+                    "conflict_report_ref": {
+                      "type": "string",
+                      "min_length": 1
+                    },
+                    "operator_decision_ref": {
+                      "type": "string",
+                      "min_length": 1
+                    }
+                  }
+                },
+                "selected_plan_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "selected_plan_fingerprint": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "close_reason": {
+                  "enum": [
+                    "awarded",
+                    "policy_blocked",
+                    "no_viable_vendor",
+                    "operator_rejected",
+                    "blocked"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "DecisionPack"
+            }
           }
         ],
         "stage_kinds": [
           {
+            "id": "request_intake",
+            "partition_id": "requirements",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "input_queue_family_ids": [
+              "purchase_request"
+            ],
+            "output_queue_family_ids": [
+              "purchase_request",
+              "decision_pack"
+            ],
             "artifact_schema_ids": [
               "PurchaseRequest",
               "DecisionPack"
@@ -14999,7 +14891,14 @@
               "vendor_selection.request_intake.request_ready",
               "vendor_selection.request_intake.needs_clarification"
             ],
-            "id": "request_intake",
+            "presentation": {
+              "display_name": "request_intake"
+            }
+          },
+          {
+            "id": "policy_screener",
+            "partition_id": "requirements",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "input_queue_family_ids": [
               "purchase_request"
             ],
@@ -15007,13 +14906,6 @@
               "purchase_request",
               "decision_pack"
             ],
-            "partition_id": "requirements",
-            "presentation": {
-              "display_name": "request_intake"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner"
-          },
-          {
             "artifact_schema_ids": [
               "PurchaseRequest",
               "DecisionPack"
@@ -15026,21 +14918,20 @@
               "vendor_selection.policy_screener.policy_allowed",
               "vendor_selection.policy_screener.policy_blocked"
             ],
-            "id": "policy_screener",
+            "presentation": {
+              "display_name": "policy_screener"
+            }
+          },
+          {
+            "id": "requirement_freezer",
+            "partition_id": "requirements",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "input_queue_family_ids": [
               "purchase_request"
             ],
             "output_queue_family_ids": [
-              "purchase_request",
-              "decision_pack"
+              "requirement_packet"
             ],
-            "partition_id": "requirements",
-            "presentation": {
-              "display_name": "policy_screener"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner"
-          },
-          {
             "artifact_schema_ids": [
               "PurchaseRequest",
               "RequirementPacket"
@@ -15052,20 +14943,21 @@
             "declared_outcome_ids": [
               "vendor_selection.requirement_freezer.requirements_ready"
             ],
-            "id": "requirement_freezer",
-            "input_queue_family_ids": [
-              "purchase_request"
-            ],
-            "output_queue_family_ids": [
-              "requirement_packet"
-            ],
-            "partition_id": "requirements",
             "presentation": {
               "display_name": "requirement_freezer"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner"
+            }
           },
           {
+            "id": "catalog_sourcer",
+            "partition_id": "sourcing",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "input_queue_family_ids": [
+              "requirement_packet"
+            ],
+            "output_queue_family_ids": [
+              "candidate_bundle",
+              "decision_pack"
+            ],
             "artifact_schema_ids": [
               "RequirementPacket",
               "CandidateBundle",
@@ -15079,21 +14971,20 @@
               "vendor_selection.catalog_sourcer.candidates_ready",
               "vendor_selection.catalog_sourcer.no_viable_vendor"
             ],
-            "id": "catalog_sourcer",
-            "input_queue_family_ids": [
-              "requirement_packet"
-            ],
-            "output_queue_family_ids": [
-              "candidate_bundle",
-              "decision_pack"
-            ],
-            "partition_id": "sourcing",
             "presentation": {
               "display_name": "catalog_sourcer"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner"
+            }
           },
           {
+            "id": "candidate_packager",
+            "partition_id": "sourcing",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "input_queue_family_ids": [
+              "candidate_bundle"
+            ],
+            "output_queue_family_ids": [
+              "candidate_bundle"
+            ],
             "artifact_schema_ids": [
               "CandidateBundle"
             ],
@@ -15104,20 +14995,20 @@
             "declared_outcome_ids": [
               "vendor_selection.candidate_packager.candidates_ready"
             ],
-            "id": "candidate_packager",
+            "presentation": {
+              "display_name": "candidate_packager"
+            }
+          },
+          {
+            "id": "rubric_evaluator",
+            "partition_id": "evaluation",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "input_queue_family_ids": [
               "candidate_bundle"
             ],
             "output_queue_family_ids": [
-              "candidate_bundle"
+              "evaluation_report"
             ],
-            "partition_id": "sourcing",
-            "presentation": {
-              "display_name": "candidate_packager"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner"
-          },
-          {
             "artifact_schema_ids": [
               "CandidateBundle",
               "RubricReport"
@@ -15129,20 +15020,20 @@
             "declared_outcome_ids": [
               "vendor_selection.rubric_evaluator.rubric_complete"
             ],
-            "id": "rubric_evaluator",
+            "presentation": {
+              "display_name": "rubric_evaluator"
+            }
+          },
+          {
+            "id": "conflict_checker",
+            "partition_id": "evaluation",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "input_queue_family_ids": [
               "candidate_bundle"
             ],
             "output_queue_family_ids": [
               "evaluation_report"
             ],
-            "partition_id": "evaluation",
-            "presentation": {
-              "display_name": "rubric_evaluator"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner"
-          },
-          {
             "artifact_schema_ids": [
               "CandidateBundle",
               "ConflictReport"
@@ -15154,20 +15045,23 @@
             "declared_outcome_ids": [
               "vendor_selection.conflict_checker.conflict_complete"
             ],
-            "id": "conflict_checker",
-            "input_queue_family_ids": [
-              "candidate_bundle"
-            ],
-            "output_queue_family_ids": [
-              "evaluation_report"
-            ],
-            "partition_id": "evaluation",
             "presentation": {
               "display_name": "conflict_checker"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner"
+            }
           },
           {
+            "id": "award_decider",
+            "partition_id": "authorization",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "input_queue_family_ids": [
+              "candidate_bundle",
+              "evaluation_report"
+            ],
+            "output_queue_family_ids": [
+              "authorization_decision",
+              "requirement_packet",
+              "decision_pack"
+            ],
             "artifact_schema_ids": [
               "CandidateBundle",
               "RubricReport",
@@ -15187,23 +15081,21 @@
               "vendor_selection.award_decider.no_viable_vendor",
               "vendor_selection.award_decider.blocked"
             ],
-            "id": "award_decider",
-            "input_queue_family_ids": [
-              "candidate_bundle",
-              "evaluation_report"
-            ],
-            "output_queue_family_ids": [
-              "authorization_decision",
-              "requirement_packet",
-              "decision_pack"
-            ],
-            "partition_id": "authorization",
             "presentation": {
               "display_name": "award_decider"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner"
+            }
           },
           {
+            "id": "decision_packager",
+            "partition_id": "authorization",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
+            "input_queue_family_ids": [
+              "authorization_decision",
+              "decision_pack"
+            ],
+            "output_queue_family_ids": [
+              "decision_pack"
+            ],
             "artifact_schema_ids": [
               "AwardDecision",
               "OperatorDecision",
@@ -15216,28 +15108,152 @@
             "declared_outcome_ids": [
               "vendor_selection.decision_packager.decision_pack_ready"
             ],
-            "id": "decision_packager",
-            "input_queue_family_ids": [
-              "authorization_decision",
-              "decision_pack"
-            ],
-            "output_queue_family_ids": [
-              "decision_pack"
-            ],
-            "partition_id": "authorization",
             "presentation": {
               "display_name": "decision_packager"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner"
+            }
+          }
+        ],
+        "terminal_outcomes": [
+          {
+            "id": "vendor_selection.request_intake.request_ready",
+            "stage_kind_id": "request_intake",
+            "marker": "REQUEST_READY",
+            "presentation": {
+              "display_name": "REQUEST_READY"
+            }
+          },
+          {
+            "id": "vendor_selection.request_intake.needs_clarification",
+            "stage_kind_id": "request_intake",
+            "marker": "REQUEST_NEEDS_CLARIFICATION",
+            "presentation": {
+              "display_name": "REQUEST_NEEDS_CLARIFICATION"
+            }
+          },
+          {
+            "id": "vendor_selection.policy_screener.policy_allowed",
+            "stage_kind_id": "policy_screener",
+            "marker": "POLICY_ALLOWED",
+            "presentation": {
+              "display_name": "POLICY_ALLOWED"
+            }
+          },
+          {
+            "id": "vendor_selection.policy_screener.policy_blocked",
+            "stage_kind_id": "policy_screener",
+            "marker": "POLICY_BLOCKED",
+            "presentation": {
+              "display_name": "POLICY_BLOCKED"
+            }
+          },
+          {
+            "id": "vendor_selection.requirement_freezer.requirements_ready",
+            "stage_kind_id": "requirement_freezer",
+            "marker": "REQUIREMENTS_READY",
+            "presentation": {
+              "display_name": "REQUIREMENTS_READY"
+            }
+          },
+          {
+            "id": "vendor_selection.catalog_sourcer.candidates_ready",
+            "stage_kind_id": "catalog_sourcer",
+            "marker": "CANDIDATES_READY",
+            "presentation": {
+              "display_name": "CANDIDATES_READY"
+            }
+          },
+          {
+            "id": "vendor_selection.catalog_sourcer.no_viable_vendor",
+            "stage_kind_id": "catalog_sourcer",
+            "marker": "NO_VIABLE_VENDOR",
+            "presentation": {
+              "display_name": "NO_VIABLE_VENDOR"
+            }
+          },
+          {
+            "id": "vendor_selection.candidate_packager.candidates_ready",
+            "stage_kind_id": "candidate_packager",
+            "marker": "CANDIDATES_READY",
+            "presentation": {
+              "display_name": "CANDIDATES_READY"
+            }
+          },
+          {
+            "id": "vendor_selection.rubric_evaluator.rubric_complete",
+            "stage_kind_id": "rubric_evaluator",
+            "marker": "RUBRIC_COMPLETE",
+            "presentation": {
+              "display_name": "RUBRIC_COMPLETE"
+            }
+          },
+          {
+            "id": "vendor_selection.conflict_checker.conflict_complete",
+            "stage_kind_id": "conflict_checker",
+            "marker": "CONFLICT_COMPLETE",
+            "presentation": {
+              "display_name": "CONFLICT_COMPLETE"
+            }
+          },
+          {
+            "id": "vendor_selection.award_decider.award_ready",
+            "stage_kind_id": "award_decider",
+            "marker": "AWARD_READY",
+            "presentation": {
+              "display_name": "AWARD_READY"
+            }
+          },
+          {
+            "id": "vendor_selection.award_decider.resource_required",
+            "stage_kind_id": "award_decider",
+            "marker": "RESOURCE_REQUIRED",
+            "presentation": {
+              "display_name": "RESOURCE_REQUIRED"
+            }
+          },
+          {
+            "id": "vendor_selection.award_decider.operator_required",
+            "stage_kind_id": "award_decider",
+            "marker": "OPERATOR_REQUIRED",
+            "presentation": {
+              "display_name": "OPERATOR_REQUIRED"
+            }
+          },
+          {
+            "id": "vendor_selection.award_decider.no_viable_vendor",
+            "stage_kind_id": "award_decider",
+            "marker": "NO_VIABLE_VENDOR",
+            "presentation": {
+              "display_name": "NO_VIABLE_VENDOR"
+            }
+          },
+          {
+            "id": "vendor_selection.award_decider.blocked",
+            "stage_kind_id": "award_decider",
+            "marker": "BLOCKED",
+            "presentation": {
+              "display_name": "BLOCKED"
+            }
+          },
+          {
+            "id": "vendor_selection.decision_packager.decision_pack_ready",
+            "stage_kind_id": "decision_packager",
+            "marker": "DECISION_PACK_READY",
+            "presentation": {
+              "display_name": "DECISION_PACK_READY"
+            }
           }
         ],
         "terminal_actions": [
           {
-            "artifact_schema_id": "PurchaseRequest",
-            "emitted_queue_family_id": "purchase_request",
             "id": "vendor_selection.request_intake.request_ready",
-            "kind": "route",
+            "stage_kind_id": "request_intake",
             "outcome_id": "vendor_selection.request_intake.request_ready",
+            "kind": "route",
+            "target_stage_kind_id": "policy_screener",
+            "target_graph_node_id": "vendor_selection.policy_screener.start",
+            "emitted_queue_family_id": "purchase_request",
+            "artifact_schema_id": "PurchaseRequest",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "payload_projection": {
               "kind": "source",
               "path": [
@@ -15246,28 +15262,28 @@
             },
             "presentation": {
               "display_name": "vendor_selection.request_intake.request_ready"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "request_intake",
-            "target_graph_node_id": "vendor_selection.policy_screener.start",
-            "target_stage_kind_id": "policy_screener"
+            }
           },
           {
-            "artifact_schema_id": "DecisionPack",
             "id": "vendor_selection.request_intake.needs_clarification",
-            "kind": "close",
+            "stage_kind_id": "request_intake",
             "outcome_id": "vendor_selection.request_intake.needs_clarification",
+            "kind": "close",
             "presentation": {
               "display_name": "vendor_selection.request_intake.needs_clarification"
             },
-            "stage_kind_id": "request_intake"
+            "artifact_schema_id": "DecisionPack"
           },
           {
-            "artifact_schema_id": "PurchaseRequest",
-            "emitted_queue_family_id": "purchase_request",
             "id": "vendor_selection.policy_screener.policy_allowed",
-            "kind": "route",
+            "stage_kind_id": "policy_screener",
             "outcome_id": "vendor_selection.policy_screener.policy_allowed",
+            "kind": "route",
+            "target_stage_kind_id": "requirement_freezer",
+            "target_graph_node_id": "vendor_selection.requirement_freezer.start",
+            "emitted_queue_family_id": "purchase_request",
+            "artifact_schema_id": "PurchaseRequest",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "payload_projection": {
               "kind": "source",
               "path": [
@@ -15276,28 +15292,28 @@
             },
             "presentation": {
               "display_name": "vendor_selection.policy_screener.policy_allowed"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "policy_screener",
-            "target_graph_node_id": "vendor_selection.requirement_freezer.start",
-            "target_stage_kind_id": "requirement_freezer"
+            }
           },
           {
-            "artifact_schema_id": "DecisionPack",
             "id": "vendor_selection.policy_screener.policy_blocked",
-            "kind": "close",
+            "stage_kind_id": "policy_screener",
             "outcome_id": "vendor_selection.policy_screener.policy_blocked",
+            "kind": "close",
             "presentation": {
               "display_name": "vendor_selection.policy_screener.policy_blocked"
             },
-            "stage_kind_id": "policy_screener"
+            "artifact_schema_id": "DecisionPack"
           },
           {
-            "artifact_schema_id": "RequirementPacket",
-            "emitted_queue_family_id": "requirement_packet",
             "id": "vendor_selection.requirement_freezer.requirements_ready",
-            "kind": "route",
+            "stage_kind_id": "requirement_freezer",
             "outcome_id": "vendor_selection.requirement_freezer.requirements_ready",
+            "kind": "route",
+            "target_stage_kind_id": "catalog_sourcer",
+            "target_graph_node_id": "vendor_selection.catalog_sourcer.start",
+            "emitted_queue_family_id": "requirement_packet",
+            "artifact_schema_id": "RequirementPacket",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "payload_projection": {
               "kind": "source",
               "path": [
@@ -15306,18 +15322,18 @@
             },
             "presentation": {
               "display_name": "vendor_selection.requirement_freezer.requirements_ready"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "requirement_freezer",
-            "target_graph_node_id": "vendor_selection.catalog_sourcer.start",
-            "target_stage_kind_id": "catalog_sourcer"
+            }
           },
           {
-            "artifact_schema_id": "CandidateBundle",
-            "emitted_queue_family_id": "candidate_bundle",
             "id": "vendor_selection.catalog_sourcer.candidates_ready",
-            "kind": "route",
+            "stage_kind_id": "catalog_sourcer",
             "outcome_id": "vendor_selection.catalog_sourcer.candidates_ready",
+            "kind": "route",
+            "target_stage_kind_id": "candidate_packager",
+            "target_graph_node_id": "vendor_selection.candidate_packager.start",
+            "emitted_queue_family_id": "candidate_bundle",
+            "artifact_schema_id": "CandidateBundle",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "payload_projection": {
               "kind": "source",
               "path": [
@@ -15326,18 +15342,18 @@
             },
             "presentation": {
               "display_name": "vendor_selection.catalog_sourcer.candidates_ready"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "catalog_sourcer",
-            "target_graph_node_id": "vendor_selection.candidate_packager.start",
-            "target_stage_kind_id": "candidate_packager"
+            }
           },
           {
-            "artifact_schema_id": "DecisionPack",
-            "emitted_queue_family_id": "decision_pack",
             "id": "vendor_selection.catalog_sourcer.no_viable_vendor",
-            "kind": "route",
+            "stage_kind_id": "catalog_sourcer",
             "outcome_id": "vendor_selection.catalog_sourcer.no_viable_vendor",
+            "kind": "route",
+            "target_stage_kind_id": "decision_packager",
+            "target_graph_node_id": "vendor_selection.decision_packager.start",
+            "emitted_queue_family_id": "decision_pack",
+            "artifact_schema_id": "DecisionPack",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "payload_projection": {
               "kind": "source",
               "path": [
@@ -15346,48 +15362,48 @@
             },
             "presentation": {
               "display_name": "vendor_selection.catalog_sourcer.no_viable_vendor"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "catalog_sourcer",
-            "target_graph_node_id": "vendor_selection.decision_packager.start",
-            "target_stage_kind_id": "decision_packager"
+            }
           },
           {
-            "artifact_schema_id": "CandidateBundle",
             "id": "vendor_selection.candidate_packager.candidates_ready",
-            "kind": "complete_work_item",
+            "stage_kind_id": "candidate_packager",
             "outcome_id": "vendor_selection.candidate_packager.candidates_ready",
+            "kind": "complete_work_item",
             "presentation": {
               "display_name": "vendor_selection.candidate_packager.candidates_ready"
             },
-            "stage_kind_id": "candidate_packager"
+            "artifact_schema_id": "CandidateBundle"
           },
           {
-            "artifact_schema_id": "RubricReport",
             "id": "vendor_selection.rubric_evaluator.rubric_complete",
-            "kind": "complete_work_item",
+            "stage_kind_id": "rubric_evaluator",
             "outcome_id": "vendor_selection.rubric_evaluator.rubric_complete",
+            "kind": "complete_work_item",
             "presentation": {
               "display_name": "vendor_selection.rubric_evaluator.rubric_complete"
             },
-            "stage_kind_id": "rubric_evaluator"
+            "artifact_schema_id": "RubricReport"
           },
           {
-            "artifact_schema_id": "ConflictReport",
             "id": "vendor_selection.conflict_checker.conflict_complete",
-            "kind": "complete_work_item",
+            "stage_kind_id": "conflict_checker",
             "outcome_id": "vendor_selection.conflict_checker.conflict_complete",
+            "kind": "complete_work_item",
             "presentation": {
               "display_name": "vendor_selection.conflict_checker.conflict_complete"
             },
-            "stage_kind_id": "conflict_checker"
+            "artifact_schema_id": "ConflictReport"
           },
           {
-            "artifact_schema_id": "AwardDecision",
-            "emitted_queue_family_id": "authorization_decision",
             "id": "vendor_selection.award_decider.award_ready",
-            "kind": "route",
+            "stage_kind_id": "award_decider",
             "outcome_id": "vendor_selection.award_decider.award_ready",
+            "kind": "route",
+            "target_stage_kind_id": "decision_packager",
+            "target_graph_node_id": "vendor_selection.decision_packager.start",
+            "emitted_queue_family_id": "authorization_decision",
+            "artifact_schema_id": "AwardDecision",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "payload_projection": {
               "kind": "source",
               "path": [
@@ -15396,18 +15412,18 @@
             },
             "presentation": {
               "display_name": "vendor_selection.award_decider.award_ready"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "award_decider",
-            "target_graph_node_id": "vendor_selection.decision_packager.start",
-            "target_stage_kind_id": "decision_packager"
+            }
           },
           {
-            "artifact_schema_id": "RequirementPacket",
-            "emitted_queue_family_id": "requirement_packet",
             "id": "vendor_selection.award_decider.resource_required",
-            "kind": "route",
+            "stage_kind_id": "award_decider",
             "outcome_id": "vendor_selection.award_decider.resource_required",
+            "kind": "route",
+            "target_stage_kind_id": "catalog_sourcer",
+            "target_graph_node_id": "vendor_selection.catalog_sourcer.start",
+            "emitted_queue_family_id": "requirement_packet",
+            "artifact_schema_id": "RequirementPacket",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "payload_projection": {
               "kind": "source",
               "path": [
@@ -15416,28 +15432,28 @@
             },
             "presentation": {
               "display_name": "vendor_selection.award_decider.resource_required"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "award_decider",
-            "target_graph_node_id": "vendor_selection.catalog_sourcer.start",
-            "target_stage_kind_id": "catalog_sourcer"
+            }
           },
           {
-            "artifact_schema_id": "AwardDecision",
             "id": "vendor_selection.award_decider.operator_required",
-            "kind": "operator_wait",
+            "stage_kind_id": "award_decider",
             "outcome_id": "vendor_selection.award_decider.operator_required",
+            "kind": "operator_wait",
             "presentation": {
               "display_name": "vendor_selection.award_decider.operator_required"
             },
-            "stage_kind_id": "award_decider"
+            "artifact_schema_id": "AwardDecision"
           },
           {
-            "artifact_schema_id": "DecisionPack",
-            "emitted_queue_family_id": "decision_pack",
             "id": "vendor_selection.award_decider.no_viable_vendor",
-            "kind": "route",
+            "stage_kind_id": "award_decider",
             "outcome_id": "vendor_selection.award_decider.no_viable_vendor",
+            "kind": "route",
+            "target_stage_kind_id": "decision_packager",
+            "target_graph_node_id": "vendor_selection.decision_packager.start",
+            "emitted_queue_family_id": "decision_pack",
+            "artifact_schema_id": "DecisionPack",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "payload_projection": {
               "kind": "source",
               "path": [
@@ -15446,18 +15462,18 @@
             },
             "presentation": {
               "display_name": "vendor_selection.award_decider.no_viable_vendor"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "award_decider",
-            "target_graph_node_id": "vendor_selection.decision_packager.start",
-            "target_stage_kind_id": "decision_packager"
+            }
           },
           {
-            "artifact_schema_id": "DecisionPack",
-            "emitted_queue_family_id": "decision_pack",
             "id": "vendor_selection.award_decider.blocked",
-            "kind": "route",
+            "stage_kind_id": "award_decider",
             "outcome_id": "vendor_selection.award_decider.blocked",
+            "kind": "route",
+            "target_stage_kind_id": "decision_packager",
+            "target_graph_node_id": "vendor_selection.decision_packager.start",
+            "emitted_queue_family_id": "decision_pack",
+            "artifact_schema_id": "DecisionPack",
+            "runner_binding_id": "deterministic_vendor_selection_runner",
             "payload_projection": {
               "kind": "source",
               "path": [
@@ -15466,197 +15482,259 @@
             },
             "presentation": {
               "display_name": "vendor_selection.award_decider.blocked"
-            },
-            "runner_binding_id": "deterministic_vendor_selection_runner",
-            "stage_kind_id": "award_decider",
-            "target_graph_node_id": "vendor_selection.decision_packager.start",
-            "target_stage_kind_id": "decision_packager"
+            }
           },
           {
-            "artifact_schema_id": "DecisionPack",
             "id": "vendor_selection.decision_packager.decision_pack_ready",
-            "kind": "complete_work_item",
+            "stage_kind_id": "decision_packager",
             "outcome_id": "vendor_selection.decision_packager.decision_pack_ready",
+            "kind": "complete_work_item",
             "presentation": {
               "display_name": "vendor_selection.decision_packager.decision_pack_ready"
             },
-            "stage_kind_id": "decision_packager"
+            "artifact_schema_id": "DecisionPack"
           }
         ],
-        "terminal_outcomes": [
+        "fanout_declarations": [
           {
-            "id": "vendor_selection.request_intake.request_ready",
-            "marker": "REQUEST_READY",
-            "presentation": {
-              "display_name": "REQUEST_READY"
+            "id": "vendor_selection.candidate_packager.rubric_fanout",
+            "source_action_id": "vendor_selection.candidate_packager.candidates_ready",
+            "source_artifact_schema_id": "CandidateBundle",
+            "item_source_path": [
+              "candidate_vendors"
+            ],
+            "item_id_key": "candidate_id",
+            "target_route_id": "vendor_selection.rubric_work",
+            "target_payload_schema_id": "CandidateBundle",
+            "target_payload_mapping": {
+              "source_requirement_id": [
+                "source_requirement_id"
+              ],
+              "bundle_id": [
+                "bundle_id"
+              ],
+              "candidate_vendors": [
+                "candidate_vendors"
+              ],
+              "deterministic_source_refs": [
+                "deterministic_source_refs"
+              ],
+              "approval_policy_hint": [
+                "approval_policy_hint"
+              ],
+              "conflict_rules": [
+                "conflict_rules"
+              ]
             },
-            "stage_kind_id": "request_intake"
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "depends_on_source_work_item"
           },
           {
-            "id": "vendor_selection.request_intake.needs_clarification",
-            "marker": "REQUEST_NEEDS_CLARIFICATION",
-            "presentation": {
-              "display_name": "REQUEST_NEEDS_CLARIFICATION"
+            "id": "vendor_selection.candidate_packager.conflict_fanout",
+            "source_action_id": "vendor_selection.candidate_packager.candidates_ready",
+            "source_artifact_schema_id": "CandidateBundle",
+            "item_source_path": [
+              "candidate_vendors"
+            ],
+            "item_id_key": "candidate_id",
+            "target_route_id": "vendor_selection.conflict_work",
+            "target_payload_schema_id": "CandidateBundle",
+            "target_payload_mapping": {
+              "source_requirement_id": [
+                "source_requirement_id"
+              ],
+              "bundle_id": [
+                "bundle_id"
+              ],
+              "candidate_vendors": [
+                "candidate_vendors"
+              ],
+              "deterministic_source_refs": [
+                "deterministic_source_refs"
+              ],
+              "approval_policy_hint": [
+                "approval_policy_hint"
+              ],
+              "conflict_rules": [
+                "conflict_rules"
+              ]
             },
-            "stage_kind_id": "request_intake"
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "depends_on_source_work_item"
+          }
+        ],
+        "join_declarations": [
+          {
+            "id": "candidate_evidence_join",
+            "target_stage_kind_id": "award_decider",
+            "correlation_key": "bundle_id",
+            "required_artifact_schema_ids": [
+              "RubricReport",
+              "ConflictReport"
+            ],
+            "missing_policy": "wait"
+          }
+        ],
+        "concurrency_policies": [
+          {
+            "id": "requirements.standard",
+            "partition_id": "requirements",
+            "max_active_runs": 1,
+            "coexist_partition_ids": [
+              "sourcing",
+              "evaluation",
+              "authorization"
+            ]
           },
           {
-            "id": "vendor_selection.policy_screener.policy_allowed",
-            "marker": "POLICY_ALLOWED",
-            "presentation": {
-              "display_name": "POLICY_ALLOWED"
-            },
-            "stage_kind_id": "policy_screener"
+            "id": "sourcing.standard",
+            "partition_id": "sourcing",
+            "max_active_runs": 1,
+            "coexist_partition_ids": [
+              "requirements",
+              "evaluation",
+              "authorization"
+            ]
           },
           {
-            "id": "vendor_selection.policy_screener.policy_blocked",
-            "marker": "POLICY_BLOCKED",
-            "presentation": {
-              "display_name": "POLICY_BLOCKED"
-            },
-            "stage_kind_id": "policy_screener"
+            "id": "evaluation.parallel",
+            "partition_id": "evaluation",
+            "max_active_runs": 2,
+            "coexist_partition_ids": [
+              "requirements",
+              "sourcing",
+              "authorization"
+            ]
           },
           {
-            "id": "vendor_selection.requirement_freezer.requirements_ready",
-            "marker": "REQUIREMENTS_READY",
-            "presentation": {
-              "display_name": "REQUIREMENTS_READY"
-            },
-            "stage_kind_id": "requirement_freezer"
-          },
+            "id": "authorization.standard",
+            "partition_id": "authorization",
+            "max_active_runs": 1,
+            "coexist_partition_ids": [
+              "requirements",
+              "sourcing",
+              "evaluation"
+            ]
+          }
+        ],
+        "recovery_policies": [],
+        "wait_states": [],
+        "counters": [],
+        "completion_behaviors": [],
+        "remediation_policies": [],
+        "intervention_options": [],
+        "operator_waits": [
           {
-            "id": "vendor_selection.catalog_sourcer.candidates_ready",
-            "marker": "CANDIDATES_READY",
-            "presentation": {
-              "display_name": "CANDIDATES_READY"
-            },
-            "stage_kind_id": "catalog_sourcer"
-          },
+            "id": "vendor_selection.award_operator_wait",
+            "source_action_ids": [
+              "vendor_selection.award_decider.operator_required"
+            ],
+            "wait_scope": "lineage",
+            "source_work_item_behavior": "leave_open",
+            "unrelated_lineages_continue": true,
+            "allowed_resolution_kinds": [
+              "resume_recorded_source",
+              "revise_recorded_source"
+            ],
+            "payload_schema_id": "OperatorDecision",
+            "target_queue_family_id": "decision_pack",
+            "target_stage_kind_id": "decision_packager",
+            "target_graph_node_id": "vendor_selection.decision_packager.start",
+            "target_runner_binding_id": "deterministic_vendor_selection_runner",
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "wait_id",
+              "operator_wait_id",
+              "lineage_id",
+              "target_activation_id",
+              "empty_payload",
+              "target_work_item_id",
+              "payload_digest",
+              "payload_reference"
+            ],
+            "correlation_key": "wait_id",
+            "idempotency": "input_receipt_and_active_wait_status",
+            "timeout_policy": "none",
+            "expiry_policy": "none",
+            "cancellation_policy": "selected_resolution_only",
+            "status_effect": "operator_wait_active"
+          }
+        ],
+        "runner_bindings": [
           {
-            "id": "vendor_selection.catalog_sourcer.no_viable_vendor",
-            "marker": "NO_VIABLE_VENDOR",
+            "id": "deterministic_vendor_selection_runner",
+            "adapter_kind": "fake_local",
+            "stage_kind_ids": [
+              "request_intake",
+              "policy_screener",
+              "requirement_freezer",
+              "catalog_sourcer",
+              "candidate_packager",
+              "rubric_evaluator",
+              "conflict_checker",
+              "award_decider",
+              "decision_packager"
+            ],
             "presentation": {
-              "display_name": "NO_VIABLE_VENDOR"
+              "display_name": "Deterministic vendor runner"
             },
-            "stage_kind_id": "catalog_sourcer"
-          },
+            "required_capability_ids": [
+              "capability.runner.invoke"
+            ]
+          }
+        ],
+        "capabilities": [
           {
-            "id": "vendor_selection.candidate_packager.candidates_ready",
-            "marker": "CANDIDATES_READY",
-            "presentation": {
-              "display_name": "CANDIDATES_READY"
-            },
-            "stage_kind_id": "candidate_packager"
-          },
-          {
-            "id": "vendor_selection.rubric_evaluator.rubric_complete",
-            "marker": "RUBRIC_COMPLETE",
-            "presentation": {
-              "display_name": "RUBRIC_COMPLETE"
-            },
-            "stage_kind_id": "rubric_evaluator"
-          },
-          {
-            "id": "vendor_selection.conflict_checker.conflict_complete",
-            "marker": "CONFLICT_COMPLETE",
-            "presentation": {
-              "display_name": "CONFLICT_COMPLETE"
-            },
-            "stage_kind_id": "conflict_checker"
-          },
-          {
-            "id": "vendor_selection.award_decider.award_ready",
-            "marker": "AWARD_READY",
-            "presentation": {
-              "display_name": "AWARD_READY"
-            },
-            "stage_kind_id": "award_decider"
-          },
-          {
-            "id": "vendor_selection.award_decider.resource_required",
-            "marker": "RESOURCE_REQUIRED",
-            "presentation": {
-              "display_name": "RESOURCE_REQUIRED"
-            },
-            "stage_kind_id": "award_decider"
-          },
-          {
-            "id": "vendor_selection.award_decider.operator_required",
-            "marker": "OPERATOR_REQUIRED",
-            "presentation": {
-              "display_name": "OPERATOR_REQUIRED"
-            },
-            "stage_kind_id": "award_decider"
-          },
-          {
-            "id": "vendor_selection.award_decider.no_viable_vendor",
-            "marker": "NO_VIABLE_VENDOR",
-            "presentation": {
-              "display_name": "NO_VIABLE_VENDOR"
-            },
-            "stage_kind_id": "award_decider"
-          },
-          {
-            "id": "vendor_selection.award_decider.blocked",
-            "marker": "BLOCKED",
-            "presentation": {
-              "display_name": "BLOCKED"
-            },
-            "stage_kind_id": "award_decider"
-          },
-          {
-            "id": "vendor_selection.decision_packager.decision_pack_ready",
-            "marker": "DECISION_PACK_READY",
-            "presentation": {
-              "display_name": "DECISION_PACK_READY"
-            },
-            "stage_kind_id": "decision_packager"
+            "id": "capability.runner.invoke",
+            "kind": "runner.invoke",
+            "support_status": "supported",
+            "grant_status": "granted",
+            "approval_policy_id": null
           }
         ],
         "unselected_catalog": [
           {
-            "budget_band": "low",
+            "id": "vendor_selection.catalog.alpha",
             "candidate_id": "vendor_alpha",
+            "vendor_label": "Alpha Stationery",
             "capabilities": [
               "standard_office_supplies",
               "net30_invoice"
             ],
-            "conflict_flag": "clear",
-            "id": "vendor_selection.catalog.alpha",
-            "vendor_label": "Alpha Stationery"
+            "budget_band": "low",
+            "conflict_flag": "clear"
           },
           {
-            "budget_band": "medium",
+            "id": "vendor_selection.catalog.beta",
             "candidate_id": "vendor_beta",
+            "vendor_label": "Beta Supplies",
             "capabilities": [
               "standard_office_supplies",
               "rush_delivery"
             ],
-            "conflict_flag": "blocked",
-            "id": "vendor_selection.catalog.beta",
-            "vendor_label": "Beta Supplies"
+            "budget_band": "medium",
+            "conflict_flag": "blocked"
           },
           {
-            "budget_band": "medium",
+            "id": "vendor_selection.catalog.gamma",
             "candidate_id": "vendor_gamma",
+            "vendor_label": "Gamma Office",
             "capabilities": [
               "standard_office_supplies",
               "net30_invoice",
               "rush_delivery"
             ],
-            "conflict_flag": "clear",
-            "id": "vendor_selection.catalog.gamma",
-            "vendor_label": "Gamma Office"
+            "budget_band": "medium",
+            "conflict_flag": "clear"
           }
-        ],
-        "wait_states": [],
-        "workflow": {
-          "compatibility_profile": null,
-          "id": "vendor_selection",
-          "name": "Vendor Selection",
-          "required_extensions": [],
-          "version": "0.1"
-        }
+        ]
       },
       "visibility": "public",
       "workflow_id": "vendor_selection",
@@ -16129,8 +16207,8 @@
     {
       "asset_id": "learning.entrypoints.librarian",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2622,
-      "content_digest": "sha256:e2c607fb0d6c389c3f661fa763917c9ee36fa5c0dfbef45f246703ae0202023c",
+      "byte_length": 4041,
+      "content_digest": "sha256:07c43a588ea413e092789ff4285827b864106e2b4ab7b1fb5b168cb1569b7a1c",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/lad.full/entrypoints/librarian.md",
@@ -16140,8 +16218,8 @@
     {
       "asset_id": "learning.skills.librarian_core",
       "asset_kind": "stage_skill",
-      "byte_length": 4603,
-      "content_digest": "sha256:37c9c29fd3dd899fdcd45caad2f17d840fb7bc8beb1a4da6e695ca07f225191e",
+      "byte_length": 7334,
+      "content_digest": "sha256:7e5ec3b7541de1ca4cffb5358fa78e3c937ec2ef1b2085a0e0bc89b4f02ed0be",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/lad.full/skills/librarian-core.md",
@@ -16162,8 +16240,8 @@
     {
       "asset_id": "vendor_selection.skills.request_intake_core",
       "asset_kind": "stage_skill",
-      "byte_length": 5442,
-      "content_digest": "sha256:649b984b2504f84e20bed3bc9d968cfb824f09710be2b794b9e8e64d06363fa7",
+      "byte_length": 5428,
+      "content_digest": "sha256:5f9dea6e4ac2074edbd3a288afa1090fb63441f5bc19cc1a66eb8722f6fc02d6",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/request_intake-core.md",
@@ -16184,8 +16262,8 @@
     {
       "asset_id": "vendor_selection.skills.policy_screener_core",
       "asset_kind": "stage_skill",
-      "byte_length": 5436,
-      "content_digest": "sha256:65f50b3da48655c04616b0d4aa2a9768c69862c8efc29422b2c121c108532070",
+      "byte_length": 5422,
+      "content_digest": "sha256:1072f31cef10c09da53355030a00ca07affb1c3ab529f5e22331c17b0d6f5bc9",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/policy_screener-core.md",
@@ -16195,8 +16273,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.requirement_freezer",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2917,
-      "content_digest": "sha256:98fe63eb6562bb496a7e589261afeb0f1535e4bc92fafbb2950e4867336d72c2",
+      "byte_length": 3137,
+      "content_digest": "sha256:134a62ddb8510c87b4bbf93a0b67b33646752caacf810089d2e2c320213ade71",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/requirement_freezer.md",
@@ -16206,8 +16284,8 @@
     {
       "asset_id": "vendor_selection.skills.requirement_freezer_core",
       "asset_kind": "stage_skill",
-      "byte_length": 3598,
-      "content_digest": "sha256:3eab8f42ea85aa5aa0929e29a011bae5c9a5a01134968a9146811adba6f60e49",
+      "byte_length": 4961,
+      "content_digest": "sha256:046cd2c62c7f7d5faa621a7f3b27541126f1cc073855638657afcc81c8fcbfd3",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/requirement_freezer-core.md",
@@ -16217,8 +16295,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.catalog_sourcer",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 3100,
-      "content_digest": "sha256:99fd28e93317422dcde306bdea8399ba8d96828b43a0fc10a47d11909c722f5c",
+      "byte_length": 3349,
+      "content_digest": "sha256:ce618ae374bfa51dedb67893c4756bebd773b337c63bc8e598849ffd026c471e",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/catalog_sourcer.md",
@@ -16228,8 +16306,8 @@
     {
       "asset_id": "vendor_selection.skills.catalog_sourcer_core",
       "asset_kind": "stage_skill",
-      "byte_length": 6207,
-      "content_digest": "sha256:031e5cba8692160766eae4b553015e28b093004fec332bcbb8cb27cd8647e7ad",
+      "byte_length": 8694,
+      "content_digest": "sha256:7365c311c4537aba4abefa0228e7675ed8eb3d20bb890c4c3e0dd160888ba98a",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/catalog_sourcer-core.md",
@@ -16239,8 +16317,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.candidate_packager",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2870,
-      "content_digest": "sha256:2d8c448c4fb90e7118f17a292c62434ba35a37624ff8b175a849a805d3233339",
+      "byte_length": 3189,
+      "content_digest": "sha256:a267e80ac858381657fb2fa955ebc4a7e09781381b9cf8def328e26a4c5cb15b",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/candidate_packager.md",
@@ -16250,8 +16328,8 @@
     {
       "asset_id": "vendor_selection.skills.candidate_packager_core",
       "asset_kind": "stage_skill",
-      "byte_length": 3760,
-      "content_digest": "sha256:e82b01ebbf1c41f6a6be2e5a12da907515c574dd4a1739db1a5bc0f753baecd1",
+      "byte_length": 5962,
+      "content_digest": "sha256:5f281f257f1bfd8e64c70754201b00743116705d4493f8bf59c0fb8fecd9febe",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/candidate_packager-core.md",
@@ -16261,8 +16339,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.rubric_evaluator",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2825,
-      "content_digest": "sha256:946ba01bc27d511801b9459297572bb9534ca77f5675516d73aba8e54a518ec8",
+      "byte_length": 3091,
+      "content_digest": "sha256:433df90de96f93a2d47ebe1aac968d0fe72cdde39a2e493872d5c7ab9964e2d0",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/rubric_evaluator.md",
@@ -16272,8 +16350,8 @@
     {
       "asset_id": "vendor_selection.skills.rubric_evaluator_core",
       "asset_kind": "stage_skill",
-      "byte_length": 3222,
-      "content_digest": "sha256:924e49037480df088b9a5998b52dd9ddb99f343f72140a87ab5d6867bf8a9335",
+      "byte_length": 4363,
+      "content_digest": "sha256:8f736c7d764e3d31d87e43d9310a4b28116cfec40d1bfe1ec8eec7da36e1b669",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/rubric_evaluator-core.md",
@@ -16283,8 +16361,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.conflict_checker",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2873,
-      "content_digest": "sha256:9c0ccf66458b8e542a0b444b7d8430ea43758029fc228132431ebcd8708c04e4",
+      "byte_length": 3119,
+      "content_digest": "sha256:2a44e16b041440de0d2eb4d91b340802c63bef396870acf1423dff4d53e8be06",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/conflict_checker.md",
@@ -16294,8 +16372,8 @@
     {
       "asset_id": "vendor_selection.skills.conflict_checker_core",
       "asset_kind": "stage_skill",
-      "byte_length": 2964,
-      "content_digest": "sha256:9194aea620cc0f4ecc9463fd192946f66fef0fe8ae1304023a68061c8f0553b3",
+      "byte_length": 3935,
+      "content_digest": "sha256:d5460856aef962902801b8ce320b23ef84db3ef6a6242da9e5c5e044bc84a353",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/conflict_checker-core.md",
@@ -16305,8 +16383,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.award_decider",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 4029,
-      "content_digest": "sha256:4621182ce3906517ad71034dbc4b3d8f0269a2e3c93ea35e8f21f39bfcae7b4f",
+      "byte_length": 4409,
+      "content_digest": "sha256:88a55ca64c6f0240be1ec0d658cb4405209a7da4a177c0af221903e69225da9f",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/award_decider.md",
@@ -16316,8 +16394,8 @@
     {
       "asset_id": "vendor_selection.skills.award_decider_core",
       "asset_kind": "stage_skill",
-      "byte_length": 8914,
-      "content_digest": "sha256:a4a89ebc1ce9092bab146714cc8c2df0aea180556dc2cab11aba1989ced6ec05",
+      "byte_length": 14166,
+      "content_digest": "sha256:20f0fa7bb75e524da98b37c166b4381230e739dfcc4d3dd24089526cf41ed9ae",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/award_decider-core.md",
@@ -16338,8 +16416,8 @@
     {
       "asset_id": "vendor_selection.skills.decision_packager_core",
       "asset_kind": "stage_skill",
-      "byte_length": 4996,
-      "content_digest": "sha256:45b80b76f4472328989e31d929ca553b5cd3f112d3e7cd4fabc700ebf8be78df",
+      "byte_length": 4982,
+      "content_digest": "sha256:e2807c450664bb700682e53c74539f320b225bef5dee1073519d849736d7134d",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/decision_packager-core.md",
@@ -16356,14 +16434,14 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:846fb4c436978dd0d199836c10409513fb499ee57843db4dcc26e3b173cf7d8d",
+  "manifest_digest": "sha256:54f1c86960ec6eef635560abf52645b6ab41ea0ec4169816428c102f43752adb",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",
-    "plus_packet": "PLUS-0003D",
-    "status": "final_official_simple_loop_lad_execution_lad_planning_full_lad_and_vendor_selection_workflow_package_with_selected_vendor_assets",
+    "plus_packet": "PLUS-0003H",
+    "status": "official_package_with_vendor_selection_decision_context_propagation_pending_post_diff_review_and_fresh_live_e2e_0005",
     "unselected_catalog_disposition": "lad_planning.workflow_source_with_unselected_catalog() inspected; unselected_catalog excluded from shipped selected authority and package assets",
-    "vendor_selection_disposition": "vendor_selection.source() packaged as selected_authority with selected entrypoint prompt and stage-core skill assets added by PLUS-0003D; unselected_catalog remains donor metadata and is ignored by compiled selected authority",
+    "vendor_selection_disposition": "vendor_selection.source() packaged as selected_authority with selected entrypoint prompt and stage-core skill assets; PLUS-0003H preserves approval_policy_hint, conflict_rules, candidate conflict_status, and source refs through selected vendor-selection handoffs; unselected_catalog remains donor metadata and is ignored by compiled selected authority",
     "vendor_selection_effect_provider_refs": "vendor_selection declares no effect_declarations/provider_ref entries; selected vendor assets define prompt and stage-skill text only and grant no provider, payment, purchase, marketplace, or credential authority",
     "vendor_selection_selected_assets": "18 selected assets: one entrypoint_prompt and one stage_skill for each runner-executed vendor_selection stage"
   }

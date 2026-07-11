@@ -23,6 +23,7 @@ Selected schemas for this stage. Treat each schema as closed.
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
 | `source_request_id` | yes | string; min_length 1 | Selected-schema field. |
+| `approval_policy_hint` | yes | enum [none, operator_required] | Preserve the selected approval policy when re-sourcing. |
 | `frozen_requirements` | yes | array; min_items 1; items string | Selected-schema array. |
 | `policy_status` | yes | enum [allowed, blocked, clarification_required] | Selected value from [allowed, blocked, clarification_required]. |
 | `selection_rubric_id` | yes | string; min_length 1 | Selected-schema field. |
@@ -47,7 +48,89 @@ Operator wait boundary:
 - `vendor_selection.award_operator_wait` is selected runtime authority, not model authority.
 - For `OPERATOR_REQUIRED`, produce an exact `AwardDecision` with `decision_kind` set to `operator_required` and `operator_gate_required` set to true.
 - Model output cannot resolve the selected local-operator gate.
+- Use joined source bundle `approval_policy_hint`, `conflict_rules`, `candidate_vendors[*].conflict_status`, and exact report provenance as selected evidence.
+- `AWARD_READY` is legal only when `approval_policy_hint` is `none` and selected evidence is sufficient. With `operator_required`, return `OPERATOR_REQUIRED` for a viable clear candidate.
+- A candidate with selected `conflict_status` of `blocked` is not viable even when rubric prose recommends it.
 
+## Decision Policy Cases
+Policy cases:
+```json
+[
+  {
+    "case": "operator_required_viable_clear",
+    "approval_policy_hint": "operator_required",
+    "candidate_id": "vendor_alpha",
+    "candidate_conflict_status": "clear",
+    "rubric_recommends_candidate": true,
+    "selected_evidence_state": "complete",
+    "candidate_viable": true,
+    "expected_marker": "OPERATOR_REQUIRED",
+    "selected_action_id": "vendor_selection.award_decider.operator_required",
+    "artifact_schema_id": "AwardDecision",
+    "operator_wait_aftermath": "selected_wait",
+    "runtime_policy_boundary": "stage_agent_selects_marker_from_selected_evidence; runtime_applies_selected_marker_action_schema_wait"
+  },
+  {
+    "case": "none_viable_clear",
+    "approval_policy_hint": "none",
+    "candidate_id": "vendor_alpha",
+    "candidate_conflict_status": "clear",
+    "rubric_recommends_candidate": true,
+    "selected_evidence_state": "complete",
+    "candidate_viable": true,
+    "expected_marker": "AWARD_READY",
+    "selected_action_id": "vendor_selection.award_decider.award_ready",
+    "artifact_schema_id": "AwardDecision",
+    "operator_wait_aftermath": "no_wait",
+    "runtime_policy_boundary": "stage_agent_selects_marker_from_selected_evidence; runtime_applies_selected_marker_action_schema_wait"
+  },
+  {
+    "case": "complete_no_viable_evidence",
+    "approval_policy_hint": "none",
+    "candidate_id": null,
+    "candidate_conflict_status": "blocked",
+    "rubric_recommends_candidate": false,
+    "selected_evidence_state": "complete_no_viable",
+    "candidate_viable": false,
+    "expected_marker": "NO_VIABLE_VENDOR",
+    "selected_action_id": "vendor_selection.award_decider.no_viable_vendor",
+    "artifact_schema_id": "DecisionPack",
+    "operator_wait_aftermath": "no_wait",
+    "runtime_policy_boundary": "stage_agent_selects_marker_from_selected_evidence; runtime_applies_selected_marker_action_schema_wait"
+  },
+  {
+    "case": "missing_or_contradictory_evidence",
+    "approval_policy_hint": "operator_required",
+    "candidate_id": null,
+    "candidate_conflict_status": "missing",
+    "rubric_recommends_candidate": false,
+    "selected_evidence_state": "missing_or_contradictory",
+    "candidate_viable": false,
+    "expected_marker": "BLOCKED",
+    "selected_action_id": "vendor_selection.award_decider.blocked",
+    "artifact_schema_id": "DecisionPack",
+    "operator_wait_aftermath": "no_wait",
+    "runtime_policy_boundary": "stage_agent_selects_marker_from_selected_evidence; runtime_applies_selected_marker_action_schema_wait"
+  },
+  {
+    "case": "blocked_candidate_rubric_recommended",
+    "approval_policy_hint": "operator_required",
+    "candidate_id": "vendor_beta",
+    "candidate_conflict_status": "blocked",
+    "rubric_recommends_candidate": true,
+    "selected_evidence_state": "complete",
+    "candidate_viable": false,
+    "expected_marker": "NO_VIABLE_VENDOR",
+    "selected_action_id": "vendor_selection.award_decider.no_viable_vendor",
+    "artifact_schema_id": "DecisionPack",
+    "operator_wait_aftermath": "no_wait",
+    "runtime_policy_boundary": "stage_agent_selects_marker_from_selected_evidence; runtime_applies_selected_marker_action_schema_wait"
+  }
+]
+```
+These are adversarial stage-agent guidance cases. They do not define a runtime
+vendor-policy engine; selected runtime data remains authority for marker,
+action, schema, and wait aftermath.
 
 ## Marker Artifact Protocol
 - AWARD_READY: selected action `vendor_selection.award_decider.award_ready`; action kind `route`; artifact schema `AwardDecision`; emitted queue `authorization_decision`; target stage `decision_packager`.
@@ -86,6 +169,7 @@ Valid examples:
     "terminal_marker": "RESOURCE_REQUIRED",
     "artifact": {
       "source_request_id": "e2e-vendor-selection-001",
+      "approval_policy_hint": "operator_required",
       "frozen_requirements": [
         "standard_office_supplies",
         "net30_invoice",
@@ -126,7 +210,7 @@ Valid examples:
         "rubric_report_ref": "rubric-report-e2e-vendor-selection-001",
         "conflict_report_ref": "conflict-report-e2e-vendor-selection-001"
       },
-      "selected_plan_id": "selected-plan-e2e-vendor-selection",
+      "selected_plan_id": "vendor_selection:0.1",
       "selected_plan_fingerprint": "sha256:selected-plan-fingerprint",
       "close_reason": "no_viable_vendor"
     }
@@ -142,7 +226,7 @@ Valid examples:
         "rubric_report_ref": "rubric-report-e2e-vendor-selection-001",
         "conflict_report_ref": "conflict-report-e2e-vendor-selection-001"
       },
-      "selected_plan_id": "selected-plan-e2e-vendor-selection",
+      "selected_plan_id": "vendor_selection:0.1",
       "selected_plan_fingerprint": "sha256:selected-plan-fingerprint",
       "close_reason": "blocked"
     }
@@ -151,23 +235,61 @@ Valid examples:
 ```
 
 ## Invalid Example
-Invalid example:
+Invalid examples:
 ```json
-{
-  "terminal_marker": "AWARD_READY",
-  "artifact": {
-    "artifact_id": "bad-award_decider-wrapper",
-    "artifact_kind": "AwardDecision",
-    "fields": {
-      "unsupported_field": "invented"
-    },
-    "evidence": [
-      "external data was assumed"
-    ]
+[
+  {
+    "case": "undeclared_extra_field_wrapper",
+    "example": {
+      "terminal_marker": "AWARD_READY",
+      "artifact": {
+        "artifact_id": "bad-award_decider-wrapper",
+        "artifact_kind": "AwardDecision",
+        "fields": {
+          "unsupported_field": "invented"
+        },
+        "evidence": [
+          "external data was assumed"
+        ]
+      }
+    }
+  },
+  {
+    "case": "missing_required_field",
+    "example": {
+      "terminal_marker": "OPERATOR_REQUIRED",
+      "artifact": {
+        "bundle_id": "bundle-e2e-vendor-selection-001",
+        "decision_kind": "operator_required",
+        "selected_candidate_id": "vendor_alpha",
+        "required_evidence_refs": {
+          "rubric_report_ref": "rubric-report-e2e-vendor-selection-001",
+          "conflict_report_ref": "conflict-report-e2e-vendor-selection-001"
+        },
+        "reason": "Selected evidence requires local-operator confirmation."
+      }
+    }
+  },
+  {
+    "case": "wrong_type",
+    "example": {
+      "terminal_marker": "OPERATOR_REQUIRED",
+      "artifact": {
+        "bundle_id": "bundle-e2e-vendor-selection-001",
+        "decision_kind": "operator_required",
+        "selected_candidate_id": "vendor_alpha",
+        "required_evidence_refs": {
+          "rubric_report_ref": "rubric-report-e2e-vendor-selection-001",
+          "conflict_report_ref": "conflict-report-e2e-vendor-selection-001"
+        },
+        "operator_gate_required": "true",
+        "reason": "Selected evidence requires local-operator confirmation."
+      }
+    }
   }
-}
+]
 ```
-Reason invalid: `artifact` is a generic wrapper-as-artifact body. The selected schema requires the artifact body itself, with no undeclared wrapper keys.
+Reasons invalid: wrapper keys are undeclared, `operator_gate_required` is required, and `operator_gate_required` must be a boolean.
 
 ## Validation Checklist
 - Marker spelling exactly matches the selected marker list above.

@@ -75,7 +75,8 @@ def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
         cast(dict[str, object], workflow)["visibility"] == "public"
         for workflow in workflows
     )
-    assert metadata["plus_packet"] == "PLUS-0003D"
+    assert metadata["plus_packet"] == "PLUS-0003H"
     assert metadata["status"] == (
-        "final_official_simple_loop_lad_execution_lad_planning_full_lad_and_vendor_selection_workflow_package_with_selected_vendor_assets"
+        "official_package_with_vendor_selection_decision_context_propagation_"
+        "pending_post_diff_review_and_fresh_live_e2e_0005"
     )

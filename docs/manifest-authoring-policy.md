@@ -52,8 +52,8 @@ authority.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:846fb4c436978dd0d199836c10409513fb499ee57843db4dcc26e3b173cf7d8d",
-  "package_digest": "sha256:4e3fdf9f7c3a0bbf168f9af5e784d8efa7348fd4474e135eda597f32f68457db",
+  "manifest_digest": "sha256:54f1c86960ec6eef635560abf52645b6ab41ea0ec4169816428c102f43752adb",
+  "package_digest": "sha256:24eb369bbe1e9c8dc9ac243ca6bbce8af9a515e11d872e64c4e585122ca8818f",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
     "package_version": "0.0.0",
@@ -62,10 +62,10 @@ authority.
   "selected_workflow_fingerprints": {
     "execution.lad@0.1": "sha256:75d1b758310703e87220174d06054f0d9263639bcdeb7c2a48129fa306bae051",
     "execution.lad_integrator@0.1": "sha256:3fc6157fc42538190181f80e717d3f5e667a956706dd1b03b3ea768311a39302",
-    "lad.full@0.1": "sha256:e973aeae67c48566fdeb4d41d40ec3e3b435638a464264540939548a91fcd845",
+    "lad.full@0.1": "sha256:151d0f0d5b70fcb6aadbe155aa844baf03d962ef9c3b557b942d7774fa5e4f9c",
     "planning.lad@0.1": "sha256:61d72f61c881e013c2500d3280c03909e8df08a72c6b96287faadb7474ce3fc2",
     "simple_loop@0.1": "sha256:dd0e916f646f062b1fcc7d2f8b49c0f1076c43d1883cd7c2297ad38ceff7bb5f",
-    "vendor_selection@0.1": "sha256:fb4bc3c1e3d9e9d9f460722d279545563fa606e799b79f32944656a097ef7224"
+    "vendor_selection@0.1": "sha256:2faf6d7252f34370fd73dcb332aff066a7e5853dfe3d4425e8d95fa2ac063e19"
   },
   "asset_pins": [
     {
@@ -160,7 +160,7 @@ authority.
     },
     {
       "asset_id": "learning.entrypoints.librarian",
-      "content_digest": "sha256:e2c607fb0d6c389c3f661fa763917c9ee36fa5c0dfbef45f246703ae0202023c",
+      "content_digest": "sha256:07c43a588ea413e092789ff4285827b864106e2b4ab7b1fb5b168cb1569b7a1c",
       "package_path": "assets/workflows/lad.full/entrypoints/librarian.md"
     },
     {
@@ -180,7 +180,7 @@ authority.
     },
     {
       "asset_id": "learning.skills.librarian_core",
-      "content_digest": "sha256:37c9c29fd3dd899fdcd45caad2f17d840fb7bc8beb1a4da6e695ca07f225191e",
+      "content_digest": "sha256:7e5ec3b7541de1ca4cffb5358fa78e3c937ec2ef1b2085a0e0bc89b4f02ed0be",
       "package_path": "assets/workflows/lad.full/skills/librarian-core.md"
     },
     {
@@ -290,22 +290,22 @@ authority.
     },
     {
       "asset_id": "vendor_selection.entrypoints.award_decider",
-      "content_digest": "sha256:4621182ce3906517ad71034dbc4b3d8f0269a2e3c93ea35e8f21f39bfcae7b4f",
+      "content_digest": "sha256:88a55ca64c6f0240be1ec0d658cb4405209a7da4a177c0af221903e69225da9f",
       "package_path": "assets/workflows/vendor_selection/entrypoints/award_decider.md"
     },
     {
       "asset_id": "vendor_selection.entrypoints.candidate_packager",
-      "content_digest": "sha256:2d8c448c4fb90e7118f17a292c62434ba35a37624ff8b175a849a805d3233339",
+      "content_digest": "sha256:a267e80ac858381657fb2fa955ebc4a7e09781381b9cf8def328e26a4c5cb15b",
       "package_path": "assets/workflows/vendor_selection/entrypoints/candidate_packager.md"
     },
     {
       "asset_id": "vendor_selection.entrypoints.catalog_sourcer",
-      "content_digest": "sha256:99fd28e93317422dcde306bdea8399ba8d96828b43a0fc10a47d11909c722f5c",
+      "content_digest": "sha256:ce618ae374bfa51dedb67893c4756bebd773b337c63bc8e598849ffd026c471e",
       "package_path": "assets/workflows/vendor_selection/entrypoints/catalog_sourcer.md"
     },
     {
       "asset_id": "vendor_selection.entrypoints.conflict_checker",
-      "content_digest": "sha256:9c0ccf66458b8e542a0b444b7d8430ea43758029fc228132431ebcd8708c04e4",
+      "content_digest": "sha256:2a44e16b041440de0d2eb4d91b340802c63bef396870acf1423dff4d53e8be06",
       "package_path": "assets/workflows/vendor_selection/entrypoints/conflict_checker.md"
     },
     {
@@ -325,57 +325,57 @@ authority.
     },
     {
       "asset_id": "vendor_selection.entrypoints.requirement_freezer",
-      "content_digest": "sha256:98fe63eb6562bb496a7e589261afeb0f1535e4bc92fafbb2950e4867336d72c2",
+      "content_digest": "sha256:134a62ddb8510c87b4bbf93a0b67b33646752caacf810089d2e2c320213ade71",
       "package_path": "assets/workflows/vendor_selection/entrypoints/requirement_freezer.md"
     },
     {
       "asset_id": "vendor_selection.entrypoints.rubric_evaluator",
-      "content_digest": "sha256:946ba01bc27d511801b9459297572bb9534ca77f5675516d73aba8e54a518ec8",
+      "content_digest": "sha256:433df90de96f93a2d47ebe1aac968d0fe72cdde39a2e493872d5c7ab9964e2d0",
       "package_path": "assets/workflows/vendor_selection/entrypoints/rubric_evaluator.md"
     },
     {
       "asset_id": "vendor_selection.skills.award_decider_core",
-      "content_digest": "sha256:a4a89ebc1ce9092bab146714cc8c2df0aea180556dc2cab11aba1989ced6ec05",
+      "content_digest": "sha256:20f0fa7bb75e524da98b37c166b4381230e739dfcc4d3dd24089526cf41ed9ae",
       "package_path": "assets/workflows/vendor_selection/skills/award_decider-core.md"
     },
     {
       "asset_id": "vendor_selection.skills.candidate_packager_core",
-      "content_digest": "sha256:e82b01ebbf1c41f6a6be2e5a12da907515c574dd4a1739db1a5bc0f753baecd1",
+      "content_digest": "sha256:5f281f257f1bfd8e64c70754201b00743116705d4493f8bf59c0fb8fecd9febe",
       "package_path": "assets/workflows/vendor_selection/skills/candidate_packager-core.md"
     },
     {
       "asset_id": "vendor_selection.skills.catalog_sourcer_core",
-      "content_digest": "sha256:031e5cba8692160766eae4b553015e28b093004fec332bcbb8cb27cd8647e7ad",
+      "content_digest": "sha256:7365c311c4537aba4abefa0228e7675ed8eb3d20bb890c4c3e0dd160888ba98a",
       "package_path": "assets/workflows/vendor_selection/skills/catalog_sourcer-core.md"
     },
     {
       "asset_id": "vendor_selection.skills.conflict_checker_core",
-      "content_digest": "sha256:9194aea620cc0f4ecc9463fd192946f66fef0fe8ae1304023a68061c8f0553b3",
+      "content_digest": "sha256:d5460856aef962902801b8ce320b23ef84db3ef6a6242da9e5c5e044bc84a353",
       "package_path": "assets/workflows/vendor_selection/skills/conflict_checker-core.md"
     },
     {
       "asset_id": "vendor_selection.skills.decision_packager_core",
-      "content_digest": "sha256:45b80b76f4472328989e31d929ca553b5cd3f112d3e7cd4fabc700ebf8be78df",
+      "content_digest": "sha256:e2807c450664bb700682e53c74539f320b225bef5dee1073519d849736d7134d",
       "package_path": "assets/workflows/vendor_selection/skills/decision_packager-core.md"
     },
     {
       "asset_id": "vendor_selection.skills.policy_screener_core",
-      "content_digest": "sha256:65f50b3da48655c04616b0d4aa2a9768c69862c8efc29422b2c121c108532070",
+      "content_digest": "sha256:1072f31cef10c09da53355030a00ca07affb1c3ab529f5e22331c17b0d6f5bc9",
       "package_path": "assets/workflows/vendor_selection/skills/policy_screener-core.md"
     },
     {
       "asset_id": "vendor_selection.skills.request_intake_core",
-      "content_digest": "sha256:649b984b2504f84e20bed3bc9d968cfb824f09710be2b794b9e8e64d06363fa7",
+      "content_digest": "sha256:5f9dea6e4ac2074edbd3a288afa1090fb63441f5bc19cc1a66eb8722f6fc02d6",
       "package_path": "assets/workflows/vendor_selection/skills/request_intake-core.md"
     },
     {
       "asset_id": "vendor_selection.skills.requirement_freezer_core",
-      "content_digest": "sha256:3eab8f42ea85aa5aa0929e29a011bae5c9a5a01134968a9146811adba6f60e49",
+      "content_digest": "sha256:046cd2c62c7f7d5faa621a7f3b27541126f1cc073855638657afcc81c8fcbfd3",
       "package_path": "assets/workflows/vendor_selection/skills/requirement_freezer-core.md"
     },
     {
       "asset_id": "vendor_selection.skills.rubric_evaluator_core",
-      "content_digest": "sha256:924e49037480df088b9a5998b52dd9ddb99f343f72140a87ab5d6867bf8a9335",
+      "content_digest": "sha256:8f736c7d764e3d31d87e43d9310a4b28116cfec40d1bfe1ec8eec7da36e1b669",
       "package_path": "assets/workflows/vendor_selection/skills/rubric_evaluator-core.md"
     }
   ]

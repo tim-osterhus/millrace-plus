@@ -5,13 +5,14 @@ Millrace. It is a data-only workflow package, not a runtime. It is separate
 from the base runtime package: `millrace-ai` remains the lightweight runtime,
 and the runtime does not depend on `millrace-plus`.
 
-The current shipped package root is `millrace.plus.official` at package
-version `0.0.0`; in other words, the current package version `0.0.0` is the
-final PLUS-0002.9 handoff version. PLUS-0002.9 is an internal official package
-boundary handoff, not a public release guarantee. It closes internal package
-conformance for `simple_loop`, `execution.lad`, `execution.lad_integrator`,
-`planning.lad`, `lad.full`, and `vendor_selection` as official public workflow
-entries and keeps package data non-executable.
+The current shipped package root is `millrace.plus.official`; the current
+package version `0.0.0` remains unchanged. PLUS-0002.9 is an internal official
+package boundary handoff, not a public release guarantee. PLUS-0003A through
+PLUS-0003H subsequently hardened the public package boundary, manifest freeze,
+selected vendor assets, live schema output, full-LAD Librarian no-op contract,
+and vendor-selection decision-context propagation. Public release readiness
+still depends on PLUS-0003.9, ORCH-0001, fresh E2E-0005 evidence, and release
+cutover.
 
 ## Package Data
 
@@ -40,11 +41,13 @@ Workflow package data lives under `millrace_workflow_package/`:
   `assets/workflows/lad.full/skills/` contain LAD Learning entrypoint and core
   stage skill assets. The full LAD workflow also selects inherited Planning and
   Execution assets through their existing package paths and digest pins.
-- `vendor_selection` was asset-free at the PLUS-0002.9 internal handoff. That
-  state is historical graph/package proof evidence only, not live
-  actual-model readiness. Live E2E readiness is governed by PLUS-0003D, which
-  adds selected `vendor_selection` entrypoint prompts and stage-core skills
-  before the vendor-selection live row may run.
+- `assets/workflows/vendor_selection/entrypoints/` and
+  `assets/workflows/vendor_selection/skills/` contain the selected prompt and
+  stage-core skill pairs added by PLUS-0003D. PLUS-0003H preserves selected
+  approval-policy, conflict-rule, candidate conflict-status, and source-ref
+  context through the vendor-selection handoffs. These package assets do not by
+  themselves establish clean live end-to-end readiness; ORCH-0001 and fresh
+  E2E-0005 evidence remain open.
 
 The installed resource root `millrace_workflow_package` remains unchanged.
 
@@ -59,9 +62,13 @@ recompute the manifest digest, package digest, selected workflow fingerprints,
 and asset pins from package bytes.
 
 Final package conformance is recorded in
-`docs/PLUS-0002.9-implementation-review.md`. That review is internal rewrite
-evidence for E2E, DOCS, META, and CUT packets. Public release readiness still
-depends on the PLUS-0003 public package-readiness lane and release cutover.
+`docs/PLUS-0002.9-implementation-review.md`; the current full-LAD handoff/no-op
+evidence is recorded in
+`docs/PLUS-0003F-full-lad-librarian-handoff-and-noop-contract.md`. These are
+internal rewrite evidence for E2E, DOCS, META, and CUT packets. Public release
+readiness still depends on PLUS-0003.9, ORCH-0001, fresh E2E-0005 evidence,
+and release cutover. PLUS-0003H implementation, post-diff confirmation, and
+parent combined verification are green; fresh live E2E-0005 evidence remains.
 
 ## Runtime Boundary
 

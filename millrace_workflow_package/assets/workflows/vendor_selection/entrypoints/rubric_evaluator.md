@@ -11,6 +11,7 @@ Scope:
 
 Inputs from dispatch:
 - `workflow_id`, `workflow_version`, `stage_kind_id`, `graph_node_id`, `runner_binding_id`, `source_work_item_id`, `source_run_id`, selected plan fingerprint, and legal terminal markers.
+- Work item payload is the full `CandidateBundle`; `generated_work_source.item_key` identifies the assigned candidate.
 - Stage artifact schemas available here: RubricReport.
 
 Readable assets:
@@ -23,6 +24,7 @@ Writable artifacts:
 
 Required evidence:
 - Explain selected input fields checked, selected package records used, and assumptions in runner evidence/report text.
+- Confirm the assigned candidate was selected from runtime `generated_work_source.item_key` and the full bundle context stayed read-only evidence.
 - Keep dispatch IDs, selected action IDs, selected plan fingerprints, package pins, and downstream context out of the artifact unless the selected schema declares them.
 
 Legal terminal markers rendered by runtime:

@@ -12,6 +12,7 @@ Selected schemas for this stage. Treat each schema as closed.
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
 | `source_request_id` | yes | string; min_length 1 | Selected-schema field. |
+| `approval_policy_hint` | yes | enum [none, operator_required] | Preserve the selected request approval policy. |
 | `frozen_requirements` | yes | array; min_items 1; items string | Selected-schema array. |
 | `policy_status` | yes | enum [allowed, blocked, clarification_required] | Selected value from [allowed, blocked, clarification_required]. |
 | `selection_rubric_id` | yes | string; min_length 1 | Selected-schema field. |
@@ -38,6 +39,7 @@ Valid examples:
     "terminal_marker": "REQUIREMENTS_READY",
     "artifact": {
       "source_request_id": "e2e-vendor-selection-001",
+      "approval_policy_hint": "operator_required",
       "frozen_requirements": [
         "standard_office_supplies",
         "net30_invoice",
@@ -57,23 +59,67 @@ Valid examples:
 ```
 
 ## Invalid Example
-Invalid example:
+Invalid examples:
 ```json
-{
-  "terminal_marker": "REQUIREMENTS_READY",
-  "artifact": {
-    "artifact_id": "bad-requirement_freezer-wrapper",
-    "artifact_kind": "RequirementPacket",
-    "fields": {
-      "unsupported_field": "invented"
-    },
-    "evidence": [
-      "external data was assumed"
-    ]
+[
+  {
+    "case": "undeclared_extra_field_wrapper",
+    "example": {
+      "terminal_marker": "REQUIREMENTS_READY",
+      "artifact": {
+        "artifact_id": "bad-requirement_freezer-wrapper",
+        "artifact_kind": "RequirementPacket",
+        "fields": {
+          "unsupported_field": "invented"
+        },
+        "evidence": [
+          "external data was assumed"
+        ]
+      }
+    }
+  },
+  {
+    "case": "missing_required_field",
+    "example": {
+      "terminal_marker": "REQUIREMENTS_READY",
+      "artifact": {
+        "source_request_id": "e2e-vendor-selection-001",
+        "frozen_requirements": [
+          "standard_office_supplies"
+        ],
+        "policy_status": "allowed",
+        "selection_rubric_id": "rubric-office-supplies-v1",
+        "conflict_rules": [
+          "exclude blocked conflict status"
+        ],
+        "candidate_count_min": 1,
+        "candidate_count_max": 3
+      }
+    }
+  },
+  {
+    "case": "wrong_type",
+    "example": {
+      "terminal_marker": "REQUIREMENTS_READY",
+      "artifact": {
+        "source_request_id": "e2e-vendor-selection-001",
+        "approval_policy_hint": "operator_required",
+        "frozen_requirements": [
+          "standard_office_supplies"
+        ],
+        "policy_status": "allowed",
+        "selection_rubric_id": "rubric-office-supplies-v1",
+        "conflict_rules": [
+          "exclude blocked conflict status"
+        ],
+        "candidate_count_min": "1",
+        "candidate_count_max": 3
+      }
+    }
   }
-}
+]
 ```
-Reason invalid: `artifact` is a generic wrapper-as-artifact body. The selected schema requires the artifact body itself, with no undeclared wrapper keys.
+Reasons invalid: wrapper keys are undeclared, `approval_policy_hint` is required, and `candidate_count_min` must be an integer.
 
 ## Validation Checklist
 - Marker spelling exactly matches the selected marker list above.

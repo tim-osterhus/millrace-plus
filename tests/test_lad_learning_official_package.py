@@ -111,6 +111,52 @@ _PROVIDER_CODE_PATTERNS = (
     "native_runner",
     "provider_adapter",
 )
+_PLUS_0003F_SKILL_DISPOSITION_SCHEMA = {
+    "type": "object",
+    "required": [
+        "artifact_kind",
+        "summary",
+        "disposition",
+    ],
+    "properties": {
+        "artifact_kind": {
+            "const": "learning.artifacts.skill_disposition",
+        },
+        "summary": {
+            "type": "string",
+            "min_length": 1,
+        },
+        "disposition": {
+            "type": "string",
+            "enum": [
+                "already_available",
+                "no_candidate",
+                "index_unavailable",
+            ],
+        },
+        "target_skill_id": {
+            "type": "string",
+            "min_length": 1,
+        },
+    },
+}
+_UNCHANGED_PLUS_0003F_WORKFLOW_FINGERPRINTS = {
+    "simple_loop": (
+        "sha256:87c51cc6baea08fa79c713d09c77d0f751ac639c2ab97deea1684a8b6bddcf35"
+    ),
+    "execution.lad": (
+        "sha256:744d5ad66e1768de7ff01556edb9a9cf95dcffce4d3e091c4b54f8d9ab1ed4ad"
+    ),
+    "execution.lad_integrator": (
+        "sha256:91dc4128a9c639dc177bb9209d6a166ca7f451b9bbfdfebe980da53a3abf127f"
+    ),
+    "planning.lad": (
+        "sha256:b8528801c16d47656760814dcc305787eed338f17c094dcf26b34c145005036a"
+    ),
+    "vendor_selection": (
+        "sha256:3f0daca738a7333a91437596a515f777c2afc5c6503b02ac91e4653013b9a428"
+    ),
+}
 
 
 def _load_manifest(package_root: Path = PACKAGE_ROOT) -> dict[str, Any]:
@@ -176,6 +222,55 @@ def _marker_schema_by_stage(manifest: dict[str, Any]) -> dict[str, dict[str, str
 def _source_as_selected_authority(source: dict[str, object]) -> dict[str, object]:
     selected = cast(dict[str, object], json.loads(json.dumps(source)))
     selected.pop("assets")
+    return selected
+
+
+def _source_as_selected_authority_with_plus_0003f_overlay(
+    source: dict[str, object],
+) -> dict[str, object]:
+    selected = _source_as_selected_authority(source)
+    artifact_schemas = cast(
+        list[dict[str, object]],
+        selected["artifact_schemas"],
+    )
+    report_index = next(
+        index
+        for index, schema in enumerate(artifact_schemas)
+        if schema["id"] == "learning.artifacts.report"
+    )
+    artifact_schemas.insert(
+        report_index,
+        {
+            "id": "learning.artifacts.skill_disposition",
+            "schema": _PLUS_0003F_SKILL_DISPOSITION_SCHEMA,
+            "presentation": {"display_name": "Learning skill disposition"},
+        },
+    )
+
+    stage_kinds = cast(list[dict[str, object]], selected["stage_kinds"])
+    librarian_stage = next(stage for stage in stage_kinds if stage["id"] == "librarian")
+    assert librarian_stage["artifact_schema_ids"] == [
+        "learning.intake.request",
+        "learning.artifacts.skill_install_report",
+        "learning.artifacts.report",
+    ]
+    librarian_stage["artifact_schema_ids"] = [
+        "learning.intake.request",
+        "learning.artifacts.skill_install_report",
+        "learning.artifacts.skill_disposition",
+        "learning.artifacts.report",
+    ]
+
+    terminal_actions = cast(list[dict[str, object]], selected["terminal_actions"])
+    noop_action = next(
+        action
+        for action in terminal_actions
+        if action["id"] == "learning.close_librarian_noop"
+    )
+    assert noop_action["artifact_schema_id"] == (
+        "learning.artifacts.skill_install_report"
+    )
+    noop_action["artifact_schema_id"] = "learning.artifacts.skill_disposition"
     return selected
 
 
@@ -365,14 +460,248 @@ def test_full_lad_workflow_identity_matches_learning_donor_source() -> None:
     assert workflow["entrypoints"] == ["default"]
 
 
-def test_full_lad_selected_authority_matches_donor_without_assets() -> None:
+def test_full_lad_authority_matches_donor_plus_librarian_overlay() -> None:
     manifest = _load_manifest()
     workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
     selected_authority = cast(dict[str, object], workflow["selected_authority"])
     source = lad_learning.workflow_source()
 
     assert "assets" not in selected_authority
-    assert selected_authority == _source_as_selected_authority(source)
+    assert selected_authority == _source_as_selected_authority_with_plus_0003f_overlay(
+        source,
+    )
+
+
+def test_librarian_noop_uses_truthful_skill_disposition_schema() -> None:
+    manifest = _load_manifest()
+    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
+    selected_authority = cast(dict[str, object], workflow["selected_authority"])
+    schemas_by_id = _schemas_by_id(manifest)
+    marker_schema_by_stage = _marker_schema_by_stage(manifest)
+    stage_kinds = cast(list[dict[str, object]], selected_authority["stage_kinds"])
+    librarian_stage = next(stage for stage in stage_kinds if stage["id"] == "librarian")
+    terminal_actions = {
+        str(action["id"]): action
+        for action in cast(
+            list[dict[str, object]],
+            selected_authority["terminal_actions"],
+        )
+    }
+
+    assert schemas_by_id["learning.artifacts.skill_disposition"] == (
+        _PLUS_0003F_SKILL_DISPOSITION_SCHEMA
+    )
+    assert librarian_stage["artifact_schema_ids"] == [
+        "learning.intake.request",
+        "learning.artifacts.skill_install_report",
+        "learning.artifacts.skill_disposition",
+        "learning.artifacts.report",
+    ]
+    assert marker_schema_by_stage["librarian"] == {
+        "LIBRARIAN_COMPLETE": "learning.artifacts.skill_install_report",
+        "LIBRARIAN_NOOP": "learning.artifacts.skill_disposition",
+        "BLOCKED": "learning.artifacts.report",
+    }
+    assert terminal_actions["learning.close_librarian_noop"][
+        "artifact_schema_id"
+    ] == "learning.artifacts.skill_disposition"
+
+
+def test_librarian_noop_disposition_refuses_invalid_payloads() -> None:
+    manifest = _load_manifest()
+    schema = _schemas_by_id(manifest)["learning.artifacts.skill_disposition"]
+    valid_noop = {
+        "artifact_kind": "learning.artifacts.skill_disposition",
+        "summary": "No selected installed-skill or remote-index source was provided.",
+        "disposition": "index_unavailable",
+    }
+
+    conformance.assert_schema_value(valid_noop, schema)
+    conformance.assert_schema_value(
+        {
+            **valid_noop,
+            "disposition": "already_available",
+            "target_skill_id": "workspace-learning-summary",
+        },
+        schema,
+    )
+    for invalid_noop in (
+        {key: value for key, value in valid_noop.items() if key != "disposition"},
+        {**valid_noop, "disposition": "installed"},
+        {**valid_noop, "installed_path": "skills/example/SKILL.md"},
+        {**valid_noop, "artifact_kind": "learning.artifacts.skill_install_report"},
+    ):
+        with pytest.raises(AssertionError):
+            conformance.assert_schema_value(invalid_noop, schema)
+
+
+def test_librarian_complete_keeps_install_report_and_selected_effect_only() -> None:
+    manifest = _load_manifest()
+    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
+    selected_authority = cast(dict[str, object], workflow["selected_authority"])
+    schemas_by_id = _schemas_by_id(manifest)
+    terminal_actions = {
+        str(action["id"]): action
+        for action in cast(
+            list[dict[str, object]],
+            selected_authority["terminal_actions"],
+        )
+    }
+    effect_declarations = {
+        str(effect["id"]): effect
+        for effect in cast(
+            list[dict[str, object]],
+            selected_authority["effect_declarations"],
+        )
+    }
+
+    assert terminal_actions["learning.close_librarian_complete"][
+        "artifact_schema_id"
+    ] == "learning.artifacts.skill_install_report"
+    assert schemas_by_id["learning.artifacts.skill_install_report"]["required"] == [
+        "artifact_kind",
+        "summary",
+        "target_skill_id",
+        "installed_path",
+    ]
+    assert effect_declarations[
+        "learning.effect.librarian.workspace_skill_install_report"
+    ] == {
+        "id": "learning.effect.librarian.workspace_skill_install_report",
+        "terminal_action_id": "learning.close_librarian_complete",
+        "artifact_schema_id": "learning.artifacts.skill_install_report",
+        "provider_ref": "provider.fake_local.workspace",
+        "capability_policy_ref": "policy.fake_local.no_real_side_effects",
+        "target_ref_kind": "workspace_skill_install_report",
+        "target_ref_schema": (
+            "learning.effects.target.workspace_skill_install_report.v1"
+        ),
+        "allowed_reconciliation_statuses": [
+            "applied",
+            "no_op",
+            "refused",
+        ],
+        "real_side_effects_allowed": False,
+    }
+    assert all(
+        effect["terminal_action_id"] != "learning.close_librarian_noop"
+        for effect in effect_declarations.values()
+    )
+
+
+def test_librarian_blocked_keeps_report_and_operator_wait() -> None:
+    manifest = _load_manifest()
+    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
+    selected_authority = cast(dict[str, object], workflow["selected_authority"])
+    terminal_actions = {
+        str(action["id"]): action
+        for action in cast(
+            list[dict[str, object]],
+            selected_authority["terminal_actions"],
+        )
+    }
+    operator_waits = {
+        str(wait["id"]): wait
+        for wait in cast(list[dict[str, object]], selected_authority["operator_waits"])
+    }
+
+    assert terminal_actions["learning.close_librarian_blocked"][
+        "artifact_schema_id"
+    ] == "learning.artifacts.report"
+    assert terminal_actions["learning.close_librarian_blocked"]["kind"] == (
+        "operator_wait"
+    )
+    assert operator_waits["learning.librarian_blocked_wait"]["source_action_ids"] == [
+        "learning.close_librarian_blocked",
+    ]
+    assert operator_waits["learning.librarian_blocked_wait"]["status_effect"] == (
+        "operator_wait_active"
+    )
+    assert operator_waits["learning.librarian_blocked_wait"]["payload_schema_id"] == (
+        "learning.intake.request"
+    )
+
+
+def test_librarian_assets_encode_index_unavailable_noop() -> None:
+    manifest = _load_manifest()
+    schemas_by_id = _schemas_by_id(manifest)
+    marker_schema_by_stage = _marker_schema_by_stage(manifest)
+    entrypoint_text = (
+        PACKAGE_ROOT / "assets/workflows/lad.full/entrypoints/librarian.md"
+    ).read_text()
+    skill_text = (
+        PACKAGE_ROOT / "assets/workflows/lad.full/skills/librarian-core.md"
+    ).read_text()
+
+    for expected_text in (
+        "`request_id`, nonblank `body`, and `root_source` are required",
+        "A Planner-authored request body is sufficient Planner context.",
+        (
+            "Installed-skill and remote-index evidence are optional unless "
+            "dispatch explicitly declares or provides them."
+        ),
+        (
+            "Absence of optional index evidence selects `LIBRARIAN_NOOP` with "
+            "disposition `index_unavailable`, not `BLOCKED`."
+        ),
+        (
+            "Terminal markers provide evidence to runtime but do not themselves "
+            "route, close, wait, propose effects, or mutate state."
+        ),
+    ):
+        assert expected_text in entrypoint_text
+
+    valid_examples = conformance.markdown_json_examples(
+        skill_text,
+        section_heading="## Valid Example",
+    )
+    examples_by_marker = {
+        str(example["terminal_marker"]): example for example in valid_examples
+    }
+    assert set(examples_by_marker) == {
+        "LIBRARIAN_COMPLETE",
+        "LIBRARIAN_NOOP",
+        "BLOCKED",
+    }
+    for valid_example in valid_examples:
+        conformance.assert_marker_artifact_example_matches_selected_schema(
+            valid_example,
+            stage_id="librarian",
+            marker_schema_by_stage=marker_schema_by_stage,
+            schemas_by_id=schemas_by_id,
+        )
+
+    noop_artifact = cast(
+        dict[str, object],
+        examples_by_marker["LIBRARIAN_NOOP"]["artifact"],
+    )
+    assert noop_artifact == {
+        "artifact_kind": "learning.artifacts.skill_disposition",
+        "summary": "No selected installed-skill or remote-index source was provided.",
+        "disposition": "index_unavailable",
+    }
+    assert "installed_path" not in noop_artifact
+
+    for expected_invalid_text in (
+        "missing `disposition`",
+        "unknown disposition",
+        "`installed_path` in a no-op artifact",
+        "`LIBRARIAN_COMPLETE` without required install-report fields",
+    ):
+        assert expected_invalid_text in skill_text
+    invalid_examples = conformance.markdown_json_examples(
+        skill_text,
+        section_heading="## Invalid Examples",
+    )
+    assert len(invalid_examples) == 5
+    for invalid_example in invalid_examples:
+        with pytest.raises(AssertionError):
+            conformance.assert_marker_artifact_example_matches_selected_schema(
+                invalid_example,
+                stage_id="librarian",
+                marker_schema_by_stage=marker_schema_by_stage,
+                schemas_by_id=schemas_by_id,
+            )
 
 
 def test_full_lad_assets_required_assets_and_digests_match_donor_closure() -> None:
@@ -479,6 +808,32 @@ def test_full_lad_path_archive_selection_compiles_and_selects_asset_pins(
             ),
             "selected_dependency_pins": (),
         }
+    assert authority_fingerprint(path_result.plan) == authority_fingerprint(
+        archive_result.plan,
+    )
+
+
+def test_full_lad_path_archive_selection_accepts_truthful_librarian_noop_contract(
+    tmp_path: Path,
+) -> None:
+    source = lad_learning.workflow_source()
+    path_result, archive_result = conformance.select_package_from_path_and_archive(
+        tmp_path / "selection-plus-0003f",
+        PACKAGE_ROOT,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=WORKFLOW_ID,
+        workflow_version=str(cast(dict[str, object], source["workflow"])["version"]),
+    )
+
+    for result in (path_result, archive_result):
+        authority_text = canonical_authority_bytes(result.plan).decode("utf-8")
+        assert "learning.artifacts.skill_disposition" in authority_text
+        assert "learning.close_librarian_noop" in authority_text
+        assert "learning.effect.librarian.workspace_skill_install_report" in (
+            authority_text
+        )
+        assert result.plan.workflow_package_pin is not None
     assert authority_fingerprint(path_result.plan) == authority_fingerprint(
         archive_result.plan,
     )
@@ -783,3 +1138,21 @@ def test_existing_workflow_fingerprints_stay_stable_when_learning_is_added(
         assert authority_fingerprint(full_result.plan) == authority_fingerprint(
             pruned_result.plan,
         )
+
+
+def test_unrelated_official_workflow_fingerprints_remain_unchanged(
+    tmp_path: Path,
+) -> None:
+    for workflow_id, expected_fingerprint in (
+        _UNCHANGED_PLUS_0003F_WORKFLOW_FINGERPRINTS.items()
+    ):
+        result = conformance.select_package_from_path(
+            tmp_path / workflow_id.replace(".", "-"),
+            PACKAGE_ROOT,
+            package_id=PACKAGE_ID,
+            package_version=PACKAGE_VERSION,
+            workflow_id=workflow_id,
+            workflow_version="0.1",
+        )
+
+        assert authority_fingerprint(result.plan) == expected_fingerprint

@@ -76,7 +76,7 @@ Valid examples:
         "rubric_report_ref": "rubric-report-e2e-vendor-selection-001",
         "conflict_report_ref": "conflict-report-e2e-vendor-selection-001"
       },
-      "selected_plan_id": "selected-plan-e2e-vendor-selection",
+      "selected_plan_id": "vendor_selection:0.1",
       "selected_plan_fingerprint": "sha256:selected-plan-fingerprint",
       "close_reason": "blocked"
     }

@@ -11,6 +11,7 @@ Scope:
 
 Inputs from dispatch:
 - `workflow_id`, `workflow_version`, `stage_kind_id`, `graph_node_id`, `runner_binding_id`, `source_work_item_id`, `source_run_id`, selected plan fingerprint, and legal terminal markers.
+- Joined evidence includes the source `CandidateBundle`, `RubricReport`, and `ConflictReport`; use selected `approval_policy_hint`, `conflict_rules`, candidate `conflict_status`, and exact artifact provenance.
 - Stage artifact schemas available here: AwardDecision, RequirementPacket, DecisionPack.
 
 Readable assets:
@@ -23,6 +24,7 @@ Writable artifacts:
 
 Required evidence:
 - Explain selected input fields checked, selected package records used, and assumptions in runner evidence/report text.
+- Confirm `operator_required` approval policy creates an `OPERATOR_REQUIRED` `AwardDecision` for viable clear evidence; do not turn model text into an operator decision.
 - Keep dispatch IDs, selected action IDs, selected plan fingerprints, package pins, and downstream context out of the artifact unless the selected schema declares them.
 
 - For `OPERATOR_REQUIRED`, return an `AwardDecision` with `decision_kind` set to `operator_required` and `operator_gate_required` set to true. Model output cannot resolve `vendor_selection.award_operator_wait`; selected runtime state owns the local-operator gate.

@@ -4,6 +4,8 @@
 Stage ID: `rubric_evaluator`.
 Responsibility: Score selected candidates against the frozen rubric.
 
+Use the runtime-provided `generated_work_source.item_key` to identify the assigned candidate within the full `CandidateBundle` payload. Do not drop or rewrite bundle-level `approval_policy_hint`, `conflict_rules`, `deterministic_source_refs`, or candidate `conflict_status` in runner evidence.
+
 ## Artifact Schemas
 Selected schemas for this stage. Treat each schema as closed.
 
@@ -55,23 +57,58 @@ Valid examples:
 ```
 
 ## Invalid Example
-Invalid example:
+Invalid examples:
 ```json
-{
-  "terminal_marker": "RUBRIC_COMPLETE",
-  "artifact": {
-    "artifact_id": "bad-rubric_evaluator-wrapper",
-    "artifact_kind": "RubricReport",
-    "fields": {
-      "unsupported_field": "invented"
-    },
-    "evidence": [
-      "external data was assumed"
-    ]
+[
+  {
+    "case": "undeclared_extra_field_wrapper",
+    "example": {
+      "terminal_marker": "RUBRIC_COMPLETE",
+      "artifact": {
+        "artifact_id": "bad-rubric_evaluator-wrapper",
+        "artifact_kind": "RubricReport",
+        "fields": {
+          "unsupported_field": "invented"
+        },
+        "evidence": [
+          "external data was assumed"
+        ]
+      }
+    }
+  },
+  {
+    "case": "missing_required_field",
+    "example": {
+      "terminal_marker": "RUBRIC_COMPLETE",
+      "artifact": {
+        "bundle_id": "bundle-e2e-vendor-selection-001",
+        "evaluator_kind": "rubric",
+        "score_table": [
+          {
+            "candidate_id": "vendor_alpha",
+            "score": 95
+          }
+        ],
+        "recommended_candidate_id": "vendor_alpha"
+      }
+    }
+  },
+  {
+    "case": "wrong_type",
+    "example": {
+      "terminal_marker": "RUBRIC_COMPLETE",
+      "artifact": {
+        "bundle_id": "bundle-e2e-vendor-selection-001",
+        "evaluator_kind": "rubric",
+        "score_table": "vendor_alpha=95",
+        "threshold_result": "pass",
+        "recommended_candidate_id": "vendor_alpha"
+      }
+    }
   }
-}
+]
 ```
-Reason invalid: `artifact` is a generic wrapper-as-artifact body. The selected schema requires the artifact body itself, with no undeclared wrapper keys.
+Reasons invalid: wrapper keys are undeclared, `threshold_result` is required, and `score_table` must be an array.
 
 ## Validation Checklist
 - Marker spelling exactly matches the selected marker list above.

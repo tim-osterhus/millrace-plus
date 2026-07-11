@@ -15,6 +15,10 @@ Selected schemas for this stage. Treat each schema as closed.
 | `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
 | `candidate_vendors` | yes | array; min_items 1; items object; unique_by `candidate_id` | Selected-schema array. |
 | `deterministic_source_refs` | yes | array; min_items 1; items string | Selected-schema array. |
+| `approval_policy_hint` | yes | enum [none, operator_required] | Preserve the selected requirement approval policy. |
+| `conflict_rules` | yes | array; min_items 1; items string | Preserve the selected conflict rules. |
+
+Each `candidate_vendors` item must include `candidate_id`, `vendor_label`, `capabilities`, `budget_band`, `catalog_ref`, and `conflict_status` with enum [clear, blocked]. Preserve `conflict_status` exactly from the selected catalog records below.
 
 `DecisionPack`
 
@@ -69,7 +73,8 @@ Valid examples:
             "net30_invoice"
           ],
           "budget_band": "low",
-          "catalog_ref": "selected-catalog:vendor_alpha"
+          "catalog_ref": "selected-catalog:vendor_alpha",
+          "conflict_status": "clear"
         },
         {
           "candidate_id": "vendor_gamma",
@@ -80,12 +85,18 @@ Valid examples:
             "rush_delivery"
           ],
           "budget_band": "medium",
-          "catalog_ref": "selected-catalog:vendor_gamma"
+          "catalog_ref": "selected-catalog:vendor_gamma",
+          "conflict_status": "clear"
         }
       ],
       "deterministic_source_refs": [
         "selected-catalog:vendor_alpha",
         "selected-catalog:vendor_gamma"
+      ],
+      "approval_policy_hint": "operator_required",
+      "conflict_rules": [
+        "exclude blocked conflict status",
+        "require invoice capability"
       ]
     }
   },
@@ -100,7 +111,7 @@ Valid examples:
         "rubric_report_ref": "rubric-report-e2e-vendor-selection-001",
         "conflict_report_ref": "conflict-report-e2e-vendor-selection-001"
       },
-      "selected_plan_id": "selected-plan-e2e-vendor-selection",
+      "selected_plan_id": "vendor_selection:0.1",
       "selected_plan_fingerprint": "sha256:selected-plan-fingerprint",
       "close_reason": "no_viable_vendor"
     }
@@ -109,23 +120,85 @@ Valid examples:
 ```
 
 ## Invalid Example
-Invalid example:
+Invalid examples:
 ```json
-{
-  "terminal_marker": "CANDIDATES_READY",
-  "artifact": {
-    "artifact_id": "bad-catalog_sourcer-wrapper",
-    "artifact_kind": "CandidateBundle",
-    "fields": {
-      "unsupported_field": "invented"
-    },
-    "evidence": [
-      "external data was assumed"
-    ]
+[
+  {
+    "case": "undeclared_extra_field_wrapper",
+    "example": {
+      "terminal_marker": "CANDIDATES_READY",
+      "artifact": {
+        "artifact_id": "bad-catalog_sourcer-wrapper",
+        "artifact_kind": "CandidateBundle",
+        "fields": {
+          "unsupported_field": "invented"
+        },
+        "evidence": [
+          "external data was assumed"
+        ]
+      }
+    }
+  },
+  {
+    "case": "missing_required_field",
+    "example": {
+      "terminal_marker": "CANDIDATES_READY",
+      "artifact": {
+        "source_requirement_id": "e2e-vendor-selection-001",
+        "bundle_id": "bundle-e2e-vendor-selection-001",
+        "candidate_vendors": [
+          {
+            "candidate_id": "vendor_alpha",
+            "vendor_label": "Alpha Stationery",
+            "capabilities": [
+              "standard_office_supplies",
+              "net30_invoice"
+            ],
+            "budget_band": "low",
+            "catalog_ref": "selected-catalog:vendor_alpha",
+            "conflict_status": "clear"
+          }
+        ],
+        "deterministic_source_refs": [
+          "selected-catalog:vendor_alpha"
+        ],
+        "approval_policy_hint": "operator_required"
+      }
+    }
+  },
+  {
+    "case": "wrong_type",
+    "example": {
+      "terminal_marker": "CANDIDATES_READY",
+      "artifact": {
+        "source_requirement_id": "e2e-vendor-selection-001",
+        "bundle_id": "bundle-e2e-vendor-selection-001",
+        "candidate_vendors": [
+          {
+            "candidate_id": "vendor_alpha",
+            "vendor_label": "Alpha Stationery",
+            "capabilities": [
+              "standard_office_supplies",
+              "net30_invoice"
+            ],
+            "budget_band": "low",
+            "catalog_ref": "selected-catalog:vendor_alpha",
+            "conflict_status": true
+          }
+        ],
+        "deterministic_source_refs": [
+          "selected-catalog:vendor_alpha"
+        ],
+        "approval_policy_hint": "operator_required",
+        "conflict_rules": [
+          "exclude blocked conflict status"
+        ]
+      }
+    }
   }
-}
+]
 ```
-Reason invalid: `artifact` is a generic wrapper-as-artifact body. The selected schema requires the artifact body itself, with no undeclared wrapper keys.
+Reasons invalid: wrapper keys are undeclared, `conflict_rules` is required, and `conflict_status` must be a selected string enum.
 
 ## Validation Checklist
 - Marker spelling exactly matches the selected marker list above.
