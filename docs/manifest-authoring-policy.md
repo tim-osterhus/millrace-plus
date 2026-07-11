@@ -52,8 +52,8 @@ authority.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:54f1c86960ec6eef635560abf52645b6ab41ea0ec4169816428c102f43752adb",
-  "package_digest": "sha256:24eb369bbe1e9c8dc9ac243ca6bbce8af9a515e11d872e64c4e585122ca8818f",
+  "manifest_digest": "sha256:f82a08b4205158738771c89bd4542aaadbefd939ce2f7435ac878c1788986251",
+  "package_digest": "sha256:64fd8a5a17543d52e3dcedf95155564f1a42158f13faf214925a7fd6ecae02f5",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
     "package_version": "0.0.0",
@@ -62,8 +62,8 @@ authority.
   "selected_workflow_fingerprints": {
     "execution.lad@0.1": "sha256:75d1b758310703e87220174d06054f0d9263639bcdeb7c2a48129fa306bae051",
     "execution.lad_integrator@0.1": "sha256:3fc6157fc42538190181f80e717d3f5e667a956706dd1b03b3ea768311a39302",
-    "lad.full@0.1": "sha256:151d0f0d5b70fcb6aadbe155aa844baf03d962ef9c3b557b942d7774fa5e4f9c",
-    "planning.lad@0.1": "sha256:61d72f61c881e013c2500d3280c03909e8df08a72c6b96287faadb7474ce3fc2",
+    "lad.full@0.1": "sha256:d1d6245fa1f7a77409ab3104a821bbc56d5a1e463fecc7c7fda416efc3c4541e",
+    "planning.lad@0.1": "sha256:e3435807aead8a077dc4f28550b26ade406cd75c021be020399d1e8721275306",
     "simple_loop@0.1": "sha256:dd0e916f646f062b1fcc7d2f8b49c0f1076c43d1883cd7c2297ad38ceff7bb5f",
     "vendor_selection@0.1": "sha256:2faf6d7252f34370fd73dcb332aff066a7e5853dfe3d4425e8d95fa2ac063e19"
   },
@@ -200,7 +200,7 @@ authority.
     },
     {
       "asset_id": "planning.entrypoints.lad_manager",
-      "content_digest": "sha256:1d072cb56e24c8831b0cdc0c30ac8f6efcfdd52901c3204337cd8c868792dd6e",
+      "content_digest": "sha256:df6282f2762296119aa2a31b8e68997c6fcc40de0bd82fb96c910bb997399aef",
       "package_path": "assets/workflows/planning.lad/entrypoints/lad_manager.md"
     },
     {
@@ -230,7 +230,7 @@ authority.
     },
     {
       "asset_id": "planning.skills.manager_core",
-      "content_digest": "sha256:c325205c1d26003eadeb6394afa511f6298b4c78350fd9ccccbc0bc3b1ba9d55",
+      "content_digest": "sha256:4a2743ab0211929f686eec48a2347f5053570e79acd9221955bbf5c2c25ad811",
       "package_path": "assets/workflows/planning.lad/skills/manager-core.md"
     },
     {

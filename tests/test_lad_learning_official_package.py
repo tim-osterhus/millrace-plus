@@ -140,7 +140,7 @@ _PLUS_0003F_SKILL_DISPOSITION_SCHEMA = {
         },
     },
 }
-_UNCHANGED_PLUS_0003F_WORKFLOW_FINGERPRINTS = {
+_UNCHANGED_OFFICIAL_WORKFLOW_FINGERPRINTS = {
     "simple_loop": (
         "sha256:87c51cc6baea08fa79c713d09c77d0f751ac639c2ab97deea1684a8b6bddcf35"
     ),
@@ -150,11 +150,8 @@ _UNCHANGED_PLUS_0003F_WORKFLOW_FINGERPRINTS = {
     "execution.lad_integrator": (
         "sha256:91dc4128a9c639dc177bb9209d6a166ca7f451b9bbfdfebe980da53a3abf127f"
     ),
-    "planning.lad": (
-        "sha256:b8528801c16d47656760814dcc305787eed338f17c094dcf26b34c145005036a"
-    ),
     "vendor_selection": (
-        "sha256:3f0daca738a7333a91437596a515f777c2afc5c6503b02ac91e4653013b9a428"
+        "sha256:6c654b362d255b506f4083116dd8421080a89614fe8a8cd8c2a673ada9589954"
     ),
 }
 
@@ -1144,7 +1141,7 @@ def test_unrelated_official_workflow_fingerprints_remain_unchanged(
     tmp_path: Path,
 ) -> None:
     for workflow_id, expected_fingerprint in (
-        _UNCHANGED_PLUS_0003F_WORKFLOW_FINGERPRINTS.items()
+        _UNCHANGED_OFFICIAL_WORKFLOW_FINGERPRINTS.items()
     ):
         result = conformance.select_package_from_path(
             tmp_path / workflow_id.replace(".", "-"),

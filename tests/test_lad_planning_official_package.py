@@ -359,6 +359,32 @@ def test_planning_selected_authority_matches_donor_without_assets_or_catalog() -
     )
 
 
+def test_planning_and_full_lad_select_lossless_planner_manager_projection() -> None:
+    workflows = _workflows_by_id(_load_manifest())
+    expected = {
+        "kind": "object",
+        "fields": {
+            "planning_result": {
+                "kind": "source",
+                "path": ["artifact_payload"],
+            },
+            "source_request": {
+                "kind": "source",
+                "path": ["work_item_payload"],
+            },
+        },
+    }
+
+    for workflow_id in ("planning.lad", "lad.full"):
+        selected = cast(dict[str, object], workflows[workflow_id]["selected_authority"])
+        action = next(
+            item
+            for item in cast(list[dict[str, object]], selected["terminal_actions"])
+            if item["id"] == "planning.route_planner_complete"
+        )
+        assert action["payload_projection"] == expected
+
+
 def test_planning_assets_required_assets_and_digests_match_donor_closure() -> None:
     manifest = conformance.assert_manifest_and_asset_digests(PACKAGE_ROOT)
     workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
@@ -673,8 +699,15 @@ def test_planning_manager_complete_example_is_task_cards_payload() -> None:
 
     assert "planning.artifacts.task_cards" in skill_text
     assert "owner stages, dependencies, acceptance criteria" in skill_text
+    assert "`source_request` is authoritative" in skill_text
+    assert "copy exact literals, paths, completion definitions" in skill_text
+    assert "`planning_result` and `source_request`" in prompt_text
     assert "same exact selected task-card object" in prompt_text
     assert "undeclared task-card JSON fields" in prompt_text
+    assert "E2E" not in skill_text
+    assert "e2e-" not in skill_text
+    assert "E2E" not in prompt_text
+    assert "e2e-" not in prompt_text
 
 
 @pytest.mark.parametrize(

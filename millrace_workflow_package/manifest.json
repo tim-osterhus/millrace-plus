@@ -5486,11 +5486,11 @@
         },
         {
           "asset_id": "planning.entrypoints.lad_manager",
-          "content_digest": "sha256:1d072cb56e24c8831b0cdc0c30ac8f6efcfdd52901c3204337cd8c868792dd6e"
+          "content_digest": "sha256:df6282f2762296119aa2a31b8e68997c6fcc40de0bd82fb96c910bb997399aef"
         },
         {
           "asset_id": "planning.skills.manager_core",
-          "content_digest": "sha256:c325205c1d26003eadeb6394afa511f6298b4c78350fd9ccccbc0bc3b1ba9d55"
+          "content_digest": "sha256:4a2743ab0211929f686eec48a2347f5053570e79acd9221955bbf5c2c25ad811"
         },
         {
           "asset_id": "planning.entrypoints.lad_mechanic",
@@ -7490,10 +7490,21 @@
             "kind": "route",
             "outcome_id": "planning.lad_planner.complete",
             "payload_projection": {
-              "kind": "source",
-              "path": [
-                "artifact_payload"
-              ]
+              "kind": "object",
+              "fields": {
+                "planning_result": {
+                  "kind": "source",
+                  "path": [
+                    "artifact_payload"
+                  ]
+                },
+                "source_request": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload"
+                  ]
+                }
+              }
             },
             "presentation": {
               "display_name": "planning.route_planner_complete"
@@ -9097,11 +9108,11 @@
         },
         {
           "asset_id": "planning.entrypoints.lad_manager",
-          "content_digest": "sha256:1d072cb56e24c8831b0cdc0c30ac8f6efcfdd52901c3204337cd8c868792dd6e"
+          "content_digest": "sha256:df6282f2762296119aa2a31b8e68997c6fcc40de0bd82fb96c910bb997399aef"
         },
         {
           "asset_id": "planning.skills.manager_core",
-          "content_digest": "sha256:c325205c1d26003eadeb6394afa511f6298b4c78350fd9ccccbc0bc3b1ba9d55"
+          "content_digest": "sha256:4a2743ab0211929f686eec48a2347f5053570e79acd9221955bbf5c2c25ad811"
         },
         {
           "asset_id": "planning.entrypoints.lad_mechanic",
@@ -12274,10 +12285,21 @@
             "kind": "route",
             "outcome_id": "planning.lad_planner.complete",
             "payload_projection": {
-              "kind": "source",
-              "path": [
-                "artifact_payload"
-              ]
+              "kind": "object",
+              "fields": {
+                "planning_result": {
+                  "kind": "source",
+                  "path": [
+                    "artifact_payload"
+                  ]
+                },
+                "source_request": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload"
+                  ]
+                }
+              }
             },
             "presentation": {
               "display_name": "planning.route_planner_complete"
@@ -16053,8 +16075,8 @@
     {
       "asset_id": "planning.entrypoints.lad_manager",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 3157,
-      "content_digest": "sha256:1d072cb56e24c8831b0cdc0c30ac8f6efcfdd52901c3204337cd8c868792dd6e",
+      "byte_length": 3493,
+      "content_digest": "sha256:df6282f2762296119aa2a31b8e68997c6fcc40de0bd82fb96c910bb997399aef",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/planning.lad/entrypoints/lad_manager.md",
@@ -16064,8 +16086,8 @@
     {
       "asset_id": "planning.skills.manager_core",
       "asset_kind": "stage_skill",
-      "byte_length": 4949,
-      "content_digest": "sha256:c325205c1d26003eadeb6394afa511f6298b4c78350fd9ccccbc0bc3b1ba9d55",
+      "byte_length": 5544,
+      "content_digest": "sha256:4a2743ab0211929f686eec48a2347f5053570e79acd9221955bbf5c2c25ad811",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/planning.lad/skills/manager-core.md",
@@ -16434,7 +16456,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:54f1c86960ec6eef635560abf52645b6ab41ea0ec4169816428c102f43752adb",
+  "manifest_digest": "sha256:f82a08b4205158738771c89bd4542aaadbefd939ce2f7435ac878c1788986251",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",

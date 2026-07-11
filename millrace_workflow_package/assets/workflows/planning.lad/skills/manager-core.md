@@ -26,6 +26,10 @@ Each `cards` item:
 
 No additional artifact keys are allowed beyond the dispatch-selected `planning.artifacts.task_cards` schema. Put owner stages, dependencies, acceptance criteria, verification notes, assumptions, and evidence in each card `body` or runner report text; do not add undeclared JSON fields for them.
 
+The selected route provides `planning_result` and `source_request`.
+`source_request` is authoritative for requested behavior and exact constraints;
+`planning_result` is supporting analysis. Task-card bodies must copy exact literals, paths, completion definitions, and constraints required by a downstream owner. A reference such as "use the exact requested content" is insufficient unless that exact content also appears in the card body.
+
 ## Handoff Format
 
 Return:
@@ -45,9 +49,9 @@ Do not put generic wrapper keys, source IDs, selected action IDs, outcome IDs, r
     "artifact_kind": "task_cards",
     "cards": [
       {
-        "task_card_id": "create-e2e-planning-result",
-        "title": "Create E2E planning result file",
-        "body": "Create e2e-planning-result.txt in the assigned workspace with the exact requested content. Verify the file exists, the full content matches exactly, and no paths outside the assigned workspace are used."
+        "task_card_id": "create-deterministic-result",
+        "title": "Create deterministic result file",
+        "body": "Create result.txt in the assigned workspace containing exactly: preserved literal. Verify the file exists, its full content is exactly preserved literal., and no paths outside the assigned workspace are used."
       }
     ]
   },
@@ -55,9 +59,9 @@ Do not put generic wrapper keys, source IDs, selected action IDs, outcome IDs, r
     "artifact_kind": "task_cards",
     "cards": [
       {
-        "task_card_id": "create-e2e-planning-result",
-        "title": "Create E2E planning result file",
-        "body": "Create e2e-planning-result.txt in the assigned workspace with the exact requested content. Verify the file exists, the full content matches exactly, and no paths outside the assigned workspace are used."
+        "task_card_id": "create-deterministic-result",
+        "title": "Create deterministic result file",
+        "body": "Create result.txt in the assigned workspace containing exactly: preserved literal. Verify the file exists, its full content is exactly preserved literal., and no paths outside the assigned workspace are used."
       }
     ]
   }
@@ -117,6 +121,8 @@ Type mismatch:
 - The successful artifact body and observation payload candidate are schema-identical when the wrapper asks for an observation payload candidate.
 - Observation payload candidates contain no source IDs, selected action IDs, outcome IDs, route targets, route metadata, evidence arrays, assumptions arrays, owner-stage fields, dependency arrays, or downstream context unless selected schema declares them.
 - Evidence supports the task-card content and marker choice.
+- Every source literal, path, completion definition, and constraint needed by
+  the owner stage is present verbatim in the task-card body.
 - Terminal marker is legal for `lad_manager` in the selected workflow.
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.

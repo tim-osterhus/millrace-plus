@@ -9,7 +9,7 @@ Scope:
 - Treat LAD, Planning, Execution, and task-card names as selected workflow data, not generic runtime concepts.
 
 Inputs from dispatch:
-- spec or stage-result payload from dispatch
+- `planning_result` and `source_request` from the selected Planner route
 - active work item and lineage context
 - selected package asset pins
 - legal terminal markers for Manager
@@ -34,10 +34,15 @@ Evidence is report text. For successful markers with selected route or fanout pa
 
 Process:
 1. Read only dispatch-provided payload and selected readable assets.
-2. Choose the smallest meaningful task-card set supported by the source input.
+2. Treat `source_request` as the authoritative requirements and
+   `planning_result` as analysis. Choose the smallest meaningful task-card set
+   supported by both.
 3. For `MANAGER_COMPLETE`, produce exact selected `planning.artifacts.task_cards` JSON: `artifact_kind` must be `task_cards`, and each card may contain only `task_card_id`, `title`, and `body`.
 4. Put owner stage, dependency, acceptance, verification, and evidence details inside each card `body` or runner report text, not as undeclared task-card JSON fields.
-5. Preserve assumptions, missing inputs, and exact evidence references.
+5. Copy every exact literal, path, completion definition, and constraint needed
+   by the owner stage into the card `body`. Never replace required source data
+   with phrases such as "as requested" or a source identifier.
+6. Preserve assumptions, missing inputs, and exact evidence references.
 
 Legal terminal markers rendered by runtime:
 - `MANAGER_COMPLETE` when the selected task-card or stage-result artifact is complete and evidence-backed.
