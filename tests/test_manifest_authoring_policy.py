@@ -365,7 +365,12 @@ def test_vendor_selection_examples_use_selected_plan_identity() -> None:
     )
 
     assert "selected-plan-e2e-vendor-selection" not in selected_text
-    assert re.findall(
+    selected_plan_ids = re.findall(
         r'"selected_plan_id": "([^"]+)"',
         selected_text,
-    ) == ["vendor_selection:0.1"] * 6
+    )
+    assert selected_plan_ids
+    assert set(selected_plan_ids) == {"vendor_selection:0.1"}
+    assert '"selected_plan_id"' not in (
+        skills_root / "policy_screener-core.md"
+    ).read_text()

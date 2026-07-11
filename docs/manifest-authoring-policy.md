@@ -52,8 +52,8 @@ authority.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:f82a08b4205158738771c89bd4542aaadbefd939ce2f7435ac878c1788986251",
-  "package_digest": "sha256:64fd8a5a17543d52e3dcedf95155564f1a42158f13faf214925a7fd6ecae02f5",
+  "manifest_digest": "sha256:7c9a1ed4746ab8e244920484782da51d04d876a4f41bd60ffac21b0bb4df7174",
+  "package_digest": "sha256:7fbf9f7370a2d9972420fc976f9875cb2393c9561f76b2d2552bc76925ec87ca",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
     "package_version": "0.0.0",
@@ -65,7 +65,7 @@ authority.
     "lad.full@0.1": "sha256:d1d6245fa1f7a77409ab3104a821bbc56d5a1e463fecc7c7fda416efc3c4541e",
     "planning.lad@0.1": "sha256:e3435807aead8a077dc4f28550b26ade406cd75c021be020399d1e8721275306",
     "simple_loop@0.1": "sha256:dd0e916f646f062b1fcc7d2f8b49c0f1076c43d1883cd7c2297ad38ceff7bb5f",
-    "vendor_selection@0.1": "sha256:2faf6d7252f34370fd73dcb332aff066a7e5853dfe3d4425e8d95fa2ac063e19"
+    "vendor_selection@0.1": "sha256:4dfad85a5d3e0adfb20c9326532ad56ee188b7d9207661435d122a225c66ec42"
   },
   "asset_pins": [
     {
@@ -315,7 +315,7 @@ authority.
     },
     {
       "asset_id": "vendor_selection.entrypoints.policy_screener",
-      "content_digest": "sha256:91817d822148a2e70b2549fe03f99f00b4e1957789c97afa8ea61bb466997684",
+      "content_digest": "sha256:4f057b0c5aaf3360a00a42813b6b73dfa9d37ad330dcd3616d4b5341338d71d9",
       "package_path": "assets/workflows/vendor_selection/entrypoints/policy_screener.md"
     },
     {
@@ -360,7 +360,7 @@ authority.
     },
     {
       "asset_id": "vendor_selection.skills.policy_screener_core",
-      "content_digest": "sha256:1072f31cef10c09da53355030a00ca07affb1c3ab529f5e22331c17b0d6f5bc9",
+      "content_digest": "sha256:e12e1f2c603d75206728e3ee9bf9346fa4aa23a36b30ff80543c210448b37193",
       "package_path": "assets/workflows/vendor_selection/skills/policy_screener-core.md"
     },
     {

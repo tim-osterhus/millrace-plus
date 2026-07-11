@@ -108,7 +108,7 @@ MARKER_PROTOCOL = {
         (
             "POLICY_BLOCKED",
             "vendor_selection.policy_screener.policy_blocked",
-            "DecisionPack",
+            "PolicyDecision",
         ),
     ),
     "requirement_freezer": (
@@ -1038,6 +1038,45 @@ def test_vendor_selection_asset_text_uses_two_layer_contract() -> None:
             conformance.selected_artifact_schema_ids_by_asset_id(manifest)
         ),
     )
+
+
+def test_policy_screener_assets_separate_request_policy_from_later_evidence() -> None:
+    manifest = _load_manifest()
+    asset_texts = _asset_texts_by_id(manifest)
+    policy_assets = (
+        asset_texts["vendor_selection.entrypoints.policy_screener"],
+        asset_texts["vendor_selection.skills.policy_screener_core"],
+    )
+
+    for text in policy_assets:
+        assert "e2e" not in text.lower()
+        for required in (
+            "synthetic_office_supplies",
+            "budget band `low`",
+            "standard_office_supplies",
+            "net30_invoice",
+            "`disallowed_vendors`",
+            "`none` and `operator_required` are allowed",
+            "Only category and budget are request-policy gates",
+            "Missing catalog or vendor evidence is not a policy violation",
+            "`operator_required` is allowed",
+            "later selected operator gate",
+            "explicit request-policy violation",
+        ):
+            assert required in text
+
+    schemas = _schemas_by_id(manifest)
+    policy_schema = schemas["PolicyDecision"]
+    assert "evidence_refs" not in cast(
+        dict[str, object],
+        policy_schema["properties"],
+    )
+    assert cast(list[str], policy_schema["required"]) == [
+        "source_request_id",
+        "policy_status",
+        "violated_policy_facts",
+        "reason",
+    ]
 
 
 def test_vendor_selection_marker_artifact_protocol_is_exact() -> None:

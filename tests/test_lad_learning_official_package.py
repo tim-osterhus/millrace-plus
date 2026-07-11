@@ -151,7 +151,7 @@ _UNCHANGED_OFFICIAL_WORKFLOW_FINGERPRINTS = {
         "sha256:91dc4128a9c639dc177bb9209d6a166ca7f451b9bbfdfebe980da53a3abf127f"
     ),
     "vendor_selection": (
-        "sha256:6c654b362d255b506f4083116dd8421080a89614fe8a8cd8c2a673ada9589954"
+        "sha256:a4f2648c49e0df5aeef16939012fbfb09da77eceba81146cae84a3cf8b2c6bca"
     ),
 }
 

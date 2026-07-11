@@ -2,7 +2,27 @@
 
 ## Stage Contract
 Stage ID: `policy_screener`.
-Responsibility: Screen the selected request against package-local policy facts and preserve the request or close with a policy decision pack.
+Responsibility: Screen the selected request against package-local policy facts and preserve the request or close with a policy decision artifact.
+
+## Selected Request-Policy Facts
+
+Apply this closed decision matrix:
+The allowed category is `synthetic_office_supplies` and the allowed budget band `low`.
+Only category and budget are request-policy gates.
+
+| Request field | Selected package policy | Stage decision |
+| --- | --- | --- |
+| `category` | `synthetic_office_supplies` is allowed | Preserve it in `PurchaseRequest`. |
+| `budget_band` | `low` is allowed | Preserve it in `PurchaseRequest`. |
+| `required_capabilities` | Values including `standard_office_supplies` and `net30_invoice` are downstream candidate constraints | Do not policy-screen them or decide whether a vendor satisfies them here. |
+| `disallowed_vendors` | Allowed downstream candidate filter | Preserve it; do not require a catalog here. |
+| `approval_policy_hint` | `none` and `operator_required` are allowed | `operator_required` requests the later selected operator gate; it is not approval. |
+
+Missing catalog or vendor evidence is not a policy violation. Rubric evidence,
+conflict evidence, candidate viability, and operator decisions are owned by
+later selected stages and cannot be prerequisites for `POLICY_ALLOWED` here.
+Return `POLICY_BLOCKED` only for an explicit request-policy violation against
+this matrix. Do not infer a violation from unavailable downstream evidence.
 
 ## Artifact Schemas
 Selected schemas for this stage. Treat each schema as closed.
@@ -19,22 +39,18 @@ Selected schemas for this stage. Treat each schema as closed.
 | `disallowed_vendors` | yes | array; min_items 0; items string | Selected-schema array. |
 | `approval_policy_hint` | yes | enum [none, operator_required] | Selected value from [none, operator_required]. |
 
-`DecisionPack`
+`PolicyDecision`
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
 | `source_request_id` | yes | string; min_length 1 | Selected-schema field. |
-| `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
-| `selected_candidate_id` | yes | enum [vendor_alpha, vendor_beta, vendor_gamma, null] | Selected value from [vendor_alpha, vendor_beta, vendor_gamma, null]. |
-| `final_refusal_reason` | yes | enum [policy_blocked, no_viable_vendor, operator_rejected, blocked, null] | Selected value from [policy_blocked, no_viable_vendor, operator_rejected, blocked, null]. |
-| `evidence_refs` | yes | object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref, operator_decision_ref] | Nested selected-schema object. |
-| `selected_plan_id` | yes | string; min_length 1 | Selected-schema field. |
-| `selected_plan_fingerprint` | yes | string; min_length 1 | Selected-schema field. |
-| `close_reason` | yes | enum [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked] | Selected value from [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked]. |
+| `policy_status` | yes | const `blocked` | Selected policy disposition. |
+| `violated_policy_facts` | yes | array; min_items 1; items enum [category_not_permitted, budget_band_not_permitted] | Selected request-policy facts violated by the request. |
+| `reason` | yes | string; min_length 1 | Explanation grounded in the selected request and policy facts. |
 
 ## Marker Artifact Protocol
 - POLICY_ALLOWED: selected action `vendor_selection.policy_screener.policy_allowed`; action kind `route`; artifact schema `PurchaseRequest`; emitted queue `purchase_request`; target stage `requirement_freezer`.
-- POLICY_BLOCKED: selected action `vendor_selection.policy_screener.policy_blocked`; action kind `close`; artifact schema `DecisionPack`; emitted queue `none`; target stage `none`.
+- POLICY_BLOCKED: selected action `vendor_selection.policy_screener.policy_blocked`; action kind `close`; artifact schema `PolicyDecision`; emitted queue `none`; target stage `none`.
 
 ## Handoff Format
 Return:
@@ -51,8 +67,8 @@ Valid examples:
   {
     "terminal_marker": "POLICY_ALLOWED",
     "artifact": {
-      "request_id": "e2e-vendor-selection-001",
-      "requester_label": "local-e2e-operator",
+      "request_id": "request-office-001",
+      "requester_label": "local-operator",
       "category": "synthetic_office_supplies",
       "budget_band": "low",
       "required_capabilities": [
@@ -68,17 +84,12 @@ Valid examples:
   {
     "terminal_marker": "POLICY_BLOCKED",
     "artifact": {
-      "source_request_id": "e2e-vendor-selection-001",
-      "bundle_id": "bundle-e2e-vendor-selection-001",
-      "selected_candidate_id": null,
-      "final_refusal_reason": "policy_blocked",
-      "evidence_refs": {
-        "rubric_report_ref": "rubric-report-e2e-vendor-selection-001",
-        "conflict_report_ref": "conflict-report-e2e-vendor-selection-001"
-      },
-      "selected_plan_id": "vendor_selection:0.1",
-      "selected_plan_fingerprint": "sha256:selected-plan-fingerprint",
-      "close_reason": "policy_blocked"
+      "source_request_id": "request-office-001",
+      "policy_status": "blocked",
+      "violated_policy_facts": [
+        "category_not_permitted"
+      ],
+      "reason": "The request category is outside the selected package policy."
     }
   }
 ]
@@ -107,6 +118,10 @@ Reason invalid: `artifact` is a generic wrapper-as-artifact body. The selected s
 - Marker spelling exactly matches the selected marker list above.
 - The artifact body matches the schema selected by that marker.
 - Required selected fields are present and unsupported artifact fields are absent.
+- A conforming `synthetic_office_supplies` / `low` request remains allowed when later catalog, vendor, rubric, conflict, or operator evidence is absent.
+- `standard_office_supplies`, `net30_invoice`, and `disallowed_vendors` remain downstream candidate constraints.
+- `operator_required` is allowed and requests the later selected operator gate; the model does not approve it here.
+- `POLICY_BLOCKED` identifies an explicit request-policy violation against the selected facts, not missing downstream evidence.
 - Evidence and assumptions live in runner evidence/report text unless the selected schema declares them.
 - No artifact text claims route, queue, approval, capability, effect, package, provider, purchase, payment, or durable-state behavior by itself.
 - No artifact or evidence includes credentials or private contact details.

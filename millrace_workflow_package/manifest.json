@@ -14139,11 +14139,11 @@
         },
         {
           "asset_id": "vendor_selection.entrypoints.policy_screener",
-          "content_digest": "sha256:91817d822148a2e70b2549fe03f99f00b4e1957789c97afa8ea61bb466997684"
+          "content_digest": "sha256:4f057b0c5aaf3360a00a42813b6b73dfa9d37ad330dcd3616d4b5341338d71d9"
         },
         {
           "asset_id": "vendor_selection.skills.policy_screener_core",
-          "content_digest": "sha256:1072f31cef10c09da53355030a00ca07affb1c3ab529f5e22331c17b0d6f5bc9"
+          "content_digest": "sha256:e12e1f2c603d75206728e3ee9bf9346fa4aa23a36b30ff80543c210448b37193"
         },
         {
           "asset_id": "vendor_selection.entrypoints.requirement_freezer",
@@ -14805,6 +14805,44 @@
             }
           },
           {
+            "id": "PolicyDecision",
+            "schema": {
+              "type": "object",
+              "required": [
+                "source_request_id",
+                "policy_status",
+                "violated_policy_facts",
+                "reason"
+              ],
+              "properties": {
+                "source_request_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "policy_status": {
+                  "const": "blocked"
+                },
+                "violated_policy_facts": {
+                  "type": "array",
+                  "min_items": 1,
+                  "items": {
+                    "enum": [
+                      "category_not_permitted",
+                      "budget_band_not_permitted"
+                    ]
+                  }
+                },
+                "reason": {
+                  "type": "string",
+                  "min_length": 1
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "PolicyDecision"
+            }
+          },
+          {
             "id": "DecisionPack",
             "schema": {
               "type": "object",
@@ -14930,7 +14968,7 @@
             ],
             "artifact_schema_ids": [
               "PurchaseRequest",
-              "DecisionPack"
+              "PolicyDecision"
             ],
             "asset_ids": [
               "vendor_selection.entrypoints.policy_screener",
@@ -15324,7 +15362,7 @@
             "presentation": {
               "display_name": "vendor_selection.policy_screener.policy_blocked"
             },
-            "artifact_schema_id": "DecisionPack"
+            "artifact_schema_id": "PolicyDecision"
           },
           {
             "id": "vendor_selection.requirement_freezer.requirements_ready",
@@ -16273,8 +16311,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.policy_screener",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 3124,
-      "content_digest": "sha256:91817d822148a2e70b2549fe03f99f00b4e1957789c97afa8ea61bb466997684",
+      "byte_length": 3959,
+      "content_digest": "sha256:4f057b0c5aaf3360a00a42813b6b73dfa9d37ad330dcd3616d4b5341338d71d9",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/policy_screener.md",
@@ -16284,8 +16322,8 @@
     {
       "asset_id": "vendor_selection.skills.policy_screener_core",
       "asset_kind": "stage_skill",
-      "byte_length": 5422,
-      "content_digest": "sha256:1072f31cef10c09da53355030a00ca07affb1c3ab529f5e22331c17b0d6f5bc9",
+      "byte_length": 6322,
+      "content_digest": "sha256:e12e1f2c603d75206728e3ee9bf9346fa4aa23a36b30ff80543c210448b37193",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/policy_screener-core.md",
@@ -16456,7 +16494,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:f82a08b4205158738771c89bd4542aaadbefd939ce2f7435ac878c1788986251",
+  "manifest_digest": "sha256:7c9a1ed4746ab8e244920484782da51d04d876a4f41bd60ffac21b0bb4df7174",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",
