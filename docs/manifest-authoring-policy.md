@@ -53,7 +53,7 @@ authority.
 {
   "policy": "frozen-manifest",
   "manifest_digest": "sha256:7c9a1ed4746ab8e244920484782da51d04d876a4f41bd60ffac21b0bb4df7174",
-  "package_digest": "sha256:7fbf9f7370a2d9972420fc976f9875cb2393c9561f76b2d2552bc76925ec87ca",
+  "package_digest": "sha256:d3ad40e592a3070808467bb215fb694b341022f2d9ed799c04d95d76f1325a0d",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
     "package_version": "0.0.0",

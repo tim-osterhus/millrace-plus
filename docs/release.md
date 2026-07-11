@@ -23,15 +23,14 @@ record exact workflow and asset pins, and the 22 v0.21 entrypoint/stage-core
 pairs have final package or deferral evidence.
 
 The current source package also includes the completed PLUS-0003A through
-PLUS-0003H hardening: standalone public validation, donor-module exclusion,
+PLUS-0003J hardening: standalone public validation, donor-module exclusion,
 frozen-manifest policy, selected `vendor_selection` assets, live schema-output
 repairs, the full-LAD Librarian handoff/truthful no-op contract, and
 vendor-selection decision-context propagation through approval-policy,
-conflict-rule, conflict-status, and source-ref handoffs. PLUS-0003H
-implementation, post-diff confirmation, and parent combined verification are
-green. Historical corrected E2E-0004 evidence is retained, while fresh
-E2E-0004 and E2E-0005 live acceptance remain. Public release readiness remains
-blocked on PLUS-0003.9, ORCH-0001 live closure, fresh E2E evidence, and release
+conflict-rule, conflict-status, and source-ref handoffs. PLUS-0003J also
+declares category/budget-only request-policy screening and a truthful
+stage-owned `PolicyDecision` close artifact. E2E-0004 is green. Public release
+readiness remains blocked on PLUS-0003.9, fresh E2E-0005 evidence, and release
 cutover.
 
 The package remains dependency-free for direct installation and ships no

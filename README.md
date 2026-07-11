@@ -8,9 +8,10 @@ and the runtime does not depend on `millrace-plus`.
 The current shipped package root is `millrace.plus.official`; the current
 package version `0.0.0` remains unchanged. PLUS-0002.9 is an internal official
 package boundary handoff, not a public release guarantee. PLUS-0003A through
-PLUS-0003H subsequently hardened the public package boundary, manifest freeze,
+PLUS-0003J subsequently hardened the public package boundary, manifest freeze,
 selected vendor assets, live schema output, full-LAD Librarian no-op contract,
-and vendor-selection decision-context propagation. Public release readiness
+vendor-selection decision-context propagation, and the Policy Screener's
+request-policy/`PolicyDecision` boundary. Public release readiness
 still depends on PLUS-0003.9, ORCH-0001, fresh E2E-0005 evidence, and release
 cutover.
 
@@ -45,9 +46,12 @@ Workflow package data lives under `millrace_workflow_package/`:
   `assets/workflows/vendor_selection/skills/` contain the selected prompt and
   stage-core skill pairs added by PLUS-0003D. PLUS-0003H preserves selected
   approval-policy, conflict-rule, candidate conflict-status, and source-ref
-  context through the vendor-selection handoffs. These package assets do not by
-  themselves establish clean live end-to-end readiness; ORCH-0001 and fresh
-  E2E-0005 evidence remain open.
+  context through the vendor-selection handoffs. PLUS-0003J declares category
+  and budget as the only Policy Screener request-policy gates, keeps
+  capabilities/vendor filters/operator hints downstream, and gives
+  `POLICY_BLOCKED` a stage-owned `PolicyDecision`. These package assets do not
+  by themselves establish clean live end-to-end readiness; fresh E2E-0005
+  evidence remains open.
 
 The installed resource root `millrace_workflow_package` remains unchanged.
 
@@ -66,9 +70,9 @@ Final package conformance is recorded in
 evidence is recorded in
 `docs/PLUS-0003F-full-lad-librarian-handoff-and-noop-contract.md`. These are
 internal rewrite evidence for E2E, DOCS, META, and CUT packets. Public release
-readiness still depends on PLUS-0003.9, ORCH-0001, fresh E2E-0005 evidence,
-and release cutover. PLUS-0003H implementation, post-diff confirmation, and
-parent combined verification are green; fresh live E2E-0005 evidence remains.
+readiness still depends on PLUS-0003.9, fresh E2E-0005 evidence, and release
+cutover. E2E-0004 is green; PLUS-0003J implementation and verification are
+green; fresh live E2E-0005 evidence remains.
 
 ## Runtime Boundary
 

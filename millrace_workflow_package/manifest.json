@@ -16498,10 +16498,10 @@
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",
-    "plus_packet": "PLUS-0003H",
-    "status": "official_package_with_vendor_selection_decision_context_propagation_pending_post_diff_review_and_fresh_live_e2e_0005",
+    "plus_packet": "PLUS-0003J",
+    "status": "official_package_with_vendor_policy_screener_boundary_pending_fresh_live_e2e_0005",
     "unselected_catalog_disposition": "lad_planning.workflow_source_with_unselected_catalog() inspected; unselected_catalog excluded from shipped selected authority and package assets",
-    "vendor_selection_disposition": "vendor_selection.source() packaged as selected_authority with selected entrypoint prompt and stage-core skill assets; PLUS-0003H preserves approval_policy_hint, conflict_rules, candidate conflict_status, and source refs through selected vendor-selection handoffs; unselected_catalog remains donor metadata and is ignored by compiled selected authority",
+    "vendor_selection_disposition": "vendor_selection.source() packaged as selected_authority with selected entrypoint prompt and stage-core skill assets; PLUS-0003H preserves approval_policy_hint, conflict_rules, candidate conflict_status, and source refs through selected handoffs; PLUS-0003J limits request-policy screening to category and budget and uses stage-owned PolicyDecision for POLICY_BLOCKED; unselected_catalog remains donor metadata and is ignored by compiled selected authority",
     "vendor_selection_effect_provider_refs": "vendor_selection declares no effect_declarations/provider_ref entries; selected vendor assets define prompt and stage-skill text only and grant no provider, payment, purchase, marketplace, or credential authority",
     "vendor_selection_selected_assets": "18 selected assets: one entrypoint_prompt and one stage_skill for each runner-executed vendor_selection stage"
   }
