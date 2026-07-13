@@ -142,16 +142,16 @@ _PLUS_0003F_SKILL_DISPOSITION_SCHEMA = {
 }
 _UNCHANGED_OFFICIAL_WORKFLOW_FINGERPRINTS = {
     "simple_loop": (
-        "sha256:87c51cc6baea08fa79c713d09c77d0f751ac639c2ab97deea1684a8b6bddcf35"
+        "sha256:3735bf81969360f8eaa3dcd0d0b4f7c64b175d5ad82d33513c483e9086204c54"
     ),
     "execution.lad": (
-        "sha256:744d5ad66e1768de7ff01556edb9a9cf95dcffce4d3e091c4b54f8d9ab1ed4ad"
+        "sha256:f5c499b7bfb581c3c98965d92f7ffd0b53693ecac7b805d4086d9421cb972023"
     ),
     "execution.lad_integrator": (
-        "sha256:91dc4128a9c639dc177bb9209d6a166ca7f451b9bbfdfebe980da53a3abf127f"
+        "sha256:8594cd77ae620d77196fd91c88d77055eff9a1f9c8d0e92636193ce902ea9c17"
     ),
     "vendor_selection": (
-        "sha256:a4f2648c49e0df5aeef16939012fbfb09da77eceba81146cae84a3cf8b2c6bca"
+        "sha256:cd125525c4ef33634618cae89e62d8060286ff2ce45a6fd32ab5995ee2c08bb5"
     ),
 }
 

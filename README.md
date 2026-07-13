@@ -11,9 +11,10 @@ package boundary handoff, not a public release guarantee. PLUS-0003A through
 PLUS-0003J subsequently hardened the public package boundary, manifest freeze,
 selected vendor assets, live schema output, full-LAD Librarian no-op contract,
 vendor-selection decision-context propagation, and the Policy Screener's
-request-policy/`PolicyDecision` boundary. Public release readiness
-still depends on PLUS-0003.9, ORCH-0001, fresh E2E-0005 evidence, and release
-cutover.
+request-policy/`PolicyDecision` boundary. ORCH-0001 and the final v12 live rows
+are complete, but TIME-0001 advances selected authority to v13. Public release
+readiness still depends on fresh v13 E2E-0002 through E2E-0005 evidence,
+PLUS-0003.9, and release cutover.
 
 ## Package Data
 
@@ -50,8 +51,9 @@ Workflow package data lives under `millrace_workflow_package/`:
   and budget as the only Policy Screener request-policy gates, keeps
   capabilities/vendor filters/operator hints downstream, and gives
   `POLICY_BLOCKED` a stage-owned `PolicyDecision`. These package assets do not
-  by themselves establish clean live end-to-end readiness; fresh E2E-0005
-  evidence remains open.
+  by themselves establish current live end-to-end readiness. The prior v12
+  E2E-0005 row reached the durable operator wait; a fresh v13 row remains
+  required after TIME-0001.
 
 The installed resource root `millrace_workflow_package` remains unchanged.
 
@@ -70,9 +72,10 @@ Final package conformance is recorded in
 evidence is recorded in
 `docs/PLUS-0003F-full-lad-librarian-handoff-and-noop-contract.md`. These are
 internal rewrite evidence for E2E, DOCS, META, and CUT packets. Public release
-readiness still depends on PLUS-0003.9, fresh E2E-0005 evidence, and release
-cutover. E2E-0004 is green; PLUS-0003J implementation and verification are
-green; fresh live E2E-0005 evidence remains.
+readiness still depends on fresh v13 E2E-0002 through E2E-0005 evidence,
+PLUS-0003.9, and release cutover. ORCH-0001, PLUS-0003J, and the final v12
+E2E-0004/E2E-0005 rows are green but historical after TIME-0001 changes the
+selected-plan format and fingerprints.
 
 ## Runtime Boundary
 

@@ -29,9 +29,10 @@ repairs, the full-LAD Librarian handoff/truthful no-op contract, and
 vendor-selection decision-context propagation through approval-policy,
 conflict-rule, conflict-status, and source-ref handoffs. PLUS-0003J also
 declares category/budget-only request-policy screening and a truthful
-stage-owned `PolicyDecision` close artifact. E2E-0004 is green. Public release
-readiness remains blocked on PLUS-0003.9, fresh E2E-0005 evidence, and release
-cutover.
+stage-owned `PolicyDecision` close artifact. ORCH-0001 and the final v12
+E2E-0004/E2E-0005 rows are green, but TIME-0001 advances selected authority to
+v13. Public release readiness remains blocked on fresh v13 E2E-0002 through
+E2E-0005 evidence, PLUS-0003.9, and release cutover.
 
 The package remains dependency-free for direct installation and ships no
 provider credentials, provider execution code, plugin/MCP behavior, native
