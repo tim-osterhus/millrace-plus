@@ -15,6 +15,7 @@ IMPLEMENTATION_REVIEW_DOCS = (
     "docs/PLUS-0002E-implementation-review.md",
     "docs/PLUS-0002F-implementation-review.md",
     "docs/PLUS-0002.9-implementation-review.md",
+    "docs/PLUS-0003.9-public-release-readiness.md",
 )
 
 

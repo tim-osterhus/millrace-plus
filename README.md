@@ -11,10 +11,12 @@ package boundary handoff, not a public release guarantee. PLUS-0003A through
 PLUS-0003J subsequently hardened the public package boundary, manifest freeze,
 selected vendor assets, live schema output, full-LAD Librarian no-op contract,
 vendor-selection decision-context propagation, and the Policy Screener's
-request-policy/`PolicyDecision` boundary. ORCH-0001 and the final v12 live rows
-are complete, but TIME-0001 advances selected authority to v13. Public release
-readiness still depends on fresh v13 E2E-0002 through E2E-0005 evidence,
-PLUS-0003.9, and release cutover.
+request-policy/`PolicyDecision` boundary. ORCH-0001 and TIME-0001 are complete,
+including fresh selected-plan-v13 E2E-0002 through E2E-0005 evidence on the
+current source/package pins. PLUS-0003.9 records the resulting handoff in
+`docs/PLUS-0003.9-public-release-readiness.md`. The distribution remains a
+pre-release private test artifact, not a published or public-release-ready
+package; final metadata, documentation, meta-package, and cutover work remain.
 
 ## Package Data
 
@@ -51,9 +53,10 @@ Workflow package data lives under `millrace_workflow_package/`:
   and budget as the only Policy Screener request-policy gates, keeps
   capabilities/vendor filters/operator hints downstream, and gives
   `POLICY_BLOCKED` a stage-owned `PolicyDecision`. These package assets do not
-  by themselves establish current live end-to-end readiness. The prior v12
-  E2E-0005 row reached the durable operator wait; a fresh v13 row remains
-  required after TIME-0001.
+  by themselves establish current live end-to-end readiness. The fresh v13
+  E2E-0005 row reached the selected durable operator wait after eight model
+  units, two selected fanouts, and the selected join, with no runtime refusal
+  or adapter failure.
 
 The installed resource root `millrace_workflow_package` remains unchanged.
 
@@ -72,10 +75,9 @@ Final package conformance is recorded in
 evidence is recorded in
 `docs/PLUS-0003F-full-lad-librarian-handoff-and-noop-contract.md`. These are
 internal rewrite evidence for E2E, DOCS, META, and CUT packets. Public release
-readiness still depends on fresh v13 E2E-0002 through E2E-0005 evidence,
-PLUS-0003.9, and release cutover. ORCH-0001, PLUS-0003J, and the final v12
-E2E-0004/E2E-0005 rows are green but historical after TIME-0001 changes the
-selected-plan format and fingerprints.
+readiness status and current v13 evidence are reconciled in
+`docs/PLUS-0003.9-public-release-readiness.md`; release cutover remains
+outstanding.
 
 ## Runtime Boundary
 
@@ -84,7 +86,7 @@ data. It does not own compiler, kernel, substrate, operator, runner adapter, or
 package registry implementation. There is no plugin, marketplace, provider, or
 native-runner behavior available from this package. Remote registry,
 multi-tenant behavior, Millrace OS, and `millrace-web` are out of scope for
-this repository.
+this repository. Millforge is also future ecosystem scope and is not included.
 
 A direct `pip install millrace-plus` installs package metadata and data only;
 `millrace-ai` is not installed as a transitive dependency. The future

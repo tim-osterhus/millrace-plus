@@ -9,8 +9,10 @@ future `millrace` meta-package refers to that deferred convenience package,
 not behavior inside `millrace-plus`.
 
 PLUS-0002.9 is an internal official package boundary handoff, not a public
-release guarantee. Public release readiness depends on the PLUS-0003 public
-package-readiness lane and release cutover.
+release guarantee. PLUS-0003.9 records the completed package-readiness handoff
+and current live evidence, while final public release still depends on the
+documented DOCS/META/CUT gates. See
+`docs/PLUS-0003.9-public-release-readiness.md`.
 
 There is no plugin, marketplace, provider, or native-runner behavior available
 from this package.

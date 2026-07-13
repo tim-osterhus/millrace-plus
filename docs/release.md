@@ -30,9 +30,11 @@ vendor-selection decision-context propagation through approval-policy,
 conflict-rule, conflict-status, and source-ref handoffs. PLUS-0003J also
 declares category/budget-only request-policy screening and a truthful
 stage-owned `PolicyDecision` close artifact. ORCH-0001 and the final v12
-E2E-0004/E2E-0005 rows are green, but TIME-0001 advances selected authority to
-v13. Public release readiness remains blocked on fresh v13 E2E-0002 through
-E2E-0005 evidence, PLUS-0003.9, and release cutover.
+E2E-0004/E2E-0005 rows are historical. TIME-0001 is complete with fresh
+selected-plan-v13 E2E-0002 through E2E-0005 evidence on source commit
+`ef9e6bbfa0a42a415eac2441a0b45b1f8e2f5360` and package commit
+`6c66fabbbbdc0a1839fe556695e449e0da119b12`. PLUS-0003.9 records the final
+pre-cutover handoff in `docs/PLUS-0003.9-public-release-readiness.md`.
 
 The package remains dependency-free for direct installation and ships no
 provider credentials, provider execution code, plugin/MCP behavior, native
@@ -44,7 +46,7 @@ project is buildable as source, but publication or name reservation remains a
 separate release decision.
 
 There is no plugin, marketplace, provider, or native-runner behavior available
-from this package.
+from this package. Millrace OS, `millrace-web`, and Millforge are not included.
 
 Manifest authoring uses the frozen-manifest policy in
 `docs/manifest-authoring-policy.md`. The committed manifest is the source of
@@ -63,7 +65,8 @@ PYTHONDONTWRITEBYTECODE=1 uv build --out-dir /tmp/millrace-plus-build --force-pe
 Public standalone validation runs without a sibling runtime checkout and
 without `PYTHONPATH`. It is the CI boundary for build, lint, public package
 tests, and installed-wheel package-data smoke. See `docs/public-validation.md`
-for the exact commands.
+for the exact commands and
+`docs/PLUS-0003.9-public-release-readiness.md` for the current classification.
 
 ## Internal Conformance Evidence
 
@@ -75,9 +78,16 @@ not public CI.
 
 ## Publication Blockers
 
+- Current classification: pre-release private test artifact; not
+  public-release-ready and not published.
+- The pinned base-runtime source checkpoint still builds distribution
+  `millrace-rewrite==0.0.0`, not a release-named `millrace-ai==0.22.0`
+  artifact. CUT-0002 owns canonical promotion, final name/version metadata,
+  and repeat artifact verification.
+- DOCS-0001, META-0001, CUT-0001, and CUT-0002 remain downstream release
+  gates.
 - Operator approval and PyPI credentials are required before publication or
   name reservation.
-- The future dependency metadata decision for `millrace-ai>=0.22,<0.23` is
-  deferred to a release packet. PLUS-0002.9 keeps the package dependency-free
-  and validates runtime conformance only through explicit internal opt-in
-  tests.
+- Direct `pip install millrace-plus` is intentionally data-only and does not
+  install `millrace-ai`; a future change to that policy requires explicit
+  META/CUT metadata and test updates.

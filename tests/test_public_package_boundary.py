@@ -20,7 +20,9 @@ PUBLIC_DOCS = (
     "README.md",
     "docs/release.md",
     "docs/public-validation.md",
+    "docs/PLUS-0003.9-public-release-readiness.md",
 )
+READINESS_DOC = "docs/PLUS-0003.9-public-release-readiness.md"
 INTERNAL_CONFORMANCE_ENV = "MILLRACE_PLUS_RUN_INTERNAL_CONFORMANCE"
 RUNTIME_SOURCE_ENV = "MILLRACE_RUNTIME_SOURCE"
 LEGACY_ASSET_ENV = "MILLRACE_LEGACY_ASSET_ROOT"
@@ -76,6 +78,49 @@ def test_current_docs_separate_public_validation_from_internal_evidence() -> Non
         LEGACY_ASSET_ENV,
     ):
         assert required in current_docs
+
+
+def test_plus_0003_9_handoff_records_required_release_facts() -> None:
+    readiness_path = PROJECT_ROOT / READINESS_DOC
+    assert readiness_path.is_file()
+    readiness = readiness_path.read_text()
+
+    for required in (
+        "pre-release private test artifact; not public-release-ready",
+        "millrace.plus.official",
+        "0.0.0",
+        "millrace_workflow_package",
+        "simple_loop / 0.1",
+        "execution.lad / 0.1",
+        "execution.lad_integrator / 0.1",
+        "planning.lad / 0.1",
+        "lad.full / 0.1",
+        "vendor_selection / 0.1",
+        "does not install `millrace-ai`",
+        "plan format 13",
+        "selected_operator_wait",
+        "learning.close_librarian_noop",
+        "planning.close_manager_complete",
+        "terminal_marker",
+        "selected_close_action_id",
+        "PolicyDecision",
+        "operator_required",
+        "tests/e2e/",
+        "tests/support/e2e_actual_model.py",
+        "docs/e2e-live-smoke.md",
+        "millrace-rewrite",
+        "no sibling runtime checkout",
+        "plugin",
+        "marketplace",
+        "provider",
+        "native runner",
+        "Millrace OS",
+        "millrace-web",
+        "Millforge",
+        "ef9e6bbfa0a42a415eac2441a0b45b1f8e2f5360",
+        "6c66fabbbbdc0a1839fe556695e449e0da119b12",
+    ):
+        assert required in readiness
 
 
 def test_dependency_policy_is_dependency_free_and_documented() -> None:
