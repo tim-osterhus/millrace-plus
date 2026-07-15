@@ -15,6 +15,7 @@ PUBLIC_TESTS = (
     "tests/test_workflow_package_manifest.py",
     "tests/test_workflow_package_installed_smoke.py",
     "tests/test_public_package_boundary.py",
+    "tests/test_agent_skill_assets.py",
 )
 PUBLIC_DOCS = (
     "README.md",
@@ -66,6 +67,8 @@ def test_current_docs_separate_public_validation_from_internal_evidence() -> Non
 
     for required in (
         "data-only workflow package, not a runtime",
+        "three advisory agent skills",
+        "not installed into an agent tool's skill root",
         "direct `pip install millrace-plus` installs package metadata and data only",
         "future `millrace` meta-package",
         "PLUS-0002.9 is an internal official package boundary handoff",
@@ -162,6 +165,7 @@ def test_public_ci_runs_clean_checkout_boundary_without_sibling_paths() -> None:
         "ruff check src tests",
         "git diff --check",
         "No millrace runtime package shipped",
+        "millrace_plus/skills/",
     ):
         assert required in workflow
     for public_test in PUBLIC_TESTS:

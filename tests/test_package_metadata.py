@@ -9,6 +9,7 @@ from importlib import import_module
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SKILL_ROOT = PROJECT_ROOT / "src" / "millrace_plus" / "skills"
 IMPLEMENTATION_REVIEW_DOCS = (
     "docs/PLUS-0002C-implementation-review.md",
     "docs/PLUS-0002D-implementation-review.md",
@@ -91,9 +92,23 @@ def test_sdist_includes_package_local_review_docs(tmp_path: Path) -> None:
 
     with tarfile.open(sdists[0]) as archive:
         names = set(archive.getnames())
+        skill_payloads = {}
+        for skill_path in SKILL_ROOT.rglob("*"):
+            if skill_path.is_file() and not skill_path.is_symlink():
+                relative_path = skill_path.relative_to(PROJECT_ROOT).as_posix()
+                archive_path = next(
+                    name for name in names if name.endswith(f"/{relative_path}")
+                )
+                member = archive.extractfile(archive_path)
+                assert member is not None
+                skill_payloads[relative_path] = member.read()
 
     for doc_path in IMPLEMENTATION_REVIEW_DOCS:
         assert any(name.endswith(f"/{doc_path}") for name in names)
+    for skill_path in SKILL_ROOT.rglob("*"):
+        if skill_path.is_file() and not skill_path.is_symlink():
+            relative_path = skill_path.relative_to(PROJECT_ROOT).as_posix()
+            assert skill_payloads[relative_path] == skill_path.read_bytes()
 
 
 def test_source_tree_does_not_shadow_runtime_or_import_private_runtime_code() -> None:

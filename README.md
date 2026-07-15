@@ -1,9 +1,10 @@
 # millrace-plus
 
-`millrace-plus` is the public official workflow package repository for
-Millrace. It is a data-only workflow package, not a runtime. It is separate
-from the base runtime package: `millrace-ai` remains the lightweight runtime,
-and the runtime does not depend on `millrace-plus`.
+`millrace-plus` is the public repository for Millrace's official workflow
+packages and supplementary agent assets. It is a data-only workflow package,
+not a runtime. It is separate from the base runtime package: `millrace-ai`
+remains the lightweight runtime, and the runtime does not depend on
+`millrace-plus`.
 
 The current shipped package root is `millrace.plus.official`; the current
 package version `0.0.0` remains unchanged. PLUS-0002.9 is an internal official
@@ -70,6 +71,19 @@ is the committed source of truth, not generated from a DSL, and public tests
 recompute the manifest digest, package digest, selected workflow fingerprints,
 and asset pins from package bytes.
 
+Three advisory agent skills live separately under
+`src/millrace_plus/skills/`:
+
+- `millrace-instruction-manual`;
+- `millrace-loop-configuration`;
+- `millrace-entrypoint-authoring`.
+
+These skills are ordinary, non-executable package data. They are not workflow
+assets, are not declared by `millrace_workflow_package/manifest.json`, and do
+not create runtime authority. Installing the distribution makes their bytes
+available under `millrace_plus/skills/`. They are not installed into an agent tool's skill root;
+no post-install mutation occurs.
+
 Final package conformance is recorded in
 `docs/PLUS-0002.9-implementation-review.md`; the current full-LAD handoff/no-op
 evidence is recorded in
@@ -101,9 +115,9 @@ The distribution remains dependency-free at package import time.
 
 Public standalone validation does not require a sibling Millrace runtime
 checkout and does not set `PYTHONPATH`. It covers package metadata,
-documentation boundary wording, manifest and asset digests, package path
-containment, wheel contents, installed-wheel package data, lint, build, and
-diff hygiene:
+documentation boundary wording, manifest and asset digests, agent-skill
+inventory and hashes, package path containment, wheel contents,
+installed-wheel package data, lint, build, and diff hygiene:
 
 ```bash
 env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with hatchling pytest -q \
@@ -112,7 +126,8 @@ env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv 
   tests/test_official_package_layout_plan.py \
   tests/test_workflow_package_manifest.py \
   tests/test_workflow_package_installed_smoke.py \
-  tests/test_public_package_boundary.py
+  tests/test_public_package_boundary.py \
+  tests/test_agent_skill_assets.py
 ```
 
 Build the local package with:

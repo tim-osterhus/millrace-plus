@@ -14,6 +14,8 @@
   - `vendor_selection` / `0.1`
 - Python: `>=3.11`
 - License metadata: Apache-2.0 via `LICENSE`
+- Advisory agent skills: `millrace-instruction-manual`,
+  `millrace-loop-configuration`, and `millrace-entrypoint-authoring`
 
 PLUS-0002.9 is an internal official package boundary handoff, not a public
 release guarantee. It closes internal conformance for the official package:
@@ -44,6 +46,12 @@ runner code, marketplace behavior, or remote install semantics. A direct
 `millrace-ai` plus `millrace-plus` if release cutover chooses that policy. The
 project is buildable as source, but publication or name reservation remains a
 separate release decision.
+
+PLUS-0004 moved the three advisory skills into `millrace-plus` as immutable
+package data after the standalone `millrace-ops` distribution was rejected as
+unnecessary. The skills remain outside the workflow manifest. No installer,
+entry point, registration hook, or post-install filesystem mutation is
+included.
 
 There is no plugin, marketplace, provider, or native-runner behavior available
 from this package. Millrace OS, `millrace-web`, and Millforge are not included.

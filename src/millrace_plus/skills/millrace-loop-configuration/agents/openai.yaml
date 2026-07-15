@@ -1,0 +1,4 @@
+interface:
+  display_name: "Millrace Loop Configuration"
+  short_description: "Design compiler-validated workflow loops"
+  default_prompt: "Use $millrace-loop-configuration to design a fully specified Millrace workflow loop."

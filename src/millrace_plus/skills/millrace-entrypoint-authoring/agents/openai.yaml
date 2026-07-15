@@ -1,0 +1,4 @@
+interface:
+  display_name: "Millrace Entrypoint Authoring"
+  short_description: "Write stage prompts and core handoff skills"
+  default_prompt: "Use $millrace-entrypoint-authoring to write a Millrace stage entrypoint and core handoff skill."

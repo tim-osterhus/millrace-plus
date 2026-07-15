@@ -1,0 +1,4 @@
+interface:
+  display_name: "Millrace Instruction Manual"
+  short_description: "Operate Millrace safely from the CLI"
+  default_prompt: "Use $millrace-instruction-manual to decide whether to delegate this work to Millrace and operate it safely."

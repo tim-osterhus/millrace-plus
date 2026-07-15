@@ -12,6 +12,7 @@ PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 DIST_NAME = "millrace-plus"
 IMPORT_PACKAGE = "millrace_plus"
 RESOURCE_ROOT = "millrace_workflow_package"
+SKILL_ROOT = PROJECT_ROOT / "src" / "millrace_plus" / "skills"
 
 
 def _member_paths() -> tuple[str, ...]:
@@ -27,6 +28,16 @@ def _member_paths() -> tuple[str, ...]:
                     for asset in manifest["assets"]
                 ),
             )
+        )
+    )
+
+
+def _skill_member_paths() -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            path.relative_to(SKILL_ROOT).as_posix()
+            for path in SKILL_ROOT.rglob("*")
+            if path.is_file() and not path.is_symlink()
         )
     )
 
@@ -80,6 +91,10 @@ def test_built_wheel_contains_official_package_data_and_no_runtime_package(
             name for name in names if name.endswith(".dist-info/METADATA")
         )
         metadata = wheel.read(metadata_name).decode("utf-8")
+        skill_payloads = {
+            member_path: wheel.read(f"{IMPORT_PACKAGE}/skills/{member_path}")
+            for member_path in _skill_member_paths()
+        }
 
     assert "Name: millrace-plus\n" in metadata
     assert "Version: 0.0.0\n" in metadata
@@ -88,6 +103,10 @@ def test_built_wheel_contains_official_package_data_and_no_runtime_package(
         assert f"{RESOURCE_ROOT}/{member_path}" in names
     assert f"{IMPORT_PACKAGE}/__init__.py" in names
     assert f"{IMPORT_PACKAGE}/py.typed" in names
+    for member_path in _skill_member_paths():
+        archive_path = f"{IMPORT_PACKAGE}/skills/{member_path}"
+        assert archive_path in names
+        assert skill_payloads[member_path] == (SKILL_ROOT / member_path).read_bytes()
     assert not any(name.startswith("millrace/") for name in names)
     assert not any(name.endswith("entry_points.txt") for name in names)
     assert not any(
@@ -114,6 +133,12 @@ def test_installed_wheel_exposes_package_data_without_importing_package_code(
         assert installed_path in distribution_files
         assert (target / installed_path).read_bytes() == (
             PACKAGE_ROOT / member_path
+        ).read_bytes()
+    for member_path in _skill_member_paths():
+        installed_path = f"{IMPORT_PACKAGE}/skills/{member_path}"
+        assert installed_path in distribution_files
+        assert (target / installed_path).read_bytes() == (
+            SKILL_ROOT / member_path
         ).read_bytes()
     assert IMPORT_PACKAGE not in sys.modules
 

@@ -29,7 +29,8 @@ jobs:
             tests/test_official_package_layout_plan.py \
             tests/test_workflow_package_manifest.py \
             tests/test_workflow_package_installed_smoke.py \
-            tests/test_public_package_boundary.py
+            tests/test_public_package_boundary.py \
+            tests/test_agent_skill_assets.py
 
       - name: Build distribution
         run: |
@@ -46,6 +47,7 @@ jobs:
               names = sorted(archive.namelist())
           assert not any(name.startswith('millrace/') for name in names)
           assert any(name.startswith('millrace_plus/') for name in names)
+          assert any(name.startswith('millrace_plus/skills/') for name in names)
           assert any(name.startswith('millrace_workflow_package/') for name in names)
           PY
 

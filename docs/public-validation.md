@@ -17,6 +17,12 @@ documented DOCS/META/CUT gates. See
 There is no plugin, marketplace, provider, or native-runner behavior available
 from this package.
 
+The distribution also contains three advisory agent skills under
+`millrace_plus/skills/`. They remain outside the workflow manifest and are not
+installed into an agent tool's skill root. Public validation freezes their
+exact inventory and content digests and verifies the same bytes in built and
+installed artifacts.
+
 ## Public standalone validation
 
 Public standalone validation is the public CI boundary. It must run from a
@@ -30,7 +36,8 @@ env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv 
   tests/test_official_package_layout_plan.py \
   tests/test_workflow_package_manifest.py \
   tests/test_workflow_package_installed_smoke.py \
-  tests/test_public_package_boundary.py
+  tests/test_public_package_boundary.py \
+  tests/test_agent_skill_assets.py
 PYTHONDONTWRITEBYTECODE=1 uv build --out-dir /tmp/millrace-plus-build --force-pep517
 python3 - <<'PY'
 from pathlib import Path
@@ -40,6 +47,7 @@ with zipfile.ZipFile(wheel) as archive:
     names = sorted(archive.namelist())
 assert not any(name.startswith('millrace/') for name in names)
 assert any(name.startswith('millrace_plus/') for name in names)
+assert any(name.startswith('millrace_plus/skills/') for name in names)
 assert any(name.startswith('millrace_workflow_package/') for name in names)
 PY
 uv run --no-project --with ruff ruff check src tests
@@ -48,8 +56,9 @@ git diff --check
 
 The public tests cover package metadata, dependency policy, docs wording,
 manifest authoring policy, manifest and asset digests, declared package-path
-containment, deterministic data-only archive shape, wheel contents,
-installed-wheel package-data discovery, and the public CI command shape.
+containment, deterministic data-only archive shape, frozen agent-skill bytes,
+wheel contents, installed-wheel package-data discovery, and the public CI
+command shape.
 Manifest authoring policy is frozen in `docs/manifest-authoring-policy.md`;
 public tests recompute its evidence from package bytes without donor workflow
 functions or sibling runtime source checkouts.
