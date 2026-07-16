@@ -1,18 +1,17 @@
-# Manifest Authoring Policy
-
-Selected policy: frozen manifest.
+# Manifest Maintenance
 
 `millrace_workflow_package/manifest.json` is the committed source of truth for
-the official package manifest. The manifest is not generated from a DSL, and
-this repository does not define a workflow marketplace, registry, provider,
-plugin, native-runner, or broad manifest generator surface.
+the official workflow package. It is canonical JSON rather than generated
+output from another configuration language.
+
+This keeps review direct: a workflow change and the exact authority it selects
+appear in the same file. A durable manifest generator should be added only if
+maintaining the canonical JSON becomes a demonstrated problem.
 
 ## Change Policy
 
-Package data changes must edit the manifest bytes directly or use a reviewed
-one-off script whose output is committed. A durable generator is out of scope
-until a separate generator-specific packet proves that the frozen policy is
-insufficient.
+Package-data changes edit the manifest directly or use a one-time script whose
+result is reviewed and committed. The committed JSON remains authoritative.
 
 Every package-data change must update the freeze evidence block below with:
 
@@ -22,8 +21,8 @@ Every package-data change must update the freeze evidence block below with:
 - selected workflow fingerprints;
 - asset pins.
 
-The evidence block is public review evidence. Public validation enforces this
-policy statement with `tests/test_manifest_authoring_policy.py`; it recomputes
+The evidence block below makes package drift visible.
+`tests/test_manifest_authoring_policy.py` recomputes
 the manifest digest, package digest, selected workflow fingerprints, and asset
 pins from the current package bytes. A selected package pin, selected workflow
 fingerprint, asset digest, or package asset path change without matching
@@ -34,17 +33,15 @@ indentation, the documented root key order, and a single trailing newline.
 Object-key sorting is used only for digest canonicalization; the committed file
 keeps the reviewed presentation order.
 
-For this policy, donor source comparisons are internal evidence only. Public
-validation does not need donor workflow functions, sibling runtime source checkouts,
-or legacy asset paths to recompute this policy evidence. Internal conformance
-can still compare against donor/runtime evidence when the explicit internal
-environment gates in `docs/public-validation.md` are set, but those
-comparisons are not public CI.
+Standalone validation does not need donor workflow functions, a sibling
+runtime checkout, or legacy asset paths. Source-conformance tests may compare
+against those references when their explicit environment variables are set,
+but the manifest and package bytes remain independently verifiable.
 
-If changing package data would alter selected workflow graph, action, or asset
-authority, stop and use a workflow-authority packet. This policy records and
-verifies approved package bytes; it does not approve new official workflow
-authority.
+If a change alters a selected graph, terminal action, schema, runner binding,
+or asset, review it as a workflow behavior change rather than a digest-only
+maintenance edit. This document records package bytes; it does not decide
+which workflow behavior should be official.
 
 ## Freeze Evidence
 

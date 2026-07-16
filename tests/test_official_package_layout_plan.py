@@ -17,14 +17,14 @@ def _shipped_manifest() -> dict[str, object]:
     )
 
 
-def test_readme_documents_plus_0002_9_final_official_workflow_package() -> None:
-    readme = (PROJECT_ROOT / "README.md").read_text()
+def test_readme_documents_public_official_workflow_package() -> None:
+    readme = " ".join((PROJECT_ROOT / "README.md").read_text().split())
 
     for required in (
         "`millrace_workflow_package/`",
         "`millrace.plus.official`",
-        "package version `0.0.0`",
-        "installed resource root `millrace_workflow_package`",
+        "staging package version `0.0.0`",
+        "installed resource root is `millrace_workflow_package`",
         "`simple_loop`",
         "`execution.lad`",
         "`execution.lad_integrator`",
@@ -32,26 +32,23 @@ def test_readme_documents_plus_0002_9_final_official_workflow_package() -> None:
         "`lad.full`",
         "`vendor_selection`",
         "package data is non-executable",
-        "PLUS-0002.9",
+        "not yet published",
     ):
         assert required in readme
-    assert "current shipped package root" in readme
-    assert "PLUS-0002D" not in readme
-    assert "PLUS-0002F" not in readme
+    assert "PLUS-" not in readme
 
 
-def test_release_notes_document_plus_0002_9_final_package_closure() -> None:
+def test_release_notes_document_current_package_contents() -> None:
     release_notes = (PROJECT_ROOT / "docs" / "release.md").read_text()
 
     for required in (
-        "PLUS-0002.9",
-        "`simple_loop` / `0.1`",
-        "`execution.lad` / `0.1`",
-        "`execution.lad_integrator` / `0.1`",
-        "`planning.lad` / `0.1`",
-        "`lad.full` / `0.1`",
-        "`vendor_selection` / `0.1`",
-        "dependency-free",
+        "`simple_loop`",
+        "`execution.lad`",
+        "`execution.lad_integrator`",
+        "`planning.lad`",
+        "`lad.full`",
+        "`vendor_selection`",
+        "| Runtime dependency | None |",
     ):
         assert required in release_notes
     assert "PLUS-0002C keeps" not in release_notes

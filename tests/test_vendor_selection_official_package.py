@@ -37,7 +37,6 @@ PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.0.0"
 WORKFLOW_ID = "vendor_selection"
 WORKFLOW_VERSION = "0.1"
-REVIEW_PATH = PROJECT_ROOT / "docs" / "PLUS-0002F-implementation-review.md"
 EXISTING_WORKFLOW_IDS = (
     "simple_loop",
     "execution.lad",
@@ -1432,24 +1431,3 @@ def test_vendor_selection_schema_and_side_effect_canaries() -> None:
         "MCP",
     ):
         assert forbidden_request.lower() not in asset_text.lower()
-
-
-def test_plus_0002f_review_doc_marks_asset_free_evidence_superseded() -> None:
-    review = REVIEW_PATH.read_text()
-
-    for required in (
-        "PLUS-0002F",
-        "vendor_selection",
-        "asset-free",
-        "selected_asset_pins=()",
-        "superseded for live",
-        "PLUS-0003D",
-        "unselected_catalog",
-        "requirements, sourcing, evaluation, authorization",
-        "fanout=2",
-        "join=1",
-        "operator_wait=1",
-        "effect/provider refs absent",
-        "tests/test_vendor_selection_official_package.py",
-    ):
-        assert required in review

@@ -51,7 +51,6 @@ PACKAGE_VERSION = "0.0.0"
 DIST_NAME = "millrace-plus"
 IMPORT_PACKAGE = "millrace_plus"
 RESOURCE_ROOT = "millrace_workflow_package"
-REVIEW_PATH = PROJECT_ROOT / "docs" / "PLUS-0002.9-implementation-review.md"
 
 SIMPLE_LOOP_STAGE_SKILL_ASSET_IDS = (
     "simple_loop.manager_core_skill",
@@ -844,43 +843,26 @@ def test_boundary_lint_scans_every_shipped_prompt_and_skill_asset() -> None:
         raise AssertionError(f"boundary lint accepted {name}")
 
 
-def test_final_v021_asset_parity_review_closes_all_legacy_pairs() -> None:
+def test_final_v021_asset_parity_inventory_covers_all_legacy_pairs() -> None:
     legacy_entrypoints = _source_file_paths("entrypoints/*/*.md")
     legacy_skills = _source_file_paths("skills/stage/*/*/SKILL.md")
     expectations = _legacy_pair_expectations()
+    asset_ids = set(_assets_by_id(_load_manifest()))
 
     assert len(legacy_entrypoints) == 22
     assert len(legacy_skills) == 22
     assert {row.entrypoint_path for row in expectations} == legacy_entrypoints
     assert {row.skill_path for row in expectations} == legacy_skills
-    assert REVIEW_PATH.is_file()
-
-    review = REVIEW_PATH.read_text()
-    matrix_rows = [
-        line
-        for line in review.splitlines()
-        if "dev/source/millrace/src/millrace_ai/assets/entrypoints/" in line
-    ]
-
-    assert len(matrix_rows) == 22
     for expectation in expectations:
-        row = next(
-            line for line in matrix_rows if f"`{expectation.entrypoint_path}`" in line
-        )
-        assert expectation.stage_id in row
-        assert f"`{expectation.skill_path}`" in row
-        assert expectation.owner_packet in row
-        assert expectation.selector in row
-        assert expectation.disposition in row
-        assert "boundary-clean" in row
-        assert "PLUS-0002.9" in row
+        assert expectation.stage_id
+        assert expectation.owner_packet
+        assert expectation.selector
+        assert expectation.disposition
         if expectation.asset_ids is None:
-            assert "not packaged" in row
-            assert "exception" in row
-            assert "no selected package asset text to lint" in row
+            assert expectation.disposition == "defer_post_cutover"
         else:
-            for asset_id in expectation.asset_ids:
-                assert f"`{asset_id}`" in row
+            assert len(expectation.asset_ids) == 2
+            assert set(expectation.asset_ids) <= asset_ids
 
 
 def test_millrace_ai_public_inventory_remains_kernel_ping_only() -> None:

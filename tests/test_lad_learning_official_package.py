@@ -30,7 +30,6 @@ PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.0.0"
 WORKFLOW_ID = "lad.full"
-REVIEW_PATH = PROJECT_ROOT / "docs" / "PLUS-0002E-implementation-review.md"
 
 _ENTRYPOINT_HEADINGS = (
     "Role:",
@@ -1081,28 +1080,6 @@ def test_full_lad_planner_complete_example_satisfies_learning_fanout() -> None:
 def test_boundary_lint_refuses_full_lad_runtime_authority_claims(text: str) -> None:
     with pytest.raises(AssertionError):
         conformance.assert_no_runtime_authority_claims({"bad-learning.md": text})
-
-
-def test_parity_exception_matrix_documents_v021_learning_pairs() -> None:
-    review = REVIEW_PATH.read_text()
-
-    for (
-        stage_id,
-        entrypoint_path,
-        skill_path,
-        entrypoint_asset_id,
-        skill_asset_id,
-    ) in _LEARNING_STAGE_PAIRS:
-        row = next(line for line in review.splitlines() if entrypoint_path in line)
-
-        assert stage_id in row
-        assert f"`{skill_path}`" in row
-        assert f"`{entrypoint_asset_id}`" in row
-        assert f"`{skill_asset_id}`" in row
-        assert WORKFLOW_ID in row
-        assert "packaged_rewritten" in row
-        assert "boundary-clean" in row
-        assert "tests/test_lad_learning_official_package.py" in row
 
 
 def test_existing_workflow_fingerprints_stay_stable_when_learning_is_added(

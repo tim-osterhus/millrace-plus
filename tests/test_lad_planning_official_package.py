@@ -28,7 +28,6 @@ PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.0.0"
 WORKFLOW_ID = "planning.lad"
-REVIEW_PATH = PROJECT_ROOT / "docs" / "PLUS-0002D-implementation-review.md"
 
 _ENTRYPOINT_HEADINGS = (
     "Role:",
@@ -728,38 +727,6 @@ def test_planning_manager_complete_example_is_task_cards_payload() -> None:
 def test_boundary_lint_refuses_planning_runtime_authority_claims(text: str) -> None:
     with pytest.raises(AssertionError):
         conformance.assert_no_runtime_authority_claims({"bad-planning.md": text})
-
-
-def test_parity_exception_matrix_documents_v021_planning_and_blueprint_pairs() -> None:
-    review = REVIEW_PATH.read_text()
-
-    for (
-        stage_id,
-        entrypoint_path,
-        skill_path,
-        entrypoint_asset_id,
-        skill_asset_id,
-    ) in _PLANNING_STAGE_PAIRS:
-        row = next(line for line in review.splitlines() if entrypoint_path in line)
-
-        assert stage_id in row
-        assert f"`{skill_path}`" in row
-        assert f"`{entrypoint_asset_id}`" in row
-        assert f"`{skill_asset_id}`" in row
-        assert "planning.lad" in row
-        assert "packaged_rewritten" in row
-        assert "boundary-clean" in row
-        assert "tests/test_lad_planning_official_package.py" in row
-
-    for stage_id, entrypoint_path, skill_path in _BLUEPRINT_PAIRS:
-        row = next(line for line in review.splitlines() if entrypoint_path in line)
-
-        assert stage_id in row
-        assert f"`{skill_path}`" in row
-        assert "planning.blueprint" in row
-        assert "deferred_post_cutover" in row
-        assert "CKPT-0001" in row
-        assert "not packaged" in row
 
 
 def test_existing_workflow_fingerprints_stay_stable_when_planning_is_added(

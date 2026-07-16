@@ -19,11 +19,12 @@ PUBLIC_TESTS = (
 )
 PUBLIC_DOCS = (
     "README.md",
+    "docs/workflows.md",
+    "docs/authoring.md",
+    "docs/manifest-authoring-policy.md",
     "docs/release.md",
     "docs/public-validation.md",
-    "docs/PLUS-0003.9-public-release-readiness.md",
 )
-READINESS_DOC = "docs/PLUS-0003.9-public-release-readiness.md"
 INTERNAL_CONFORMANCE_ENV = "MILLRACE_PLUS_RUN_INTERNAL_CONFORMANCE"
 RUNTIME_SOURCE_ENV = "MILLRACE_RUNTIME_SOURCE"
 LEGACY_ASSET_ENV = "MILLRACE_LEGACY_ASSET_ROOT"
@@ -62,20 +63,27 @@ def test_public_validation_selection_has_no_runtime_or_legacy_path_imports() -> 
     assert LEGACY_ASSET_PATH not in public_text
 
 
-def test_current_docs_separate_public_validation_from_internal_evidence() -> None:
+def test_current_docs_preserve_public_package_and_evidence_boundaries() -> None:
+    readme = " ".join(_project_text("README.md").split())
     current_docs = "\n".join(_project_text(path) for path in PUBLIC_DOCS)
 
     for required in (
-        "data-only workflow package, not a runtime",
-        "three advisory agent skills",
-        "not installed into an agent tool's skill root",
-        "direct `pip install millrace-plus` installs package metadata and data only",
-        "future `millrace` meta-package",
-        "PLUS-0002.9 is an internal official package boundary handoff",
-        "not a public release guarantee",
-        "no plugin, marketplace, provider, or native-runner behavior",
-        "Public standalone validation",
-        "Internal conformance evidence",
+        "official collection of ready-to-run Millrace workflows",
+        "`millrace.plus.official`",
+        "staging package version `0.0.0`",
+        "installed resource root is `millrace_workflow_package`",
+        "package data is non-executable",
+        "not yet published",
+        "A direct installation contains package metadata and data only",
+        "does not transitively install `millrace-ai`",
+        "does not copy them into Codex, Claude Code",
+        "no daemon, CLI, runner, provider",
+        "does not import `millrace_plus` modules or execute package code",
+        "See [Validation](docs/public-validation.md)",
+    ):
+        assert required in readme
+
+    for required in (
         INTERNAL_CONFORMANCE_ENV,
         RUNTIME_SOURCE_ENV,
         LEGACY_ASSET_ENV,
@@ -83,62 +91,19 @@ def test_current_docs_separate_public_validation_from_internal_evidence() -> Non
         assert required in current_docs
 
 
-def test_plus_0003_9_handoff_records_required_release_facts() -> None:
-    readiness_path = PROJECT_ROOT / READINESS_DOC
-    assert readiness_path.is_file()
-    readiness = readiness_path.read_text()
-
-    for required in (
-        "pre-release private test artifact; not public-release-ready",
-        "millrace.plus.official",
-        "0.0.0",
-        "millrace_workflow_package",
-        "simple_loop / 0.1",
-        "execution.lad / 0.1",
-        "execution.lad_integrator / 0.1",
-        "planning.lad / 0.1",
-        "lad.full / 0.1",
-        "vendor_selection / 0.1",
-        "does not install `millrace-ai`",
-        "plan format 13",
-        "selected_operator_wait",
-        "learning.close_librarian_noop",
-        "planning.close_manager_complete",
-        "terminal_marker",
-        "selected_close_action_id",
-        "PolicyDecision",
-        "operator_required",
-        "tests/e2e/",
-        "tests/support/e2e_actual_model.py",
-        "docs/e2e-live-smoke.md",
-        "millrace-rewrite",
-        "no sibling runtime checkout",
-        "plugin",
-        "marketplace",
-        "provider",
-        "native runner",
-        "Millrace OS",
-        "millrace-web",
-        "Millforge",
-        "ef9e6bbfa0a42a415eac2441a0b45b1f8e2f5360",
-        "6c66fabbbbdc0a1839fe556695e449e0da119b12",
-    ):
-        assert required in readiness
-
-
 def test_dependency_policy_is_dependency_free_and_documented() -> None:
     pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
-    readme = _project_text("README.md")
+    readme = " ".join(_project_text("README.md").split())
     release_notes = _project_text("docs/release.md")
 
     assert pyproject["project"].get("dependencies", []) == []
     assert "dependencies = []" in _project_text("pyproject.toml")
     assert (
-        "direct `pip install millrace-plus` installs package metadata and data only"
+        "A direct installation contains package metadata and data only"
         in readme
     )
-    assert "`millrace-ai` is not installed as a transitive dependency" in readme
-    assert "dependency-free for direct installation" in release_notes
+    assert "does not transitively install `millrace-ai`" in readme
+    assert "| Runtime dependency | None |" in release_notes
 
 
 def test_internal_conformance_tests_are_explicitly_gated() -> None:

@@ -328,11 +328,10 @@ def test_manifest_authoring_policy_declares_frozen_source_of_truth() -> None:
     public_validation = (PROJECT_ROOT / "docs" / "public-validation.md").read_text()
 
     for required in (
-        "Selected policy: frozen manifest",
         "`millrace_workflow_package/manifest.json` is the committed source of truth",
-        "not generated from a DSL",
-        "donor source comparisons are internal evidence only",
-        "Public validation enforces this policy",
+        "canonical JSON rather than generated output",
+        "Standalone validation does not need donor workflow functions",
+        "`tests/test_manifest_authoring_policy.py` recomputes",
         "manifest digest",
         "package digest",
         "selected workflow fingerprints",

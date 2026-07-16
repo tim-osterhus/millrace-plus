@@ -10,13 +10,12 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = PROJECT_ROOT / "src" / "millrace_plus" / "skills"
-IMPLEMENTATION_REVIEW_DOCS = (
-    "docs/PLUS-0002C-implementation-review.md",
-    "docs/PLUS-0002D-implementation-review.md",
-    "docs/PLUS-0002E-implementation-review.md",
-    "docs/PLUS-0002F-implementation-review.md",
-    "docs/PLUS-0002.9-implementation-review.md",
-    "docs/PLUS-0003.9-public-release-readiness.md",
+PACKAGE_DOCS = (
+    "docs/authoring.md",
+    "docs/manifest-authoring-policy.md",
+    "docs/public-validation.md",
+    "docs/release.md",
+    "docs/workflows.md",
 )
 
 
@@ -70,7 +69,7 @@ def test_pyproject_declares_narrow_distribution_metadata() -> None:
     assert "entry-points" not in pyproject.get("project", {})
 
 
-def test_sdist_includes_package_local_review_docs(tmp_path: Path) -> None:
+def test_sdist_includes_package_docs_and_skills(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env.pop("PYTHONPATH", None)
@@ -103,7 +102,7 @@ def test_sdist_includes_package_local_review_docs(tmp_path: Path) -> None:
                 assert member is not None
                 skill_payloads[relative_path] = member.read()
 
-    for doc_path in IMPLEMENTATION_REVIEW_DOCS:
+    for doc_path in PACKAGE_DOCS:
         assert any(name.endswith(f"/{doc_path}") for name in names)
     for skill_path in SKILL_ROOT.rglob("*"):
         if skill_path.is_file() and not skill_path.is_symlink():

@@ -26,7 +26,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.0.0"
-REVIEW_PATH = PROJECT_ROOT / "docs" / "PLUS-0002C-implementation-review.md"
 
 _ENTRYPOINT_HEADINGS = (
     "Role:",
@@ -455,33 +454,3 @@ def test_boundary_lint_refuses_prompt_or_skill_runtime_authority_claims(
 ) -> None:
     with pytest.raises(AssertionError):
         conformance.assert_no_runtime_authority_claims({"bad-asset.md": text})
-
-
-def test_parity_exception_matrix_documents_each_v021_execution_pair() -> None:
-    review = REVIEW_PATH.read_text()
-    matrix_rows = [
-        line
-        for line in review.splitlines()
-        if "`dev/source/millrace/src/millrace_ai/assets/entrypoints/execution/"
-        in line
-    ]
-
-    assert len(matrix_rows) == len(_LEGACY_STAGE_PAIRS)
-    for (
-        stage_id,
-        entrypoint_path,
-        skill_path,
-        entrypoint_asset_id,
-        skill_asset_id,
-        owning_selector,
-    ) in _LEGACY_STAGE_PAIRS:
-        row = next(line for line in matrix_rows if entrypoint_path in line)
-
-        assert stage_id in row
-        assert f"`{skill_path}`" in row
-        assert f"`{entrypoint_asset_id}`" in row
-        assert f"`{skill_asset_id}`" in row
-        assert owning_selector in row
-        assert "packaged_rewritten" in row
-        assert "boundary-clean" in row
-        assert "tests/test_lad_execution_official_package.py" in row
