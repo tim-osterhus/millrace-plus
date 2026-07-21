@@ -4,9 +4,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
+
+import pytest
 
 from support.internal_conformance_gate import require_internal_conformance
 
@@ -70,6 +73,172 @@ VENDOR_SELECTION_STAGE_IDS = (
     "decision_packager",
 )
 
+OFFICIAL_WORKFLOW_IDS = (
+    "simple_loop",
+    "execution.lad",
+    "execution.lad_integrator",
+    "planning.lad",
+    "lad.full",
+    "vendor_selection",
+)
+MILLFORGE_COMPONENT_CAPABILITY_IDS = (
+    "terminal.intent",
+    "unrestricted.filesystem.read",
+    "unrestricted.filesystem.write",
+    "unrestricted.process.execute",
+)
+MILLFORGE_BINDING_CAPABILITY_IDS = (
+    "capability.runner.invoke",
+    *MILLFORGE_COMPONENT_CAPABILITY_IDS,
+)
+MILLFORGE_PROFILE_DIGESTS = {
+    (
+        "BLOCKED",
+        "INCIDENT_TRIAGED",
+        "INVALID_PROMPT",
+        "NEEDS_OPERATOR_DETAIL",
+        "PACKET_READY",
+    ): "5889f14114b6be9e67cdeb98693e5ed5efc34c8e0805de8ccf8191b595db371f",
+    (
+        "BLOCKED",
+        "FAILED",
+        "INSUFFICIENT_SPEC",
+        "WORK_DONE",
+    ): "36a2077b95de775a2eb878ef534f4dbc9d91157428c16c7828c5fa5910e16bc9",
+    (
+        "ACCEPTED",
+        "BLOCKED",
+        "GAPS_FOUND",
+        "INCIDENT_REQUIRED",
+    ): "ac23d3c46a61e85947547c04af7af9d7b1b45146501da2d875765f6190abcd31",
+    (
+        "OPERATOR_NEEDED",
+        "RESOLVED",
+        "UNRESOLVED",
+    ): "ed7abfe3d8b83e48b39c2fd6f08d722ac0aaf6bf3044cfa8c4a11265936e9c58",
+    (
+        "BLOCKED",
+        "BUILDER_COMPLETE",
+        "RUNTIME_FAILURE",
+        "RUNTIME_FAILURE_ESCALATE",
+    ): "dc0808ee8110c5ab575540188a6b146d0c24788bb5ef44d4fe6f5d5e2ae2acf2",
+    (
+        "BLOCKED",
+        "CHECKER_PASS",
+        "FIX_NEEDED",
+        "RUNTIME_FAILURE",
+        "RUNTIME_FAILURE_ESCALATE",
+    ): "6ceb7acae9badac078b5db27c2a2368e9d1b06ea5b43016768899de3e84ec075",
+    (
+        "BLOCKED",
+        "FIXER_COMPLETE",
+        "RUNTIME_FAILURE",
+        "RUNTIME_FAILURE_ESCALATE",
+    ): "1b1b35f6bb5260827d6d2067c2229d0d8044e94da3b59125a9b47b65464d6a1e",
+    (
+        "BLOCKED",
+        "DOUBLECHECK_PASS",
+        "FIX_NEEDED",
+        "RUNTIME_FAILURE",
+        "RUNTIME_FAILURE_ESCALATE",
+    ): "50fb6cb278189bdd240371dd0fc4fd9c367859ac91bb0d063f8b91ac175f99b2",
+    (
+        "BLOCKED",
+        "RUNTIME_FAILURE",
+        "RUNTIME_FAILURE_ESCALATE",
+        "UPDATE_COMPLETE",
+    ): "7524f70b0c7f763011e3758153ed673f6446917053267e59a4d92305f0e8fe1d",
+    (
+        "BLOCKED",
+        "RUNTIME_FAILURE",
+        "RUNTIME_FAILURE_ESCALATE",
+        "TROUBLESHOOT_COMPLETE",
+        "TROUBLESHOOT_QUARANTINE",
+        "TROUBLESHOOT_RECOVERED",
+    ): "f76d38b89cf9fe21c93f53f3c37c1afe7fad13c070598975276495544f9f58d2",
+    (
+        "BLOCKED",
+        "CONSULT_COMPLETE",
+        "CONSULT_QUARANTINE",
+        "CONSULT_RECOVERED",
+        "NEEDS_PLANNING",
+    ): "f348bf2f4190300419843ab8ecb6956fca0c41dd3e23ba13365a423bdaee999c",
+    (
+        "BLOCKED",
+        "INTEGRATION_COMPLETE",
+        "RUNTIME_FAILURE",
+        "RUNTIME_FAILURE_ESCALATE",
+    ): "ca7423327da225c82b719ef7e186395fd9634cd85835cb7cc5a6e8027cfb7c14",
+    (
+        "BLOCKED",
+        "RECON_BLOCKED",
+        "RECON_NOOP",
+        "RECON_TO_EXECUTION",
+        "RECON_TO_PLANNING",
+    ): "c4ac9e391a423496403d526a5f92beca22adef360dc485ca269b115e9d8656b5",
+    ("BLOCKED", "PLANNER_COMPLETE"): (
+        "e901b1c3956c4a69832dc4d4c15acdaa03680883d38a6fd0e7232349b81c6dab"
+    ),
+    ("BLOCKED", "MANAGER_COMPLETE"): (
+        "9d70c821b31dbff9b6c0f4881c76db0faa8c9792d3c7599bd3f0f16018171ca2"
+    ),
+    (
+        "BLOCKED",
+        "MECHANIC_COMPLETE",
+        "MECHANIC_QUARANTINE",
+        "MECHANIC_RECOVERED",
+    ): "c6fa272c65da35e58446f29b03ccd4fa6053b9375f00502b2915bc5514ff88f3",
+    ("AUDITOR_COMPLETE", "BLOCKED"): (
+        "b37afbb2fe70fe1eb3be931558faa377637e8b1ff97bae9e8b90f68ec3b422ff"
+    ),
+    ("ARBITER_COMPLETE", "BLOCKED", "REMEDIATION_NEEDED"): (
+        "71344b42c694647389bad99c0cf98b285ff9afdc6d1b26c0a32aa2dab6c868a6"
+    ),
+    ("ANALYST_COMPLETE", "ANALYST_NOOP", "BLOCKED"): (
+        "b2ecbd24e4e7c724ae3e4495ca7869f6f232c1f7a74ca40f6ccbbdb157523aaf"
+    ),
+    ("BLOCKED", "PROFESSOR_COMPLETE", "PROFESSOR_NOOP"): (
+        "76d776ed68ad374d7fa7b51ca046db056bd242c41c1df069da734cad334987af"
+    ),
+    ("BLOCKED", "CURATOR_COMPLETE", "CURATOR_NOOP"): (
+        "7387d205959a48427a34421445505ff421214497d27bdb79ab1e948f11c955cb"
+    ),
+    ("BLOCKED", "LIBRARIAN_COMPLETE", "LIBRARIAN_NOOP"): (
+        "2c5adb659af64366b37944f676d3774980150c52b04fb5e7f3daca14e241219f"
+    ),
+    ("REQUEST_NEEDS_CLARIFICATION", "REQUEST_READY"): (
+        "e91e10c7f10e7bd93e2c14ff67aa82695f01e4dc32d6a0929c7226411e0a9d2e"
+    ),
+    ("POLICY_ALLOWED", "POLICY_BLOCKED"): (
+        "6da1a469fb4e52dd59239cf6ed605b1930a607a9ea57ac0d65b89eec5288b501"
+    ),
+    ("REQUIREMENTS_READY",): (
+        "f48fcba31a2c26132bb60a8e684a78023400779a2dc7aae433de2ff069c255f4"
+    ),
+    ("CANDIDATES_READY", "NO_VIABLE_VENDOR"): (
+        "d11ae29482a0d9d2251f6036289ecdb6c13a1530f5743328b69858fcb6af07b9"
+    ),
+    ("CANDIDATES_READY",): (
+        "887f818c17238237fa96f543874396a06413ce657d12ccae23f7a7029ca1e5c7"
+    ),
+    ("RUBRIC_COMPLETE",): (
+        "01b52dbc24839f308082a214be3db10f53f2714e49516d26c62d84f156ee7565"
+    ),
+    ("CONFLICT_COMPLETE",): (
+        "49504366992e1855782b787a5657509151dce7a96f08dfeb43c5fb1926600f0f"
+    ),
+    (
+        "AWARD_READY",
+        "BLOCKED",
+        "NO_VIABLE_VENDOR",
+        "OPERATOR_REQUIRED",
+        "RESOURCE_REQUIRED",
+    ): "4b7924cf407b97deade920a7a23542d480f6f286f72d0b613f84c09e91596c30",
+    ("DECISION_PACK_READY",): (
+        "4cc4a8fdc6bef4fca9a6fd07f4c4da43f910d1ae9cd4ecc4e309c9d1fe671d88"
+    ),
+}
+
 
 @dataclass(frozen=True)
 class WorkflowExpectation:
@@ -99,6 +268,135 @@ def _workflows_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
         str(workflow["workflow_id"]): workflow
         for workflow in cast(list[dict[str, object]], manifest["workflows"])
     }
+
+
+def _selected_authority(workflow: dict[str, object]) -> dict[str, object]:
+    return cast(dict[str, object], workflow["selected_authority"])
+
+
+def _official_terminal_rows(manifest: dict[str, Any]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for workflow_id, workflow in _workflows_by_id(manifest).items():
+        authority = _selected_authority(workflow)
+        stages = cast(list[dict[str, object]], authority["stage_kinds"])
+        outcomes = cast(list[dict[str, object]], authority["terminal_outcomes"])
+        actions = cast(list[dict[str, object]], authority["terminal_actions"])
+        for stage in stages:
+            stage_id = str(stage["id"])
+            declared_outcome_ids = {
+                str(outcome_id)
+                for outcome_id in cast(list[object], stage["declared_outcome_ids"])
+            }
+            for outcome in outcomes:
+                if outcome["stage_kind_id"] != stage_id:
+                    continue
+                outcome_id = str(outcome["id"])
+                matching_actions = [
+                    action
+                    for action in actions
+                    if action["stage_kind_id"] == stage_id
+                    and action["outcome_id"] == outcome_id
+                ]
+                assert len(matching_actions) == 1
+                action = matching_actions[0]
+                marker = str(outcome.get("marker", ""))
+                declared = outcome_id in declared_outcome_ids
+                rows.append(
+                    {
+                        "workflow_id": workflow_id,
+                        "stage_id": stage_id,
+                        "outcome_id": outcome_id,
+                        "declared": declared,
+                        "marker": marker,
+                        "action_id": str(action["id"]),
+                        "action_kind": str(action["kind"]),
+                        "artifact_schema_id": action.get("artifact_schema_id"),
+                        "classification": (
+                            "runner_selectable"
+                            if declared and marker.strip()
+                            else "runtime_owned_non_runner"
+                        ),
+                    }
+                )
+    return rows
+
+
+def _rows_by_stage(
+    manifest: dict[str, Any],
+) -> dict[tuple[str, str], list[dict[str, object]]]:
+    rows_by_stage: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in _official_terminal_rows(manifest):
+        key = (str(row["workflow_id"]), str(row["stage_id"]))
+        rows_by_stage.setdefault(key, []).append(row)
+    return rows_by_stage
+
+
+def _bindings_by_id(authority: dict[str, object]) -> dict[str, dict[str, object]]:
+    return {
+        str(binding["id"]): binding
+        for binding in cast(list[dict[str, object]], authority["runner_bindings"])
+    }
+
+
+def _walk_dicts(value: object) -> Iterator[dict[str, object]]:
+    if isinstance(value, dict):
+        record = cast(dict[str, object], value)
+        yield record
+        for child in record.values():
+            yield from _walk_dicts(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_dicts(child)
+
+
+def _constraint_sites(
+    value: object,
+    path: tuple[str, ...] = (),
+) -> dict[tuple[str, ...], object]:
+    sites: dict[tuple[str, ...], object] = {}
+    if isinstance(value, dict):
+        record = cast(dict[str, object], value)
+        for key, child in record.items():
+            child_path = (*path, key)
+            if key == "const":
+                sites[child_path] = child
+            elif key == "enum":
+                sites[child_path] = tuple(
+                    sorted(
+                        cast(list[object], child),
+                        key=lambda item: json.dumps(
+                            item,
+                            ensure_ascii=False,
+                            allow_nan=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8"),
+                    )
+                )
+            sites.update(_constraint_sites(child, child_path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            sites.update(_constraint_sites(child, (*path, str(index))))
+    return sites
+
+
+def _expected_runner_display_name(workflow_id: str, stage_id: str) -> str:
+    if workflow_id == "simple_loop":
+        return "Default agent runner"
+    if workflow_id == "vendor_selection":
+        return "Deterministic vendor runner"
+    if stage_id in {
+        "recon",
+        "lad_planner",
+        "lad_manager",
+        "lad_mechanic",
+        "lad_auditor",
+        "lad_arbiter",
+    }:
+        return "Local LAD Planning runner"
+    if stage_id in {"analyst", "professor", "curator", "librarian"}:
+        return "Learning runner"
+    return "Local LAD runner"
 
 
 def _assets_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
@@ -215,7 +513,7 @@ def _invalid_selected_runner_bindings(
         for index, binding in enumerate(
             cast(list[dict[str, object]], selected_authority["runner_bindings"]),
         )
-        if binding.get("adapter_kind") != "codex"
+        if binding.get("adapter_kind") not in {"codex", "millforge"}
     )
 
 
@@ -278,10 +576,11 @@ def _assert_runner_defaulting_warnings(
 
 def _assert_selected_runner_authority(plan: object) -> None:
     assert plan is not None
-    assert {runner.adapter_kind for runner in plan.runner_bindings} == {"codex"}
+    assert {runner.adapter_kind for runner in plan.runner_bindings} == {"millforge"}
     authority_text = canonical_authority_bytes(plan).decode("utf-8")
     assert '"adapter_kind":"fake_local"' not in authority_text
-    assert '"adapter_kind":"codex"' in authority_text
+    assert '"adapter_kind":"codex"' not in authority_text
+    assert '"adapter_kind":"millforge"' in authority_text
 
 
 def _store(tmp_path: Path) -> tuple[SQLiteRuntimeStore, ContentAddressedByteStore]:
@@ -328,7 +627,6 @@ def _enable_select_verify_all_workflows(
     selected_by_workflow: dict[str, object] = {}
     package_root = cast(Path, mutation_kwargs.get("package_root", PACKAGE_ROOT))
     manifest = _load_manifest(package_root)
-    package_source_kind = _package_source_kind(import_operation_id)
 
     for expectation in _workflow_expectations():
         safe_id = expectation.workflow_id.replace(".", "-")
@@ -361,23 +659,23 @@ def _enable_select_verify_all_workflows(
         assert verified.plan_ready
         assert selected.outcome == "succeeded"
         assert selected.plan is not None
-        _assert_runner_defaulting_warnings(
-            verified,
-            manifest=manifest,
-            expectation=expectation,
-            package_source_kind=package_source_kind,
-        )
-        _assert_runner_defaulting_warnings(
-            selected,
-            manifest=manifest,
-            expectation=expectation,
-            package_source_kind=package_source_kind,
-        )
+        assert not [
+            diagnostic
+            for diagnostic in verified.diagnostics
+            if diagnostic.code == RUNNER_ADAPTER_KIND_DEFAULTED
+        ]
+        assert not [
+            diagnostic
+            for diagnostic in selected.diagnostics
+            if diagnostic.code == RUNNER_ADAPTER_KIND_DEFAULTED
+        ]
         warning_count = len(
             _invalid_selected_runner_bindings(manifest, expectation.workflow_id),
         )
         diagnostics_summary = (
-            f"diagnostics:{warning_count} errors:0 warnings:{warning_count}"
+            "diagnostics:0"
+            if warning_count == 0
+            else f"diagnostics:{warning_count} errors:0 warnings:{warning_count}"
         )
         assert selected.command_audit.diagnostics_summary == (diagnostics_summary)
         assert verified.command_audit.diagnostics_summary == (diagnostics_summary)
@@ -445,6 +743,212 @@ def _copy_package_with_mutated_vendor_catalog(tmp_path: Path) -> Path:
     (mutated_root / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n",
     )
+    return mutated_root
+
+
+def _write_manifest(package_root: Path, manifest: dict[str, Any]) -> None:
+    manifest["manifest_digest"] = manifest_digest_for_manifest(manifest)
+    (package_root / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n",
+    )
+
+
+def _copy_package_with_test_local_codex_binding(tmp_path: Path) -> Path:
+    fixture_root = tmp_path / "codex-defaulting-fixture"
+    shutil.copytree(PACKAGE_ROOT, fixture_root)
+    manifest = _load_manifest(fixture_root)
+    workflow = _workflows_by_id(manifest)["simple_loop"]
+    authority = _selected_authority(workflow)
+    stage_ids = [
+        str(stage["id"])
+        for stage in cast(list[dict[str, object]], authority["stage_kinds"])
+    ]
+    fixture_binding_id = "test.fixture.fake_local_runner"
+    authority["runner_bindings"] = [
+        {
+            "id": fixture_binding_id,
+            "adapter_kind": "fake_local",
+            "stage_kind_ids": stage_ids,
+            "required_capability_ids": ["capability.runner.invoke"],
+            "presentation": {"display_name": "Test-local defaulting runner"},
+        }
+    ]
+    authority["capabilities"] = [
+        {
+            "id": "capability.runner.invoke",
+            "kind": "runner.invoke",
+            "support_status": "supported",
+            "grant_status": "granted",
+            "approval_policy_id": None,
+        }
+    ]
+    for record in _walk_dicts(authority):
+        if "runner_binding_id" in record:
+            record["runner_binding_id"] = fixture_binding_id
+        if "target_runner_binding_id" in record:
+            record["target_runner_binding_id"] = fixture_binding_id
+    _write_manifest(fixture_root, manifest)
+    return fixture_root
+
+
+def _copy_package_with_runner_authority_mutation(
+    tmp_path: Path,
+    mutation_kind: str,
+) -> Path:
+    mutated_root = tmp_path / mutation_kind
+    shutil.copytree(PACKAGE_ROOT, mutated_root)
+    manifest = _load_manifest(mutated_root)
+    workflows = _workflows_by_id(manifest)
+    workflow = workflows["simple_loop"]
+    authority = _selected_authority(workflow)
+    bindings = cast(list[dict[str, object]], authority["runner_bindings"])
+    assert len(bindings) == 4, "PLUS-0005 per-stage bindings are missing"
+    binding = bindings[0]
+    pin = cast(dict[str, object], binding.get("component_pin"))
+    mappings = cast(
+        list[dict[str, object]],
+        binding.get("terminal_result_mappings"),
+    )
+    assert pin and mappings, "PLUS-0005 component authority is missing"
+
+    if mutation_kind == "pin_fields":
+        pin["descriptor_sha256"] = "not-a-descriptor-digest"
+    elif mutation_kind == "capabilities":
+        binding["required_capability_ids"] = ["capability.runner.invoke"]
+    elif mutation_kind == "result_ids":
+        mappings[0]["runner_result_id"] = "UNKNOWN_PROVIDER_RESULT"
+    elif mutation_kind == "target_outcomes":
+        foreign_binding = bindings[1]
+        foreign_mapping = cast(
+            list[dict[str, object]],
+            foreign_binding["terminal_result_mappings"],
+        )[0]
+        mappings[0]["outcome_id"] = foreign_mapping["outcome_id"]
+    elif mutation_kind == "stage_ids":
+        foreign_stage_ids = cast(list[object], bindings[1]["stage_kind_ids"])
+        mappings[0]["stage_kind_id"] = foreign_stage_ids[0]
+    elif mutation_kind == "blank_marker_mappings":
+        planning = _selected_authority(workflows["planning.lad"])
+        planning_stages = cast(list[dict[str, object]], planning["stage_kinds"])
+        declared_by_stage = {
+            str(stage["id"]): {
+                str(outcome_id)
+                for outcome_id in cast(list[object], stage["declared_outcome_ids"])
+            }
+            for stage in planning_stages
+        }
+        blank_outcome = next(
+            outcome
+            for outcome in cast(
+                list[dict[str, object]], planning["terminal_outcomes"]
+            )
+            if not str(outcome.get("marker", "")).strip()
+            and str(outcome["id"])
+            not in declared_by_stage[str(outcome["stage_kind_id"])]
+        )
+        stage_id = str(blank_outcome["stage_kind_id"])
+        planning_binding = next(
+            item
+            for item in cast(
+                list[dict[str, object]], planning["runner_bindings"]
+            )
+            if item["stage_kind_ids"] == [stage_id]
+        )
+        planning_mappings = cast(
+            list[dict[str, object]],
+            planning_binding["terminal_result_mappings"],
+        )
+        planning_mappings[0]["outcome_id"] = blank_outcome["id"]
+    elif mutation_kind == "binding_references":
+        stages = cast(list[dict[str, object]], authority["stage_kinds"])
+        stages[0]["runner_binding_id"] = bindings[1]["id"]
+    else:
+        raise AssertionError(f"unknown mutation kind: {mutation_kind}")
+
+    _write_manifest(mutated_root, manifest)
+    return mutated_root
+
+
+def _assert_package_selection_refuses(
+    tmp_path: Path,
+    package_root: Path,
+    workflow_id: str,
+) -> None:
+    store, cas_store = _store(tmp_path)
+    imported = execute_package_mutation_command(
+        store,
+        cas_store,
+        PackageMutationCommand(
+            command_id="mutated-import",
+            operation_id="package.import_path",
+            actor_id="operator:test",
+            package_root=package_root,
+        ),
+    )
+    if imported.outcome != "succeeded":
+        assert imported.outcome == "refused"
+        assert any(
+            diagnostic.severity == "error"
+            for diagnostic in imported.diagnostics
+        )
+        return
+
+    enabled = execute_package_mutation_command(
+        store,
+        cas_store,
+        PackageMutationCommand(
+            command_id="mutated-enable",
+            operation_id="package.enable",
+            actor_id="operator:test",
+            package_id=PACKAGE_ID,
+            package_version=PACKAGE_VERSION,
+        ),
+    )
+    assert enabled.outcome == "succeeded"
+    selected = execute_package_workflow_selection_command(
+        store,
+        cas_store,
+        PackageWorkflowSelectionCommand(
+            command_id="mutated-select",
+            actor_id="operator:test",
+            package_id=PACKAGE_ID,
+            package_version=PACKAGE_VERSION,
+            workflow_id=workflow_id,
+            workflow_version="0.1",
+        ),
+    )
+    assert selected.outcome == "failed"
+    assert selected.plan is None
+    assert any(diagnostic.severity == "error" for diagnostic in selected.diagnostics)
+
+
+def _copy_package_with_reordered_runner_authority(tmp_path: Path) -> Path:
+    reordered_root = tmp_path / "reordered-runner-authority"
+    shutil.copytree(PACKAGE_ROOT, reordered_root)
+    manifest = _load_manifest(reordered_root)
+    for workflow in _workflows_by_id(manifest).values():
+        authority = _selected_authority(workflow)
+        cast(list[object], authority["runner_bindings"]).reverse()
+        assert "capabilities" in authority, "PLUS-0005 capabilities are missing"
+        cast(list[object], authority["capabilities"]).reverse()
+        for binding in cast(list[dict[str, object]], authority["runner_bindings"]):
+            assert "terminal_result_mappings" in binding, (
+                "PLUS-0005 terminal mappings are missing"
+            )
+            cast(list[object], binding["terminal_result_mappings"]).reverse()
+    _write_manifest(reordered_root, manifest)
+    return reordered_root
+
+
+def _copy_package_with_semantic_runner_mutation(tmp_path: Path) -> Path:
+    mutated_root = tmp_path / "semantic-runner-mutation"
+    shutil.copytree(PACKAGE_ROOT, mutated_root)
+    manifest = _load_manifest(mutated_root)
+    authority = _selected_authority(_workflows_by_id(manifest)["simple_loop"])
+    binding = cast(list[dict[str, object]], authority["runner_bindings"])[0]
+    pin = cast(dict[str, object], binding["component_pin"])
+    pin["descriptor_sha256"] = "f" * 64
+    _write_manifest(mutated_root, manifest)
     return mutated_root
 
 
@@ -611,6 +1115,631 @@ def _source_file_paths(pattern: str) -> set[str]:
         f"{LEGACY_ASSET_LABEL}/{path.relative_to(LEGACY_ASSET_ROOT).as_posix()}"
         for path in LEGACY_ASSET_ROOT.glob(pattern)
     }
+
+
+def test_official_millforge_compatibility_matrix_is_total() -> None:
+    manifest = _load_manifest()
+    rows = _official_terminal_rows(manifest)
+    rows_by_stage = _rows_by_stage(manifest)
+    runner_rows = [
+        row for row in rows if row["classification"] == "runner_selectable"
+    ]
+    runtime_rows = [
+        row
+        for row in rows
+        if row["classification"] == "runtime_owned_non_runner"
+    ]
+    multi_schema_stage_keys = {
+        key
+        for key, stage_rows in rows_by_stage.items()
+        if len(
+            {
+                row["artifact_schema_id"]
+                for row in stage_rows
+                if row["classification"] == "runner_selectable"
+                and row["artifact_schema_id"] is not None
+            }
+        )
+        > 1
+    }
+    profiles = {
+        tuple(
+            sorted(
+                (
+                    str(row["marker"])
+                    for row in stage_rows
+                    if row["classification"] == "runner_selectable"
+                ),
+                key=lambda value: value.encode("utf-8"),
+            )
+        )
+        for stage_rows in rows_by_stage.values()
+    }
+
+    assert tuple(_workflows_by_id(manifest)) == OFFICIAL_WORKFLOW_IDS
+    assert len(rows_by_stage) == 58
+    assert len(rows) == 257
+    assert len(runner_rows) == 216
+    assert len(runtime_rows) == 41
+    assert len([row for row in runtime_rows if not row["declared"]]) == 33
+    assert len([row for row in runtime_rows if row["declared"]]) == 8
+    assert len([row for row in runner_rows if row["artifact_schema_id"]]) == 177
+    assert len([row for row in runner_rows if not row["artifact_schema_id"]]) == 39
+    assert len(multi_schema_stage_keys) == 31
+    assert (
+        len(
+            [
+                row
+                for row in runner_rows
+                if (str(row["workflow_id"]), str(row["stage_id"]))
+                in multi_schema_stage_keys
+            ]
+        )
+        == 128
+    )
+    assert profiles == set(MILLFORGE_PROFILE_DIGESTS)
+    assert len(profiles) == 31
+
+
+def test_official_workflows_select_exact_millforge_stage_bindings() -> None:
+    manifest = _load_manifest()
+    rows_by_stage = _rows_by_stage(manifest)
+    selected_stage_bindings = 0
+    selected_profile_digests: set[str] = set()
+
+    for workflow_id, workflow in _workflows_by_id(manifest).items():
+        authority = _selected_authority(workflow)
+        stages = cast(list[dict[str, object]], authority["stage_kinds"])
+        bindings = cast(list[dict[str, object]], authority["runner_bindings"])
+        bindings_by_id = _bindings_by_id(authority)
+        assert len(bindings) == len(stages)
+        selected_stage_bindings += len(bindings)
+
+        for stage in stages:
+            stage_id = str(stage["id"])
+            binding_id = f"{stage_id}.millforge_runner"
+            assert stage["runner_binding_id"] == binding_id
+            binding = bindings_by_id[binding_id]
+            runner_markers = tuple(
+                sorted(
+                    (
+                        str(row["marker"])
+                        for row in rows_by_stage[(workflow_id, stage_id)]
+                        if row["classification"] == "runner_selectable"
+                    ),
+                    key=lambda value: value.encode("utf-8"),
+                )
+            )
+            expected_digest = MILLFORGE_PROFILE_DIGESTS[runner_markers]
+            expected_pin = {
+                "component_kind": "runner",
+                "component_id": "millforge-base",
+                "component_version": "2",
+                "provider_distribution": "millforge",
+                "provider_version": "0.1.0",
+                "descriptor_media_type": "application/json",
+                "descriptor_sha256": expected_digest,
+                "required_capability_ids": list(
+                    MILLFORGE_COMPONENT_CAPABILITY_IDS
+                ),
+                "legal_terminal_result_ids": list(runner_markers),
+            }
+            assert binding["id"] == binding_id
+            assert binding["adapter_kind"] == "millforge"
+            assert binding["stage_kind_ids"] == [stage_id]
+            assert "invocation_timeout_seconds" not in binding
+            assert binding["presentation"] == {
+                "display_name": _expected_runner_display_name(
+                    workflow_id,
+                    stage_id,
+                )
+            }
+            assert binding["component_pin"] == expected_pin
+            selected_profile_digests.add(expected_digest)
+
+    assert selected_stage_bindings == 58
+    assert selected_profile_digests == set(MILLFORGE_PROFILE_DIGESTS.values())
+    assert len(selected_profile_digests) == 31
+
+
+def test_official_millforge_terminal_mappings_are_total_and_stage_scoped() -> None:
+    manifest = _load_manifest()
+    rows_by_stage = _rows_by_stage(manifest)
+    mapping_count = 0
+
+    for workflow_id, workflow in _workflows_by_id(manifest).items():
+        authority = _selected_authority(workflow)
+        bindings_by_id = _bindings_by_id(authority)
+        binding_id_by_stage = {
+            str(stage["id"]): str(stage["runner_binding_id"])
+            for stage in cast(list[dict[str, object]], authority["stage_kinds"])
+        }
+        for stage_id, binding_id in binding_id_by_stage.items():
+            binding = bindings_by_id[binding_id]
+            expected_mappings = [
+                {
+                    "stage_kind_id": stage_id,
+                    "runner_result_id": str(row["marker"]),
+                    "outcome_id": str(row["outcome_id"]),
+                }
+                for row in sorted(
+                    rows_by_stage[(workflow_id, stage_id)],
+                    key=lambda row: str(row["marker"]).encode("utf-8"),
+                )
+                if row["classification"] == "runner_selectable"
+            ]
+            assert "terminal_result_mappings" in binding, (
+                "PLUS-0005 terminal mappings are missing"
+            )
+            assert binding["terminal_result_mappings"] == expected_mappings
+            assert len(
+                {
+                    mapping["runner_result_id"]
+                    for mapping in expected_mappings
+                }
+            ) == len(expected_mappings)
+            assert len(
+                {mapping["outcome_id"] for mapping in expected_mappings}
+            ) == len(expected_mappings)
+            mapping_count += len(expected_mappings)
+
+        for record in _walk_dicts(authority):
+            if "runner_binding_id" in record:
+                target_stage_id = record.get("target_stage_kind_id")
+                if target_stage_id is None:
+                    target_stage_id = record.get("stage_kind_id", record.get("id"))
+                assert record["runner_binding_id"] == binding_id_by_stage[
+                    str(target_stage_id)
+                ]
+            if "target_runner_binding_id" in record:
+                target_stage_id = str(record["target_stage_kind_id"])
+                assert record["target_runner_binding_id"] == binding_id_by_stage[
+                    target_stage_id
+                ]
+
+    assert mapping_count == 216
+
+
+def test_official_millforge_result_schemas_are_outcome_scoped() -> None:
+    from millrace.adapters.millforge import _project_schema
+
+    manifest = _load_manifest()
+    rows_by_stage = _rows_by_stage(manifest)
+    associations: dict[tuple[str, str, str], str | None] = {}
+    schema_bearing_count = 0
+    schema_less_count = 0
+
+    for workflow_id, workflow in _workflows_by_id(manifest).items():
+        authority = _selected_authority(workflow)
+        schemas_by_id = {
+            str(schema["id"]): cast(dict[str, object], schema["schema"])
+            for schema in cast(
+                list[dict[str, object]], authority["artifact_schemas"]
+            )
+        }
+        for binding in cast(
+            list[dict[str, object]], authority["runner_bindings"]
+        ):
+            assert "terminal_result_mappings" in binding, (
+                "PLUS-0005 terminal mappings are missing"
+            )
+            stage_id = str(cast(list[object], binding["stage_kind_ids"])[0])
+            rows_by_outcome = {
+                str(row["outcome_id"]): row
+                for row in rows_by_stage[(workflow_id, stage_id)]
+            }
+            for mapping in cast(
+                list[dict[str, object]], binding["terminal_result_mappings"]
+            ):
+                result_id = str(mapping["runner_result_id"])
+                row = rows_by_outcome[str(mapping["outcome_id"])]
+                schema_id = cast(str | None, row["artifact_schema_id"])
+                key = (workflow_id, stage_id, result_id)
+                assert key not in associations
+                associations[key] = schema_id
+                if schema_id is None:
+                    schema_less_count += 1
+                    continue
+                schema_bearing_count += 1
+                original = schemas_by_id[schema_id]
+                projected = _project_schema(original)
+                assert _constraint_sites(projected) == _constraint_sites(original)
+
+    assert len(associations) == 216
+    assert schema_bearing_count == 177
+    assert schema_less_count == 39
+
+
+def test_official_millforge_provider_requirements_match_compiled_result_mappings(
+    tmp_path: Path,
+) -> None:
+    import millforge
+    from millforge import (
+        SelectedOutputRequirement,
+        TerminalSelectedOutputRequirement,
+    )
+    from millrace.adapters.cli.run import _selected_runner_authority_for_request
+    from millrace.adapters.millforge import (
+        _current_mappings,
+        _options_by_outcome,
+        _selected_output_requirements,
+    )
+    from millrace.adapters.runner_contract import (
+        AdapterInvocationRequest,
+        RedactionPolicy,
+    )
+    from millrace.contracts.compiled_plan import RunnerTerminalResultMapping
+    from millrace.contracts.runner import RunnerDispatchEnvelope
+
+    manifest = _load_manifest()
+    plans = _enable_select_verify_all_workflows(
+        tmp_path / "provider-contract",
+        command_label="provider-contract",
+        import_operation_id="package.import_path",
+        mutation_kwargs={"package_root": PACKAGE_ROOT},
+    )
+    binding_count = 0
+    mapping_count = 0
+    schema_bearing_count = 0
+    schema_less_count = 0
+    const_site_count = 0
+    enum_site_count = 0
+
+    for workflow_id in _workflows_by_id(manifest):
+        plan = cast(Any, plans[workflow_id])
+        stages_by_id = {str(stage.id): stage for stage in plan.stage_kinds}
+        actions_by_stage_outcome = {
+            (str(action.stage_kind_id), str(action.outcome_id)): action
+            for action in plan.terminal_actions
+        }
+        schemas_by_id = {
+            str(schema.id): schema for schema in plan.artifact_schemas
+        }
+
+        for binding in plan.runner_bindings:
+            binding_count += 1
+            assert len(binding.stage_kind_ids) == 1
+            stage_id = str(binding.stage_kind_ids[0])
+            stage = stages_by_id[stage_id]
+            terminal_options = tuple(
+                {
+                    "outcome_id": str(outcome.id),
+                    "marker": outcome.marker,
+                    "action_id": str(action.id),
+                    "action_kind": action.action_kind,
+                    "artifact_schema_id": (
+                        str(action.artifact_schema_id)
+                        if action.artifact_schema_id is not None
+                        else None
+                    ),
+                }
+                for outcome in plan.terminal_outcomes
+                if str(outcome.stage_kind_id) == stage_id
+                and outcome.id in stage.declared_outcome_ids
+                and outcome.marker.strip()
+                for action in (
+                    actions_by_stage_outcome[(stage_id, str(outcome.id))],
+                )
+            )
+            dispatch = RunnerDispatchEnvelope(
+                run_id=f"provider-contract:{workflow_id}:{stage_id}",
+                work_item_id="provider-contract-work",
+                activation_id="provider-contract-activation",
+                plan_fingerprint=authority_fingerprint(plan),
+                plan_id=f"{workflow_id}:provider-contract",
+                workflow_id=str(plan.workflow.workflow_id),
+                workflow_version=str(plan.workflow.workflow_version),
+                graph_id="provider-contract-graph",
+                claim_id="provider-contract-claim",
+                generation=1,
+                fencing_token="provider-contract-fence",
+                queue_family_id="provider-contract-queue",
+                stage_kind_id=stage_id,
+                graph_node_id="provider-contract-node",
+                runner_binding_id=str(binding.id),
+                external_enqueue_route_id=None,
+                entrypoint_asset_id=None,
+                skill_asset_ids=(),
+                artifact_schema_ids=tuple(
+                    str(schema_id) for schema_id in stage.artifact_schema_ids
+                ),
+                work_item_payload={},
+                terminal_options=terminal_options,
+            )
+            pin, mappings, schemas = _selected_runner_authority_for_request(
+                plan,
+                dispatch,
+            )
+            assert pin == binding.component_pin
+            assert mappings == binding.terminal_result_mappings
+            assert all(
+                isinstance(mapping, RunnerTerminalResultMapping)
+                for mapping in mappings
+            )
+
+            request = AdapterInvocationRequest(
+                adapter_id="provider-contract-proof",
+                selected_runner_binding_id=str(binding.id),
+                selected_adapter_kind="millforge",
+                dispatch_envelope=dispatch,
+                timeout_seconds=binding.invocation_timeout_seconds,
+                correlation_id=f"provider-contract:{workflow_id}:{stage_id}",
+                redaction_policy=RedactionPolicy(
+                    policy_id="provider-contract-proof"
+                ),
+                selected_component_pin=pin,
+                selected_terminal_result_mappings=mappings,
+                selected_artifact_schemas=schemas,
+            )
+            options = _options_by_outcome(request)
+            assert pin is not None
+            current_mappings = _current_mappings(request, pin, options)
+            selected_outputs, requirements = _selected_output_requirements(
+                request,
+                millforge,
+                current_mappings,
+                options,
+            )
+            requirements_by_result = {
+                requirement.terminal_result: requirement
+                for requirement in requirements
+            }
+            assert all(
+                isinstance(requirement, TerminalSelectedOutputRequirement)
+                for requirement in requirements
+            )
+
+            mapping_count += len(mappings)
+            for mapping in mappings:
+                result_id = mapping.runner_result_id
+                schema_id = options[str(mapping.outcome_id)]["artifact_schema_id"]
+                if schema_id is None:
+                    schema_less_count += 1
+                    assert result_id not in requirements_by_result
+                    assert result_id not in selected_outputs
+                    continue
+
+                schema_bearing_count += 1
+                requirement = requirements_by_result[result_id]
+                assert requirement.terminal_result == result_id
+                assert isinstance(
+                    requirement.selected_output,
+                    SelectedOutputRequirement,
+                )
+                original_schema = json.loads(
+                    canonical_authority_bytes(schemas_by_id[str(schema_id)].schema)
+                )
+                provider_schema = json.loads(
+                    canonical_authority_bytes(
+                        requirement.selected_output.json_schema
+                    )
+                )
+                original_constraints = _constraint_sites(original_schema)
+                assert _constraint_sites(provider_schema) == original_constraints
+                const_site_count += sum(
+                    path[-1] == "const" for path in original_constraints
+                )
+                enum_site_count += sum(
+                    path[-1] == "enum" for path in original_constraints
+                )
+
+    assert binding_count == 58
+    assert mapping_count == 216
+    assert schema_bearing_count == 177
+    assert schema_less_count == 39
+    assert (const_site_count, enum_site_count) == (162, 36)
+
+
+def test_official_non_runner_outcomes_have_runtime_ownership_proof() -> None:
+    manifest = _load_manifest()
+    runtime_rows = [
+        row
+        for row in _official_terminal_rows(manifest)
+        if row["classification"] == "runtime_owned_non_runner"
+    ]
+    mapped_outcomes: set[str] = set()
+    for workflow in _workflows_by_id(manifest).values():
+        for binding in cast(
+            list[dict[str, object]],
+            _selected_authority(workflow)["runner_bindings"],
+        ):
+            assert "terminal_result_mappings" in binding, (
+                "PLUS-0005 terminal mappings are missing"
+            )
+            mapped_outcomes.update(
+                str(mapping["outcome_id"])
+                for mapping in cast(
+                    list[dict[str, object]], binding["terminal_result_mappings"]
+                )
+            )
+
+    assert len(runtime_rows) == 41
+    assert all(not str(row["marker"]).strip() for row in runtime_rows)
+    assert not mapped_outcomes.intersection(
+        str(row["outcome_id"]) for row in runtime_rows
+    )
+
+    runtime_source = Path(os.environ["MILLRACE_RUNTIME_SOURCE"])
+    dispatch_source = (runtime_source / "millrace/operator/dispatch.py").read_text()
+    lookup_source = (runtime_source / "millrace/kernel/lookups.py").read_text()
+    assert (
+        "if not outcome.marker.strip() or outcome.id not in "
+        "stage.declared_outcome_ids"
+    ) in dispatch_source
+    assert "str(outcome.stage_kind_id) == stage_kind_id" in lookup_source
+    assert "outcome.id in stage.declared_outcome_ids" in lookup_source
+    assert "outcome.marker == marker" in lookup_source
+
+
+def test_official_millforge_capabilities_are_explicit_and_exact() -> None:
+    manifest = _load_manifest()
+    expected_capabilities = [
+        {
+            "id": capability_id,
+            "kind": "runner.invoke",
+            "support_status": "supported",
+            "grant_status": "granted",
+            "approval_policy_id": None,
+        }
+        for capability_id in MILLFORGE_BINDING_CAPABILITY_IDS
+    ]
+
+    for workflow in _workflows_by_id(manifest).values():
+        authority = _selected_authority(workflow)
+        assert "capabilities" in authority, "PLUS-0005 capabilities are missing"
+        assert authority["capabilities"] == expected_capabilities
+        for binding in cast(
+            list[dict[str, object]], authority["runner_bindings"]
+        ):
+            assert binding["required_capability_ids"] == list(
+                MILLFORGE_BINDING_CAPABILITY_IDS
+            )
+            pin = cast(dict[str, object], binding["component_pin"])
+            assert pin["required_capability_ids"] == list(
+                MILLFORGE_COMPONENT_CAPABILITY_IDS
+            )
+
+
+def test_codex_defaulting_fixture_remains_test_local(tmp_path: Path) -> None:
+    fixture_root = _copy_package_with_test_local_codex_binding(tmp_path)
+    fixture_manifest = _load_manifest(fixture_root)
+    expectation = _workflow_expectations()[0]
+    store, cas_store = _store(tmp_path / "runtime")
+    imported = execute_package_mutation_command(
+        store,
+        cas_store,
+        PackageMutationCommand(
+            command_id="fixture-import",
+            operation_id="package.import_path",
+            actor_id="operator:test",
+            package_root=fixture_root,
+        ),
+    )
+    enabled = execute_package_mutation_command(
+        store,
+        cas_store,
+        PackageMutationCommand(
+            command_id="fixture-enable",
+            operation_id="package.enable",
+            actor_id="operator:test",
+            package_id=PACKAGE_ID,
+            package_version=PACKAGE_VERSION,
+        ),
+    )
+    selected = execute_package_workflow_selection_command(
+        store,
+        cas_store,
+        PackageWorkflowSelectionCommand(
+            command_id="fixture-select",
+            actor_id="operator:test",
+            package_id=PACKAGE_ID,
+            package_version=PACKAGE_VERSION,
+            workflow_id="simple_loop",
+            workflow_version="0.1",
+        ),
+    )
+
+    assert imported.outcome == "succeeded"
+    assert enabled.outcome == "succeeded"
+    assert selected.outcome == "succeeded"
+    _assert_runner_defaulting_warnings(
+        selected,
+        manifest=fixture_manifest,
+        expectation=expectation,
+        package_source_kind=_package_source_kind("package.import_path"),
+    )
+    assert selected.plan is not None
+    assert {binding.adapter_kind for binding in selected.plan.runner_bindings} == {
+        "codex"
+    }
+    production_bindings = [
+        binding
+        for workflow in _workflows_by_id(_load_manifest()).values()
+        for binding in cast(
+            list[dict[str, object]],
+            _selected_authority(workflow)["runner_bindings"],
+        )
+    ]
+    assert all(
+        binding["adapter_kind"] not in {"fake_local", "codex"}
+        for binding in production_bindings
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation_kind", "workflow_id"),
+    (
+        ("pin_fields", "simple_loop"),
+        ("capabilities", "simple_loop"),
+        ("result_ids", "simple_loop"),
+        ("target_outcomes", "simple_loop"),
+        ("stage_ids", "simple_loop"),
+        ("blank_marker_mappings", "planning.lad"),
+        ("binding_references", "simple_loop"),
+    ),
+)
+def test_official_millforge_authority_mutations_are_refused(
+    tmp_path: Path,
+    mutation_kind: str,
+    workflow_id: str,
+) -> None:
+    mutated_root = _copy_package_with_runner_authority_mutation(
+        tmp_path,
+        mutation_kind,
+    )
+    _assert_package_selection_refuses(
+        tmp_path / f"runtime-{mutation_kind}",
+        mutated_root,
+        workflow_id,
+    )
+
+
+def test_official_runner_authority_fingerprints_are_canonical_and_semantic(
+    tmp_path: Path,
+) -> None:
+    base_result = conformance.select_package_from_path(
+        tmp_path / "base",
+        PACKAGE_ROOT,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id="simple_loop",
+        workflow_version="0.1",
+    )
+    reordered_result = conformance.select_package_from_path(
+        tmp_path / "reordered",
+        _copy_package_with_reordered_runner_authority(tmp_path),
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id="simple_loop",
+        workflow_version="0.1",
+    )
+    mutated_result = conformance.select_package_from_path(
+        tmp_path / "mutated",
+        _copy_package_with_semantic_runner_mutation(tmp_path),
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id="simple_loop",
+        workflow_version="0.1",
+    )
+
+    assert authority_fingerprint(base_result.plan) == authority_fingerprint(
+        reordered_result.plan
+    )
+    assert authority_fingerprint(base_result.plan) != authority_fingerprint(
+        mutated_result.plan
+    )
+
+
+def test_official_runner_authority_adds_no_runtime_workflow_policy_branches() -> None:
+    runtime_root = Path(os.environ["MILLRACE_RUNTIME_SOURCE"]) / "millrace"
+    workflow_markers = OFFICIAL_WORKFLOW_IDS
+    for relative_root in ("adapters", "compiler", "contracts"):
+        for source_path in (runtime_root / relative_root).rglob("*.py"):
+            source = source_path.read_text()
+            assert not any(marker in source for marker in workflow_markers), source_path
+    for relative_root in ("kernel", "substrate", "workflows"):
+        for source_path in (runtime_root / relative_root).rglob("*.py"):
+            assert "millforge" not in source_path.read_text().lower(), source_path
 
 
 def test_path_archive_and_installed_sources_are_same_official_package_bytes(

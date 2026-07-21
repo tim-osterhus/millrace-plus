@@ -232,6 +232,26 @@ def _source_as_selected_authority(source: dict[str, object]) -> dict[str, object
     return selected
 
 
+def _without_runner_authority(authority: dict[str, object]) -> dict[str, object]:
+    normalized = cast(dict[str, object], json.loads(json.dumps(authority)))
+    normalized.pop("capabilities", None)
+    normalized.pop("runner_bindings")
+
+    def normalize_refs(value: object) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in {"runner_binding_id", "target_runner_binding_id"}:
+                    value[key] = "<selected-runner-binding>"
+                else:
+                    normalize_refs(child)
+        elif isinstance(value, list):
+            for child in value:
+                normalize_refs(child)
+
+    normalize_refs(normalized)
+    return normalized
+
+
 def _expected_entrypoint_asset_id(stage_id: str) -> str:
     return f"vendor_selection.entrypoints.{stage_id}"
 
@@ -647,7 +667,9 @@ def test_vendor_selection_selected_authority_matches_donor_plus_selected_assets(
             _expected_core_skill_asset_id(stage_id),
         ]
 
-    assert selected_authority == expected_authority
+    assert _without_runner_authority(selected_authority) == (
+        _without_runner_authority(expected_authority)
+    )
     assert "assets" not in selected_authority
     assert "unselected_catalog" in selected_authority
     assert len(cast(list[object], selected_authority["unselected_catalog"])) == 3
@@ -709,7 +731,7 @@ def test_vendor_selection_path_archive_selection_compiles_selected_asset_shape(
         assert str(plan.operator_waits[0].id) == (
             "vendor_selection.award_operator_wait"
         )
-        assert len(plan.runner_bindings) == 1
+        assert len(plan.runner_bindings) == len(VENDOR_STAGE_IDS)
         assert len(plan.effect_declarations) == 0
         authority_text = canonical_authority_bytes(plan).decode("utf-8")
         assert "unselected_catalog" not in authority_text

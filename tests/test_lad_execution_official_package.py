@@ -159,6 +159,26 @@ def _source_as_selected_authority(source: dict[str, object]) -> dict[str, object
     return selected
 
 
+def _without_runner_authority(authority: dict[str, object]) -> dict[str, object]:
+    normalized = cast(dict[str, object], json.loads(json.dumps(authority)))
+    normalized.pop("capabilities", None)
+    normalized.pop("runner_bindings")
+
+    def normalize_refs(value: object) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in {"runner_binding_id", "target_runner_binding_id"}:
+                    value[key] = "<selected-runner-binding>"
+                else:
+                    normalize_refs(child)
+        elif isinstance(value, list):
+            for child in value:
+                normalize_refs(child)
+
+    normalize_refs(normalized)
+    return normalized
+
+
 def _donor_assets(source: dict[str, object]) -> list[dict[str, object]]:
     return cast(list[dict[str, object]], source["assets"])
 
@@ -305,7 +325,9 @@ def test_lad_selected_authority_matches_donor_sources_without_inline_assets() ->
         )
 
         assert "assets" not in selected_authority
-        assert selected_authority == _source_as_selected_authority(donor())
+        assert _without_runner_authority(selected_authority) == (
+            _without_runner_authority(_source_as_selected_authority(donor()))
+        )
 
 
 def test_lad_assets_and_required_assets_match_donor_closures() -> None:

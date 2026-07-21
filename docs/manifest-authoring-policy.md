@@ -49,20 +49,20 @@ which workflow behavior should be official.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:7c9a1ed4746ab8e244920484782da51d04d876a4f41bd60ffac21b0bb4df7174",
-  "package_digest": "sha256:d3ad40e592a3070808467bb215fb694b341022f2d9ed799c04d95d76f1325a0d",
+  "manifest_digest": "sha256:31d54eee6245369d5da69bbce34c960e7064739c0710591f24eec954e5189292",
+  "package_digest": "sha256:17b57cef431ef134edb280e9b4ccf690c3c2a4250789603d1ae6944401f91b41",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
     "package_version": "0.0.0",
     "package_format_version": "1"
   },
   "selected_workflow_fingerprints": {
-    "execution.lad@0.1": "sha256:75d1b758310703e87220174d06054f0d9263639bcdeb7c2a48129fa306bae051",
-    "execution.lad_integrator@0.1": "sha256:3fc6157fc42538190181f80e717d3f5e667a956706dd1b03b3ea768311a39302",
-    "lad.full@0.1": "sha256:d1d6245fa1f7a77409ab3104a821bbc56d5a1e463fecc7c7fda416efc3c4541e",
-    "planning.lad@0.1": "sha256:e3435807aead8a077dc4f28550b26ade406cd75c021be020399d1e8721275306",
-    "simple_loop@0.1": "sha256:dd0e916f646f062b1fcc7d2f8b49c0f1076c43d1883cd7c2297ad38ceff7bb5f",
-    "vendor_selection@0.1": "sha256:4dfad85a5d3e0adfb20c9326532ad56ee188b7d9207661435d122a225c66ec42"
+    "execution.lad@0.1": "sha256:a430c30abea30981432da115ef06885a4753857d52c3178c444543f032c31a71",
+    "execution.lad_integrator@0.1": "sha256:68743fa23d7c543158634fb23b0fc2cb867d01f7e0d541e40430123325e59dad",
+    "lad.full@0.1": "sha256:dc5e2538e89bf6ca4e242716a2ecea35fbecaf4c070548e55e69fd386fd99979",
+    "planning.lad@0.1": "sha256:e862bd172122e5114c5cab09d775d22b28ff049c9e9e0003f1c9522cc2c69b96",
+    "simple_loop@0.1": "sha256:464caa5330169319d8ad6a42bdcf5b6fb8d22e7367c89812c602e526bf156714",
+    "vendor_selection@0.1": "sha256:f9155caf1e5f5d66398f9a9ab5eaff97f9baff2552e0daf5ba2daf557cd6f0e3"
   },
   "asset_pins": [
     {

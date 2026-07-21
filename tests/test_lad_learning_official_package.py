@@ -139,18 +139,24 @@ _PLUS_0003F_SKILL_DISPOSITION_SCHEMA = {
         },
     },
 }
-_UNCHANGED_OFFICIAL_WORKFLOW_FINGERPRINTS = {
+_FINAL_OFFICIAL_WORKFLOW_FINGERPRINTS = {
     "simple_loop": (
-        "sha256:3735bf81969360f8eaa3dcd0d0b4f7c64b175d5ad82d33513c483e9086204c54"
+        "sha256:62e9fa4d2ef456a92df6488840eab95956bd642754febee34d1779d53726f527"
     ),
     "execution.lad": (
-        "sha256:f5c499b7bfb581c3c98965d92f7ffd0b53693ecac7b805d4086d9421cb972023"
+        "sha256:8132d77e64115403386b495b9eff717f41978da2e146a3083ce3f357b065b641"
     ),
     "execution.lad_integrator": (
-        "sha256:8594cd77ae620d77196fd91c88d77055eff9a1f9c8d0e92636193ce902ea9c17"
+        "sha256:efe53848de3d36b2f3ba98f762f5bb457f925532fb7cc4a052f72c60ef097204"
+    ),
+    "planning.lad": (
+        "sha256:db3f9bae1b067e694276639f75c8b50f54b8125a9864309fd1d5b5692b195d20"
+    ),
+    "lad.full": (
+        "sha256:eeba7ad8911dedb912e0dfb1b6ce58191c692c62af50161d8bfb6ae2e1a5bcf6"
     ),
     "vendor_selection": (
-        "sha256:cd125525c4ef33634618cae89e62d8060286ff2ce45a6fd32ab5995ee2c08bb5"
+        "sha256:6d4382caa894d856ce62f39f8fbe3ebe9a842e0c3af5b5519273254ebd0fe161"
     ),
 }
 
@@ -219,6 +225,26 @@ def _source_as_selected_authority(source: dict[str, object]) -> dict[str, object
     selected = cast(dict[str, object], json.loads(json.dumps(source)))
     selected.pop("assets")
     return selected
+
+
+def _without_runner_authority(authority: dict[str, object]) -> dict[str, object]:
+    normalized = cast(dict[str, object], json.loads(json.dumps(authority)))
+    normalized.pop("capabilities", None)
+    normalized.pop("runner_bindings")
+
+    def normalize_refs(value: object) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in {"runner_binding_id", "target_runner_binding_id"}:
+                    value[key] = "<selected-runner-binding>"
+                else:
+                    normalize_refs(child)
+        elif isinstance(value, list):
+            for child in value:
+                normalize_refs(child)
+
+    normalize_refs(normalized)
+    return normalized
 
 
 def _source_as_selected_authority_with_plus_0003f_overlay(
@@ -463,8 +489,8 @@ def test_full_lad_authority_matches_donor_plus_librarian_overlay() -> None:
     source = lad_learning.workflow_source()
 
     assert "assets" not in selected_authority
-    assert selected_authority == _source_as_selected_authority_with_plus_0003f_overlay(
-        source,
+    assert _without_runner_authority(selected_authority) == _without_runner_authority(
+        _source_as_selected_authority_with_plus_0003f_overlay(source)
     )
 
 
@@ -1114,11 +1140,11 @@ def test_existing_workflow_fingerprints_stay_stable_when_learning_is_added(
         )
 
 
-def test_unrelated_official_workflow_fingerprints_remain_unchanged(
+def test_final_official_workflow_fingerprints_match_selected_authority(
     tmp_path: Path,
 ) -> None:
     for workflow_id, expected_fingerprint in (
-        _UNCHANGED_OFFICIAL_WORKFLOW_FINGERPRINTS.items()
+        _FINAL_OFFICIAL_WORKFLOW_FINGERPRINTS.items()
     ):
         result = conformance.select_package_from_path(
             tmp_path / workflow_id.replace(".", "-"),

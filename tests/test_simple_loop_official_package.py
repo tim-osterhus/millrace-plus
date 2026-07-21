@@ -152,6 +152,26 @@ def _expected_selected_authority() -> dict[str, object]:
     return cast(dict[str, object], json.loads(json.dumps(source)))
 
 
+def _without_runner_authority(authority: dict[str, object]) -> dict[str, object]:
+    normalized = cast(dict[str, object], json.loads(json.dumps(authority)))
+    normalized.pop("capabilities", None)
+    normalized.pop("runner_bindings")
+
+    def normalize_refs(value: object) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in {"runner_binding_id", "target_runner_binding_id"}:
+                    value[key] = "<selected-runner-binding>"
+                else:
+                    normalize_refs(child)
+        elif isinstance(value, list):
+            for child in value:
+                normalize_refs(child)
+
+    normalize_refs(normalized)
+    return normalized
+
+
 def _sequence_as_tuple(value: object) -> tuple[str, ...]:
     return tuple(str(item) for item in cast(list[object] | tuple[object, ...], value))
 
@@ -278,7 +298,9 @@ def test_shipped_package_root_is_official_simple_loop_package() -> None:
     assert workflow["workflow_version"] == WORKFLOW_VERSION
     assert workflow["visibility"] == "public"
     assert workflow["entrypoints"] == ["default"]
-    assert cast(dict[str, object], workflow["selected_authority"]) == (
+    assert _without_runner_authority(
+        cast(dict[str, object], workflow["selected_authority"])
+    ) == _without_runner_authority(
         _expected_selected_authority()
     )
 
