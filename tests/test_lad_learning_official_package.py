@@ -28,7 +28,7 @@ from support import package_conformance as conformance
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.0.0"
+PACKAGE_VERSION = "0.22.0"
 WORKFLOW_ID = "lad.full"
 
 _ENTRYPOINT_HEADINGS = (
@@ -141,22 +141,22 @@ _PLUS_0003F_SKILL_DISPOSITION_SCHEMA = {
 }
 _FINAL_OFFICIAL_WORKFLOW_FINGERPRINTS = {
     "simple_loop": (
-        "sha256:62e9fa4d2ef456a92df6488840eab95956bd642754febee34d1779d53726f527"
+        "sha256:ecc5911d025141a235815c982f4e03d980914c66fcfdca4bb7da2db4cc8161d2"
     ),
     "execution.lad": (
-        "sha256:8132d77e64115403386b495b9eff717f41978da2e146a3083ce3f357b065b641"
+        "sha256:58f27aacac22e31598634ea90d3a31a86b8ef8c4f5006dc878a973cbc68f918a"
     ),
     "execution.lad_integrator": (
-        "sha256:efe53848de3d36b2f3ba98f762f5bb457f925532fb7cc4a052f72c60ef097204"
+        "sha256:0281fc61a7a47662f3bc769f3fc9a28d3f7fda23c4ceb9a32bd1dafbd2da5ced"
     ),
     "planning.lad": (
-        "sha256:db3f9bae1b067e694276639f75c8b50f54b8125a9864309fd1d5b5692b195d20"
+        "sha256:4aa20a7e7048ba9a946fb323aa5b1b659c28756a812459fe697201c7819a0c4b"
     ),
     "lad.full": (
-        "sha256:eeba7ad8911dedb912e0dfb1b6ce58191c692c62af50161d8bfb6ae2e1a5bcf6"
+        "sha256:ff21a2b2f72821d4bedab2a59dc7ad0023e59bb79a4a8556f7057b15ff53b05b"
     ),
     "vendor_selection": (
-        "sha256:6d4382caa894d856ce62f39f8fbe3ebe9a842e0c3af5b5519273254ebd0fe161"
+        "sha256:c2da9a4dd77196add01dd458276d7fc19d0799fcebe081441636db575e6646de"
     ),
 }
 

@@ -34,7 +34,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
 SCAFFOLD_PACKAGE_ID = "millrace.plus.scaffold"
-PACKAGE_VERSION = "0.0.0"
+PACKAGE_VERSION = "0.22.0"
 WORKFLOW_ID = "simple_loop"
 WORKFLOW_VERSION = "0.1"
 

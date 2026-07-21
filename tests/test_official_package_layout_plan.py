@@ -8,6 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 OFFICIAL_PACKAGE_ID = "millrace.plus.official"
 TEMPORARY_SCAFFOLD_PACKAGE_ID = "millrace.plus.scaffold"
+RELEASE_IDENTITY = "0.22.0"
 
 
 def _shipped_manifest() -> dict[str, object]:
@@ -65,7 +66,6 @@ def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
 
     assert package["package_id"] == OFFICIAL_PACKAGE_ID
     assert package["package_id"] != TEMPORARY_SCAFFOLD_PACKAGE_ID
-    assert package["package_version"] == "0.0.0"
     assert package["package_role"] == "workflow_package"
     assert workflows
     assert all(
@@ -77,3 +77,10 @@ def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
         "official_package_with_vendor_policy_screener_boundary_"
         "pending_fresh_live_e2e_0005"
     )
+
+
+def test_official_manifest_uses_v022_release_identity() -> None:
+    manifest = _shipped_manifest()
+    package = cast(dict[str, object], manifest["package"])
+
+    assert package["package_version"] == RELEASE_IDENTITY

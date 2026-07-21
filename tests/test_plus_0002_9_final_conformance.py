@@ -21,11 +21,13 @@ from millrace.compiler.workflow_package_sources import (
     read_archive_workflow_package_source,
     read_path_workflow_package_source,
 )
+from millrace.contracts import AdmitPlan, InitializeWorkspace
 from millrace.contracts.compiled_plan import canonical_authority_bytes
 from millrace.contracts.workflow_package import (
     asset_digest_for_bytes,
     manifest_digest_for_manifest,
 )
+from millrace.kernel import apply, decide, empty_runtime_state
 from millrace.operator.packages import (
     PackageMutationCommand,
     PackageWorkflowSelectionCommand,
@@ -36,6 +38,7 @@ from millrace.operator.packages import (
 )
 from millrace.substrate import ContentAddressedByteStore, SQLiteRuntimeStore
 from millrace.substrate.package_archives import export_workflow_package_directory
+from millrace.testing import deterministic_context
 from millrace.workflows import (
     lad_execution,
     lad_learning,
@@ -50,7 +53,7 @@ PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 LEGACY_ASSET_ROOT = Path(os.environ["MILLRACE_LEGACY_ASSET_ROOT"])
 LEGACY_ASSET_LABEL = "dev/source/millrace/src/millrace_ai/assets"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.0.0"
+PACKAGE_VERSION = "0.22.0"
 DIST_NAME = "millrace-plus"
 IMPORT_PACKAGE = "millrace_plus"
 RESOURCE_ROOT = "millrace_workflow_package"
@@ -1794,6 +1797,82 @@ def test_path_archive_and_installed_sources_are_same_official_package_bytes(
     assert archive_source.member_paths == installed_source.member_paths
     assert path_source.asset_bytes_by_path == archive_source.asset_bytes_by_path
     assert archive_source.asset_bytes_by_path == installed_source.asset_bytes_by_path
+
+
+def test_final_package_pin_uses_v022_release_identity(tmp_path: Path) -> None:
+    manifest = _load_manifest()
+    package = cast(dict[str, object], manifest["package"])
+    expectation = _workflow_expectations()[0]
+
+    assert PACKAGE_VERSION == "0.22.0"
+    assert package["package_version"] == PACKAGE_VERSION
+
+    selected = conformance.select_package_from_path(
+        tmp_path / "selection",
+        PACKAGE_ROOT,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=expectation.workflow_id,
+        workflow_version=expectation.workflow_version,
+    )
+    plan = selected.plan
+    assert plan is not None
+    selected_asset_pins = _expected_selected_asset_pins(
+        manifest,
+        expectation.workflow_id,
+    )
+    conformance.assert_selected_package_pin(
+        plan,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=expectation.workflow_id,
+        workflow_version=expectation.workflow_version,
+        selected_asset_pins=selected_asset_pins,
+    )
+
+    fingerprint = authority_fingerprint(plan)
+    state = empty_runtime_state()
+    for transition_input, transition_id in (
+        (InitializeWorkspace("v022-initialize"), "v022-initialize"),
+        (
+            AdmitPlan(
+                "v022-admit",
+                selected_plan=plan,
+                authority_fingerprint=fingerprint,
+            ),
+            "v022-admit",
+        ),
+    ):
+        decision = decide(
+            state,
+            transition_input,
+            deterministic_context(transition_id=transition_id),
+        )
+        assert decision.accepted is True
+        state = apply(state, decision)
+
+    runtime_root = tmp_path / "runtime"
+    store, cas_store = _store(runtime_root)
+    store.persist_runtime_state(state, cas_store)
+    store.close()
+
+    reopened = SQLiteRuntimeStore.open(runtime_root / "runtime.sqlite3")
+    try:
+        reloaded = reopened.load_runtime_state(cas_store)
+    finally:
+        reopened.close()
+
+    admitted = reloaded.admitted_plans[fingerprint]
+    assert admitted.plan_ref.authority_fingerprint == fingerprint
+    assert authority_fingerprint(admitted.selected_plan) == fingerprint
+    conformance.assert_selected_package_pin(
+        admitted.selected_plan,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=expectation.workflow_id,
+        workflow_version=expectation.workflow_version,
+        selected_asset_pins=selected_asset_pins,
+    )
 
 
 def test_every_official_workflow_selects_verifies_and_records_final_pins(

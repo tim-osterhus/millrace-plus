@@ -10,7 +10,7 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.0.0"
+PACKAGE_VERSION = "0.22.0"
 WORKFLOW_SELECTORS = {
     ("simple_loop", "0.1"),
     ("execution.lad", "0.1"),

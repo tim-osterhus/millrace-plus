@@ -10,6 +10,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = PROJECT_ROOT / "src" / "millrace_plus" / "skills"
+RELEASE_IDENTITY = "0.22.0"
 PACKAGE_DOCS = (
     "docs/authoring.md",
     "docs/manifest-authoring-policy.md",
@@ -38,7 +39,7 @@ def test_millrace_plus_import_is_metadata_only(monkeypatch) -> None:
 
     module = import_module("millrace_plus")
 
-    assert module.__version__ == "0.0.0"
+    assert module.__version__ == RELEASE_IDENTITY
     assert module.__all__ == ("__version__",)
     assert "millrace" not in sys.modules
     assert all(name.startswith("_") for name in vars(module) if name != "annotations")
@@ -49,7 +50,7 @@ def test_pyproject_declares_narrow_distribution_metadata() -> None:
 
     assert pyproject["build-system"]["build-backend"] == "hatchling.build"
     assert pyproject["project"]["name"] == "millrace-plus"
-    assert pyproject["project"]["version"] == "0.0.0"
+    assert pyproject["project"]["version"] == RELEASE_IDENTITY
     assert pyproject["project"]["requires-python"] == ">=3.11"
     assert pyproject["project"].get("dependencies", []) == []
     assert pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == [
@@ -67,6 +68,14 @@ def test_pyproject_declares_narrow_distribution_metadata() -> None:
     assert "gui-scripts" not in project_metadata
     assert "entry-points" not in project_metadata
     assert "entry-points" not in pyproject.get("project", {})
+
+
+def test_package_version_matches_release_identity() -> None:
+    pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
+    module = import_module("millrace_plus")
+
+    assert pyproject["project"]["version"] == RELEASE_IDENTITY
+    assert module.__version__ == RELEASE_IDENTITY
 
 
 def test_sdist_includes_package_docs_and_skills(tmp_path: Path) -> None:

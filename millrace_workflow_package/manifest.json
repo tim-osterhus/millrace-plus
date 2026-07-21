@@ -11,7 +11,7 @@
     "package_format_version": "1",
     "package_id": "millrace.plus.official",
     "package_role": "workflow_package",
-    "package_version": "0.0.0",
+    "package_version": "0.22.0",
     "publication_scope": "public",
     "publisher": "Millrace",
     "repository_url": "https://github.com/tim-osterhus/millrace-plus"
@@ -19892,7 +19892,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:31d54eee6245369d5da69bbce34c960e7064739c0710591f24eec954e5189292",
+  "manifest_digest": "sha256:a165f49dee8bf1528aa1b401d6342d85bfb14433e4c7f3b8a86fab66f92febe2",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",

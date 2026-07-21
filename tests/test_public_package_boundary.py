@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import ast
+import importlib
+import json
 import os
 import subprocess
 import sys
+import tarfile
 import tomllib
+import zipfile
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +34,7 @@ RUNTIME_SOURCE_ENV = "MILLRACE_RUNTIME_SOURCE"
 LEGACY_ASSET_ENV = "MILLRACE_LEGACY_ASSET_ROOT"
 HIDDEN_REWRITE_PYTHONPATH = "PYTHONPATH=../../source/" "millrace-rewrite/src"
 LEGACY_ASSET_PATH = "dev/source/millrace/src/" "millrace_ai/assets"
+RELEASE_IDENTITY = "0.22.0"
 
 
 def _project_text(path: str) -> str:
@@ -137,6 +142,75 @@ def test_public_ci_runs_clean_checkout_boundary_without_sibling_paths() -> None:
         assert public_test in workflow
     assert "source/" "millrace-rewrite" not in workflow
     assert LEGACY_ASSET_PATH not in workflow
+
+
+def test_built_artifacts_share_v022_release_identity(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    build_env = os.environ.copy()
+    build_env["PYTHONDONTWRITEBYTECODE"] = "1"
+    build_env.pop("PYTHONPATH", None)
+    subprocess.run(
+        ["uv", "build", "--out-dir", str(tmp_path), "--clear"],
+        cwd=PROJECT_ROOT,
+        check=True,
+        env=build_env,
+    )
+    wheel_path = next(tmp_path.glob("*.whl"))
+    sdist_path = next(tmp_path.glob("*.tar.gz"))
+
+    with zipfile.ZipFile(wheel_path) as wheel:
+        wheel_metadata = wheel.read(
+            next(
+                name
+                for name in wheel.namelist()
+                if name.endswith(".dist-info/METADATA")
+            )
+        ).decode("utf-8")
+        wheel_manifest = json.loads(
+            wheel.read("millrace_workflow_package/manifest.json")
+        )
+        wheel.extractall(tmp_path / "site")
+
+    with tarfile.open(sdist_path) as sdist:
+        sdist_metadata = sdist.extractfile(
+            next(
+                member
+                for member in sdist.getmembers()
+                if member.name.endswith("/PKG-INFO")
+            )
+        )
+        sdist_manifest = sdist.extractfile(
+            next(
+                member
+                for member in sdist.getmembers()
+                if member.name.endswith("/millrace_workflow_package/manifest.json")
+            )
+        )
+        assert sdist_metadata is not None
+        assert sdist_manifest is not None
+        sdist_metadata_text = sdist_metadata.read().decode("utf-8")
+        sdist_manifest_data = json.loads(sdist_manifest.read())
+
+    monkeypatch.syspath_prepend(str(tmp_path / "site"))
+    module_name = "millrace_plus"
+    had_previous_module = module_name in sys.modules
+    previous_module = sys.modules.get(module_name)
+    try:
+        sys.modules.pop(module_name, None)
+        installed_module = importlib.import_module(module_name)
+
+        assert f"Version: {RELEASE_IDENTITY}\n" in wheel_metadata
+        assert f"Version: {RELEASE_IDENTITY}\n" in sdist_metadata_text
+        assert wheel_manifest["package"]["package_version"] == RELEASE_IDENTITY
+        assert sdist_manifest_data["package"]["package_version"] == RELEASE_IDENTITY
+        assert installed_module.__version__ == RELEASE_IDENTITY
+        assert importlib.reload(installed_module).__version__ == RELEASE_IDENTITY
+    finally:
+        sys.modules.pop(module_name, None)
+        if had_previous_module:
+            sys.modules[module_name] = previous_module
 
 
 def test_internal_conformance_direct_selection_skips_without_runtime_import() -> None:

@@ -34,7 +34,7 @@ from support import package_conformance as conformance
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.0.0"
+PACKAGE_VERSION = "0.22.0"
 WORKFLOW_ID = "vendor_selection"
 WORKFLOW_VERSION = "0.1"
 EXISTING_WORKFLOW_IDS = (

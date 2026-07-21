@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "millrace-plus"
-version = "0.0.0"
+version = "0.22.0"
 description = "Official workflow packages and agent skill assets for Millrace."
 readme = "README.md"
 requires-python = ">=3.11"
