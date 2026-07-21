@@ -141,22 +141,22 @@ _PLUS_0003F_SKILL_DISPOSITION_SCHEMA = {
 }
 _FINAL_OFFICIAL_WORKFLOW_FINGERPRINTS = {
     "simple_loop": (
-        "sha256:921d60e28fd4ac99c7bd9080e56c6b72db66d2ff4ba6fe0219540bdd3b7e072a"
+        "sha256:3a07e61e87ee48cb943a384efe0675ee09179e0201c4c1c2d9f9f1219ad09eeb"
     ),
     "execution.lad": (
-        "sha256:7f816ea3f15998ea80fa95e8769b127d77e085c47d795a509345b3e6c5b966bb"
+        "sha256:5677157e3560b1683dd25f76c6ed625d4b13ece56f1860a530499421df09de92"
     ),
     "execution.lad_integrator": (
-        "sha256:67f56c15f32b3740fd8197758ad0045d1f10679277a6b408e4994a696f220b34"
+        "sha256:2af47d827f6b31caad7069a7c4c5be19654e365375587d276229105f5df6bed5"
     ),
     "planning.lad": (
-        "sha256:3966abf29942ed320b38941e96f50705971cc51c0cc1adef49c99a4c54d79614"
+        "sha256:47137295e83824c2217ea60af37ec247d86d268d8959133c9d821f868494f0a4"
     ),
     "lad.full": (
-        "sha256:2a5b282c4c16b808696573bf8b34fece15dcc699b6ec935cb299a900e350314e"
+        "sha256:46a66c908314cc7dccc5e755a9ad7ca9b50da597471ca02d365dffe62c9a6fcf"
     ),
     "vendor_selection": (
-        "sha256:64c9af05e36650e457be150010f11726c9ece33871ddf8ced7b258268caa06a2"
+        "sha256:b4742469d4579338684bb9914a607272d50112f80af78dc67f50df81793b1807"
     ),
 }
 
