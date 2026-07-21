@@ -15,6 +15,7 @@ from support.internal_conformance_gate import require_internal_conformance
 
 require_internal_conformance()
 
+from millforge import describe_millforge_base
 from millrace.compiler.canonical import authority_fingerprint
 from millrace.compiler.runner_bindings import RUNNER_ADAPTER_KIND_DEFAULTED
 from millrace.compiler.workflow_package_sources import (
@@ -101,56 +102,56 @@ MILLFORGE_PROFILE_DIGESTS = {
         "INVALID_PROMPT",
         "NEEDS_OPERATOR_DETAIL",
         "PACKET_READY",
-    ): "5889f14114b6be9e67cdeb98693e5ed5efc34c8e0805de8ccf8191b595db371f",
+    ): "ebfe9fd6b5df92d8e952a41a09e59de20780b70ae7602f6ed208c837354c5493",
     (
         "BLOCKED",
         "FAILED",
         "INSUFFICIENT_SPEC",
         "WORK_DONE",
-    ): "36a2077b95de775a2eb878ef534f4dbc9d91157428c16c7828c5fa5910e16bc9",
+    ): "93859e777aeb9c42c48381f5aadc3fc86766ec812efbfef6351c4f7bfa585c17",
     (
         "ACCEPTED",
         "BLOCKED",
         "GAPS_FOUND",
         "INCIDENT_REQUIRED",
-    ): "ac23d3c46a61e85947547c04af7af9d7b1b45146501da2d875765f6190abcd31",
+    ): "e04ef61202b783dfcb6f08fa08a448075d7c394ac883271c882d317d04b2d714",
     (
         "OPERATOR_NEEDED",
         "RESOLVED",
         "UNRESOLVED",
-    ): "ed7abfe3d8b83e48b39c2fd6f08d722ac0aaf6bf3044cfa8c4a11265936e9c58",
+    ): "aa418747b35818fafa7148691dba653d7735974cf0b0f80aa308ce9ecbd3dace",
     (
         "BLOCKED",
         "BUILDER_COMPLETE",
         "RUNTIME_FAILURE",
         "RUNTIME_FAILURE_ESCALATE",
-    ): "dc0808ee8110c5ab575540188a6b146d0c24788bb5ef44d4fe6f5d5e2ae2acf2",
+    ): "a971d08698523dd16bd49a82cefb6680ab2912313455c6669bc6fbd65e5dca9d",
     (
         "BLOCKED",
         "CHECKER_PASS",
         "FIX_NEEDED",
         "RUNTIME_FAILURE",
         "RUNTIME_FAILURE_ESCALATE",
-    ): "6ceb7acae9badac078b5db27c2a2368e9d1b06ea5b43016768899de3e84ec075",
+    ): "cc74cd51275f4c8b141bb2b2e777f1ee520e65dc6abed343ff5cdfe8c0a13a7a",
     (
         "BLOCKED",
         "FIXER_COMPLETE",
         "RUNTIME_FAILURE",
         "RUNTIME_FAILURE_ESCALATE",
-    ): "1b1b35f6bb5260827d6d2067c2229d0d8044e94da3b59125a9b47b65464d6a1e",
+    ): "660fd04a18289aae2ffeaa0d24454fdc35760d3375ab66744de95868f91151ec",
     (
         "BLOCKED",
         "DOUBLECHECK_PASS",
         "FIX_NEEDED",
         "RUNTIME_FAILURE",
         "RUNTIME_FAILURE_ESCALATE",
-    ): "50fb6cb278189bdd240371dd0fc4fd9c367859ac91bb0d063f8b91ac175f99b2",
+    ): "e85a971348076d63b388e0a763f190638770177dfbd15c15bb965b228305f94c",
     (
         "BLOCKED",
         "RUNTIME_FAILURE",
         "RUNTIME_FAILURE_ESCALATE",
         "UPDATE_COMPLETE",
-    ): "7524f70b0c7f763011e3758153ed673f6446917053267e59a4d92305f0e8fe1d",
+    ): "efe0a3088e3ae134c51442d9cf8e738307f7ec17b893f7403fdc8dce334d15db",
     (
         "BLOCKED",
         "RUNTIME_FAILURE",
@@ -158,77 +159,77 @@ MILLFORGE_PROFILE_DIGESTS = {
         "TROUBLESHOOT_COMPLETE",
         "TROUBLESHOOT_QUARANTINE",
         "TROUBLESHOOT_RECOVERED",
-    ): "f76d38b89cf9fe21c93f53f3c37c1afe7fad13c070598975276495544f9f58d2",
+    ): "d629181e7a0485c169cd79a085f592a6d34c3da2f4b41b86a43040dbe4f91872",
     (
         "BLOCKED",
         "CONSULT_COMPLETE",
         "CONSULT_QUARANTINE",
         "CONSULT_RECOVERED",
         "NEEDS_PLANNING",
-    ): "f348bf2f4190300419843ab8ecb6956fca0c41dd3e23ba13365a423bdaee999c",
+    ): "41c8e47078c78de75b3c3aa3f1f840f640e83913351df54e8b4ac836f549e610",
     (
         "BLOCKED",
         "INTEGRATION_COMPLETE",
         "RUNTIME_FAILURE",
         "RUNTIME_FAILURE_ESCALATE",
-    ): "ca7423327da225c82b719ef7e186395fd9634cd85835cb7cc5a6e8027cfb7c14",
+    ): "ae9993016fb19a31fe19d5e76de599bd67e848f1867f8faeacc25c2117c89018",
     (
         "BLOCKED",
         "RECON_BLOCKED",
         "RECON_NOOP",
         "RECON_TO_EXECUTION",
         "RECON_TO_PLANNING",
-    ): "c4ac9e391a423496403d526a5f92beca22adef360dc485ca269b115e9d8656b5",
+    ): "ddbbd2de4d4ad381e842778b5bf05cce6b3348621845f2a4f7306ed5ac310ace",
     ("BLOCKED", "PLANNER_COMPLETE"): (
-        "e901b1c3956c4a69832dc4d4c15acdaa03680883d38a6fd0e7232349b81c6dab"
+        "6a3e319b5946109077e83408eb1f57bb6bf58d88f8f4e3ba2f13ebfed28acf13"
     ),
     ("BLOCKED", "MANAGER_COMPLETE"): (
-        "9d70c821b31dbff9b6c0f4881c76db0faa8c9792d3c7599bd3f0f16018171ca2"
+        "0b0311e3710d73559362993fca1b6647ca31eda0736843d593a7e4844a608e6c"
     ),
     (
         "BLOCKED",
         "MECHANIC_COMPLETE",
         "MECHANIC_QUARANTINE",
         "MECHANIC_RECOVERED",
-    ): "c6fa272c65da35e58446f29b03ccd4fa6053b9375f00502b2915bc5514ff88f3",
+    ): "7b0fe81dc901a603bac67601a5da5c7e9cc2761f0d2f20ba15f9cb1cf98afdc9",
     ("AUDITOR_COMPLETE", "BLOCKED"): (
-        "b37afbb2fe70fe1eb3be931558faa377637e8b1ff97bae9e8b90f68ec3b422ff"
+        "84e6df7b298da0d4a199b93202daadcdd04a33fa53e6ee63f9a6dc9b74260c50"
     ),
     ("ARBITER_COMPLETE", "BLOCKED", "REMEDIATION_NEEDED"): (
-        "71344b42c694647389bad99c0cf98b285ff9afdc6d1b26c0a32aa2dab6c868a6"
+        "386773dd2294d89692232c9ff04fa60e83e09149233d2d7ddbbb368dad4283de"
     ),
     ("ANALYST_COMPLETE", "ANALYST_NOOP", "BLOCKED"): (
-        "b2ecbd24e4e7c724ae3e4495ca7869f6f232c1f7a74ca40f6ccbbdb157523aaf"
+        "aecbc6950171c6b29b9a77fc593b06bea725c502fb1b81258519c14a56ca78a1"
     ),
     ("BLOCKED", "PROFESSOR_COMPLETE", "PROFESSOR_NOOP"): (
-        "76d776ed68ad374d7fa7b51ca046db056bd242c41c1df069da734cad334987af"
+        "43d0787ae31a48afccbf11d5d2fa8055bed263dfdfe9a2eb7db163c70f9ecaf0"
     ),
     ("BLOCKED", "CURATOR_COMPLETE", "CURATOR_NOOP"): (
-        "7387d205959a48427a34421445505ff421214497d27bdb79ab1e948f11c955cb"
+        "2bb3bbf7af9a2e6c8380bb2f567a1f51fe9bc64113c2eec86ceb0195156a6b4e"
     ),
     ("BLOCKED", "LIBRARIAN_COMPLETE", "LIBRARIAN_NOOP"): (
-        "2c5adb659af64366b37944f676d3774980150c52b04fb5e7f3daca14e241219f"
+        "17b5013443b31bd18c0a01d97057107f147a970d28f623617baf686b9e66c704"
     ),
     ("REQUEST_NEEDS_CLARIFICATION", "REQUEST_READY"): (
-        "e91e10c7f10e7bd93e2c14ff67aa82695f01e4dc32d6a0929c7226411e0a9d2e"
+        "9d1cb254bc9ef461bb0501527e3a8205c6c92229f79328ff28a2cb7daa31fe66"
     ),
     ("POLICY_ALLOWED", "POLICY_BLOCKED"): (
-        "6da1a469fb4e52dd59239cf6ed605b1930a607a9ea57ac0d65b89eec5288b501"
+        "c883095f57b3fe457cfe480dae68d4707c4797f99ab72d1359c2b88c3410eaf5"
     ),
     ("REQUIREMENTS_READY",): (
-        "f48fcba31a2c26132bb60a8e684a78023400779a2dc7aae433de2ff069c255f4"
+        "16a8814c20e36880bfe629bcbcf859a88131118d37f3986cfb08fd88599a1bee"
     ),
     ("CANDIDATES_READY", "NO_VIABLE_VENDOR"): (
-        "d11ae29482a0d9d2251f6036289ecdb6c13a1530f5743328b69858fcb6af07b9"
+        "5317e67080f49a261b6f613774d6cb0c477917d4f4ca9b7062b2b2235f7b74b1"
     ),
     ("CANDIDATES_READY",): (
-        "887f818c17238237fa96f543874396a06413ce657d12ccae23f7a7029ca1e5c7"
+        "3e7fd93c9a716ea4c2818a7b2ca3e2a5290542af1ac19222c8d2e7e08a97385f"
     ),
     ("RUBRIC_COMPLETE",): (
-        "01b52dbc24839f308082a214be3db10f53f2714e49516d26c62d84f156ee7565"
+        "03c903d6aec16c89566363a7c6e176d3feffd8f6c275d4be8b8633666241d509"
     ),
     ("CONFLICT_COMPLETE",): (
-        "49504366992e1855782b787a5657509151dce7a96f08dfeb43c5fb1926600f0f"
+        "59cc476fa4742e44812973aea37cba6a113ee3a1673a0f0e0272ed865a54c42b"
     ),
     (
         "AWARD_READY",
@@ -236,9 +237,9 @@ MILLFORGE_PROFILE_DIGESTS = {
         "NO_VIABLE_VENDOR",
         "OPERATOR_REQUIRED",
         "RESOURCE_REQUIRED",
-    ): "4b7924cf407b97deade920a7a23542d480f6f286f72d0b613f84c09e91596c30",
+    ): "16c0d2892f521a9c0b3b9276a6d49dc77d10496e6277f1f66e7b571afaac646c",
     ("DECISION_PACK_READY",): (
-        "4cc4a8fdc6bef4fca9a6fd07f4c4da43f910d1ae9cd4ecc4e309c9d1fe671d88"
+        "09c4d7aba5737198136a8bdd5e840a8c95f5d5f3193eea7069f9949ee3f18c63"
     ),
 }
 
@@ -1214,6 +1215,10 @@ def test_official_workflows_select_exact_millforge_stage_bindings() -> None:
                 )
             )
             expected_digest = MILLFORGE_PROFILE_DIGESTS[runner_markers]
+            current_descriptor = describe_millforge_base(
+                legal_terminal_results=runner_markers,
+            )
+            assert expected_digest == current_descriptor.descriptor_sha256
             expected_pin = {
                 "component_kind": "runner",
                 "component_id": "millforge-base",
