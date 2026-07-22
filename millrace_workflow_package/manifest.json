@@ -585,7 +585,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "9cf762277a9048d92fb937cfa9c922e83a572af0052a1c2b60b19b8258f53529",
+              "descriptor_sha256": "eac94d518fbca0d53afbc6d8e1052b80623b1a6ca054e98d1e20eb3206c8eaf1",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -651,7 +651,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "2bfa4f03ae8d9a2ebfa820fbd1a55a5309d263df61b53df33bea05a2c2b66890",
+              "descriptor_sha256": "e2b8b8c6249d9c99b9dfb430b93be4ae5a645c240059ee78232f8f7eb7c55f77",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -711,7 +711,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "598d1e3549a7862519daa41afd49b7731a71acdcabc8a8b63c5c755d518fb113",
+              "descriptor_sha256": "b21af8cbfe90184cac329f5101bbfd66760f78305ba39e88dce98ce072065185",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -771,7 +771,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "28c475e27ee0679cc0091fa96f376a0a4b1d3937ea8867c4874d8dd53af5c012",
+              "descriptor_sha256": "1b851cf8208066bab668ef119f09de78f2063969bf71930106e325951c667448",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -2174,7 +2174,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "89f1ec1748dc946446bfc2a5499652bdf59baff85c17e19ab8622544bcf6201b",
+              "descriptor_sha256": "a9ba52eef071ad8b8399c3c36c1a63be814d791793cfc50d411aadc7b96309d6",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -2234,7 +2234,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "70b430235ae8d9e175f3e293f17a1bae9e5090ecdb456dddac0418eb0e03eb18",
+              "descriptor_sha256": "c1e6a75f2f12550ddff913f690657be55499819556e5afe6112cb4456dc21d55",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -2300,7 +2300,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "741c46db3b98d0c927ad4deb0f6bcd0ae703e09a061a8cee4f0a54beb6dd1d61",
+              "descriptor_sha256": "5fb7380f9905cf7235b721e7e1ad7eb35b255a9308d29dbd9665d84aa6df1dca",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -2360,7 +2360,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "92876bb9d55a993336f63ec6d2db722669dd3d935b08cc7b7d52d03b77cf74ae",
+              "descriptor_sha256": "1544b8502dbe820bef5975324264dd95e7420c00090173fb7aa6a37ec77a2422",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -2426,7 +2426,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3c6909c2b28d3da460083ea15eab05527980b4373e062e49417f5bc9ed42841d",
+              "descriptor_sha256": "3f0aa5bab7252ff24e49ca42574d421a10ccb7335f348882e33a7e888882d301",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -2486,7 +2486,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3eec492385be0b1f8f9be2f8c3550e7f5da2d776e4cd3c3b5c3c329e33835d72",
+              "descriptor_sha256": "120c5a874ea96cf2c60bbe9420dd922d788e7e26d4cd503eb8c4bea8fed2a99d",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -2558,7 +2558,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "9fcd8ab6051d5d66b591443ec93521175b3790b9b1d540db19bc85e16506b085",
+              "descriptor_sha256": "6a150470c2aa3015502d83cdfe0ebd398b3e95cd350e3e4e5f15623b6b4bccb8",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -4743,7 +4743,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "89f1ec1748dc946446bfc2a5499652bdf59baff85c17e19ab8622544bcf6201b",
+              "descriptor_sha256": "a9ba52eef071ad8b8399c3c36c1a63be814d791793cfc50d411aadc7b96309d6",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -4803,7 +4803,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "74e352895f2dc7cf492c6ab233dde30fbe07049f7d1059ae896fe31e920020b3",
+              "descriptor_sha256": "9b4956cca2113ccaf9fa01302755b4ce381f590256c81c1f79c7854cefb2fe5b",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -4863,7 +4863,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "70b430235ae8d9e175f3e293f17a1bae9e5090ecdb456dddac0418eb0e03eb18",
+              "descriptor_sha256": "c1e6a75f2f12550ddff913f690657be55499819556e5afe6112cb4456dc21d55",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -4929,7 +4929,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "741c46db3b98d0c927ad4deb0f6bcd0ae703e09a061a8cee4f0a54beb6dd1d61",
+              "descriptor_sha256": "5fb7380f9905cf7235b721e7e1ad7eb35b255a9308d29dbd9665d84aa6df1dca",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -4989,7 +4989,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "92876bb9d55a993336f63ec6d2db722669dd3d935b08cc7b7d52d03b77cf74ae",
+              "descriptor_sha256": "1544b8502dbe820bef5975324264dd95e7420c00090173fb7aa6a37ec77a2422",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -5055,7 +5055,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3c6909c2b28d3da460083ea15eab05527980b4373e062e49417f5bc9ed42841d",
+              "descriptor_sha256": "3f0aa5bab7252ff24e49ca42574d421a10ccb7335f348882e33a7e888882d301",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -5115,7 +5115,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3eec492385be0b1f8f9be2f8c3550e7f5da2d776e4cd3c3b5c3c329e33835d72",
+              "descriptor_sha256": "120c5a874ea96cf2c60bbe9420dd922d788e7e26d4cd503eb8c4bea8fed2a99d",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -5187,7 +5187,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "9fcd8ab6051d5d66b591443ec93521175b3790b9b1d540db19bc85e16506b085",
+              "descriptor_sha256": "6a150470c2aa3015502d83cdfe0ebd398b3e95cd350e3e4e5f15623b6b4bccb8",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8276,7 +8276,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "99de39b29d8eb0d2b2cfc1dfa42f28264c5630a0f1970839c69307fcb50af87d",
+              "descriptor_sha256": "ce6b1058d2cfb8f67ccc9f4039a7a8ee70450f7ecc69c17b7af2a9d80486b6a3",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8342,7 +8342,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "c7479409a3c156d9f3c9e2b73d232e68a5b7ec54e88c150ba4093231eb8e8dd1",
+              "descriptor_sha256": "1c59c8e53b81d1964260861b30a3ba0a3a2b4b61a1ab6e300262e1de366fa917",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8390,7 +8390,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "d9eb6f020817525df94edd47281515f2798b0d056c9421e688a202d05ce39e6b",
+              "descriptor_sha256": "976e6f78d905626a1a6ef221936424f3491d2fca6e1dfaba752bf8f010f22790",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8438,7 +8438,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3df5cafb846ff5a74800df41ebd39f36de2518e335a09b2998ba7d7a277c622d",
+              "descriptor_sha256": "c8e7797c7cc4ede48baa0d9551bebda6f8cabd1c200284f9ce9ab8ae5695f080",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8498,7 +8498,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "974b22b7ccda71315c967ccdf32466d2eac04614db650fee6da6b713029a86cf",
+              "descriptor_sha256": "9cebe087de353d637aaa471f8ac409067e6a153df8476f5038723fe4b0bb52b3",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8546,7 +8546,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "7de54272b610e702d9cf7e4121ce6ad505d2ec42305511b774c4c3d902002345",
+              "descriptor_sha256": "41654d29f17b94388685fdf610e9b48d42713d320dd56a0c42a58b4b5afebb14",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8600,7 +8600,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "89f1ec1748dc946446bfc2a5499652bdf59baff85c17e19ab8622544bcf6201b",
+              "descriptor_sha256": "a9ba52eef071ad8b8399c3c36c1a63be814d791793cfc50d411aadc7b96309d6",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8660,7 +8660,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "70b430235ae8d9e175f3e293f17a1bae9e5090ecdb456dddac0418eb0e03eb18",
+              "descriptor_sha256": "c1e6a75f2f12550ddff913f690657be55499819556e5afe6112cb4456dc21d55",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8726,7 +8726,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "741c46db3b98d0c927ad4deb0f6bcd0ae703e09a061a8cee4f0a54beb6dd1d61",
+              "descriptor_sha256": "5fb7380f9905cf7235b721e7e1ad7eb35b255a9308d29dbd9665d84aa6df1dca",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8786,7 +8786,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "92876bb9d55a993336f63ec6d2db722669dd3d935b08cc7b7d52d03b77cf74ae",
+              "descriptor_sha256": "1544b8502dbe820bef5975324264dd95e7420c00090173fb7aa6a37ec77a2422",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8852,7 +8852,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3c6909c2b28d3da460083ea15eab05527980b4373e062e49417f5bc9ed42841d",
+              "descriptor_sha256": "3f0aa5bab7252ff24e49ca42574d421a10ccb7335f348882e33a7e888882d301",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8912,7 +8912,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3eec492385be0b1f8f9be2f8c3550e7f5da2d776e4cd3c3b5c3c329e33835d72",
+              "descriptor_sha256": "120c5a874ea96cf2c60bbe9420dd922d788e7e26d4cd503eb8c4bea8fed2a99d",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -8984,7 +8984,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "9fcd8ab6051d5d66b591443ec93521175b3790b9b1d540db19bc85e16506b085",
+              "descriptor_sha256": "6a150470c2aa3015502d83cdfe0ebd398b3e95cd350e3e4e5f15623b6b4bccb8",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -13681,7 +13681,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "99de39b29d8eb0d2b2cfc1dfa42f28264c5630a0f1970839c69307fcb50af87d",
+              "descriptor_sha256": "ce6b1058d2cfb8f67ccc9f4039a7a8ee70450f7ecc69c17b7af2a9d80486b6a3",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -13747,7 +13747,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "c7479409a3c156d9f3c9e2b73d232e68a5b7ec54e88c150ba4093231eb8e8dd1",
+              "descriptor_sha256": "1c59c8e53b81d1964260861b30a3ba0a3a2b4b61a1ab6e300262e1de366fa917",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -13795,7 +13795,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "d9eb6f020817525df94edd47281515f2798b0d056c9421e688a202d05ce39e6b",
+              "descriptor_sha256": "976e6f78d905626a1a6ef221936424f3491d2fca6e1dfaba752bf8f010f22790",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -13843,7 +13843,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3df5cafb846ff5a74800df41ebd39f36de2518e335a09b2998ba7d7a277c622d",
+              "descriptor_sha256": "c8e7797c7cc4ede48baa0d9551bebda6f8cabd1c200284f9ce9ab8ae5695f080",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -13903,7 +13903,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "974b22b7ccda71315c967ccdf32466d2eac04614db650fee6da6b713029a86cf",
+              "descriptor_sha256": "9cebe087de353d637aaa471f8ac409067e6a153df8476f5038723fe4b0bb52b3",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -13951,7 +13951,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "7de54272b610e702d9cf7e4121ce6ad505d2ec42305511b774c4c3d902002345",
+              "descriptor_sha256": "41654d29f17b94388685fdf610e9b48d42713d320dd56a0c42a58b4b5afebb14",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14005,7 +14005,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "89f1ec1748dc946446bfc2a5499652bdf59baff85c17e19ab8622544bcf6201b",
+              "descriptor_sha256": "a9ba52eef071ad8b8399c3c36c1a63be814d791793cfc50d411aadc7b96309d6",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14065,7 +14065,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "70b430235ae8d9e175f3e293f17a1bae9e5090ecdb456dddac0418eb0e03eb18",
+              "descriptor_sha256": "c1e6a75f2f12550ddff913f690657be55499819556e5afe6112cb4456dc21d55",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14131,7 +14131,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "741c46db3b98d0c927ad4deb0f6bcd0ae703e09a061a8cee4f0a54beb6dd1d61",
+              "descriptor_sha256": "5fb7380f9905cf7235b721e7e1ad7eb35b255a9308d29dbd9665d84aa6df1dca",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14191,7 +14191,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "92876bb9d55a993336f63ec6d2db722669dd3d935b08cc7b7d52d03b77cf74ae",
+              "descriptor_sha256": "1544b8502dbe820bef5975324264dd95e7420c00090173fb7aa6a37ec77a2422",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14257,7 +14257,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3c6909c2b28d3da460083ea15eab05527980b4373e062e49417f5bc9ed42841d",
+              "descriptor_sha256": "3f0aa5bab7252ff24e49ca42574d421a10ccb7335f348882e33a7e888882d301",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14317,7 +14317,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3eec492385be0b1f8f9be2f8c3550e7f5da2d776e4cd3c3b5c3c329e33835d72",
+              "descriptor_sha256": "120c5a874ea96cf2c60bbe9420dd922d788e7e26d4cd503eb8c4bea8fed2a99d",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14389,7 +14389,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "9fcd8ab6051d5d66b591443ec93521175b3790b9b1d540db19bc85e16506b085",
+              "descriptor_sha256": "6a150470c2aa3015502d83cdfe0ebd398b3e95cd350e3e4e5f15623b6b4bccb8",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14455,7 +14455,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "9c8e434f111cd5fa89ae895cbba3020718e0f6b956a99a5231d95f871e8155b6",
+              "descriptor_sha256": "aef310f93ff67a02aac7545b6c33a15bba0b76babf7200677ff3bf44746bb581",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14509,7 +14509,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "b6f14ab2de231fbb311e27ba9023e711ba6436be9fc236cfe5349e58d2213395",
+              "descriptor_sha256": "e3919a2a1b8b0d1fda41b525595abf9ddc573542555cadc82d2a906ba06da979",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14563,7 +14563,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "a07f5dd4e9fa70d33d30b9db701d7bde5c518b15fb5a46b1a842d063ad3efbcc",
+              "descriptor_sha256": "ee2b37f21fd2e47f8f80abcc5ec4788d4686b3a9966bcaae1fcb444f53903395",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -14617,7 +14617,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "aeead5d64461dc7c3f46dee42802eae2d802dc5c49d367c119c56ff71832f6c5",
+              "descriptor_sha256": "4b8f0a0d5bf2a662c496aa79b60248530eebf7c518c1c808b054db7bc805087c",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -18793,7 +18793,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "6f8f6ef76ea08258d74a5b366fc29aed05b681615586ceee8b64e9fbc4c3e1fd",
+              "descriptor_sha256": "230ea6502507df213a8afc7cfdb69aeaf209b5081466d1c6e0ba085d796a2689",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -18841,7 +18841,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "93eae2d17fbefbb2ba30e3e63eb0de4363829b2f21eaf9e648474ca8f6e52740",
+              "descriptor_sha256": "6c7acd4ecd54e5921ec506206186459b6c1d7de884537c09767f758601ab57b6",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -18889,7 +18889,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "a7b10797c20f42339f7f77bf571fbdaf7273fd8d0cdfc9df58045be544a1852b",
+              "descriptor_sha256": "3aeb3cef38d7ab68b378cdcdc661feb8e39f6b5a721f3a88c01b3438b55e3b28",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -18931,7 +18931,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "df723ecffd45f3ec3f8dee462905c0d80509b314e257800b74038cd5f6303645",
+              "descriptor_sha256": "bf79fdb51f1b84af97e6dfa9fef42eef252041290985a835d8f93038bfedbaa5",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -18979,7 +18979,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "3e827d13831e22a38f31a478a1a82a68706ab39a3e4a8dac52c196e490f18f69",
+              "descriptor_sha256": "3da9b5b08d952cf8517afcd321ba46ddbd5f9582031be1e9237c7c1facdc6a57",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -19021,7 +19021,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "f2d7fcfaef51dd89a72a162271fe81549583a391ce55a96739dea6917853d89f",
+              "descriptor_sha256": "09b513739a96d7487fb88e6ed2d19ed2dc433671f028a4ecde78ce67824c00fc",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -19063,7 +19063,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "b2d552e278b1e706da6c67cc7153ca23833f9df7de0ea0b5f993d7b922516b41",
+              "descriptor_sha256": "a37fb197dd8ee3f80d0c4d9c0bb2cf7a63c3b1d0b6e1f7d62b47462a87af011f",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -19105,7 +19105,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "2bdec4ebc86c66d60c24e9a016406867c744d463580e592a924c522e01e85215",
+              "descriptor_sha256": "f7124be9cd857d1edfb3aa92635c74025dc8eedcc8996774f5fdc229727d04da",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -19171,7 +19171,7 @@
               "provider_distribution": "millforge",
               "provider_version": "0.1.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "239a0eed910056e65c5259b35b9e77673d4aecbe1ae4a93c8e324dc81c84fdec",
+              "descriptor_sha256": "8f7497381b236baac490e8a71b4bef898f971781d79d8190f977b91d3ecde7cc",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -19963,7 +19963,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:71504b9b4226883dc3953f3d84013eb35c139d0c14b7276911b67c357e2f7078",
+  "manifest_digest": "sha256:b41be954b5da7bb5acdf1576f35a3c626163d79ca8692c91133c5b8c0dd4f17c",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",
