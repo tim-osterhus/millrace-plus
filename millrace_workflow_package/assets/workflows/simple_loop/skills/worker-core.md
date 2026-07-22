@@ -82,6 +82,9 @@ handoff_context:
 - Required fields for the chosen artifact are present.
 - Evidence supports the result, detail request, or gap packet.
 - Assumptions and unresolved risks are explicit.
+- Before doing work, compare the runtime-projected `body` with the work packet's
+  objective and completion definition. If the packet omits or changes a literal
+  source requirement, return `INSUFFICIENT_SPEC` with the exact discrepancy.
 - When completion requires exact file content, read the actual target and compare its exact bytes or text with the work packet requirement. Do not return `WORK_DONE` when punctuation, capitalization, whitespace, or any other required character differs.
 - Terminal marker is legal for `simple_loop.worker`.
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.

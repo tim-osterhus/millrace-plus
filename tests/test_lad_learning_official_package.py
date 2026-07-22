@@ -141,7 +141,7 @@ _PLUS_0003F_SKILL_DISPOSITION_SCHEMA = {
 }
 _FINAL_OFFICIAL_WORKFLOW_FINGERPRINTS = {
     "simple_loop": (
-        "sha256:379298fe7d73b3e92bc2f35e27d5cb3b50beb28d263f375ac00ef6cf948a2ae7"
+        "sha256:909bf24f9ac9b21f034e5dc502cd628fefea502666fc856e362bc4bf6aa961cb"
     ),
     "execution.lad": (
         "sha256:812f3de6c50a2406fd04e66f57ddb075547fc3783556e01a24fee9ac92583630"

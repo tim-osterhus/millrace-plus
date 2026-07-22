@@ -28,15 +28,15 @@
       "required_assets": [
         {
           "asset_id": "simple_loop.manager_prompt",
-          "content_digest": "sha256:b4837c4b3b1f302870efc21f34ec3b97ebabdb5292d381dbbe26e0dca3495720"
+          "content_digest": "sha256:8f684884b717e0b38e20f7b92a0c0174bf4c15808cbf65a022e5fc4a294df515"
         },
         {
           "asset_id": "simple_loop.worker_prompt",
-          "content_digest": "sha256:82f4ba7b804926b9730f69f0a19194b38f7611d5d5bb7bdcd7619b1394b51022"
+          "content_digest": "sha256:d5949f2bef43d29fedd54c20ad832d0bba76f88db314048f18a04599daabcaeb"
         },
         {
           "asset_id": "simple_loop.reviewer_prompt",
-          "content_digest": "sha256:83e108af820e02fd77adf24be381cba9c4fca95d422301cff7f7948b186f66c2"
+          "content_digest": "sha256:aca1ed01b5d4f1a2eb3a2bc4f13c972882601dd19491c88ff92a6de50556b2c3"
         },
         {
           "asset_id": "simple_loop.troubleshooter_prompt",
@@ -44,15 +44,15 @@
         },
         {
           "asset_id": "simple_loop.manager_core_skill",
-          "content_digest": "sha256:81aa67d938f21b6efb22373e9d6e28cea4ab0cb97caa9854bca3a96604690b2a"
+          "content_digest": "sha256:f6c0728e9dfdf04d7d11b5b9e8dac86795a8eaeacebd544abc3fcb807f528d4c"
         },
         {
           "asset_id": "simple_loop.worker_core_skill",
-          "content_digest": "sha256:5e3fab9c773f70e0fcfba145815ac6bf591183b55e1e0a7cc4ad05956fb089e0"
+          "content_digest": "sha256:578c6ea31adc36e4c773250284861a8b3303aed41adb57cdb549c9a6efa54abc"
         },
         {
           "asset_id": "simple_loop.reviewer_core_skill",
-          "content_digest": "sha256:52e0d4305e9678c76cbfb92212f28b3fc62865027d507c2796ce63ce9ba02c88"
+          "content_digest": "sha256:998a09034bf5e063f1e6c8a57bcbd9123c14c9bdea45ad5539f325cc0c7f078d"
         },
         {
           "asset_id": "simple_loop.troubleshooter_core_skill",
@@ -277,7 +277,8 @@
             "id": "simple_loop.external_work_prompt",
             "queue_family_id": "work_prompt",
             "runner_binding_id": "simple_loop.manager.millforge_runner",
-            "stage_kind_id": "simple_loop.manager"
+            "stage_kind_id": "simple_loop.manager",
+            "payload_schema_id": "simple_loop.work_prompt"
           }
         ],
         "graphs": [
@@ -929,15 +930,29 @@
             "kind": "route",
             "outcome_id": "simple_loop.manager.packet_ready",
             "payload_projection": {
+              "kind": "object",
               "fields": {
+                "prompt_id": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "prompt_id"
+                  ]
+                },
+                "body": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "body"
+                  ]
+                },
                 "work_packet": {
                   "kind": "source",
                   "path": [
                     "artifact_payload"
                   ]
                 }
-              },
-              "kind": "object"
+              }
             },
             "presentation": {
               "display_name": "simple_loop.manager.packet_ready"
@@ -999,7 +1014,22 @@
             "kind": "route",
             "outcome_id": "simple_loop.worker.work_done",
             "payload_projection": {
+              "kind": "object",
               "fields": {
+                "prompt_id": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "prompt_id"
+                  ]
+                },
+                "body": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "body"
+                  ]
+                },
                 "work_packet": {
                   "kind": "source",
                   "path": [
@@ -1013,8 +1043,7 @@
                     "artifact_payload"
                   ]
                 }
-              },
-              "kind": "object"
+              }
             },
             "presentation": {
               "display_name": "simple_loop.worker.work_done"
@@ -1031,11 +1060,20 @@
             "kind": "route",
             "outcome_id": "simple_loop.worker.insufficient_spec",
             "payload_projection": {
+              "kind": "object",
               "fields": {
-                "detail_request": {
+                "prompt_id": {
                   "kind": "source",
                   "path": [
-                    "artifact_payload"
+                    "work_item_payload",
+                    "prompt_id"
+                  ]
+                },
+                "body": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "body"
                   ]
                 },
                 "work_packet": {
@@ -1044,9 +1082,14 @@
                     "work_item_payload",
                     "work_packet"
                   ]
+                },
+                "detail_request": {
+                  "kind": "source",
+                  "path": [
+                    "artifact_payload"
+                  ]
                 }
-              },
-              "kind": "object"
+              }
             },
             "presentation": {
               "display_name": "simple_loop.worker.insufficient_spec"
@@ -1103,11 +1146,27 @@
             "kind": "route",
             "outcome_id": "simple_loop.reviewer.gaps_found",
             "payload_projection": {
+              "kind": "object",
               "fields": {
-                "gap_packet": {
+                "prompt_id": {
                   "kind": "source",
                   "path": [
-                    "artifact_payload"
+                    "work_item_payload",
+                    "prompt_id"
+                  ]
+                },
+                "body": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "body"
+                  ]
+                },
+                "work_packet": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "work_packet"
                   ]
                 },
                 "latest_work_result": {
@@ -1117,15 +1176,13 @@
                     "work_result"
                   ]
                 },
-                "work_packet": {
+                "gap_packet": {
                   "kind": "source",
                   "path": [
-                    "work_item_payload",
-                    "work_packet"
+                    "artifact_payload"
                   ]
                 }
-              },
-              "kind": "object"
+              }
             },
             "presentation": {
               "display_name": "simple_loop.reviewer.gaps_found"
@@ -1142,11 +1199,27 @@
             "kind": "route",
             "outcome_id": "simple_loop.reviewer.incident_required",
             "payload_projection": {
+              "kind": "object",
               "fields": {
-                "incident_report": {
+                "prompt_id": {
                   "kind": "source",
                   "path": [
-                    "artifact_payload"
+                    "work_item_payload",
+                    "prompt_id"
+                  ]
+                },
+                "body": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "body"
+                  ]
+                },
+                "work_packet": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "work_packet"
                   ]
                 },
                 "latest_work_result": {
@@ -1156,15 +1229,13 @@
                     "work_result"
                   ]
                 },
-                "work_packet": {
+                "incident_report": {
                   "kind": "source",
                   "path": [
-                    "work_item_payload",
-                    "work_packet"
+                    "artifact_payload"
                   ]
                 }
-              },
-              "kind": "object"
+              }
             },
             "presentation": {
               "display_name": "simple_loop.reviewer.incident_required"
@@ -19203,8 +19274,8 @@
     {
       "asset_id": "simple_loop.manager_prompt",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2359,
-      "content_digest": "sha256:b4837c4b3b1f302870efc21f34ec3b97ebabdb5292d381dbbe26e0dca3495720",
+      "byte_length": 2581,
+      "content_digest": "sha256:8f684884b717e0b38e20f7b92a0c0174bf4c15808cbf65a022e5fc4a294df515",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/simple_loop/entrypoints/manager.md",
@@ -19214,8 +19285,8 @@
     {
       "asset_id": "simple_loop.worker_prompt",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2180,
-      "content_digest": "sha256:82f4ba7b804926b9730f69f0a19194b38f7611d5d5bb7bdcd7619b1394b51022",
+      "byte_length": 2387,
+      "content_digest": "sha256:d5949f2bef43d29fedd54c20ad832d0bba76f88db314048f18a04599daabcaeb",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/simple_loop/entrypoints/worker.md",
@@ -19225,8 +19296,8 @@
     {
       "asset_id": "simple_loop.reviewer_prompt",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2153,
-      "content_digest": "sha256:83e108af820e02fd77adf24be381cba9c4fca95d422301cff7f7948b186f66c2",
+      "byte_length": 2313,
+      "content_digest": "sha256:aca1ed01b5d4f1a2eb3a2bc4f13c972882601dd19491c88ff92a6de50556b2c3",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/simple_loop/entrypoints/reviewer.md",
@@ -19247,8 +19318,8 @@
     {
       "asset_id": "simple_loop.manager_core_skill",
       "asset_kind": "stage_skill",
-      "byte_length": 3353,
-      "content_digest": "sha256:81aa67d938f21b6efb22373e9d6e28cea4ab0cb97caa9854bca3a96604690b2a",
+      "byte_length": 3489,
+      "content_digest": "sha256:f6c0728e9dfdf04d7d11b5b9e8dac86795a8eaeacebd544abc3fcb807f528d4c",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/simple_loop/skills/manager-core.md",
@@ -19258,8 +19329,8 @@
     {
       "asset_id": "simple_loop.worker_core_skill",
       "asset_kind": "stage_skill",
-      "byte_length": 3082,
-      "content_digest": "sha256:5e3fab9c773f70e0fcfba145815ac6bf591183b55e1e0a7cc4ad05956fb089e0",
+      "byte_length": 3320,
+      "content_digest": "sha256:578c6ea31adc36e4c773250284861a8b3303aed41adb57cdb549c9a6efa54abc",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/simple_loop/skills/worker-core.md",
@@ -19269,8 +19340,8 @@
     {
       "asset_id": "simple_loop.reviewer_core_skill",
       "asset_kind": "stage_skill",
-      "byte_length": 3210,
-      "content_digest": "sha256:52e0d4305e9678c76cbfb92212f28b3fc62865027d507c2796ce63ce9ba02c88",
+      "byte_length": 3392,
+      "content_digest": "sha256:998a09034bf5e063f1e6c8a57bcbd9123c14c9bdea45ad5539f325cc0c7f078d",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/simple_loop/skills/reviewer-core.md",
@@ -19892,7 +19963,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:cddbd9497d4825a44e32b57c5e7b06c47de638f97833b32745d95a4d87313e00",
+  "manifest_digest": "sha256:71504b9b4226883dc3953f3d84013eb35c139d0c14b7276911b67c357e2f7078",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",

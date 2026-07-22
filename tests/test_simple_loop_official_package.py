@@ -389,22 +389,35 @@ def test_each_simple_loop_stage_has_entrypoint_prompt_and_core_skill() -> None:
 
 
 def test_simple_loop_core_skills_require_literal_completion_verification() -> None:
+    entrypoints_root = PACKAGE_ROOT / "assets/workflows/simple_loop/entrypoints"
     skills_root = PACKAGE_ROOT / "assets/workflows/simple_loop/skills"
+    manager_entrypoint = (entrypoints_root / "manager.md").read_text()
+    worker_entrypoint = (entrypoints_root / "worker.md").read_text()
+    reviewer_entrypoint = (entrypoints_root / "reviewer.md").read_text()
     manager = (skills_root / "manager-core.md").read_text()
     worker = (skills_root / "worker-core.md").read_text()
     reviewer = (skills_root / "reviewer-core.md").read_text()
 
+    for entrypoint in (manager_entrypoint, worker_entrypoint, reviewer_entrypoint):
+        assert "top-level `prompt_id` and `body`" in entrypoint
+
     assert "preserve it character-for-character" in manager
     assert "punctuation, capitalization, and whitespace" in manager
     assert "do not normalize or paraphrase it" in manager
+    assert "runtime-projected top-level `prompt_id` and `body`" in manager
 
     assert "read the actual target" in worker
     assert "compare its exact bytes or text" in worker
     assert "Do not return `WORK_DONE`" in worker
+    assert "compare the runtime-projected `body`" in worker
+    assert "return `INSUFFICIENT_SPEC`" in worker
 
     assert "independently read the actual target" in reviewer
     assert "Do not rely on the Worker's summary" in reviewer
     assert "return `GAPS_FOUND`" in reviewer
+    assert (
+        "runtime-projected `body`, the work packet, and the actual target" in reviewer
+    )
 
 
 def test_path_archive_sources_select_and_verify_simple_loop(tmp_path: Path) -> None:

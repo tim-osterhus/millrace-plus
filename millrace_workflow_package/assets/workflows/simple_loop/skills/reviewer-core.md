@@ -83,6 +83,9 @@ handoff_context:
 - Required fields for the chosen artifact are present.
 - Evidence supports acceptance, gaps, or incident findings.
 - Assumptions and unresolved risks are explicit.
+- Compare the runtime-projected `body`, the work packet, and the actual target
+  independently. Return `GAPS_FOUND` when the packet or target changes a
+  literal source requirement.
 - When completion requires exact file content, independently read the actual target and compare its exact bytes or text with the completion definition. Do not rely on the Worker's summary; return `GAPS_FOUND` for any punctuation, capitalization, whitespace, or other required-character mismatch.
 - Terminal marker is legal for `simple_loop.reviewer`.
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.

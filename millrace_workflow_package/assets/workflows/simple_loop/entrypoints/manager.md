@@ -11,7 +11,9 @@ Scope:
 Inputs from dispatch:
 - Work item and run identifiers.
 - Stage identifier `simple_loop.manager`.
-- Input payload containing `work_prompt`, `work_packet`, or `incident_report` data.
+- Input payload containing the top-level `prompt_id` and `body` from the exact
+  source prompt, plus any `work_packet`, `detail_request`, or `incident_report`
+  context selected by the workflow.
 - Legal terminal markers and selected package asset pins from dispatch.
 
 Readable assets:
@@ -30,8 +32,10 @@ Required evidence:
 
 Process:
 1. Read only dispatch-provided payload and selected readable assets.
-2. Produce the management artifact using the core skill schema.
-3. Preserve assumptions and evidence in the returned artifact summary.
+2. Preserve literal requirements from the top-level source `body` when writing
+   or revising the work packet.
+3. Produce the management artifact using the core skill schema.
+4. Preserve assumptions and evidence in the returned artifact summary.
 
 Legal terminal markers rendered by runtime:
 - `PACKET_READY` when a complete work packet is produced.

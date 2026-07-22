@@ -11,7 +11,8 @@ Scope:
 Inputs from dispatch:
 - Work item and run identifiers.
 - Stage identifier `simple_loop.worker`.
-- Input payload containing a `work_packet` and optional `gap_packet`.
+- Input payload containing the top-level `prompt_id` and `body` from the exact
+  source prompt, a `work_packet`, and optional review-gap context.
 - Legal terminal markers and selected package asset pins from dispatch.
 
 Readable assets:
@@ -29,9 +30,12 @@ Required evidence:
 - Assumptions and unresolved risks.
 
 Process:
-1. Validate the work packet against selected schema details.
-2. Do the requested work within the dispatch scope.
-3. Return a structured artifact with evidence and one legal marker.
+1. Validate the work packet against selected schema details and the top-level
+   source `body`.
+2. Return `INSUFFICIENT_SPEC` when the packet omits or changes a literal source
+   requirement.
+3. Do the requested work within the dispatch scope.
+4. Return a structured artifact with evidence and one legal marker.
 
 Legal terminal markers rendered by runtime:
 - `WORK_DONE` when the work result satisfies the completion definition.

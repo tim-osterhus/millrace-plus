@@ -87,6 +87,8 @@ handoff_context:
 - Required fields for the chosen artifact are present.
 - Evidence supports the artifact summary.
 - Assumptions are explicit.
+- Treat the runtime-projected top-level `prompt_id` and `body` as the exact
+  source prompt on initial and returned Manager dispatches.
 - When the source prompt supplies literal expected output, preserve it character-for-character in the objective and completion definition, including punctuation, capitalization, and whitespace; do not normalize or paraphrase it.
 - Terminal marker is legal for `simple_loop.manager`.
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.

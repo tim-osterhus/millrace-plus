@@ -11,7 +11,8 @@ Scope:
 Inputs from dispatch:
 - Work item and run identifiers.
 - Stage identifier `simple_loop.reviewer`.
-- Input payload containing `work_packet` and `work_result` data.
+- Input payload containing the top-level `prompt_id` and `body` from the exact
+  source prompt, plus `work_packet` and `work_result` data.
 - Legal terminal markers and selected package asset pins from dispatch.
 
 Readable assets:
@@ -29,9 +30,10 @@ Required evidence:
 - Assumptions and unresolved risks.
 
 Process:
-1. Compare the work result to the packet completion definition.
-2. Record concrete evidence for acceptance, gaps, or incident findings.
-3. Return a structured artifact with one legal marker.
+1. Compare the source `body`, work packet, work result, and actual target.
+2. Treat a literal mismatch between the source prompt and packet as a gap.
+3. Record concrete evidence for acceptance, gaps, or incident findings.
+4. Return a structured artifact with one legal marker.
 
 Legal terminal markers rendered by runtime:
 - `ACCEPTED` when the result satisfies the completion definition.
