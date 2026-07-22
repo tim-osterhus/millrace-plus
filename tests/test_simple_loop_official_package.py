@@ -388,6 +388,25 @@ def test_each_simple_loop_stage_has_entrypoint_prompt_and_core_skill() -> None:
         assert asset_kinds[skill_asset_id] == "stage_skill"
 
 
+def test_simple_loop_core_skills_require_literal_completion_verification() -> None:
+    skills_root = PACKAGE_ROOT / "assets/workflows/simple_loop/skills"
+    manager = (skills_root / "manager-core.md").read_text()
+    worker = (skills_root / "worker-core.md").read_text()
+    reviewer = (skills_root / "reviewer-core.md").read_text()
+
+    assert "preserve it character-for-character" in manager
+    assert "punctuation, capitalization, and whitespace" in manager
+    assert "do not normalize or paraphrase it" in manager
+
+    assert "read the actual target" in worker
+    assert "compare its exact bytes or text" in worker
+    assert "Do not return `WORK_DONE`" in worker
+
+    assert "independently read the actual target" in reviewer
+    assert "Do not rely on the Worker's summary" in reviewer
+    assert "return `GAPS_FOUND`" in reviewer
+
+
 def test_path_archive_sources_select_and_verify_simple_loop(tmp_path: Path) -> None:
     path_source, archive_source = conformance.assert_path_archive_source_parity(
         PACKAGE_ROOT,

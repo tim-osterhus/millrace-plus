@@ -87,6 +87,7 @@ handoff_context:
 - Required fields for the chosen artifact are present.
 - Evidence supports the artifact summary.
 - Assumptions are explicit.
+- When the source prompt supplies literal expected output, preserve it character-for-character in the objective and completion definition, including punctuation, capitalization, and whitespace; do not normalize or paraphrase it.
 - Terminal marker is legal for `simple_loop.manager`.
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.

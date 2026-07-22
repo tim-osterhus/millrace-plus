@@ -83,6 +83,7 @@ handoff_context:
 - Required fields for the chosen artifact are present.
 - Evidence supports acceptance, gaps, or incident findings.
 - Assumptions and unresolved risks are explicit.
+- When completion requires exact file content, independently read the actual target and compare its exact bytes or text with the completion definition. Do not rely on the Worker's summary; return `GAPS_FOUND` for any punctuation, capitalization, whitespace, or other required-character mismatch.
 - Terminal marker is legal for `simple_loop.reviewer`.
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.

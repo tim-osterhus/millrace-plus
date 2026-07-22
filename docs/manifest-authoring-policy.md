@@ -49,8 +49,8 @@ which workflow behavior should be official.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:ff9871c006ab5a2cb6b64e15c5054dcc49f3e35d467f804834910d094706f8ba",
-  "package_digest": "sha256:050f1dde41788032e41109bdf6cb72af71438d9da1ee7ea7d4155c9f858a59ac",
+  "manifest_digest": "sha256:cddbd9497d4825a44e32b57c5e7b06c47de638f97833b32745d95a4d87313e00",
+  "package_digest": "sha256:ff5dad8caa2f48df529aa0e4942a940d9a39ad39167cab0bbb7d9fa7dad3b0a6",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
     "package_version": "0.22.0",
@@ -61,7 +61,7 @@ which workflow behavior should be official.
     "execution.lad_integrator@0.1": "sha256:14fa9bfd828f3d8570611850897b44eb7d39ffb45b19eee0010f34647173274d",
     "lad.full@0.1": "sha256:823b2ad242324e6c05c1e7449585132b92f50fcbedc2d1e6d3d9ca55a70c6cfc",
     "planning.lad@0.1": "sha256:9efafc58fd4b3d089f80b2529251eddd45087203d356180f27d6aa1d928bd775",
-    "simple_loop@0.1": "sha256:8872ed905d363938e5c00e7049a0f66eeccf9aafc68de1b265e9d612fd448404",
+    "simple_loop@0.1": "sha256:a7ffc2c00a2e23a9226273d9bc583df2c2c528d25fbb98d840722ad7e34246e0",
     "vendor_selection@0.1": "sha256:f7de5aeda706c078f76c46d4627a2e02e6d61f09ea808106bb35a898ab5c7e9d"
   },
   "asset_pins": [
@@ -247,7 +247,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "simple_loop.manager_core_skill",
-      "content_digest": "sha256:072c2c3fe2a6bf62c5bc58f975e569f7fc731bf1d863d765d144f42433afde21",
+      "content_digest": "sha256:81aa67d938f21b6efb22373e9d6e28cea4ab0cb97caa9854bca3a96604690b2a",
       "package_path": "assets/workflows/simple_loop/skills/manager-core.md"
     },
     {
@@ -257,7 +257,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "simple_loop.reviewer_core_skill",
-      "content_digest": "sha256:eaddd593333d592c78a43deaa74e2197831de1d5dda79a31ac0d3e52e0113e34",
+      "content_digest": "sha256:52e0d4305e9678c76cbfb92212f28b3fc62865027d507c2796ce63ce9ba02c88",
       "package_path": "assets/workflows/simple_loop/skills/reviewer-core.md"
     },
     {
@@ -277,7 +277,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "simple_loop.worker_core_skill",
-      "content_digest": "sha256:5e317e3efc5b7315bf7a40b77dd13cd52e3dca7d71826f546bf269361681e8d9",
+      "content_digest": "sha256:5e3fab9c773f70e0fcfba145815ac6bf591183b55e1e0a7cc4ad05956fb089e0",
       "package_path": "assets/workflows/simple_loop/skills/worker-core.md"
     },
     {
