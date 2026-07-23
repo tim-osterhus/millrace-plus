@@ -35,10 +35,38 @@ LEGACY_ASSET_ENV = "MILLRACE_LEGACY_ASSET_ROOT"
 HIDDEN_REWRITE_PYTHONPATH = "PYTHONPATH=../../source/" "millrace-rewrite/src"
 LEGACY_ASSET_PATH = "dev/source/millrace/src/" "millrace_ai/assets"
 RELEASE_IDENTITY = "0.22.0"
+META_RELEASE_PIN = "`millrace==0.22.0`"
+BUNDLE_MEMBER_PINS = (
+    "`millrace-ai==0.22.0`",
+    "`millrace-plus==0.22.0`",
+    "`millforge==0.1.0`",
+)
+VERSIONING_RULES = (
+    "Member distributions version independently.",
+    "Each `millrace` meta-distribution release pins one tested combination",
+    "may reuse an unchanged compatible member.",
+)
+STALE_PUBLIC_RELEASE_PHRASES = (
+    "0.0.0",
+    "staging version",
+    "staging package version",
+    "staging metadata",
+    "not yet published",
+    "being prepared",
+    "replace staging metadata",
+    "install both tested distributions together",
+    "`millrace-ai` and `millrace-plus` together",
+    "only `millrace-ai` and `millrace-plus`",
+    "both `millrace-ai` and `millrace-plus`",
+)
 
 
 def _project_text(path: str) -> str:
     return (PROJECT_ROOT / path).read_text()
+
+
+def _normalized_text(text: str) -> str:
+    return " ".join(text.lower().split())
 
 
 def _imports_runtime_module(path: Path) -> bool:
@@ -75,10 +103,9 @@ def test_current_docs_preserve_public_package_and_evidence_boundaries() -> None:
     for required in (
         "official collection of ready-to-run Millrace workflows",
         "`millrace.plus.official`",
-        "staging package version `0.0.0`",
+        "source and package are on the v0.22.0 release line",
         "installed resource root is `millrace_workflow_package`",
         "package data is non-executable",
-        "not yet published",
         "A direct installation contains package metadata and data only",
         "does not transitively install `millrace-ai`",
         "does not copy them into Codex, Claude Code",
@@ -94,6 +121,28 @@ def test_current_docs_preserve_public_package_and_evidence_boundaries() -> None:
         LEGACY_ASSET_ENV,
     ):
         assert required in current_docs
+
+
+def test_public_release_text_has_no_staging_or_prepublication_claims() -> None:
+    for public_doc in PUBLIC_DOCS:
+        normalized_text = _normalized_text(_project_text(public_doc))
+        for stale_phrase in STALE_PUBLIC_RELEASE_PHRASES:
+            assert stale_phrase not in normalized_text, (
+                public_doc,
+                stale_phrase,
+            )
+
+
+def test_public_release_text_names_exact_initial_bundle_members() -> None:
+    for public_release_doc in ("README.md", "docs/release.md"):
+        release_text = _project_text(public_release_doc)
+        normalized_release_text = _normalized_text(release_text)
+
+        assert META_RELEASE_PIN in release_text
+        for member_pin in BUNDLE_MEMBER_PINS:
+            assert member_pin in release_text
+        for versioning_rule in VERSIONING_RULES:
+            assert _normalized_text(versioning_rule) in normalized_release_text
 
 
 def test_dependency_policy_is_dependency_free_and_documented() -> None:
@@ -144,7 +193,7 @@ def test_public_ci_runs_clean_checkout_boundary_without_sibling_paths() -> None:
     assert LEGACY_ASSET_PATH not in workflow
 
 
-def test_built_artifacts_share_v022_release_identity(
+def test_built_artifacts_have_durable_v022_public_text(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -201,8 +250,18 @@ def test_built_artifacts_share_v022_release_identity(
         sys.modules.pop(module_name, None)
         installed_module = importlib.import_module(module_name)
 
-        assert f"Version: {RELEASE_IDENTITY}\n" in wheel_metadata
-        assert f"Version: {RELEASE_IDENTITY}\n" in sdist_metadata_text
+        for metadata_text in (wheel_metadata, sdist_metadata_text):
+            assert f"Version: {RELEASE_IDENTITY}\n" in metadata_text
+            assert META_RELEASE_PIN in metadata_text
+            for member_pin in BUNDLE_MEMBER_PINS:
+                assert member_pin in metadata_text
+
+            normalized_metadata = _normalized_text(metadata_text)
+            for versioning_rule in VERSIONING_RULES:
+                assert _normalized_text(versioning_rule) in normalized_metadata
+            for stale_phrase in STALE_PUBLIC_RELEASE_PHRASES:
+                assert stale_phrase not in normalized_metadata
+
         assert wheel_manifest["package"]["package_version"] == RELEASE_IDENTITY
         assert sdist_manifest_data["package"]["package_version"] == RELEASE_IDENTITY
         assert installed_module.__version__ == RELEASE_IDENTITY

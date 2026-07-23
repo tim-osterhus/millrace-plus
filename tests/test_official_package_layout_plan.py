@@ -24,7 +24,7 @@ def test_readme_documents_public_official_workflow_package() -> None:
     for required in (
         "`millrace_workflow_package/`",
         "`millrace.plus.official`",
-        "staging package version `0.0.0`",
+        "source and package are on the v0.22.0 release line",
         "installed resource root is `millrace_workflow_package`",
         "`simple_loop`",
         "`execution.lad`",
@@ -33,7 +33,7 @@ def test_readme_documents_public_official_workflow_package() -> None:
         "`lad.full`",
         "`vendor_selection`",
         "package data is non-executable",
-        "not yet published",
+        "`millrace==0.22.0` convenience meta-distribution",
     ):
         assert required in readme
     assert "PLUS-" not in readme

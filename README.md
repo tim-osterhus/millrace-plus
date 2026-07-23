@@ -8,9 +8,7 @@ workflow definitions, entrypoint prompts, stage skills, and examples that make
 the runtime useful out of the box. It contains data only: no daemon, CLI,
 runner, provider, plugin, or installation hook.
 
-> **Status:** Millrace Plus is being prepared for its first v0.22.0 release.
-> The source manifest still uses the staging package version `0.0.0`, and the
-> distribution is not yet published.
+> **Release line:** This source and package are on the v0.22.0 release line.
 
 ## Included Workflows
 
@@ -57,8 +55,13 @@ execute package code to discover workflows.
 
 The installed resource root is `millrace_workflow_package`; package data is
 non-executable. A direct installation contains package metadata and data only
-and does not transitively install `millrace-ai`; the `millrace` convenience
-package will install both tested distributions together.
+and does not transitively install `millrace-ai` or another member distribution.
+
+The `millrace==0.22.0` convenience meta-distribution selects and installs this
+exact tested combination: `millrace-ai==0.22.0`, `millrace-plus==0.22.0`, and
+`millforge==0.1.0`. Member distributions version independently. Each
+`millrace` meta-distribution release pins one tested combination and may reuse
+an unchanged compatible member.
 
 ## Authoring Model
 
@@ -109,7 +112,7 @@ env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
 ```
 
 See [Validation](docs/public-validation.md) for build and artifact checks, and
-[Release status](docs/release.md) for the current packaging state.
+[Release details](docs/release.md) for packaging and versioning rules.
 
 ## License
 
