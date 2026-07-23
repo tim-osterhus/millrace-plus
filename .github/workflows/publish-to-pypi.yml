@@ -1,0 +1,91 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - v0.22.0
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+        with:
+          version: 0.9.30
+      - name: Test
+        run: env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python 3.11 --with pytest==9.1.1 --with hatchling==1.31.0 pytest -q
+      - name: Lint
+        run: uv run --no-project --python 3.11 --with ruff==0.15.21 ruff check src tests
+      - name: Check clean source tree
+        run: test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      - name: Build
+        run: |
+          test ! -e dist
+          SOURCE_DATE_EPOCH=1580601600 PYTHONDONTWRITEBYTECODE=1 uv build --python 3.11 --force-pep517
+      - name: Verify built distributions
+        shell: bash
+        run: |
+          expected=(
+            ".gitignore"
+            "millrace_plus-0.22.0-py3-none-any.whl"
+            "millrace_plus-0.22.0.tar.gz"
+          )
+          mapfile -t actual < <(find dist -maxdepth 1 -type f -printf '%f\n' | sort)
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          if [[ "${actual[*]}" != "${expected_sorted[*]}" ]]; then
+            printf 'unexpected distribution set: %s\n' "${actual[*]}" >&2
+            exit 1
+          fi
+          sha256sum --check --strict <<'SHA256'
+          36daed6f26ef2856341cafadbac5f1ed054574f9648e8a4e8da4fbbd21023d71  dist/millrace_plus-0.22.0-py3-none-any.whl
+          1308d26d06b9af0449e3dc0ca7e406c1e4f626156dac8b9588bd4568a58046bf  dist/millrace_plus-0.22.0.tar.gz
+          SHA256
+      - name: Check source unchanged
+        run: git diff --exit-code
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pypi-distributions
+          if-no-files-found: error
+          path: |
+            dist/millrace_plus-0.22.0-py3-none-any.whl
+            dist/millrace_plus-0.22.0.tar.gz
+
+  publish:
+    needs: validate
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/tags/v0.22.0' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: pypi-distributions
+          path: dist/
+      - name: Verify downloaded distributions
+        shell: bash
+        run: |
+          expected=(
+            "millrace_plus-0.22.0-py3-none-any.whl"
+            "millrace_plus-0.22.0.tar.gz"
+          )
+          mapfile -t actual < <(find dist -maxdepth 1 -type f -printf '%f\n' | sort)
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          if [[ "${actual[*]}" != "${expected_sorted[*]}" ]]; then
+            printf 'unexpected downloaded distribution set: %s\n' "${actual[*]}" >&2
+            exit 1
+          fi
+          sha256sum --check --strict <<'SHA256'
+          36daed6f26ef2856341cafadbac5f1ed054574f9648e8a4e8da4fbbd21023d71  dist/millrace_plus-0.22.0-py3-none-any.whl
+          1308d26d06b9af0449e3dc0ca7e406c1e4f626156dac8b9588bd4568a58046bf  dist/millrace_plus-0.22.0.tar.gz
+          SHA256
+      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+        with:
+          packages-dir: dist/
