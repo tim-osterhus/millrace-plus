@@ -1,27 +1,21 @@
 from __future__ import annotations
 
-# ruff: noqa: E402
-import copy
-import json
-import re
-import shutil
-from dataclasses import asdict
+from collections.abc import Callable
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
-
-from support.internal_conformance_gate import require_internal_conformance
-
-require_internal_conformance()
-
-from millrace.compiler.canonical import authority_fingerprint
-from millrace.contracts.compiled_plan import canonical_authority_bytes
-from millrace.contracts.workflow_package import (
-    asset_digest_for_bytes,
-    manifest_digest_for_manifest,
+from millrace.compiler import (
+    CompiledPlanExportError,
+    authority_fingerprint,
+    canonical_authority_bytes,
+    compile_workflow,
+    compiled_plan_export_bytes,
+    compiled_plan_export_record,
+    verify_compiled_plan_export_bytes,
+    verify_compiled_plan_export_record,
 )
-from millrace.workflows import lad_learning
 
 from support import package_conformance as conformance
 
@@ -30,1129 +24,860 @@ PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.22.0"
 WORKFLOW_ID = "lad.full"
+Record = dict[str, object]
 
-_ENTRYPOINT_HEADINGS = (
-    "Role:",
-    "Scope:",
-    "Inputs from dispatch:",
-    "Readable assets:",
-    "Writable artifacts:",
-    "Required evidence:",
-    "Legal terminal markers rendered by runtime:",
-    "Forbidden claims:",
-    "How to return evidence:",
-    "When to stop:",
-)
-_CORE_SKILL_HEADINGS = (
-    "## Artifact Schema",
-    "## Handoff Format",
-    "## Valid Example",
-    "## Invalid Examples",
-    "## Validation Checklist",
-    "## Completion Criteria",
-)
-_LEARNING_STAGE_PAIRS = (
-    (
+
+def _manifest() -> dict[str, Any]:
+    return conformance.assert_packaged_asset_closure(PACKAGE_ROOT)
+
+
+def _source() -> dict[str, object]:
+    return conformance.packaged_workflow_source(PACKAGE_ROOT, WORKFLOW_ID)
+
+
+def _records(source: dict[str, object], section: str) -> list[Record]:
+    return cast(list[Record], source[section])
+
+
+def _record(source: dict[str, object], section: str, record_id: str) -> Record:
+    return next(item for item in _records(source, section) if item["id"] == record_id)
+
+
+def _compile_errors(source: dict[str, object]) -> tuple[object, ...]:
+    return tuple(
+        diagnostic
+        for diagnostic in compile_workflow(source).diagnostics
+        if diagnostic.severity == "error"
+    )
+
+
+def _error(source: dict[str, object], code: str) -> object:
+    return next(error for error in _compile_errors(source) if error.code == code)
+
+
+def test_full_lad_authority_and_assets_are_package_owned() -> None:
+    manifest = _manifest()
+    workflow = conformance.workflows_by_id(manifest)[WORKFLOW_ID]
+    selected = cast(dict[str, object], workflow["selected_authority"])
+
+    assert workflow["workflow_version"] == "0.1"
+    assert len(cast(list[object], selected["stage_kinds"])) == 17
+    assert len(cast(list[object], workflow["required_assets"])) == 34
+    assert "assets" not in selected
+
+
+def test_full_lad_selects_through_installed_public_api(tmp_path: Path) -> None:
+    manifest = _manifest()
+    plan = conformance.select_and_verify_package(
+        tmp_path,
+        PACKAGE_ROOT,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=WORKFLOW_ID,
+        workflow_version="0.1",
+    )
+    conformance.assert_selected_package_pin(
+        plan,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=WORKFLOW_ID,
+        workflow_version="0.1",
+        selected_asset_pins=conformance.selected_asset_pins(manifest, WORKFLOW_ID),
+    )
+
+
+def test_full_lad_librarian_assets_keep_truthful_noop_contract() -> None:
+    root = PACKAGE_ROOT / "assets/workflows/lad.full"
+    entrypoint = (root / "entrypoints/librarian.md").read_text()
+    skill = (root / "skills/librarian-core.md").read_text()
+    combined = entrypoint + skill
+    assert "index_unavailable" in combined
+    assert "NOOP" in combined
+    assert "skill_disposition" in combined
+    assert "install authority" in combined
+
+
+def test_full_lad_learning_route_is_selected_authority() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    route = next(
+        route
+        for route in plan.external_enqueue_routes
+        if route.id == "learning_request"
+    )
+
+    assert (
+        str(route.queue_family_id),
+        route.graph_node_id,
+        str(route.stage_kind_id),
+        str(route.runner_binding_id),
+        str(route.payload_schema_id),
+    ) == (
+        "learning_request",
+        "learning.standard.analyst",
         "analyst",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/learning/"
-        "analyst.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/learning/"
-        "analyst-core/SKILL.md",
-        "learning.entrypoints.analyst",
-        "learning.skills.analyst_core",
-    ),
-    (
-        "professor",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/learning/"
-        "professor.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/learning/"
-        "professor-core/SKILL.md",
-        "learning.entrypoints.professor",
-        "learning.skills.professor_core",
-    ),
-    (
-        "curator",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/learning/"
-        "curator.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/learning/"
-        "curator-core/SKILL.md",
-        "learning.entrypoints.curator",
-        "learning.skills.curator_core",
-    ),
-    (
-        "librarian",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/learning/"
-        "librarian.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/learning/"
-        "librarian-core/SKILL.md",
-        "learning.entrypoints.librarian",
-        "learning.skills.librarian_core",
-    ),
-)
-_PROVIDER_EFFECT_REFS = (
-    "learning.effect.curator.workspace_skill_update",
-    "learning.effect.librarian.workspace_skill_install_report",
-    "provider.fake_local.workspace",
-    "policy.fake_local.no_real_side_effects",
-)
-_SECRET_VALUE_PATTERN = re.compile(
-    r"\b(?:api[_-]?key|oauth[_-]?token|provider[_-]?secret|"
-    r"client[_-]?secret|password)\b\s*[:=]\s*['\"][^'\"]+['\"]",
-    re.IGNORECASE,
-)
-_PROVIDER_CODE_PATTERNS = (
-    "subprocess.run(",
-    "requests.",
-    "httpx.",
-    "import requests",
-    "import httpx",
-    "mcp.server",
-    "native_runner",
-    "provider_adapter",
-)
-_PLUS_0003F_SKILL_DISPOSITION_SCHEMA = {
-    "type": "object",
-    "required": [
-        "artifact_kind",
-        "summary",
-        "disposition",
-    ],
-    "properties": {
-        "artifact_kind": {
-            "const": "learning.artifacts.skill_disposition",
-        },
-        "summary": {
-            "type": "string",
-            "min_length": 1,
-        },
-        "disposition": {
-            "type": "string",
-            "enum": [
-                "already_available",
-                "no_candidate",
-                "index_unavailable",
-            ],
-        },
-        "target_skill_id": {
-            "type": "string",
-            "min_length": 1,
-        },
-    },
-}
-_FINAL_OFFICIAL_WORKFLOW_FINGERPRINTS = {
-    "simple_loop": (
-        "sha256:1c1836f4150df5a1144ea09d90c27eff53e75eebc1dff5b127b30dd0992c4635"
-    ),
-    "execution.lad": (
-        "sha256:91069cb4fa237fd113a9b6e8ce33f459de4dc8bf90fa94892ea158d0591ecf9a"
-    ),
-    "execution.lad_integrator": (
-        "sha256:7152c913423dfa4463b8f14247b163d3749e2d44857d840fdbec84c09857f955"
-    ),
-    "planning.lad": (
-        "sha256:c7da2a2f0325c025c94effbda299c312d7454e36579301f65de89c92ba788869"
-    ),
-    "lad.full": (
-        "sha256:7980769e2e4a8aab706edfc39d60ef2b64ea504d33ee69052951edffa0aa097c"
-    ),
-    "vendor_selection": (
-        "sha256:fb75556de6dc9f637a9bb2dfadbabd2b33d6dda09818263a5e50b31ebd38ec01"
-    ),
-}
-
-
-def _load_manifest(package_root: Path = PACKAGE_ROOT) -> dict[str, Any]:
-    return conformance.load_manifest_source(package_root)
-
-
-def _workflows_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
-    return {
-        str(workflow["workflow_id"]): workflow
-        for workflow in cast(list[dict[str, object]], manifest["workflows"])
-    }
-
-
-def _assets_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
-    return {
-        str(asset["asset_id"]): asset
-        for asset in cast(list[dict[str, object]], manifest["assets"])
-    }
-
-
-def _schemas_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    return {
-        str(schema["id"]): cast(dict[str, object], schema["schema"])
-        for schema in cast(
-            list[dict[str, object]], selected_authority["artifact_schemas"]
-        )
-    }
-
-
-def _marker_schema_by_stage(manifest: dict[str, Any]) -> dict[str, dict[str, str]]:
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    outcomes = {
-        str(outcome["id"]): (
-            str(outcome["stage_kind_id"]),
-            str(outcome["marker"]),
-        )
-        for outcome in cast(
-            list[dict[str, object]],
-            selected_authority["terminal_outcomes"],
-        )
-        if "marker" in outcome
-    }
-    marker_schema_by_stage: dict[str, dict[str, str]] = {}
-    for action in cast(
-        list[dict[str, object]],
-        selected_authority["terminal_actions"],
-    ):
-        if "artifact_schema_id" not in action:
-            continue
-        outcome_id = str(action["outcome_id"])
-        if outcome_id not in outcomes:
-            continue
-        stage_id, marker = outcomes[outcome_id]
-        marker_schema_by_stage.setdefault(stage_id, {})[marker] = str(
-            action["artifact_schema_id"]
-        )
-    return marker_schema_by_stage
-
-
-def _source_as_selected_authority(source: dict[str, object]) -> dict[str, object]:
-    selected = cast(dict[str, object], json.loads(json.dumps(source)))
-    selected.pop("assets")
-    return selected
-
-
-def _without_runner_authority(authority: dict[str, object]) -> dict[str, object]:
-    normalized = cast(dict[str, object], json.loads(json.dumps(authority)))
-    normalized.pop("capabilities", None)
-    normalized.pop("runner_bindings")
-
-    def normalize_refs(value: object) -> None:
-        if isinstance(value, dict):
-            for key, child in value.items():
-                if key in {"runner_binding_id", "target_runner_binding_id"}:
-                    value[key] = "<selected-runner-binding>"
-                else:
-                    normalize_refs(child)
-        elif isinstance(value, list):
-            for child in value:
-                normalize_refs(child)
-
-    normalize_refs(normalized)
-    return normalized
-
-
-def _source_as_selected_authority_with_plus_0003f_overlay(
-    source: dict[str, object],
-) -> dict[str, object]:
-    selected = _source_as_selected_authority(source)
-    artifact_schemas = cast(
-        list[dict[str, object]],
-        selected["artifact_schemas"],
-    )
-    report_index = next(
-        index
-        for index, schema in enumerate(artifact_schemas)
-        if schema["id"] == "learning.artifacts.report"
-    )
-    artifact_schemas.insert(
-        report_index,
-        {
-            "id": "learning.artifacts.skill_disposition",
-            "schema": _PLUS_0003F_SKILL_DISPOSITION_SCHEMA,
-            "presentation": {"display_name": "Learning skill disposition"},
-        },
-    )
-
-    stage_kinds = cast(list[dict[str, object]], selected["stage_kinds"])
-    librarian_stage = next(stage for stage in stage_kinds if stage["id"] == "librarian")
-    assert librarian_stage["artifact_schema_ids"] == [
+        "analyst.millforge_runner",
         "learning.intake.request",
-        "learning.artifacts.skill_install_report",
-        "learning.artifacts.report",
-    ]
-    librarian_stage["artifact_schema_ids"] = [
-        "learning.intake.request",
-        "learning.artifacts.skill_install_report",
-        "learning.artifacts.skill_disposition",
-        "learning.artifacts.report",
-    ]
-
-    terminal_actions = cast(list[dict[str, object]], selected["terminal_actions"])
-    noop_action = next(
-        action
-        for action in terminal_actions
-        if action["id"] == "learning.close_librarian_noop"
-    )
-    assert noop_action["artifact_schema_id"] == (
-        "learning.artifacts.skill_install_report"
-    )
-    noop_action["artifact_schema_id"] = "learning.artifacts.skill_disposition"
-    return selected
-
-
-def _donor_assets(source: dict[str, object]) -> list[dict[str, object]]:
-    return cast(list[dict[str, object]], source["assets"])
-
-
-def _donor_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
-    return tuple(str(asset["id"]) for asset in _donor_assets(source))
-
-
-def _learning_owned_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
-    return tuple(
-        asset_id
-        for asset_id in _donor_asset_ids(source)
-        if asset_id.startswith("learning.")
     )
 
 
-def _inherited_planning_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
-    return tuple(
-        asset_id
-        for asset_id in _donor_asset_ids(source)
-        if asset_id.startswith("planning.")
+def test_learning_topology_trigger_and_concurrency_authority_is_exact() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    graphs = {str(graph.id): graph for graph in plan.graphs}
+    assert graphs["learning.standard.graph"].node_ids == (
+        "learning.standard.analyst",
+        "learning.standard.professor",
+        "learning.standard.curator",
+        "learning.standard.librarian",
     )
 
-
-def _inherited_execution_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
-    return tuple(
-        asset_id
-        for asset_id in _donor_asset_ids(source)
-        if asset_id.startswith("execution.")
-    )
-
-
-def _required_asset_digests(workflow: dict[str, object]) -> dict[str, str]:
-    return {
-        str(asset["asset_id"]): str(asset["content_digest"])
-        for asset in cast(list[dict[str, object]], workflow["required_assets"])
-    }
-
-
-def _package_path_for_full_lad_asset(asset_id: str) -> str:
-    if asset_id.startswith("learning.entrypoints."):
-        stage_id = asset_id.removeprefix("learning.entrypoints.")
-        return f"assets/workflows/lad.full/entrypoints/{stage_id}.md"
-    if asset_id.startswith("learning.skills."):
-        skill_id = asset_id.removeprefix("learning.skills.")
-        skill_name = skill_id.removesuffix("_core").replace("_", "-")
-        return f"assets/workflows/lad.full/skills/{skill_name}-core.md"
-    if asset_id.startswith("planning.entrypoints."):
-        stage_id = asset_id.removeprefix("planning.entrypoints.")
-        return f"assets/workflows/planning.lad/entrypoints/{stage_id}.md"
-    if asset_id.startswith("planning.skills."):
-        skill_id = asset_id.removeprefix("planning.skills.")
-        skill_name = skill_id.removesuffix("_core").replace("_", "-")
-        return f"assets/workflows/planning.lad/skills/{skill_name}-core.md"
-    if asset_id.startswith("execution.entrypoints."):
-        stage_id = asset_id.removeprefix("execution.entrypoints.")
-        return f"assets/workflows/execution.lad/entrypoints/{stage_id}.md"
-    if asset_id.startswith("execution.skills."):
-        skill_id = asset_id.removeprefix("execution.skills.")
-        skill_name = skill_id.removesuffix("_core").replace("_", "-")
-        return f"assets/workflows/execution.lad/skills/{skill_name}-core.md"
-    raise AssertionError(f"unexpected full LAD asset id: {asset_id}")
-
-
-def _expected_full_lad_asset_pins(
-    package_root: Path,
-    source: dict[str, object],
-) -> tuple[tuple[str, str], ...]:
-    return tuple(
-        (
-            asset_id,
-            conformance.asset_digest_for_package_path(
-                package_root,
-                _package_path_for_full_lad_asset(asset_id),
-            ),
-        )
-        for asset_id in sorted(_donor_asset_ids(source))
-    )
-
-
-def _refresh_manifest_digests(package_root: Path) -> None:
-    manifest = _load_manifest(package_root)
-    for asset in cast(list[dict[str, object]], manifest["assets"]):
-        asset_bytes = (package_root / str(asset["package_path"])).read_bytes()
-        asset["content_digest"] = asset_digest_for_bytes(asset_bytes)
-        asset["byte_length"] = len(asset_bytes)
-
-    assets_by_id = _assets_by_id(manifest)
-    for workflow in cast(list[dict[str, object]], manifest["workflows"]):
-        for required_asset in cast(
-            list[dict[str, object]],
-            workflow["required_assets"],
-        ):
-            asset_id = str(required_asset["asset_id"])
-            required_asset["content_digest"] = assets_by_id[asset_id][
-                "content_digest"
-            ]
-    manifest["manifest_digest"] = manifest_digest_for_manifest(manifest)
-    (package_root / "manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n",
-    )
-
-
-def _copy_pruned_package_without_learning(tmp_path: Path) -> Path:
-    pruned_root = tmp_path / "without-learning"
-    shutil.copytree(PACKAGE_ROOT, pruned_root)
-    manifest = _load_manifest(pruned_root)
-    workflows = _workflows_by_id(manifest)
-    source = lad_learning.workflow_source()
-    learning_asset_ids = set(_learning_owned_asset_ids(source))
-
-    manifest["workflows"] = [
-        workflow
-        for workflow in workflows.values()
-        if workflow["workflow_id"] != WORKFLOW_ID
-    ]
-    manifest["assets"] = [
-        asset
-        for asset in cast(list[dict[str, object]], manifest["assets"])
-        if str(asset["asset_id"]) not in learning_asset_ids
-    ]
-    metadata = cast(dict[str, object], manifest["non_authoritative_metadata"])
-    metadata["plus_packet"] = "PLUS-0002D"
-    metadata["status"] = (
-        "official_simple_loop_lad_execution_and_lad_planning_workflow_package"
-    )
-    learning_asset_dir = pruned_root / "assets" / "workflows" / "lad.full"
-    if learning_asset_dir.exists():
-        shutil.rmtree(learning_asset_dir)
-
-    (pruned_root / "manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n",
-    )
-    _refresh_manifest_digests(pruned_root)
-    return pruned_root
-
-
-def _asset_texts_by_id(
-    manifest: dict[str, Any],
-    asset_ids: tuple[str, ...],
-) -> dict[str, str]:
-    assets_by_id = _assets_by_id(manifest)
-    return {
-        asset_id: (
-            PACKAGE_ROOT / str(assets_by_id[asset_id]["package_path"])
-        ).read_text()
-        for asset_id in asset_ids
-    }
-
-
-def _asset_texts_by_path(
-    manifest: dict[str, Any],
-    asset_ids: tuple[str, ...],
-) -> dict[str, str]:
-    assets_by_id = _assets_by_id(manifest)
-    return {
-        str(assets_by_id[asset_id]["package_path"]): (
-            PACKAGE_ROOT / str(assets_by_id[asset_id]["package_path"])
-        ).read_text()
-        for asset_id in asset_ids
-    }
-
-
-def test_full_lad_workflow_identity_matches_learning_donor_source() -> None:
-    manifest = _load_manifest()
-    workflows = _workflows_by_id(manifest)
-    source_identity = cast(
-        dict[str, object],
-        lad_learning.workflow_source()["workflow"],
-    )
-    workflow = workflows[WORKFLOW_ID]
-
-    assert set(workflows) == {
-        "simple_loop",
-        "execution.lad",
-        "execution.lad_integrator",
-        "planning.lad",
-        WORKFLOW_ID,
-        "vendor_selection",
-    }
-    assert workflow["workflow_id"] == source_identity["id"]
-    assert workflow["workflow_version"] == source_identity["version"]
-    assert workflow["visibility"] == "public"
-    assert workflow["entrypoints"] == ["default"]
-
-
-def test_full_lad_authority_matches_donor_plus_librarian_overlay() -> None:
-    manifest = _load_manifest()
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    source = lad_learning.workflow_source()
-
-    assert "assets" not in selected_authority
-    assert _without_runner_authority(selected_authority) == _without_runner_authority(
-        _source_as_selected_authority_with_plus_0003f_overlay(source)
-    )
-
-
-def test_librarian_noop_uses_truthful_skill_disposition_schema() -> None:
-    manifest = _load_manifest()
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    schemas_by_id = _schemas_by_id(manifest)
-    marker_schema_by_stage = _marker_schema_by_stage(manifest)
-    stage_kinds = cast(list[dict[str, object]], selected_authority["stage_kinds"])
-    librarian_stage = next(stage for stage in stage_kinds if stage["id"] == "librarian")
-    terminal_actions = {
-        str(action["id"]): action
-        for action in cast(
-            list[dict[str, object]],
-            selected_authority["terminal_actions"],
-        )
-    }
-
-    assert schemas_by_id["learning.artifacts.skill_disposition"] == (
-        _PLUS_0003F_SKILL_DISPOSITION_SCHEMA
-    )
-    assert librarian_stage["artifact_schema_ids"] == [
-        "learning.intake.request",
-        "learning.artifacts.skill_install_report",
-        "learning.artifacts.skill_disposition",
-        "learning.artifacts.report",
-    ]
-    assert marker_schema_by_stage["librarian"] == {
-        "LIBRARIAN_COMPLETE": "learning.artifacts.skill_install_report",
-        "LIBRARIAN_NOOP": "learning.artifacts.skill_disposition",
-        "BLOCKED": "learning.artifacts.report",
-    }
-    assert terminal_actions["learning.close_librarian_noop"][
-        "artifact_schema_id"
-    ] == "learning.artifacts.skill_disposition"
-
-
-def test_librarian_noop_disposition_refuses_invalid_payloads() -> None:
-    manifest = _load_manifest()
-    schema = _schemas_by_id(manifest)["learning.artifacts.skill_disposition"]
-    valid_noop = {
-        "artifact_kind": "learning.artifacts.skill_disposition",
-        "summary": "No selected installed-skill or remote-index source was provided.",
-        "disposition": "index_unavailable",
-    }
-
-    conformance.assert_schema_value(valid_noop, schema)
-    conformance.assert_schema_value(
-        {
-            **valid_noop,
-            "disposition": "already_available",
-            "target_skill_id": "workspace-learning-summary",
-        },
-        schema,
-    )
-    for invalid_noop in (
-        {key: value for key, value in valid_noop.items() if key != "disposition"},
-        {**valid_noop, "disposition": "installed"},
-        {**valid_noop, "installed_path": "skills/example/SKILL.md"},
-        {**valid_noop, "artifact_kind": "learning.artifacts.skill_install_report"},
-    ):
-        with pytest.raises(AssertionError):
-            conformance.assert_schema_value(invalid_noop, schema)
-
-
-def test_librarian_complete_keeps_install_report_and_selected_effect_only() -> None:
-    manifest = _load_manifest()
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    schemas_by_id = _schemas_by_id(manifest)
-    terminal_actions = {
-        str(action["id"]): action
-        for action in cast(
-            list[dict[str, object]],
-            selected_authority["terminal_actions"],
-        )
-    }
-    effect_declarations = {
-        str(effect["id"]): effect
-        for effect in cast(
-            list[dict[str, object]],
-            selected_authority["effect_declarations"],
-        )
-    }
-
-    assert terminal_actions["learning.close_librarian_complete"][
-        "artifact_schema_id"
-    ] == "learning.artifacts.skill_install_report"
-    assert schemas_by_id["learning.artifacts.skill_install_report"]["required"] == [
-        "artifact_kind",
-        "summary",
-        "target_skill_id",
-        "installed_path",
-    ]
-    assert effect_declarations[
-        "learning.effect.librarian.workspace_skill_install_report"
-    ] == {
-        "id": "learning.effect.librarian.workspace_skill_install_report",
-        "terminal_action_id": "learning.close_librarian_complete",
-        "artifact_schema_id": "learning.artifacts.skill_install_report",
-        "provider_ref": "provider.fake_local.workspace",
-        "capability_policy_ref": "policy.fake_local.no_real_side_effects",
-        "target_ref_kind": "workspace_skill_install_report",
-        "target_ref_schema": (
-            "learning.effects.target.workspace_skill_install_report.v1"
-        ),
-        "allowed_reconciliation_statuses": [
-            "applied",
-            "no_op",
-            "refused",
-        ],
-        "real_side_effects_allowed": False,
-    }
-    assert all(
-        effect["terminal_action_id"] != "learning.close_librarian_noop"
-        for effect in effect_declarations.values()
-    )
-
-
-def test_librarian_blocked_keeps_report_and_operator_wait() -> None:
-    manifest = _load_manifest()
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    terminal_actions = {
-        str(action["id"]): action
-        for action in cast(
-            list[dict[str, object]],
-            selected_authority["terminal_actions"],
-        )
-    }
-    operator_waits = {
-        str(wait["id"]): wait
-        for wait in cast(list[dict[str, object]], selected_authority["operator_waits"])
-    }
-
-    assert terminal_actions["learning.close_librarian_blocked"][
-        "artifact_schema_id"
-    ] == "learning.artifacts.report"
-    assert terminal_actions["learning.close_librarian_blocked"]["kind"] == (
-        "operator_wait"
-    )
-    assert operator_waits["learning.librarian_blocked_wait"]["source_action_ids"] == [
-        "learning.close_librarian_blocked",
-    ]
-    assert operator_waits["learning.librarian_blocked_wait"]["status_effect"] == (
-        "operator_wait_active"
-    )
-    assert operator_waits["learning.librarian_blocked_wait"]["payload_schema_id"] == (
-        "learning.intake.request"
-    )
-
-
-def test_librarian_assets_encode_index_unavailable_noop() -> None:
-    manifest = _load_manifest()
-    schemas_by_id = _schemas_by_id(manifest)
-    marker_schema_by_stage = _marker_schema_by_stage(manifest)
-    entrypoint_text = (
-        PACKAGE_ROOT / "assets/workflows/lad.full/entrypoints/librarian.md"
-    ).read_text()
-    skill_text = (
-        PACKAGE_ROOT / "assets/workflows/lad.full/skills/librarian-core.md"
-    ).read_text()
-
-    for expected_text in (
-        "`request_id`, nonblank `body`, and `root_source` are required",
-        "A Planner-authored request body is sufficient Planner context.",
-        (
-            "Installed-skill and remote-index evidence are optional unless "
-            "dispatch explicitly declares or provides them."
-        ),
-        (
-            "Absence of optional index evidence selects `LIBRARIAN_NOOP` with "
-            "disposition `index_unavailable`, not `BLOCKED`."
-        ),
-        (
-            "Terminal markers provide evidence to runtime but do not themselves "
-            "route, close, wait, propose effects, or mutate state."
-        ),
-    ):
-        assert expected_text in entrypoint_text
-
-    valid_examples = conformance.markdown_json_examples(
-        skill_text,
-        section_heading="## Valid Example",
-    )
-    examples_by_marker = {
-        str(example["terminal_marker"]): example for example in valid_examples
-    }
-    assert set(examples_by_marker) == {
-        "LIBRARIAN_COMPLETE",
-        "LIBRARIAN_NOOP",
-        "BLOCKED",
-    }
-    for valid_example in valid_examples:
-        conformance.assert_marker_artifact_example_matches_selected_schema(
-            valid_example,
-            stage_id="librarian",
-            marker_schema_by_stage=marker_schema_by_stage,
-            schemas_by_id=schemas_by_id,
-        )
-
-    noop_artifact = cast(
-        dict[str, object],
-        examples_by_marker["LIBRARIAN_NOOP"]["artifact"],
-    )
-    assert noop_artifact == {
-        "artifact_kind": "learning.artifacts.skill_disposition",
-        "summary": "No selected installed-skill or remote-index source was provided.",
-        "disposition": "index_unavailable",
-    }
-    assert "installed_path" not in noop_artifact
-
-    for expected_invalid_text in (
-        "missing `disposition`",
-        "unknown disposition",
-        "`installed_path` in a no-op artifact",
-        "`LIBRARIAN_COMPLETE` without required install-report fields",
-    ):
-        assert expected_invalid_text in skill_text
-    invalid_examples = conformance.markdown_json_examples(
-        skill_text,
-        section_heading="## Invalid Examples",
-    )
-    assert len(invalid_examples) == 5
-    for invalid_example in invalid_examples:
-        with pytest.raises(AssertionError):
-            conformance.assert_marker_artifact_example_matches_selected_schema(
-                invalid_example,
-                stage_id="librarian",
-                marker_schema_by_stage=marker_schema_by_stage,
-                schemas_by_id=schemas_by_id,
-            )
-
-
-def test_full_lad_assets_required_assets_and_digests_match_donor_closure() -> None:
-    manifest = conformance.assert_manifest_and_asset_digests(PACKAGE_ROOT)
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    assets_by_id = _assets_by_id(manifest)
-    source = lad_learning.workflow_source()
-    donor_asset_ids = _donor_asset_ids(source)
-
+    generated = {route.id: route for route in plan.generated_work_routes}
     assert {
-        asset_id for asset_id in assets_by_id if asset_id in donor_asset_ids
-    } == set(donor_asset_ids)
-    assert workflow["required_assets"] == [
-        {
-            "asset_id": asset_id,
-            "content_digest": assets_by_id[asset_id]["content_digest"],
-        }
-        for asset_id in donor_asset_ids
-    ]
-
-    for asset_id in donor_asset_ids:
-        asset = assets_by_id[asset_id]
-        assert asset["package_path"] == _package_path_for_full_lad_asset(asset_id)
-        assert asset["selected_authority_participation"] == "yes"
-        if ".entrypoints." in asset_id:
-            assert asset["asset_kind"] == "entrypoint_prompt"
-        else:
-            assert asset["asset_kind"] == "stage_skill"
-
-
-def test_full_lad_inherited_assets_reuse_planning_and_execution_package_bytes() -> None:
-    manifest = conformance.assert_manifest_and_asset_digests(PACKAGE_ROOT)
-    workflows = _workflows_by_id(manifest)
-    assets_by_id = _assets_by_id(manifest)
-    source = lad_learning.workflow_source()
-    full_required = _required_asset_digests(workflows[WORKFLOW_ID])
-    planning_required = _required_asset_digests(workflows["planning.lad"])
-    execution_required = _required_asset_digests(workflows["execution.lad"])
-
-    for asset_id in _inherited_planning_asset_ids(source):
-        asset = assets_by_id[asset_id]
-        package_path = str(asset["package_path"])
-        asset_bytes = (PACKAGE_ROOT / package_path).read_bytes()
-
-        assert package_path == _package_path_for_full_lad_asset(asset_id)
-        assert full_required[asset_id] == planning_required[asset_id]
-        assert asset["content_digest"] == planning_required[asset_id]
-        assert asset["content_digest"] == asset_digest_for_bytes(asset_bytes)
-        assert asset["byte_length"] == len(asset_bytes)
-
-    for asset_id in _inherited_execution_asset_ids(source):
-        asset = assets_by_id[asset_id]
-        package_path = str(asset["package_path"])
-        asset_bytes = (PACKAGE_ROOT / package_path).read_bytes()
-
-        assert package_path == _package_path_for_full_lad_asset(asset_id)
-        assert full_required[asset_id] == planning_required[asset_id]
-        assert full_required[asset_id] == execution_required[asset_id]
-        assert asset["content_digest"] == execution_required[asset_id]
-        assert asset["content_digest"] == asset_digest_for_bytes(asset_bytes)
-        assert asset["byte_length"] == len(asset_bytes)
-
-
-def test_full_lad_path_archive_selection_compiles_and_selects_asset_pins(
-    tmp_path: Path,
-) -> None:
-    source = lad_learning.workflow_source()
-    path_result, archive_result = conformance.select_package_from_path_and_archive(
-        tmp_path / "selection",
-        PACKAGE_ROOT,
-        package_id=PACKAGE_ID,
-        package_version=PACKAGE_VERSION,
-        workflow_id=WORKFLOW_ID,
-        workflow_version=str(cast(dict[str, object], source["workflow"])["version"]),
-    )
-    expected_asset_pins = _expected_full_lad_asset_pins(PACKAGE_ROOT, source)
-
-    for result in (path_result, archive_result):
-        conformance.assert_selected_package_pin(
-            result.plan,
-            package_id=PACKAGE_ID,
-            package_version=PACKAGE_VERSION,
-            workflow_id=WORKFLOW_ID,
-            workflow_version="0.1",
-            selected_asset_pins=expected_asset_pins,
+        route_id: (
+            str(route.queue_family_id),
+            route.graph_node_id,
+            str(route.stage_kind_id),
+            str(route.runner_binding_id),
+            str(route.payload_schema_id),
         )
-        assert result.plan is not None
-        authority_text = canonical_authority_bytes(result.plan).decode("utf-8")
-        for selected_ref in _PROVIDER_EFFECT_REFS:
-            assert selected_ref in authority_text
-        assert asdict(result.plan.workflow_package_pin) == {
-            "package_id": PACKAGE_ID,
-            "package_version": PACKAGE_VERSION,
-            "package_format_version": "1",
-            "workflow_id": WORKFLOW_ID,
-            "workflow_version": "0.1",
-            "entrypoint": "default",
-            "selected_asset_pins": tuple(
-                {
-                    "asset_id": asset_id,
-                    "content_digest": content_digest,
-                }
-                for asset_id, content_digest in expected_asset_pins
-            ),
-            "selected_dependency_pins": (),
-        }
-    assert authority_fingerprint(path_result.plan) == authority_fingerprint(
-        archive_result.plan,
-    )
-
-
-def test_full_lad_path_archive_selection_accepts_truthful_librarian_noop_contract(
-    tmp_path: Path,
-) -> None:
-    source = lad_learning.workflow_source()
-    path_result, archive_result = conformance.select_package_from_path_and_archive(
-        tmp_path / "selection-plus-0003f",
-        PACKAGE_ROOT,
-        package_id=PACKAGE_ID,
-        package_version=PACKAGE_VERSION,
-        workflow_id=WORKFLOW_ID,
-        workflow_version=str(cast(dict[str, object], source["workflow"])["version"]),
-    )
-
-    for result in (path_result, archive_result):
-        authority_text = canonical_authority_bytes(result.plan).decode("utf-8")
-        assert "learning.artifacts.skill_disposition" in authority_text
-        assert "learning.close_librarian_noop" in authority_text
-        assert "learning.effect.librarian.workspace_skill_install_report" in (
-            authority_text
-        )
-        assert result.plan.workflow_package_pin is not None
-    assert authority_fingerprint(path_result.plan) == authority_fingerprint(
-        archive_result.plan,
-    )
-
-
-def test_full_lad_effect_provider_refs_are_selected_data_only() -> None:
-    manifest = _load_manifest()
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    source = lad_learning.workflow_source()
-    learning_asset_ids = _learning_owned_asset_ids(source)
-    asset_text = "\n".join(
-        _asset_texts_by_id(manifest, learning_asset_ids).values(),
-    )
-    manifest_without_authority = copy.deepcopy(manifest)
-    for record in cast(
-        list[dict[str, object]],
-        manifest_without_authority["workflows"],
-    ):
-        record.pop("selected_authority")
-
-    selected_authority_text = json.dumps(
-        workflow["selected_authority"],
-        sort_keys=True,
-    )
-    non_authority_manifest_text = json.dumps(
-        manifest_without_authority,
-        sort_keys=True,
-    )
-
-    for selected_ref in _PROVIDER_EFFECT_REFS:
-        assert selected_ref in selected_authority_text
-        assert selected_ref not in non_authority_manifest_text
-        assert selected_ref not in asset_text
-
-    assert not any(PACKAGE_ROOT.rglob("*.py"))
-    assert _SECRET_VALUE_PATTERN.search(asset_text) is None
-    for provider_code_pattern in _PROVIDER_CODE_PATTERNS:
-        assert provider_code_pattern not in asset_text
-
-
-def test_full_lad_assets_follow_entrypoint_authoring_boundaries() -> None:
-    manifest = _load_manifest()
-    source = lad_learning.workflow_source()
-    donor_asset_ids = _donor_asset_ids(source)
-    asset_texts_by_path = _asset_texts_by_path(manifest, donor_asset_ids)
-    asset_texts_by_id = _asset_texts_by_id(manifest, donor_asset_ids)
-
-    for asset_id in donor_asset_ids:
-        headings = (
-            _ENTRYPOINT_HEADINGS
-            if ".entrypoints." in asset_id
-            else _CORE_SKILL_HEADINGS
-        )
-        for heading in headings:
-            assert heading in asset_texts_by_id[asset_id]
-
-    conformance.assert_no_runtime_authority_claims(
-        {
-            **asset_texts_by_path,
-            "manifest.json": (PACKAGE_ROOT / "manifest.json").read_text(),
-        },
-    )
-    conformance.assert_no_unscoped_selected_artifact_kind_mentions(
-        asset_texts_by_id,
-        declared_artifact_schema_ids_by_asset_id=(
-            conformance.selected_artifact_schema_ids_by_asset_id(manifest)
+        for route_id, route in generated.items()
+    } == {
+        "learning.trigger.analyst": (
+            "learning_request",
+            "learning.standard.analyst",
+            "analyst",
+            "analyst.millforge_runner",
+            "learning.intake.request",
         ),
-    )
+        "learning.trigger.librarian": (
+            "learning_request",
+            "learning.standard.librarian",
+            "librarian",
+            "librarian.millforge_runner",
+            "learning.intake.request",
+        ),
+    }
 
-
-def test_full_lad_core_skill_examples_match_selected_schemas_for_all_stages() -> None:
-    manifest = _load_manifest()
-    schemas_by_id = _schemas_by_id(manifest)
-    marker_schema_by_stage = _marker_schema_by_stage(manifest)
-
-    for stage_id, _, _, _, core_asset_id in _LEARNING_STAGE_PAIRS:
-        skill_text = (
-            PACKAGE_ROOT / _package_path_for_full_lad_asset(core_asset_id)
-        ).read_text()
-        valid_examples = conformance.markdown_json_examples(
-            skill_text,
-            section_heading="## Valid Example",
+    concurrency = {
+        str(policy.partition_id): policy for policy in plan.concurrency_policies
+    }
+    assert {
+        partition_id: (
+            policy.max_active_runs,
+            tuple(str(item) for item in policy.coexist_partition_ids),
         )
-        invalid_example = conformance.markdown_json_examples(
-            skill_text,
-            section_heading="## Invalid Examples",
-        )[0]
+        for partition_id, policy in concurrency.items()
+    } == {
+        "execution": (1, ("learning",)),
+        "planning": (1, ("learning",)),
+        "learning": (1, ("planning", "execution")),
+    }
 
-        assert valid_examples
-        for valid_example in valid_examples:
-            conformance.assert_marker_artifact_example_matches_selected_schema(
-                valid_example,
-                stage_id=stage_id,
-                marker_schema_by_stage=marker_schema_by_stage,
-                schemas_by_id=schemas_by_id,
-            )
-            artifact = cast(dict[str, object], valid_example["artifact"])
-            conformance.assert_not_generic_artifact_envelope_body(artifact)
-            if "observation_payload" in valid_example:
-                observation_payload = cast(
-                    dict[str, object],
-                    valid_example["observation_payload"],
-                )
-                conformance.assert_not_generic_artifact_envelope_body(
-                    observation_payload
-                )
-
-        with pytest.raises(AssertionError):
-            conformance.assert_marker_artifact_example_matches_selected_schema(
-                invalid_example,
-                stage_id=stage_id,
-                marker_schema_by_stage=marker_schema_by_stage,
-                schemas_by_id=schemas_by_id,
-            )
-
-
-def test_full_lad_analyst_complete_example_is_research_packet_payload() -> None:
-    manifest = _load_manifest()
-    schemas_by_id = _schemas_by_id(manifest)
-    marker_schema_by_stage = _marker_schema_by_stage(manifest)
-    skill_text = (
-        PACKAGE_ROOT / "assets/workflows/lad.full/skills/analyst-core.md"
-    ).read_text()
-    prompt_text = (
-        PACKAGE_ROOT / "assets/workflows/lad.full/entrypoints/analyst.md"
-    ).read_text()
-
-    valid_example = conformance.markdown_json_examples(
-        skill_text,
-        section_heading="## Valid Example",
-    )[0]
-    invalid_example = conformance.markdown_json_examples(
-        skill_text,
-        section_heading="## Invalid Examples",
-    )[0]
-
-    conformance.assert_marker_artifact_example_matches_selected_schema(
-        valid_example,
-        stage_id="analyst",
-        marker_schema_by_stage=marker_schema_by_stage,
-        schemas_by_id=schemas_by_id,
+    fanouts = {str(fanout.id): fanout for fanout in plan.fanout_declarations}
+    learning_fanouts = {
+        fanout_id: fanout
+        for fanout_id, fanout in fanouts.items()
+        if fanout_id.startswith("learning.trigger.")
+    }
+    assert len(learning_fanouts) == 7
+    assert all(
+        fanout.source_state_policy == "accepted_terminal_observation"
+        and str(fanout.target_queue_family_id) == "learning_request"
+        and str(fanout.target_payload_schema_id) == "learning.intake.request"
+        and fanout.root_lineage_policy == "inherit_source_lineage"
+        for fanout in learning_fanouts.values()
     )
-    assert valid_example == {
-        "terminal_marker": "ANALYST_COMPLETE",
-        "artifact": {
-            "artifact_kind": "learning.artifacts.research_packet",
-            "summary": "Learning request summary.",
-            "research_notes": "Grounded notes for the next Learning stage.",
+    assert (
+        str(
+            learning_fanouts[
+                "learning.trigger.execution.needs_planning"
+            ].source_action_id
+        ),
+        learning_fanouts["learning.trigger.execution.needs_planning"].target_route_id,
+    ) == ("execution.close_consultant_needs_plan", "learning.trigger.analyst")
+    assert (
+        learning_fanouts["learning.trigger.planning.planner_complete"].target_route_id
+        == "learning.trigger.librarian"
+    )
+
+
+def test_learning_stage_graph_runner_and_artifact_authority_is_exact() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    stages = {
+        str(stage.id): stage
+        for stage in plan.stage_kinds
+        if str(stage.id) in {"analyst", "professor", "curator", "librarian"}
+    }
+    assert {
+        stage_id: (
+            str(stage.runner_binding_id),
+            tuple(str(asset_id) for asset_id in stage.asset_ids),
+        )
+        for stage_id, stage in stages.items()
+    } == {
+        stage_id: (
+            f"{stage_id}.millforge_runner",
+            (
+                f"learning.entrypoints.{stage_id}",
+                f"learning.skills.{stage_id}_core",
+            ),
+        )
+        for stage_id in ("analyst", "professor", "curator", "librarian")
+    }
+
+    expected_stage_schemas = {
+        "analyst": {
+            "learning.intake.request",
+            "learning.artifacts.research_packet",
+            "learning.artifacts.report",
+        },
+        "professor": {
+            "learning.intake.request",
+            "learning.artifacts.research_packet",
+            "learning.artifacts.skill_candidate",
+            "learning.artifacts.professor_notes",
+            "learning.artifacts.report",
+        },
+        "curator": {
+            "learning.intake.request",
+            "learning.artifacts.skill_candidate",
+            "learning.artifacts.skill_update",
+            "learning.artifacts.curator_decision",
+            "learning.artifacts.report",
+        },
+        "librarian": {
+            "learning.intake.request",
+            "learning.artifacts.skill_install_report",
+            "learning.artifacts.skill_disposition",
+            "learning.artifacts.report",
         },
     }
-    conformance.assert_not_generic_artifact_envelope_body(
-        cast(dict[str, object], valid_example["artifact"])
+    assert {
+        stage_id: {str(schema_id) for schema_id in stage.artifact_schema_ids}
+        for stage_id, stage in stages.items()
+    } == expected_stage_schemas
+    assert all(
+        "learning.artifacts.stage_result" not in schema_ids
+        for schema_ids in expected_stage_schemas.values()
     )
 
-    with pytest.raises(AssertionError):
-        conformance.assert_marker_artifact_example_matches_selected_schema(
-            invalid_example,
-            stage_id="analyst",
-            marker_schema_by_stage=marker_schema_by_stage,
-            schemas_by_id=schemas_by_id,
-        )
-    invalid_artifact = cast(dict[str, object], invalid_example["artifact"])
-    for forbidden_field in (
-        "request_id",
-        "target_skill_id",
-        "preferred_output_paths",
-        "recommended_learning_action",
-        "route_target_graph_node_id",
-    ):
-        assert forbidden_field in invalid_artifact
-        assert forbidden_field not in cast(dict[str, object], valid_example["artifact"])
 
-    assert "Learning context fields embedded in the artifact body" in skill_text
-    assert "exact selected artifact JSON object" in prompt_text
-
-
-def test_full_lad_planner_complete_example_satisfies_learning_fanout() -> None:
-    manifest = _load_manifest()
-    schemas_by_id = _schemas_by_id(manifest)
-    marker_schema_by_stage = _marker_schema_by_stage(manifest)
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    fanout = next(
-        fanout
-        for fanout in cast(
-            list[dict[str, object]],
-            selected_authority["fanout_declarations"],
-        )
-        if fanout["source_action_id"] == "planning.route_planner_complete"
-    )
-    skill_text = (
-        PACKAGE_ROOT / "assets/workflows/planning.lad/skills/planner-core.md"
-    ).read_text()
-    prompt_text = (
-        PACKAGE_ROOT / "assets/workflows/planning.lad/entrypoints/lad_planner.md"
-    ).read_text()
-
-    valid_example = conformance.markdown_json_examples(
-        skill_text,
-        section_heading="## Full LAD Fanout Example",
-    )[0]
-
-    conformance.assert_marker_artifact_example_matches_selected_schema(
-        valid_example,
-        stage_id="lad_planner",
-        marker_schema_by_stage=marker_schema_by_stage,
-        schemas_by_id=schemas_by_id,
-    )
-    artifact = cast(dict[str, object], valid_example["artifact"])
-    observation_payload = cast(dict[str, object], valid_example["observation_payload"])
-    learning_requests = cast(list[dict[str, object]], artifact["learning_requests"])
-
-    assert fanout["item_source_path"] == ["learning_requests"]
-    assert fanout["source_artifact_schema_id"] == "planning.artifacts.stage_result"
-    assert fanout["target_payload_schema_id"] == "learning.intake.request"
-    assert observation_payload == artifact
-    assert len(learning_requests) == 1
-    assert set(learning_requests[0]) == {
-        "request_id",
-        "body",
-        "root_source",
-        "target_skill_id",
-        "preferred_output_paths",
+def test_learning_terminal_outcomes_routes_closes_and_waits_are_exact() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    outcomes = {
+        str(outcome.id): (str(outcome.stage_kind_id), outcome.marker)
+        for outcome in plan.terminal_outcomes
+        if str(outcome.id).startswith("learning.")
     }
-    conformance.assert_not_generic_artifact_envelope_body(artifact)
-    conformance.assert_not_generic_artifact_envelope_body(observation_payload)
+    assert outcomes == {
+        f"learning.{stage}.{suffix}": (stage, marker)
+        for stage, markers in {
+            "analyst": {
+                "blocked": "BLOCKED",
+                "complete": "ANALYST_COMPLETE",
+                "noop": "ANALYST_NOOP",
+            },
+            "professor": {
+                "blocked": "BLOCKED",
+                "complete": "PROFESSOR_COMPLETE",
+                "noop": "PROFESSOR_NOOP",
+            },
+            "curator": {
+                "blocked": "BLOCKED",
+                "complete": "CURATOR_COMPLETE",
+                "noop": "CURATOR_NOOP",
+            },
+            "librarian": {
+                "blocked": "BLOCKED",
+                "complete": "LIBRARIAN_COMPLETE",
+                "noop": "LIBRARIAN_NOOP",
+            },
+        }.items()
+        for suffix, marker in markers.items()
+    }
 
-    assert "Full LAD extension" in skill_text
-    assert "learning_requests" in skill_text
-    assert "invalid_fanout_payload" in skill_text
-    assert "selected full-LAD fanout reads it" in prompt_text
+    actions = {
+        str(action.id): action
+        for action in plan.terminal_actions
+        if str(action.id).startswith("learning.")
+    }
+    expected = {
+        "learning.route_analyst_complete": (
+            "route",
+            "professor",
+            "learning.standard.professor",
+            "stage_result",
+            "learning.artifacts.research_packet",
+            "professor.millforge_runner",
+        ),
+        "learning.route_professor_complete": (
+            "route",
+            "curator",
+            "learning.standard.curator",
+            "stage_result",
+            "learning.artifacts.skill_candidate",
+            "curator.millforge_runner",
+        ),
+        "learning.close_analyst_noop": (
+            "complete_work_item",
+            None,
+            None,
+            None,
+            "learning.artifacts.research_packet",
+            None,
+        ),
+        "learning.close_professor_noop": (
+            "complete_work_item",
+            None,
+            None,
+            None,
+            "learning.artifacts.professor_notes",
+            None,
+        ),
+        "learning.close_curator_complete": (
+            "complete_work_item",
+            None,
+            None,
+            None,
+            "learning.artifacts.skill_update",
+            None,
+        ),
+        "learning.close_curator_noop": (
+            "complete_work_item",
+            None,
+            None,
+            None,
+            "learning.artifacts.curator_decision",
+            None,
+        ),
+        "learning.close_librarian_complete": (
+            "complete_work_item",
+            None,
+            None,
+            None,
+            "learning.artifacts.skill_install_report",
+            None,
+        ),
+        "learning.close_librarian_noop": (
+            "complete_work_item",
+            None,
+            None,
+            None,
+            "learning.artifacts.skill_disposition",
+            None,
+        ),
+    }
+    for stage in ("analyst", "professor", "curator", "librarian"):
+        expected[f"learning.close_{stage}_blocked"] = (
+            "operator_wait",
+            None,
+            None,
+            None,
+            "learning.artifacts.report",
+            None,
+        )
+    assert {
+        action_id: (
+            action.action_kind,
+            None
+            if action.target_stage_kind_id is None
+            else str(action.target_stage_kind_id),
+            action.target_graph_node_id,
+            None
+            if action.emitted_queue_family_id is None
+            else str(action.emitted_queue_family_id),
+            None
+            if action.artifact_schema_id is None
+            else str(action.artifact_schema_id),
+            None if action.runner_binding_id is None else str(action.runner_binding_id),
+        )
+        for action_id, action in actions.items()
+    } == expected
+
+    waits = {str(wait.id): wait for wait in plan.operator_waits}
+    assert set(waits) == {
+        f"learning.{stage}_blocked_wait"
+        for stage in ("analyst", "professor", "curator", "librarian")
+    }
+    for stage, wait in (
+        (stage, waits[f"learning.{stage}_blocked_wait"])
+        for stage in ("analyst", "professor", "curator", "librarian")
+    ):
+        assert tuple(str(action) for action in wait.source_action_ids) == (
+            f"learning.close_{stage}_blocked",
+        )
+        assert tuple(wait.allowed_resolution_kinds) == (
+            "resume_recorded_source",
+            "close_recorded_source",
+            "revise_recorded_source",
+        )
+        assert (
+            str(wait.payload_schema_id),
+            str(wait.target_queue_family_id),
+            str(wait.target_stage_kind_id),
+            wait.target_graph_node_id,
+            str(wait.target_runner_binding_id),
+            wait.actor_kind,
+        ) == (
+            "learning.intake.request",
+            "learning_request",
+            "analyst",
+            "learning.standard.analyst",
+            "analyst.millforge_runner",
+            "local_operator",
+        )
+
+
+def test_learning_effect_declarations_are_fake_local_selected_authority() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    effects = {
+        str(effect.effect_declaration_id): effect for effect in plan.effect_declarations
+    }
+    assert {
+        effect_id: (
+            str(effect.terminal_action_id),
+            str(effect.artifact_schema_id),
+            effect.provider_ref,
+            effect.capability_policy_ref,
+            effect.target_ref_kind,
+            effect.target_ref_schema,
+            effect.allowed_reconciliation_statuses,
+            effect.real_side_effects_allowed,
+        )
+        for effect_id, effect in effects.items()
+    } == {
+        "learning.effect.curator.workspace_skill_update": (
+            "learning.close_curator_complete",
+            "learning.artifacts.skill_update",
+            "provider.fake_local.workspace",
+            "policy.fake_local.no_real_side_effects",
+            "workspace_skill_update",
+            "learning.effects.target.workspace_skill_update.v1",
+            ("applied", "no_op", "refused"),
+            False,
+        ),
+        "learning.effect.librarian.workspace_skill_install_report": (
+            "learning.close_librarian_complete",
+            "learning.artifacts.skill_install_report",
+            "provider.fake_local.workspace",
+            "policy.fake_local.no_real_side_effects",
+            "workspace_skill_install_report",
+            "learning.effects.target.workspace_skill_install_report.v1",
+            ("applied", "no_op", "refused"),
+            False,
+        ),
+    }
+
+
+def test_full_lad_selected_export_and_cross_plane_authority_are_deterministic() -> None:
+    plan_a = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    plan_b = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    export = compiled_plan_export_bytes(plan_a)
+    verified = verify_compiled_plan_export_bytes(export)
+
+    assert plan_a == plan_b
+    assert canonical_authority_bytes(plan_a) == canonical_authority_bytes(plan_b)
+    assert compiled_plan_export_bytes(plan_b) == export
+    assert verified.authority_fingerprint == authority_fingerprint(plan_a)
+    assert {str(graph.id) for graph in plan_a.graphs} == {
+        "execution.lad.graph",
+        "learning.standard.graph",
+        "planning.lad.graph",
+    }
+    assert {str(partition.id) for partition in plan_a.partitions} == {
+        "execution",
+        "learning",
+        "planning",
+    }
+
+    close_action = next(
+        action
+        for action in plan_a.terminal_actions
+        if str(action.id) == "execution.close_consultant_needs_plan"
+    )
+    assert (
+        close_action.action_kind,
+        close_action.target_stage_kind_id,
+        close_action.target_graph_node_id,
+        close_action.emitted_queue_family_id,
+    ) == ("close_with_escalation", None, None, None)
+
+
+def test_full_lad_export_verification_refuses_selected_authority_drift() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    record = dict(compiled_plan_export_record(plan))
+    selected = dict(cast(dict[str, object], record["selected_authority"]))
+    workflow = dict(cast(dict[str, object], selected["workflow"]))
+    workflow["workflow_name"] = "Full LAD drifted"
+    selected["workflow"] = workflow
+    record["selected_authority"] = selected
+
+    with pytest.raises(CompiledPlanExportError, match="authority fingerprint mismatch"):
+        verify_compiled_plan_export_record(record)
+
+
+def _mutate_learning_source(source: dict[str, object], case: str) -> None:
+    effect = _record(
+        source,
+        "effect_declarations",
+        "learning.effect.curator.workspace_skill_update",
+    )
+    generated = _record(source, "generated_work_routes", "learning.trigger.analyst")
+    analyst_wait = _record(source, "operator_waits", "learning.analyst_blocked_wait")
+    analyst_route = _record(
+        source, "terminal_actions", "learning.route_analyst_complete"
+    )
+    professor = _record(source, "stage_kinds", "professor")
+    analyst_runner = _record(source, "runner_bindings", "analyst.millforge_runner")
+    mutations: dict[str, Callable[[], None]] = {
+        "effect_provider": lambda: effect.__setitem__(
+            "provider_ref", "provider.real.network"
+        ),
+        "effect_capability": lambda: effect.__setitem__(
+            "capability_policy_ref", "policy.real.install"
+        ),
+        "effect_real": lambda: effect.__setitem__("real_side_effects_allowed", True),
+        "effect_statuses": lambda: effect.__setitem__(
+            "allowed_reconciliation_statuses", ("applied", "refused")
+        ),
+        "effect_action": lambda: effect.__setitem__(
+            "terminal_action_id", "learning.close_curator_noop"
+        ),
+        "effect_artifact": lambda: effect.__setitem__(
+            "artifact_schema_id", "learning.artifacts.curator_decision"
+        ),
+        "effect_target_kind": lambda: effect.__setitem__("target_ref_kind", ""),
+        "effect_target_schema": lambda: effect.pop("target_ref_schema"),
+        "route_missing_artifact": lambda: analyst_route.__setitem__(
+            "artifact_schema_id", "learning.artifacts.missing"
+        ),
+        "route_stage_result": lambda: analyst_route.__setitem__(
+            "artifact_schema_id", "learning.artifacts.stage_result"
+        ),
+        "route_missing_node": lambda: analyst_route.pop("target_graph_node_id"),
+        "route_wrong_owner": lambda: analyst_route.__setitem__(
+            "target_graph_node_id", "learning.standard.analyst"
+        ),
+        "route_queue_contract": lambda: professor.__setitem__(
+            "input_queue_family_ids", ()
+        ),
+        "route_stage_runner": lambda: analyst_route.__setitem__(
+            "runner_binding_id", "lad_planner.millforge_runner"
+        ),
+        "route_runner_stage": lambda: _record(
+            source, "runner_bindings", "professor.millforge_runner"
+        ).__setitem__("stage_kind_ids", ("analyst",)),
+        "generated_queue": lambda: generated.__setitem__(
+            "queue_family_id", "missing-learning-queue"
+        ),
+        "generated_ambiguous": lambda: generated.__setitem__("id", "learning_request"),
+        "generated_node": lambda: generated.__setitem__(
+            "graph_node_id", "missing.learning.node"
+        ),
+        "generated_stage": lambda: generated.__setitem__(
+            "stage_kind_id", "missing_learning_stage"
+        ),
+        "generated_schema": lambda: generated.__setitem__(
+            "payload_schema_id", "missing.learning.payload"
+        ),
+        "generated_input": lambda: generated.update(
+            {
+                "stage_kind_id": "professor",
+                "graph_node_id": "learning.standard.professor",
+            }
+        ),
+        "generated_stage_runner": lambda: generated.__setitem__(
+            "runner_binding_id", "lad_planner.millforge_runner"
+        ),
+        "generated_runner_stage": lambda: analyst_runner.__setitem__(
+            "stage_kind_ids", ("professor", "curator", "librarian")
+        ),
+        "concurrency_self": lambda: _record(
+            source, "concurrency_policies", "learning.standard"
+        ).__setitem__("coexist_partition_ids", ("learning",)),
+        "concurrency_duplicate": lambda: _record(
+            source, "concurrency_policies", "learning.standard"
+        ).__setitem__("coexist_partition_ids", ("planning", "planning")),
+        "concurrency_asymmetric": lambda: _record(
+            source, "concurrency_policies", "foreground.execution"
+        ).__setitem__("coexist_partition_ids", ()),
+        "concurrency_missing": lambda: _record(
+            source, "concurrency_policies", "foreground.execution"
+        ).__setitem__("coexist_partition_ids", ("missing",)),
+        "wait_resolution": lambda: analyst_wait.__setitem__(
+            "allowed_resolution_kinds",
+            ("resume_recorded_source", "delegate_to_learning"),
+        ),
+        "wait_queue": lambda: analyst_wait.__setitem__(
+            "target_queue_family_id", "stage_result"
+        ),
+        "wait_schema": lambda: analyst_wait.__setitem__(
+            "payload_schema_id", "learning.artifacts.report"
+        ),
+        "wait_action": lambda: _record(
+            source, "terminal_actions", "learning.close_analyst_blocked"
+        ).__setitem__("kind", "block_work_item"),
+        "trigger_contract": lambda: _record(
+            source, "generated_work_routes", "learning.trigger.librarian"
+        ).__setitem__("payload_schema_id", "learning.artifacts.stage_result"),
+        "needs_planning_route": lambda: _record(
+            source, "terminal_actions", "execution.close_consultant_needs_plan"
+        ).__setitem__("target_graph_node_id", "planning.lad.planner.start"),
+        "needs_planning_old_kind": lambda: _record(
+            source, "terminal_actions", "execution.close_consultant_needs_plan"
+        ).__setitem__("kind", "escalate_to_planning"),
+    }
+    mutations[case]()
 
 
 @pytest.mark.parametrize(
-    "text",
+    ("case", "diagnostic_code"),
     (
-        "This package grants provider credentials.",
-        "The manifest ships provider execution code.",
-        "This skill runs MCP tool execution.",
-        "This prompt invokes native runner behavior.",
-        "The asset text persists durable state.",
-        "This package reconciles effects.",
-        "The manifest grants capability grants.",
-        "Return `CURATOR_COMPLETE` to approve effects.",
-        "Return `LIBRARIAN_COMPLETE` to mutate runtime state.",
+        ("effect_provider", "invalid_effect_declaration"),
+        ("effect_capability", "invalid_effect_declaration"),
+        ("effect_real", "invalid_effect_declaration"),
+        ("effect_statuses", "invalid_effect_declaration"),
+        ("effect_action", "invalid_effect_declaration"),
+        ("effect_artifact", "invalid_effect_declaration"),
+        ("effect_target_kind", "invalid_effect_declaration"),
+        ("effect_target_schema", "invalid_effect_declaration"),
+        ("route_missing_artifact", "missing_reference"),
+        ("route_stage_result", "terminal_route_artifact_schema_mismatch"),
+        ("route_missing_node", "terminal_route_missing_field"),
+        ("route_wrong_owner", "terminal_route_graph_node_stage_mismatch"),
+        ("route_queue_contract", "terminal_route_stage_input_mismatch"),
+        ("route_stage_runner", "terminal_route_stage_runner_mismatch"),
+        ("route_runner_stage", "terminal_route_runner_stage_mismatch"),
+        ("generated_queue", "missing_reference"),
+        ("generated_ambiguous", "ambiguous_selected_enqueue_route"),
+        ("generated_node", "missing_reference"),
+        ("generated_stage", "missing_reference"),
+        ("generated_schema", "missing_reference"),
+        ("generated_input", "generated_work_route_stage_input_mismatch"),
+        ("generated_stage_runner", "generated_work_route_stage_runner_mismatch"),
+        ("generated_runner_stage", "generated_work_route_runner_stage_mismatch"),
+        ("concurrency_self", "invalid_concurrency_policy"),
+        ("concurrency_duplicate", "invalid_concurrency_policy"),
+        ("concurrency_asymmetric", "invalid_concurrency_policy"),
+        ("concurrency_missing", "missing_reference"),
+        ("wait_resolution", "invalid_operator_wait_field"),
+        ("wait_queue", "intervention_target_route_mismatch"),
+        ("wait_schema", "intervention_target_payload_schema_mismatch"),
+        ("wait_action", "invalid_operator_wait_action_kind"),
+        ("trigger_contract", "invalid_fanout_declaration"),
+        ("needs_planning_route", "terminal_close_with_escalation_route_authority"),
+        ("needs_planning_old_kind", "unsupported_terminal_action_kind"),
     ),
 )
-def test_boundary_lint_refuses_full_lad_runtime_authority_claims(text: str) -> None:
-    with pytest.raises(AssertionError):
-        conformance.assert_no_runtime_authority_claims({"bad-learning.md": text})
-
-
-def test_existing_workflow_fingerprints_stay_stable_when_learning_is_added(
-    tmp_path: Path,
+def test_learning_compiler_refuses_exact_authority_mutations(
+    case: str,
+    diagnostic_code: str,
 ) -> None:
-    pruned_root = _copy_pruned_package_without_learning(tmp_path)
-    for workflow_id in (
-        "simple_loop",
-        "execution.lad",
-        "execution.lad_integrator",
-        "planning.lad",
-    ):
-        full_result = conformance.select_package_from_path(
-            tmp_path / f"full-{workflow_id.replace('.', '-')}",
-            PACKAGE_ROOT,
-            package_id=PACKAGE_ID,
-            package_version=PACKAGE_VERSION,
-            workflow_id=workflow_id,
-            workflow_version="0.1",
-        )
-        pruned_result = conformance.select_package_from_path(
-            tmp_path / f"pruned-{workflow_id.replace('.', '-')}",
-            pruned_root,
-            package_id=PACKAGE_ID,
-            package_version=PACKAGE_VERSION,
-            workflow_id=workflow_id,
-            workflow_version="0.1",
-        )
+    source = _source()
+    _mutate_learning_source(source, case)
 
-        assert authority_fingerprint(full_result.plan) == authority_fingerprint(
-            pruned_result.plan,
-        )
+    error = _error(source, diagnostic_code)
+
+    assert error.severity == "error"
 
 
-def test_final_official_workflow_fingerprints_match_selected_authority(
-    tmp_path: Path,
+def test_learning_compiler_refuses_duplicate_effect_action_binding() -> None:
+    source = _source()
+    effects = _records(source, "effect_declarations")
+    duplicate = dict(effects[1])
+    duplicate.update(
+        {
+            "id": "learning.effect.duplicate.curator",
+            "terminal_action_id": "learning.close_curator_complete",
+            "artifact_schema_id": "learning.artifacts.skill_update",
+            "target_ref_kind": "workspace_skill_update",
+            "target_ref_schema": "learning.effects.target.workspace_skill_update.v1",
+        }
+    )
+    source["effect_declarations"] = (*effects, duplicate)
+
+    error = _error(source, "invalid_effect_declaration")
+
+    assert error.declaration_path.endswith(".terminal_action_id")
+
+
+@pytest.mark.parametrize(
+    "compatibility_profile",
+    (
+        "lad_codex",
+        "learning_lad_codex",
+        "blueprint_lad_codex",
+        "blueprint_learning_lad_codex",
+    ),
+)
+def test_full_lad_compiler_refuses_legacy_alias_authority(
+    compatibility_profile: str,
 ) -> None:
-    for workflow_id, expected_fingerprint in (
-        _FINAL_OFFICIAL_WORKFLOW_FINGERPRINTS.items()
-    ):
-        result = conformance.select_package_from_path(
-            tmp_path / workflow_id.replace(".", "-"),
-            PACKAGE_ROOT,
-            package_id=PACKAGE_ID,
-            package_version=PACKAGE_VERSION,
-            workflow_id=workflow_id,
-            workflow_version="0.1",
-        )
+    source = _source()
+    workflow = cast(Record, source["workflow"])
+    workflow["compatibility_profile"] = compatibility_profile
 
-        assert authority_fingerprint(result.plan) == expected_fingerprint
+    error = _error(source, "unsupported_compatibility_profile")
+
+    assert error.declaration_path == "workflow.compatibility_profile"
+    assert error.context["compatibility_profile"] == compatibility_profile
+
+
+_RESTART_LEDGER = (
+    ("trigger_generated_learning_work_and_active_learning", 1, "selected_authority"),
+    ("two_active_learning_runs", 1, "selected_authority"),
+    ("generated_route_missing_queue", 1, "compiler_refusal"),
+    ("generated_route_structural_corruption", 6, "compiler_refusal"),
+    ("concurrency_policy_shape_corruption", 3, "compiler_refusal"),
+    ("learning_recovery_authority_drift", 1, "compiler_refusal"),
+    ("operator_wait_revise_schema_drift", 1, "compiler_refusal"),
+    ("operator_wait_revise_target_drift", 7, "compiler_refusal"),
+    ("c3_cross_record_persistence_corruption", 33, "generic_runtime_n_a"),
+    ("stage_artifact_route_close_and_block", 8, "selected_authority"),
+    ("route_artifact_schema_contract_drift", 2, "compiler_refusal"),
+    ("stage_result_terminal_reselection", 2, "compiler_refusal"),
+    ("static_route_authority_drift", 6, "compiler_refusal"),
+    ("learning_with_active_foreground", 2, "selected_authority"),
+    ("coexist_policy_drift", 1, "compiler_refusal"),
+)
+
+_STATUS_LEDGER = (
+    ("trigger_and_concurrency_context", 1, "selected_authority"),
+    ("terminal_action_source_action_and_input_context", 1, "selected_authority"),
+    ("c3_family_combined_after_restart", 1, "selected_authority"),
+    ("closure_root_learning_aftermath", 8, "selected_authority"),
+)
+
+_FULL_RESTART_LEDGER = (
+    ("selected_plan_drift", 1, "export_fingerprint_refusal"),
+    ("learning_closure_effect_and_intervention", 1, "selected_authority"),
+    ("closure_root_persistence_corruption", 64, "generic_runtime_n_a"),
+)
+
+_FULL_STATUS_LEDGER = (
+    ("full_lad_projection", 1, "selected_authority"),
+    ("closure_root_learning_aftermath", 8, "selected_authority"),
+)
+
+_OFFICIAL_OWNER_LEDGER = {
+    "compiler/test_lad_learning_compile.py": (
+        "selected topology/schema/action/effect/wait authority",
+        "exact compiler negative mutations",
+    ),
+    "compiler/test_lad_full_conformance.py": (
+        "deterministic export and fingerprint",
+        "C3 cross-plane selected authority",
+        "legacy alias and export drift refusals",
+    ),
+    "kernel/test_lad_learning_intake_dispatch.py": (
+        "selected external/generated/static route authority",
+        "compiler refusals replace duplicate admission mutations",
+    ),
+    "kernel/test_lad_learning_triggers_concurrency.py": (
+        "selected trigger, close source, and coexist authority",
+    ),
+    "kernel/test_lad_learning_artifacts_effects.py": (
+        "selected artifact/action and fake-local effect authority",
+        "generic effect transition/replay behavior is N/A",
+    ),
+    "kernel/test_lad_learning_recovery.py": (
+        "selected operator-wait/revise authority",
+        "generic intervention transition/provenance behavior is N/A",
+    ),
+    "kernel/test_lad_full_conformance.py": (
+        "selected full-LAD cross-plane combinations",
+    ),
+    "operator/test_lad_learning_status_projection.py": (
+        "11-row Learning status ledger",
+    ),
+    "operator/test_lad_full_status_projection.py": ("9-row full-LAD status ledger",),
+    "substrate/test_lad_learning_restart.py": ("75-row Learning restart ledger",),
+    "substrate/test_lad_full_restart.py": ("66-row full-LAD restart ledger",),
+    "guardrails/test_lad_learning_compatibility_refusal.py": (
+        "package-owned selected data",
+        "generic source scan is N/A",
+    ),
+    "guardrails/test_lad_full_compatibility_refusal.py": (
+        "package-owned selected data",
+        "generic source scan is N/A",
+    ),
+}
+
+_C3_GENERIC_RUNTIME_N_A_ROWS = frozenset(
+    {
+        "resolved_wait_missing_closed_source",
+        "artifact_source_action",
+        "fanout_target_lineage",
+        "fanout_target_queue",
+        "artifact_schema",
+        "artifact_source_input",
+        "artifact_payload_digest",
+        "artifact_source_run",
+        "effect_plan_id",
+        "effect_plan_fingerprint",
+        "effect_artifact_payload_digest",
+        "effect_source_run",
+        "effect_source_work_item",
+        "effect_source_activation",
+        "effect_graph_node",
+        "effect_stage_kind",
+        "effect_runner_binding",
+        "effect_queue_family",
+        "effect_provider",
+        "effect_capability_policy",
+        "effect_target_skill",
+        "effect_status",
+        "reconciliation_status",
+        "reconciliation_effect_id",
+        "reconciliation_provider",
+        "wait_operator_id",
+        "wait_source_action",
+        "wait_source_graph_node",
+        "wait_actor_on_active",
+        "wait_status",
+        "resolved_wait_actor_kind",
+        "resolved_wait_resolution",
+        "closed_source_created_input",
+    }
+)
+
+
+def test_learning_restart_and_status_source_to_plus_ledgers_are_complete() -> None:
+    assert sum(rows for _owner, rows, _disposition in _RESTART_LEDGER) == 75
+    assert sum(rows for _owner, rows, _disposition in _STATUS_LEDGER) == 11
+    assert {
+        owner
+        for owner, _rows, disposition in _RESTART_LEDGER
+        if disposition == "generic_runtime_n_a"
+    } == {"c3_cross_record_persistence_corruption"}
+    assert len(_C3_GENERIC_RUNTIME_N_A_ROWS) == 33
+    assert all(
+        disposition == "selected_authority"
+        for _owner, _rows, disposition in _STATUS_LEDGER
+    )
+    assert sum(rows for _owner, rows, _disposition in _FULL_RESTART_LEDGER) == 66
+    assert sum(rows for _owner, rows, _disposition in _FULL_STATUS_LEDGER) == 9
+    assert _FULL_RESTART_LEDGER[-1] == (
+        "closure_root_persistence_corruption",
+        64,
+        "generic_runtime_n_a",
+    )
+    assert len(_OFFICIAL_OWNER_LEDGER) == 13
+
+
+def test_unselected_catalog_does_not_change_full_lad_authority() -> None:
+    source = _source()
+    base = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    source["unselected_catalog"] = (
+        {
+            "id": "legacy-blueprint-learning-evidence",
+            "catalog_payload": {
+                "mode_id": "blueprint_learning_lad_codex",
+                "legacy_alias": "learning_lad_codex",
+            },
+        },
+    )
+    result = compile_workflow(deepcopy(source))
+    assert result.plan is not None
+
+    assert authority_fingerprint(result.plan) == authority_fingerprint(base)
+    assert canonical_authority_bytes(result.plan) == canonical_authority_bytes(base)

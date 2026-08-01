@@ -4,6 +4,7 @@ import ast
 import importlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tarfile
@@ -29,11 +30,6 @@ PUBLIC_DOCS = (
     "docs/release.md",
     "docs/public-validation.md",
 )
-INTERNAL_CONFORMANCE_ENV = "MILLRACE_PLUS_RUN_INTERNAL_CONFORMANCE"
-RUNTIME_SOURCE_ENV = "MILLRACE_RUNTIME_SOURCE"
-LEGACY_ASSET_ENV = "MILLRACE_LEGACY_ASSET_ROOT"
-HIDDEN_REWRITE_PYTHONPATH = "PYTHONPATH=../../source/" "millrace-rewrite/src"
-LEGACY_ASSET_PATH = "dev/source/millrace/src/" "millrace_ai/assets"
 RELEASE_IDENTITY = "0.22.0"
 META_RELEASE_PIN = "`millrace==0.22.0`"
 BUNDLE_MEMBER_PINS = (
@@ -89,12 +85,6 @@ def test_public_validation_selection_has_no_runtime_or_legacy_path_imports() -> 
         assert test_path.is_file(), public_test
         assert not _imports_runtime_module(test_path), public_test
 
-    public_text = "\n".join(
-        _project_text(path) for path in (*PUBLIC_DOCS, *PUBLIC_TESTS)
-    )
-    assert HIDDEN_REWRITE_PYTHONPATH not in public_text
-    assert LEGACY_ASSET_PATH not in public_text
-
 
 def test_current_docs_preserve_public_package_and_evidence_boundaries() -> None:
     readme = " ".join(_project_text("README.md").split())
@@ -115,12 +105,7 @@ def test_current_docs_preserve_public_package_and_evidence_boundaries() -> None:
     ):
         assert required in readme
 
-    for required in (
-        INTERNAL_CONFORMANCE_ENV,
-        RUNTIME_SOURCE_ENV,
-        LEGACY_ASSET_ENV,
-    ):
-        assert required in current_docs
+    assert "Source-Conformance Checks" not in current_docs
 
 
 def test_public_release_text_has_no_staging_or_prepublication_claims() -> None:
@@ -152,24 +137,32 @@ def test_dependency_policy_is_dependency_free_and_documented() -> None:
 
     assert pyproject["project"].get("dependencies", []) == []
     assert "dependencies = []" in _project_text("pyproject.toml")
-    assert (
-        "A direct installation contains package metadata and data only"
-        in readme
-    )
+    assert "A direct installation contains package metadata and data only" in readme
     assert "does not transitively install `millrace-ai`" in readme
     assert "| Runtime dependency | None |" in release_notes
 
 
-def test_internal_conformance_tests_are_explicitly_gated() -> None:
-    conftest = _project_text("tests/conftest.py")
-    for required in (
-        INTERNAL_CONFORMANCE_ENV,
-        RUNTIME_SOURCE_ENV,
-        LEGACY_ASSET_ENV,
-        "test_simple_loop_official_package.py",
-        "test_plus_0002_9_final_conformance.py",
-    ):
-        assert required in conftest
+def test_conformance_tests_are_ungated_and_use_public_module_roots() -> None:
+    tests_root = PROJECT_ROOT / "tests"
+    assert PROJECT_ROOT.is_dir()
+    assert tests_root.is_dir()
+    assert not (tests_root / "conftest.py").exists()
+    assert not (tests_root / "support/internal_conformance_gate.py").exists()
+    forbidden_literals = (
+        "sys." + "path.insert",
+        "MILLRACE_" + "RUNTIME_SOURCE",
+        "MILLRACE_" + "LEGACY_ASSET_ROOT",
+        "MILLRACE_PLUS_RUN_" + "INTERNAL_CONFORMANCE",
+        "millrace" + ".testing",
+        "dev/source/" + "millrace/src/",
+        "planning." + "lad_review",
+    )
+    private_import = re.compile(r"from millrace\.[^\n]* import _")
+    for test_path in tests_root.rglob("*.py"):
+        text = test_path.read_text()
+        for literal in forbidden_literals:
+            assert literal not in text, (test_path, literal)
+        assert private_import.search(text) is None, test_path
 
 
 def test_public_ci_runs_clean_checkout_boundary_without_sibling_paths() -> None:
@@ -189,8 +182,8 @@ def test_public_ci_runs_clean_checkout_boundary_without_sibling_paths() -> None:
         assert required in workflow
     for public_test in PUBLIC_TESTS:
         assert public_test in workflow
-    assert "source/" "millrace-rewrite" not in workflow
-    assert LEGACY_ASSET_PATH not in workflow
+    assert "source/millrace-rewrite" not in workflow
+    assert "sys." + "path.insert" not in workflow
 
 
 def test_built_artifacts_have_durable_v022_public_text(
@@ -272,30 +265,9 @@ def test_built_artifacts_have_durable_v022_public_text(
             sys.modules[module_name] = previous_module
 
 
-def test_internal_conformance_direct_selection_skips_without_runtime_import() -> None:
-    env = os.environ.copy()
-    env.pop("PYTHONPATH", None)
-    env.pop(INTERNAL_CONFORMANCE_ENV, None)
-    env.pop(RUNTIME_SOURCE_ENV, None)
-    env.pop(LEGACY_ASSET_ENV, None)
-    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
-
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            "-q",
-            "tests/test_plus_0002_9_final_conformance.py",
-        ],
-        cwd=PROJECT_ROOT,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-    combined_output = result.stdout + result.stderr
-    assert result.returncode in {0, 5}
-    assert "skipped" in combined_output
-    assert "ModuleNotFoundError" not in combined_output
+def test_all_conformance_modules_are_in_normal_pytest_collection() -> None:
+    pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
+    assert pyproject["tool"]["pytest"]["ini_options"]["testpaths"] == ["tests"]
+    assert pyproject["tool"]["pytest"]["ini_options"].get("markers") == [
+        "public: standalone public package tests"
+    ]

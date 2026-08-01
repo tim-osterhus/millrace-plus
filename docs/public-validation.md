@@ -1,25 +1,50 @@
 # Validation
 
-Millrace Plus is a data package. Its normal validation can run from a clean
-checkout without a sibling Millrace runtime repository and without setting
-`PYTHONPATH`.
+Millrace Plus is a data package. Its full validation uses locally built wheels
+from the exact Millrace and Millforge checkouts under review. Those wheels are
+test inputs only; `millrace-plus` remains dependency-free at runtime.
 
 ## Standalone Checks
 
+From the workspace root, build one wheel from each exact checkout into a fresh
+temporary directory:
+
 ```bash
-env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+BOUNDARY_ARTIFACT_ROOT="$(mktemp -d)"
+
+uv build --wheel --out-dir "$BOUNDARY_ARTIFACT_ROOT/millrace" \
+  dev/source/millrace
+
+uv build --wheel --out-dir "$BOUNDARY_ARTIFACT_ROOT/millforge" \
+  dev/harness/millforge
+
+MILLRACE_AI_WHEEL="$(find "$BOUNDARY_ARTIFACT_ROOT/millrace" \
+  -maxdepth 1 -type f -name '*.whl' -print)"
+MILLFORGE_WHEEL="$(find "$BOUNDARY_ARTIFACT_ROOT/millforge" \
+  -maxdepth 1 -type f -name '*.whl' -print)"
+test -f "$MILLRACE_AI_WHEEL"
+test -f "$MILLFORGE_WHEEL"
+```
+
+Then run the complete suite from `dev/assets/millrace-plus/` against those
+installed artifacts, with no source checkout on the import path:
+
+```bash
+env -u PYTHONPATH \
+  -u MILLRACE_RUNTIME_SOURCE \
+  -u MILLRACE_LEGACY_ASSET_ROOT \
+  -u MILLRACE_PLUS_RUN_INTERNAL_CONFORMANCE \
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
   PYTHONDONTWRITEBYTECODE=1 \
-  uv run --no-project --with pytest --with hatchling pytest -q \
-    tests/test_package_metadata.py \
-    tests/test_manifest_authoring_policy.py \
-    tests/test_official_package_layout_plan.py \
-    tests/test_workflow_package_manifest.py \
-    tests/test_workflow_package_installed_smoke.py \
-    tests/test_public_package_boundary.py \
-    tests/test_agent_skill_assets.py
+  uv run --no-project \
+    --with pytest \
+    --with hatchling \
+    --with "$MILLRACE_AI_WHEEL" \
+    --with "$MILLFORGE_WHEEL" \
+    pytest -q
 
 PYTHONDONTWRITEBYTECODE=1 \
-  uv build --out-dir /tmp/millrace-plus-build --force-pep517
+  uv build --out-dir "$BOUNDARY_ARTIFACT_ROOT/millrace-plus" --force-pep517
 
 uv run --no-project --with ruff ruff check src tests
 git diff --check
@@ -53,20 +78,6 @@ millrace_workflow_package/
 
 Installing the wheel must not load entry points, execute workflow code, or
 install `millrace-ai` as a dependency.
-
-## Source-Conformance Checks
-
-Some maintainer tests compare the packaged workflows with runtime APIs and
-legacy donor evidence. They are intentionally opt-in and require all three
-variables:
-
-- `MILLRACE_PLUS_RUN_INTERNAL_CONFORMANCE=1`
-- `MILLRACE_RUNTIME_SOURCE`, pointing to the runtime checkout's `src`
-  directory
-- `MILLRACE_LEGACY_ASSET_ROOT`, pointing to the legacy Millrace asset root
-
-These tests are useful while migrating and reviewing workflow behavior, but
-they are not required to verify that the built package is self-contained.
 
 ## Live Workflow Tests
 

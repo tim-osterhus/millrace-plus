@@ -1,25 +1,11 @@
 from __future__ import annotations
 
-# ruff: noqa: E402
-import json
-import shutil
-from dataclasses import asdict
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
-
-from support.internal_conformance_gate import require_internal_conformance
-
-require_internal_conformance()
-
-from millrace.compiler.canonical import authority_fingerprint
-from millrace.contracts.compiled_plan import canonical_authority_bytes
-from millrace.contracts.workflow_package import (
-    asset_digest_for_bytes,
-    manifest_digest_for_manifest,
-)
-from millrace.workflows import lad_planning
+from millrace.compiler import compile_workflow
 
 from support import package_conformance as conformance
 
@@ -28,751 +14,639 @@ PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.22.0"
 WORKFLOW_ID = "planning.lad"
-
-_ENTRYPOINT_HEADINGS = (
-    "Role:",
-    "Scope:",
-    "Inputs from dispatch:",
-    "Readable assets:",
-    "Writable artifacts:",
-    "Required evidence:",
-    "Legal terminal markers rendered by runtime:",
-    "Forbidden claims:",
-    "How to return evidence:",
-    "When to stop:",
-)
-_CORE_SKILL_HEADINGS = (
-    "## Artifact Schema",
-    "## Handoff Format",
-    "## Valid Example",
-    "## Invalid Examples",
-    "## Validation Checklist",
-    "## Completion Criteria",
-)
-_PLANNING_STAGE_PAIRS = (
-    (
-        "recon",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/recon.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "recon-core/SKILL.md",
-        "planning.entrypoints.recon",
-        "planning.skills.recon_core",
-    ),
-    (
-        "lad_planner",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "lad_planner.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "planner-core/SKILL.md",
-        "planning.entrypoints.lad_planner",
-        "planning.skills.planner_core",
-    ),
-    (
-        "lad_manager",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "lad_manager.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "manager-core/SKILL.md",
-        "planning.entrypoints.lad_manager",
-        "planning.skills.manager_core",
-    ),
-    (
-        "lad_mechanic",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "lad_mechanic.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "mechanic-core/SKILL.md",
-        "planning.entrypoints.lad_mechanic",
-        "planning.skills.mechanic_core",
-    ),
-    (
-        "lad_auditor",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "lad_auditor.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "auditor-core/SKILL.md",
-        "planning.entrypoints.lad_auditor",
-        "planning.skills.auditor_core",
-    ),
-    (
-        "lad_arbiter",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "lad_arbiter.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "arbiter-core/SKILL.md",
-        "planning.entrypoints.lad_arbiter",
-        "planning.skills.arbiter_core",
-    ),
-)
-_BLUEPRINT_PAIRS = (
-    (
-        "contractor_blueprint",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "contractor_blueprint.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "contractor-blueprint-core/SKILL.md",
-    ),
-    (
-        "evaluator_blueprint",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "evaluator_blueprint.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "evaluator-blueprint-core/SKILL.md",
-    ),
-    (
-        "manager_blueprint",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "manager_blueprint.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "manager-blueprint-core/SKILL.md",
-    ),
-    (
-        "mechanic_blueprint",
-        "dev/source/millrace/src/millrace_ai/assets/entrypoints/planning/"
-        "mechanic_blueprint.md",
-        "dev/source/millrace/src/millrace_ai/assets/skills/stage/planning/"
-        "mechanic-blueprint-core/SKILL.md",
-    ),
-)
+Record = dict[str, object]
 
 
-def _load_manifest(package_root: Path = PACKAGE_ROOT) -> dict[str, Any]:
-    return conformance.load_manifest_source(package_root)
+def _manifest() -> dict[str, Any]:
+    return conformance.assert_packaged_asset_closure(PACKAGE_ROOT)
 
 
-def _workflows_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
-    return {
-        str(workflow["workflow_id"]): workflow
-        for workflow in cast(list[dict[str, object]], manifest["workflows"])
-    }
+def _source() -> dict[str, object]:
+    return conformance.packaged_workflow_source(PACKAGE_ROOT, WORKFLOW_ID)
 
 
-def _assets_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
-    return {
-        str(asset["asset_id"]): asset
-        for asset in cast(list[dict[str, object]], manifest["assets"])
-    }
+def _records(source: dict[str, object], section: str) -> list[Record]:
+    return cast(list[Record], source[section])
 
 
-def _schemas_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    return {
-        str(schema["id"]): cast(dict[str, object], schema["schema"])
-        for schema in cast(
-            list[dict[str, object]], selected_authority["artifact_schemas"]
-        )
-    }
+def _record(source: dict[str, object], section: str, record_id: str) -> Record:
+    return next(item for item in _records(source, section) if item["id"] == record_id)
 
 
-def _marker_schema_by_stage(manifest: dict[str, Any]) -> dict[str, dict[str, str]]:
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    outcomes = {
-        str(outcome["id"]): (
-            str(outcome["stage_kind_id"]),
-            str(outcome["marker"]),
-        )
-        for outcome in cast(
-            list[dict[str, object]],
-            selected_authority["terminal_outcomes"],
-        )
-        if "marker" in outcome
-    }
-    marker_schema_by_stage: dict[str, dict[str, str]] = {}
-    for action in cast(
-        list[dict[str, object]],
-        selected_authority["terminal_actions"],
-    ):
-        if "artifact_schema_id" not in action:
-            continue
-        outcome_id = str(action["outcome_id"])
-        if outcome_id not in outcomes:
-            continue
-        stage_id, marker = outcomes[outcome_id]
-        marker_schema_by_stage.setdefault(stage_id, {})[marker] = str(
-            action["artifact_schema_id"]
-        )
-    return marker_schema_by_stage
-
-
-def _source_as_selected_authority(source: dict[str, object]) -> dict[str, object]:
-    selected = cast(dict[str, object], json.loads(json.dumps(source)))
-    selected.pop("assets")
-    return selected
-
-
-def _without_runner_authority(authority: dict[str, object]) -> dict[str, object]:
-    normalized = cast(dict[str, object], json.loads(json.dumps(authority)))
-    normalized.pop("capabilities", None)
-    normalized.pop("runner_bindings")
-
-    def normalize_refs(value: object) -> None:
-        if isinstance(value, dict):
-            for key, child in value.items():
-                if key in {"runner_binding_id", "target_runner_binding_id"}:
-                    value[key] = "<selected-runner-binding>"
-                else:
-                    normalize_refs(child)
-        elif isinstance(value, list):
-            for child in value:
-                normalize_refs(child)
-
-    normalize_refs(normalized)
-    return normalized
-
-
-def _donor_assets(source: dict[str, object]) -> list[dict[str, object]]:
-    return cast(list[dict[str, object]], source["assets"])
-
-
-def _donor_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
-    return tuple(str(asset["id"]) for asset in _donor_assets(source))
-
-
-def _planning_owned_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
-    return tuple(
-        asset_id
-        for asset_id in _donor_asset_ids(source)
-        if asset_id.startswith("planning.")
+def _error(result: object, code: str, path_suffix: str | None = None) -> object:
+    return next(
+        diagnostic
+        for diagnostic in result.diagnostics
+        if diagnostic.severity == "error"
+        and diagnostic.code == code
+        and (path_suffix is None or diagnostic.declaration_path.endswith(path_suffix))
     )
 
 
-def _inherited_execution_asset_ids(source: dict[str, object]) -> tuple[str, ...]:
-    return tuple(
-        asset_id
-        for asset_id in _donor_asset_ids(source)
-        if asset_id.startswith("execution.")
-    )
+def test_planning_lad_authority_and_assets_are_package_owned() -> None:
+    manifest = _manifest()
+    workflow = conformance.workflows_by_id(manifest)[WORKFLOW_ID]
+    selected = cast(dict[str, object], workflow["selected_authority"])
+
+    assert workflow["workflow_version"] == "0.1"
+    assert len(cast(list[object], selected["stage_kinds"])) == 13
+    assert len(cast(list[object], workflow["required_assets"])) == 26
+    assert "assets" not in selected
 
 
-def _package_path_for_planning_asset(asset_id: str) -> str:
-    if asset_id.startswith("planning.entrypoints."):
-        stage_id = asset_id.removeprefix("planning.entrypoints.")
-        return f"assets/workflows/planning.lad/entrypoints/{stage_id}.md"
-    if asset_id.startswith("planning.skills."):
-        skill_id = asset_id.removeprefix("planning.skills.")
-        skill_name = skill_id.removesuffix("_core").replace("_", "-")
-        return f"assets/workflows/planning.lad/skills/{skill_name}-core.md"
-    if asset_id.startswith("execution.entrypoints."):
-        stage_id = asset_id.removeprefix("execution.entrypoints.")
-        return f"assets/workflows/execution.lad/entrypoints/{stage_id}.md"
-    if asset_id.startswith("execution.skills."):
-        skill_id = asset_id.removeprefix("execution.skills.")
-        skill_name = skill_id.removesuffix("_core").replace("_", "-")
-        return f"assets/workflows/execution.lad/skills/{skill_name}-core.md"
-    raise AssertionError(f"unexpected Planning asset id: {asset_id}")
-
-
-def _expected_planning_asset_pins(
-    package_root: Path,
-    source: dict[str, object],
-) -> tuple[tuple[str, str], ...]:
-    return tuple(
-        (
-            asset_id,
-            conformance.asset_digest_for_package_path(
-                package_root,
-                _package_path_for_planning_asset(asset_id),
-            ),
-        )
-        for asset_id in sorted(_donor_asset_ids(source))
-    )
-
-
-def _refresh_manifest_digests(package_root: Path) -> None:
-    manifest = _load_manifest(package_root)
-    for asset in cast(list[dict[str, object]], manifest["assets"]):
-        asset_bytes = (package_root / str(asset["package_path"])).read_bytes()
-        asset["content_digest"] = asset_digest_for_bytes(asset_bytes)
-        asset["byte_length"] = len(asset_bytes)
-
-    assets_by_id = _assets_by_id(manifest)
-    for workflow in cast(list[dict[str, object]], manifest["workflows"]):
-        for required_asset in cast(
-            list[dict[str, object]],
-            workflow["required_assets"],
-        ):
-            asset_id = str(required_asset["asset_id"])
-            required_asset["content_digest"] = assets_by_id[asset_id][
-                "content_digest"
-            ]
-    manifest["manifest_digest"] = manifest_digest_for_manifest(manifest)
-    (package_root / "manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n",
-    )
-
-
-def _copy_pruned_package_without_planning(tmp_path: Path) -> Path:
-    pruned_root = tmp_path / "without-planning"
-    shutil.copytree(PACKAGE_ROOT, pruned_root)
-    manifest = _load_manifest(pruned_root)
-    workflows = _workflows_by_id(manifest)
-    planning_source = lad_planning.workflow_source()
-    planning_owned_asset_ids = set(_planning_owned_asset_ids(planning_source))
-
-    manifest["workflows"] = [
-        workflow
-        for workflow in workflows.values()
-        if workflow["workflow_id"] not in {WORKFLOW_ID, "lad.full"}
-    ]
-    manifest["assets"] = [
-        asset
-        for asset in cast(list[dict[str, object]], manifest["assets"])
-        if (
-            str(asset["asset_id"]) not in planning_owned_asset_ids
-            and not str(asset["asset_id"]).startswith("learning.")
-        )
-    ]
-    metadata = cast(dict[str, object], manifest["non_authoritative_metadata"])
-    metadata["plus_packet"] = "PLUS-0002C"
-    metadata["status"] = "official_simple_loop_and_lad_execution_workflow_package"
-    planning_asset_dir = pruned_root / "assets" / "workflows" / "planning.lad"
-    if planning_asset_dir.exists():
-        shutil.rmtree(planning_asset_dir)
-    learning_asset_dir = pruned_root / "assets" / "workflows" / "lad.full"
-    if learning_asset_dir.exists():
-        shutil.rmtree(learning_asset_dir)
-
-    (pruned_root / "manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n",
-    )
-    _refresh_manifest_digests(pruned_root)
-    return pruned_root
-
-
-def test_planning_workflow_identity_matches_donor_source() -> None:
-    manifest = _load_manifest()
-    workflows = _workflows_by_id(manifest)
-    source_identity = cast(
-        dict[str, object],
-        lad_planning.workflow_source()["workflow"],
-    )
-    workflow = workflows[WORKFLOW_ID]
-
-    assert set(workflows) == {
-        "simple_loop",
-        "execution.lad",
-        "execution.lad_integrator",
-        WORKFLOW_ID,
-        "lad.full",
-        "vendor_selection",
-    }
-    assert workflow["workflow_id"] == source_identity["id"]
-    assert workflow["workflow_version"] == source_identity["version"]
-    assert workflow["visibility"] == "public"
-    assert workflow["entrypoints"] == ["default"]
-
-
-def test_planning_selected_authority_matches_donor_without_assets_or_catalog() -> None:
-    manifest = _load_manifest()
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    selected_authority = cast(dict[str, object], workflow["selected_authority"])
-    source = lad_planning.workflow_source()
-
-    assert "assets" not in selected_authority
-    assert "unselected_catalog" not in selected_authority
-    assert _without_runner_authority(selected_authority) == (
-        _without_runner_authority(_source_as_selected_authority(source))
-    )
-    assert "unselected_catalog" in (
-        lad_planning.workflow_source_with_unselected_catalog()
-    )
-
-
-def test_planning_and_full_lad_select_lossless_planner_manager_projection() -> None:
-    workflows = _workflows_by_id(_load_manifest())
-    expected = {
-        "kind": "object",
-        "fields": {
-            "planning_result": {
-                "kind": "source",
-                "path": ["artifact_payload"],
-            },
-            "source_request": {
-                "kind": "source",
-                "path": ["work_item_payload"],
-            },
-        },
-    }
-
-    for workflow_id in ("planning.lad", "lad.full"):
-        selected = cast(dict[str, object], workflows[workflow_id]["selected_authority"])
-        action = next(
-            item
-            for item in cast(list[dict[str, object]], selected["terminal_actions"])
-            if item["id"] == "planning.route_planner_complete"
-        )
-        assert action["payload_projection"] == expected
-
-
-def test_planning_assets_required_assets_and_digests_match_donor_closure() -> None:
-    manifest = conformance.assert_manifest_and_asset_digests(PACKAGE_ROOT)
-    workflow = _workflows_by_id(manifest)[WORKFLOW_ID]
-    assets_by_id = _assets_by_id(manifest)
-    source = lad_planning.workflow_source()
-    donor_asset_ids = _donor_asset_ids(source)
-
-    assert {
-        asset_id for asset_id in assets_by_id if asset_id in donor_asset_ids
-    } == set(donor_asset_ids)
-    assert workflow["required_assets"] == [
-        {
-            "asset_id": asset_id,
-            "content_digest": assets_by_id[asset_id]["content_digest"],
-        }
-        for asset_id in donor_asset_ids
-    ]
-
-    for asset_id in donor_asset_ids:
-        asset = assets_by_id[asset_id]
-        assert asset["package_path"] == _package_path_for_planning_asset(asset_id)
-        assert asset["selected_authority_participation"] == "yes"
-        if ".entrypoints." in asset_id:
-            assert asset["asset_kind"] == "entrypoint_prompt"
-        else:
-            assert asset["asset_kind"] == "stage_skill"
-
-
-def test_planning_inherited_execution_assets_reuse_plus_0002c_package_bytes() -> None:
-    manifest = conformance.assert_manifest_and_asset_digests(PACKAGE_ROOT)
-    workflows = _workflows_by_id(manifest)
-    assets_by_id = _assets_by_id(manifest)
-    planning_required = {
-        str(asset["asset_id"]): str(asset["content_digest"])
-        for asset in cast(
-            list[dict[str, object]],
-            workflows[WORKFLOW_ID]["required_assets"],
-        )
-    }
-    execution_required = {
-        str(asset["asset_id"]): str(asset["content_digest"])
-        for asset in cast(
-            list[dict[str, object]],
-            workflows["execution.lad"]["required_assets"],
-        )
-    }
-
-    for asset_id in _inherited_execution_asset_ids(lad_planning.workflow_source()):
-        asset = assets_by_id[asset_id]
-        package_path = str(asset["package_path"])
-        asset_bytes = (PACKAGE_ROOT / package_path).read_bytes()
-
-        assert package_path == _package_path_for_planning_asset(asset_id)
-        assert planning_required[asset_id] == execution_required[asset_id]
-        assert asset["content_digest"] == execution_required[asset_id]
-        assert asset["content_digest"] == asset_digest_for_bytes(asset_bytes)
-        assert asset["byte_length"] == len(asset_bytes)
-
-
-def test_planning_path_archive_selection_compiles_and_selects_asset_pins(
-    tmp_path: Path,
-) -> None:
-    source = lad_planning.workflow_source()
-    path_result, archive_result = conformance.select_package_from_path_and_archive(
-        tmp_path / "selection",
+def test_planning_lad_selects_through_installed_public_api(tmp_path: Path) -> None:
+    manifest = _manifest()
+    plan = conformance.select_and_verify_package(
+        tmp_path,
         PACKAGE_ROOT,
         package_id=PACKAGE_ID,
         package_version=PACKAGE_VERSION,
         workflow_id=WORKFLOW_ID,
-        workflow_version=str(cast(dict[str, object], source["workflow"])["version"]),
+        workflow_version="0.1",
     )
-    expected_asset_pins = _expected_planning_asset_pins(PACKAGE_ROOT, source)
-
-    for result in (path_result, archive_result):
-        conformance.assert_selected_package_pin(
-            result.plan,
-            package_id=PACKAGE_ID,
-            package_version=PACKAGE_VERSION,
-            workflow_id=WORKFLOW_ID,
-            workflow_version="0.1",
-            selected_asset_pins=expected_asset_pins,
-        )
-        assert result.plan is not None
-        assert "unselected_catalog" not in (
-            canonical_authority_bytes(result.plan).decode("utf-8")
-        )
-        assert asdict(result.plan.workflow_package_pin) == {
-            "package_id": PACKAGE_ID,
-            "package_version": PACKAGE_VERSION,
-            "package_format_version": "1",
-            "workflow_id": WORKFLOW_ID,
-            "workflow_version": "0.1",
-            "entrypoint": "default",
-            "selected_asset_pins": tuple(
-                {
-                    "asset_id": asset_id,
-                    "content_digest": content_digest,
-                }
-                for asset_id, content_digest in expected_asset_pins
-            ),
-            "selected_dependency_pins": (),
-        }
-    assert authority_fingerprint(path_result.plan) == authority_fingerprint(
-        archive_result.plan,
+    conformance.assert_selected_package_pin(
+        plan,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=WORKFLOW_ID,
+        workflow_version="0.1",
+        selected_asset_pins=conformance.selected_asset_pins(manifest, WORKFLOW_ID),
     )
 
 
-def test_planning_assets_follow_entrypoint_authoring_boundaries() -> None:
-    manifest = _load_manifest()
-    assets_by_id = _assets_by_id(manifest)
-    donor_asset_ids = _donor_asset_ids(lad_planning.workflow_source())
-    asset_texts_by_path = {
-        str(assets_by_id[asset_id]["package_path"]): (
-            PACKAGE_ROOT / str(assets_by_id[asset_id]["package_path"])
-        ).read_text()
-        for asset_id in donor_asset_ids
-    }
-    asset_texts_by_id = {
-        asset_id: (
-            PACKAGE_ROOT / str(assets_by_id[asset_id]["package_path"])
-        ).read_text()
-        for asset_id in donor_asset_ids
-    }
+def test_planning_lad_assets_keep_task_card_handoff_contract() -> None:
+    root = PACKAGE_ROOT / "assets/workflows/planning.lad"
+    planner = (root / "skills/planner-core.md").read_text()
+    manager = (root / "skills/manager-core.md").read_text()
+    assert "planning.artifacts.stage_result" in planner
+    assert "planning.artifacts.task_cards" in manager
+    assert "## Completion Criteria" in planner
+    assert "## Completion Criteria" in manager
 
-    for asset_id in donor_asset_ids:
-        headings = (
-            _ENTRYPOINT_HEADINGS
-            if ".entrypoints." in asset_id
-            else _CORE_SKILL_HEADINGS
+
+def test_planning_lad_compiles_packaged_selected_authority() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+
+    assert str(plan.workflow.workflow_id) == WORKFLOW_ID
+    assert plan.workflow.workflow_name == "LAD Planning"
+    assert plan.lineage_policy == "root_from_external_enqueue"
+    graphs = {str(graph.id): graph for graph in plan.graphs}
+    assert graphs["planning.lad.graph"].node_ids == (
+        "planning.lad.recon.start",
+        "planning.lad.planner.start",
+        "planning.lad.manager.start",
+        "planning.lad.mechanic.start",
+        "planning.lad.auditor.start",
+        "planning.lad.arbiter.start",
+    )
+    assert graphs["execution.lad.graph"].node_ids == (
+        "execution.lad.builder.start",
+        "execution.lad.checker.start",
+        "execution.lad.fixer.start",
+        "execution.lad.doublechecker.start",
+        "execution.lad.updater.start",
+        "execution.lad.troubleshooter.start",
+        "execution.lad.consultant.start",
+    )
+    routes = {route.id: route for route in plan.external_enqueue_routes}
+    assert {
+        route_id: (
+            str(route.queue_family_id),
+            route.graph_node_id,
+            str(route.stage_kind_id),
+            str(route.runner_binding_id),
+            str(route.payload_schema_id),
         )
-        for heading in headings:
-            assert heading in asset_texts_by_id[asset_id]
-
-    conformance.assert_no_runtime_authority_claims(asset_texts_by_path)
-    conformance.assert_no_unscoped_selected_artifact_kind_mentions(
-        asset_texts_by_id,
-        declared_artifact_schema_ids_by_asset_id=(
-            conformance.selected_artifact_schema_ids_by_asset_id(manifest)
+        for route_id, route in routes.items()
+    } == {
+        "spec": (
+            "spec",
+            "planning.lad.planner.start",
+            "lad_planner",
+            "lad_planner.millforge_runner",
+            "planning.intake.spec",
         ),
-    )
-
-
-def test_planning_core_skill_examples_match_selected_schemas_for_all_stages() -> None:
-    manifest = _load_manifest()
-    schemas_by_id = _schemas_by_id(manifest)
-    marker_schema_by_stage = _marker_schema_by_stage(manifest)
-
-    for stage_id, _, _, _, core_asset_id in _PLANNING_STAGE_PAIRS:
-        skill_text = (
-            PACKAGE_ROOT / _package_path_for_planning_asset(core_asset_id)
-        ).read_text()
-        valid_examples = conformance.markdown_json_examples(
-            skill_text,
-            section_heading="## Valid Example",
-        )
-        invalid_example = conformance.markdown_json_examples(
-            skill_text,
-            section_heading="## Invalid Examples",
-        )[0]
-
-        assert valid_examples
-        for valid_example in valid_examples:
-            conformance.assert_marker_artifact_example_matches_selected_schema(
-                valid_example,
-                stage_id=stage_id,
-                marker_schema_by_stage=marker_schema_by_stage,
-                schemas_by_id=schemas_by_id,
-            )
-            artifact = cast(dict[str, object], valid_example["artifact"])
-            conformance.assert_not_generic_artifact_envelope_body(artifact)
-            if "observation_payload" in valid_example:
-                observation_payload = cast(
-                    dict[str, object],
-                    valid_example["observation_payload"],
-                )
-                conformance.assert_not_generic_artifact_envelope_body(
-                    observation_payload
-                )
-
-        with pytest.raises(AssertionError):
-            conformance.assert_marker_artifact_example_matches_selected_schema(
-                invalid_example,
-                stage_id=stage_id,
-                marker_schema_by_stage=marker_schema_by_stage,
-                schemas_by_id=schemas_by_id,
-            )
-
-
-def test_planning_planner_complete_example_is_stage_result_artifact_payload() -> None:
-    manifest = _load_manifest()
-    schemas_by_id = _schemas_by_id(manifest)
-    marker_schema_by_stage = _marker_schema_by_stage(manifest)
-    skill_text = (
-        PACKAGE_ROOT / "assets/workflows/planning.lad/skills/planner-core.md"
-    ).read_text()
-    prompt_text = (
-        PACKAGE_ROOT / "assets/workflows/planning.lad/entrypoints/lad_planner.md"
-    ).read_text()
-
-    valid_example = conformance.markdown_json_examples(
-        skill_text,
-        section_heading="## Valid Example",
-    )[0]
-    invalid_example = conformance.markdown_json_examples(
-        skill_text,
-        section_heading="## Invalid Examples",
-    )[0]
-
-    conformance.assert_marker_artifact_example_matches_selected_schema(
-        valid_example,
-        stage_id="lad_planner",
-        marker_schema_by_stage=marker_schema_by_stage,
-        schemas_by_id=schemas_by_id,
-    )
-    assert valid_example == {
-        "terminal_marker": "PLANNER_COMPLETE",
-        "artifact": {
-            "artifact_kind": "planning.artifacts.stage_result",
-            "summary": "Planner summary.",
+        "probe": (
+            "probe",
+            "planning.lad.recon.start",
+            "recon",
+            "recon.millforge_runner",
+            "planning.intake.probe",
+        ),
+        "incident": (
+            "incident",
+            "planning.lad.auditor.start",
+            "lad_auditor",
+            "lad_auditor.millforge_runner",
+            "planning.intake.incident",
+        ),
+        "execution.lad.task": (
+            "task",
+            "execution.lad.builder.start",
+            "lad_builder",
+            "lad_builder.millforge_runner",
+            "execution.artifacts.task",
+        ),
+    }
+    assert {str(queue.id) for queue in plan.queue_families} == {
+        "spec",
+        "probe",
+        "incident",
+        "task",
+        "stage_result",
+        "recon_packet",
+        "generated_task",
+        "generated_spec",
+        "planner_disposition",
+        "task_cards",
+        "incident_report",
+        "report",
+        "rubric",
+        "verdict",
+    }
+    planning_stages = {
+        "recon",
+        "lad_planner",
+        "lad_manager",
+        "lad_mechanic",
+        "lad_auditor",
+        "lad_arbiter",
+    }
+    stage_assets = {
+        str(stage.id): {str(asset_id) for asset_id in stage.asset_ids}
+        for stage in plan.stage_kinds
+        if str(stage.id) in planning_stages
+    }
+    assert stage_assets == {
+        "recon": {"planning.entrypoints.recon", "planning.skills.recon_core"},
+        "lad_planner": {
+            "planning.entrypoints.lad_planner",
+            "planning.skills.planner_core",
         },
-        "observation_payload": {
-            "artifact_kind": "planning.artifacts.stage_result",
-            "summary": "Planner summary.",
+        "lad_manager": {
+            "planning.entrypoints.lad_manager",
+            "planning.skills.manager_core",
+        },
+        "lad_mechanic": {
+            "planning.entrypoints.lad_mechanic",
+            "planning.skills.mechanic_core",
+        },
+        "lad_auditor": {
+            "planning.entrypoints.lad_auditor",
+            "planning.skills.auditor_core",
+        },
+        "lad_arbiter": {
+            "planning.entrypoints.lad_arbiter",
+            "planning.skills.arbiter_core",
         },
     }
-    assert valid_example["observation_payload"] == valid_example["artifact"]
-    conformance.assert_not_generic_artifact_envelope_body(
-        cast(dict[str, object], valid_example["artifact"])
-    )
-    conformance.assert_not_generic_artifact_envelope_body(
-        cast(dict[str, object], valid_example["observation_payload"])
+    assert all(
+        str(stage.runner_binding_id) == f"{stage.id}.millforge_runner"
+        for stage in plan.stage_kinds
     )
 
-    with pytest.raises(AssertionError):
-        conformance.assert_marker_artifact_example_matches_selected_schema(
-            invalid_example,
-            stage_id="lad_planner",
-            marker_schema_by_stage=marker_schema_by_stage,
-            schemas_by_id=schemas_by_id,
+
+def test_planning_lad_work_shaping_and_downstream_routes_are_exact() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    actions = {str(action.id): action for action in plan.terminal_actions}
+    expected = {
+        "planning.recon_enqueue_task": (
+            "route",
+            "lad_builder",
+            "execution.lad.builder.start",
+            "task",
+            "execution.artifacts.task",
+        ),
+        "planning.recon_enqueue_spec": (
+            "route",
+            "lad_planner",
+            "planning.lad.planner.start",
+            "spec",
+            "planning.artifacts.generated_spec",
+        ),
+        "planning.recon_noop": (
+            "complete_work_item",
+            None,
+            None,
+            None,
+            "planning.artifacts.recon_packet",
+        ),
+        "planning.recon_block_work_item": (
+            "block_work_item",
+            None,
+            None,
+            None,
+            "planning.artifacts.report",
+        ),
+        "planning.route_planner_complete": (
+            "route",
+            "lad_manager",
+            "planning.lad.manager.start",
+            "stage_result",
+            "planning.artifacts.stage_result",
+        ),
+        "planning.close_manager_complete": (
+            "complete_work_item",
+            None,
+            None,
+            None,
+            "planning.artifacts.task_cards",
+        ),
+        "planning.route_auditor_complete": (
+            "route",
+            "lad_planner",
+            "planning.lad.planner.start",
+            "stage_result",
+            "planning.artifacts.stage_result",
+        ),
+    }
+    assert {
+        action_id: (
+            action.action_kind,
+            None
+            if action.target_stage_kind_id is None
+            else str(action.target_stage_kind_id),
+            action.target_graph_node_id,
+            None
+            if action.emitted_queue_family_id is None
+            else str(action.emitted_queue_family_id),
+            None
+            if action.artifact_schema_id is None
+            else str(action.artifact_schema_id),
         )
-    with pytest.raises(AssertionError):
-        conformance.assert_marker_artifact_example_matches_selected_schema(
-            {
-                "terminal_marker": "PLANNER_COMPLETE",
-                "artifact": valid_example["artifact"],
-                "observation_payload": {
-                    "report": "Planner evidence.",
-                    "source_id": "e2e-full-lad-spec-001",
-                    "selected_action_id": "planning.route_planner_complete",
-                    "outcome_id": "planning.lad_planner.complete",
-                    "downstream_context": "execution.lad.builder.start",
-                },
+        for action_id, action in actions.items()
+        if action_id in expected
+    } == expected
+
+    planner = actions["planning.route_planner_complete"]
+    assert planner.payload_projection == {
+        "kind": "object",
+        "fields": {
+            "planning_result": {
+                "kind": "source",
+                "path": ("artifact_payload",),
             },
-            stage_id="lad_planner",
-            marker_schema_by_stage=marker_schema_by_stage,
-            schemas_by_id=schemas_by_id,
-        )
-
-    assert "observation/fanout payload candidate" in skill_text
-    assert "source IDs, selected action IDs, outcome IDs" in skill_text
-    assert "generic wrapper keys" in skill_text
-    assert "`next_stage_context`" not in skill_text
-    assert "`fields`" not in skill_text
-    assert "exact selected artifact JSON object" in prompt_text
-    assert "same exact selected artifact object" in prompt_text
-    assert "not extra JSON fields" in prompt_text
-
-
-def test_planning_manager_complete_example_is_task_cards_payload() -> None:
-    manifest = _load_manifest()
-    schemas_by_id = _schemas_by_id(manifest)
-    marker_schema_by_stage = _marker_schema_by_stage(manifest)
-    skill_text = (
-        PACKAGE_ROOT / "assets/workflows/planning.lad/skills/manager-core.md"
-    ).read_text()
-    prompt_text = (
-        PACKAGE_ROOT / "assets/workflows/planning.lad/entrypoints/lad_manager.md"
-    ).read_text()
-
-    valid_example = conformance.markdown_json_examples(
-        skill_text,
-        section_heading="## Valid Example",
-    )[0]
-    invalid_example = conformance.markdown_json_examples(
-        skill_text,
-        section_heading="## Invalid Examples",
-    )[0]
-
-    conformance.assert_marker_artifact_example_matches_selected_schema(
-        valid_example,
-        stage_id="lad_manager",
-        marker_schema_by_stage=marker_schema_by_stage,
-        schemas_by_id=schemas_by_id,
+            "source_request": {
+                "kind": "source",
+                "path": ("work_item_payload",),
+            },
+        },
+    }
+    fanout = plan.fanout_declarations[0]
+    assert (
+        str(fanout.id),
+        str(fanout.source_action_id),
+        str(fanout.source_artifact_schema_id),
+        fanout.target_route_id,
+        str(fanout.target_payload_schema_id),
+        fanout.root_lineage_policy,
+        fanout.dependency_policy,
+        fanout.duplicate_policy,
+    ) == (
+        "planning.manager.task_cards_to_execution",
+        "planning.close_manager_complete",
+        "planning.artifacts.task_cards",
+        "execution.lad.task",
+        "execution.artifacts.task",
+        "inherit_source_lineage",
+        "depends_on_source_work_item",
+        "refuse",
     )
-    artifact = cast(dict[str, object], valid_example["artifact"])
-    observation_payload = cast(dict[str, object], valid_example["observation_payload"])
-    card = cast(list[dict[str, object]], artifact["cards"])[0]
 
-    assert observation_payload == artifact
-    assert artifact["artifact_kind"] == "task_cards"
-    assert set(card) == {"task_card_id", "title", "body"}
-    conformance.assert_not_generic_artifact_envelope_body(artifact)
-    conformance.assert_not_generic_artifact_envelope_body(observation_payload)
 
-    with pytest.raises(AssertionError):
-        conformance.assert_marker_artifact_example_matches_selected_schema(
-            invalid_example,
-            stage_id="lad_manager",
-            marker_schema_by_stage=marker_schema_by_stage,
-            schemas_by_id=schemas_by_id,
+def test_planning_lad_recovery_and_operator_interventions_are_exact() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    actions = {str(action.id): action for action in plan.terminal_actions}
+    policy = next(
+        item
+        for item in plan.recovery_policies
+        if str(item.id) == "planning.blocked.recovery"
+    )
+    counters = {
+        str(item.id): item
+        for item in plan.counters
+        if str(item.id).startswith("planning.")
+    }
+    interventions = {
+        str(item.id): item
+        for item in plan.intervention_options
+        if str(item.id).startswith("planning.")
+    }
+
+    for stage in ("planner", "manager", "mechanic", "auditor"):
+        assert actions[f"planning.route_{stage}_blocked"].action_kind == (
+            "recovery_route"
         )
+        assert actions[f"planning.escalate_{stage}_blocked_exhausted"].action_kind == (
+            "recovery_route"
+        )
+    assert actions["planning.return_mechanic_recovered"].action_kind == (
+        "return_to_recorded_source"
+    )
+    assert actions["planning.quarantine_mechanic_blocked"].action_kind == (
+        "quarantine_lineage"
+    )
+    mechanic = actions["planning.route_mechanic_complete"]
+    assert isinstance(mechanic.dynamic_target_selector, Mapping)
+    assert mechanic.dynamic_target_selector["field_names"] == ("resume_stage",)
+    assert "mechanic" not in mechanic.dynamic_target_selector["targets"]
+    assert tuple(str(item) for item in policy.source_recovery_action_ids) == (
+        "planning.route_planner_blocked",
+        "planning.route_manager_blocked",
+        "planning.route_mechanic_blocked",
+        "planning.route_auditor_blocked",
+    )
+    assert (
+        str(policy.recovery_stage_kind_id),
+        policy.immediate_recovery_limit,
+        policy.cooldown_starts_at_attempt,
+        policy.quarantine_threshold_attempt,
+        policy.default_cooldown_seconds,
+        str(policy.cooldown_wait_state_id),
+    ) == (
+        "lad_mechanic",
+        1,
+        2,
+        2,
+        900,
+        "planning.blocked.recovery.cooldown",
+    )
+    assert set(counters) == {
+        "planning.mechanic_attempt_count.planner",
+        "planning.mechanic_attempt_count.manager",
+        "planning.mechanic_attempt_count.mechanic",
+        "planning.mechanic_attempt_count.auditor",
+    }
+    assert all(counter.threshold_count == 2 for counter in counters.values())
+    assert {
+        option_id: option.option_kind for option_id, option in interventions.items()
+    } == {
+        "planning.blocked.resume_lineage": "resume_lineage",
+        "planning.blocked.close_lineage": "close_lineage",
+        "planning.blocked.revise_lineage": "revise_lineage",
+    }
+    revise = interventions["planning.blocked.revise_lineage"]
+    assert (
+        str(revise.payload_schema_id),
+        str(revise.target_queue_family_id),
+        str(revise.target_stage_kind_id),
+        revise.target_graph_node_id,
+        str(revise.target_runner_binding_id),
+    ) == (
+        "planning.intake.spec",
+        "spec",
+        "lad_planner",
+        "planning.lad.planner.start",
+        "lad_planner.millforge_runner",
+    )
 
-    assert "planning.artifacts.task_cards" in skill_text
-    assert "owner stages, dependencies, acceptance criteria" in skill_text
-    assert "`source_request` is authoritative" in skill_text
-    assert "copy exact literals, paths, completion definitions" in skill_text
-    assert "`planning_result` and `source_request`" in prompt_text
-    assert "same exact selected task-card object" in prompt_text
-    assert "undeclared task-card JSON fields" in prompt_text
-    assert "E2E" not in skill_text
-    assert "e2e-" not in skill_text
-    assert "E2E" not in prompt_text
-    assert "e2e-" not in prompt_text
+
+def test_planning_lad_closure_and_remediation_authority_is_exact() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
+    behavior = plan.completion_behaviors[0]
+    remediation = plan.remediation_policies[0]
+    actions = {str(action.id): action for action in plan.terminal_actions}
+
+    assert (
+        str(behavior.id),
+        behavior.trigger,
+        behavior.readiness_rule,
+        behavior.request_kind,
+        behavior.target_selector,
+        str(behavior.target_stage_kind_id),
+        behavior.target_graph_node_id,
+        str(behavior.runner_binding_id),
+        str(behavior.request_queue_family_id),
+        str(behavior.pass_action_id),
+        str(behavior.gap_action_id),
+        str(behavior.blocked_action_id),
+        str(behavior.verdict_artifact_schema_id),
+        str(behavior.remediation_policy_id),
+    ) == (
+        "planning.closure.completion",
+        "backlog_drained",
+        "no_open_lineage_work",
+        "closure_target",
+        "active_closure_target",
+        "lad_arbiter",
+        "planning.lad.arbiter.start",
+        "lad_arbiter.millforge_runner",
+        "stage_result",
+        "planning.close_arbiter_complete",
+        "planning.closure_gap",
+        "planning.close_arbiter_blocked",
+        "planning.artifacts.verdict",
+        "planning.closure.remediation",
+    )
+    assert behavior.accepted_root_source_kinds == (
+        "idea",
+        "probe",
+        "manual",
+        "spec",
+        "incident",
+    )
+    assert {
+        action_id: actions[action_id].action_kind
+        for action_id in (
+            "planning.close_arbiter_complete",
+            "planning.closure_gap",
+            "planning.close_arbiter_blocked",
+        )
+    } == {
+        "planning.close_arbiter_complete": "complete_work_item",
+        "planning.closure_gap": "closure_gap",
+        "planning.close_arbiter_blocked": "block_work_item",
+    }
+    assert (
+        str(remediation.id),
+        str(remediation.source_action_id),
+        str(remediation.target_queue_family_id),
+        str(remediation.target_stage_kind_id),
+        remediation.target_graph_node_id,
+        str(remediation.target_runner_binding_id),
+        str(remediation.payload_schema_id),
+        remediation.dedupe_key,
+        remediation.duplicate_policy,
+    ) == (
+        "planning.closure.remediation",
+        "planning.closure_gap",
+        "incident",
+        "lad_auditor",
+        "planning.lad.auditor.start",
+        "lad_auditor.millforge_runner",
+        "planning.intake.incident",
+        "closure_target_and_source_artifact",
+        "refuse",
+    )
 
 
 @pytest.mark.parametrize(
-    "text",
+    ("mutation", "diagnostic_code", "path_suffix", "context_key", "context_value"),
     (
-        "This prompt creates queue aliases.",
-        "This skill routes work.",
-        "Return `MANAGER_COMPLETE` to close work.",
-        "The marker retries work.",
-        "This prompt mutates runtime state.",
-        "This skill grants authority.",
-        "This prompt approves effects.",
-        "The skill selects packages.",
-        "Planning assets become default global inbox router.",
-        "Planning assets become default task-kind router.",
+        (
+            "route_graph",
+            "missing_reference",
+            "external_enqueue_routes[0].graph_node_id",
+            "referenced_id",
+            "planning.lad.missing.start",
+        ),
+        (
+            "route_schema",
+            "missing_reference",
+            "external_enqueue_routes[0].payload_schema_id",
+            "referenced_id",
+            "planning.intake.missing",
+        ),
+        ("duplicate_queue", "duplicate_id", None, "duplicate_id", "spec"),
+        (
+            "missing_asset",
+            "missing_reference",
+            ".asset_ids[1]",
+            "referenced_id",
+            "planning.skills.missing",
+        ),
+        (
+            "missing_outcome",
+            "missing_reference",
+            ".outcome_id",
+            "referenced_id",
+            "planning.lad_planner.MISSING",
+        ),
+        (
+            "invalid_schema",
+            "invalid_artifact_schema",
+            None,
+            "schema_id",
+            "planning.artifacts.task_cards",
+        ),
+        (
+            "request_kind",
+            "invalid_completion_behavior_declaration",
+            "completion_behaviors[0].request_kind",
+            "reason",
+            "unsupported_request_kind",
+        ),
+        (
+            "completion_graph",
+            "missing_reference",
+            "completion_behaviors[0].target_graph_node_id",
+            "referenced_id",
+            "planning.lad.missing.start",
+        ),
+        (
+            "guidance_source",
+            "invalid_remediation_policy_declaration",
+            "remediation_policies[0].guidance_source",
+            "reason",
+            "unsupported_guidance_source",
+        ),
+        (
+            "remediation_action",
+            "invalid_remediation_policy_declaration",
+            "remediation_policies[0].source_action_id",
+            "reason",
+            "unsupported_source_action_kind",
+        ),
+        (
+            "compatibility_profile",
+            "unsupported_compatibility_profile",
+            "workflow.compatibility_profile",
+            "compatibility_profile",
+            "lad_codex",
+        ),
+        (
+            "old_loop_override",
+            "unknown_source_section",
+            "old_loop_config_override",
+            "section",
+            "old_loop_config_override",
+        ),
     ),
 )
-def test_boundary_lint_refuses_planning_runtime_authority_claims(text: str) -> None:
-    with pytest.raises(AssertionError):
-        conformance.assert_no_runtime_authority_claims({"bad-planning.md": text})
-
-
-def test_existing_workflow_fingerprints_stay_stable_when_planning_is_added(
-    tmp_path: Path,
+def test_planning_lad_refuses_workflow_specific_authority_mutations(
+    mutation: str,
+    diagnostic_code: str,
+    path_suffix: str | None,
+    context_key: str,
+    context_value: str,
 ) -> None:
-    pruned_root = _copy_pruned_package_without_planning(tmp_path)
-    for workflow_id in ("simple_loop", "execution.lad", "execution.lad_integrator"):
-        full_result = conformance.select_package_from_path(
-            tmp_path / f"full-{workflow_id.replace('.', '-')}",
-            PACKAGE_ROOT,
-            package_id=PACKAGE_ID,
-            package_version=PACKAGE_VERSION,
-            workflow_id=workflow_id,
-            workflow_version="0.1",
+    source = _source()
+    if mutation in {"route_graph", "route_schema"}:
+        route = _records(source, "external_enqueue_routes")[0]
+        if mutation == "route_graph":
+            route["graph_node_id"] = "planning.lad.missing.start"
+        else:
+            route["payload_schema_id"] = "planning.intake.missing"
+    elif mutation == "duplicate_queue":
+        families = _records(source, "queue_families")
+        source["queue_families"] = (*families, dict(families[0]))
+    elif mutation == "missing_asset":
+        _record(source, "stage_kinds", "recon")["asset_ids"] = (
+            "planning.entrypoints.recon",
+            "planning.skills.missing",
         )
-        pruned_result = conformance.select_package_from_path(
-            tmp_path / f"pruned-{workflow_id.replace('.', '-')}",
-            pruned_root,
-            package_id=PACKAGE_ID,
-            package_version=PACKAGE_VERSION,
-            workflow_id=workflow_id,
-            workflow_version="0.1",
+    elif mutation == "missing_outcome":
+        _record(source, "terminal_actions", "planning.route_planner_complete")[
+            "outcome_id"
+        ] = "planning.lad_planner.MISSING"
+    elif mutation == "invalid_schema":
+        schema = cast(
+            Record,
+            _record(source, "artifact_schemas", "planning.artifacts.task_cards")[
+                "schema"
+            ],
         )
+        schema["type"] = "number"
+    elif mutation in {"request_kind", "completion_graph"}:
+        behavior = _records(source, "completion_behaviors")[0]
+        if mutation == "request_kind":
+            behavior["request_kind"] = "wrong_request"
+        else:
+            behavior["target_graph_node_id"] = "planning.lad.missing.start"
+    elif mutation in {"guidance_source", "remediation_action"}:
+        policy = _records(source, "remediation_policies")[0]
+        if mutation == "guidance_source":
+            policy["guidance_source"] = "static"
+        else:
+            policy["source_action_id"] = "planning.close_arbiter_complete"
+    elif mutation == "compatibility_profile":
+        cast(Record, source["workflow"])["compatibility_profile"] = "lad_codex"
+    else:
+        source["old_loop_config_override"] = {"path": "assets/loops/planning/lad.json"}
 
-        assert authority_fingerprint(full_result.plan) == authority_fingerprint(
-            pruned_result.plan,
-        )
+    result = compile_workflow(source)
+    error = _error(result, diagnostic_code, path_suffix)
+    assert result.plan is None
+    assert error.context[context_key] == context_value
+
+
+# Rows are (Millrace source owner, collected rows, Plus replacements, generic N/A).
+_PLANNING_SOURCE_OWNER_LEDGER = (
+    ("compiler/test_lad_planning_compile.py", 20, 20, 0),
+    ("kernel/test_lad_planning_intake_dispatch.py", 16, 13, 3),
+    ("kernel/test_lad_planning_work_shaping.py", 15, 11, 4),
+    ("kernel/test_lad_planning_downstream_routing.py", 11, 6, 5),
+    ("kernel/test_lad_planning_recovery.py", 9, 9, 0),
+    ("kernel/test_lad_planning_closure.py", 26, 9, 17),
+    ("operator/test_lad_planning_status_projection.py", 5, 0, 5),
+)
+
+_PLANNING_GENERIC_N_A = (
+    ("plan selection/fingerprint runtime refusals", 3),
+    ("payload/source/override transition mechanics", 4),
+    ("restart persistence mechanics", 5),
+    ("closure root relation and persistence corruption", 17),
+    ("status-projection mechanics", 5),
+)
+
+
+def test_planning_source_owner_row_disposition_ledger_is_complete() -> None:
+    assert len(_PLANNING_SOURCE_OWNER_LEDGER) == 7
+    assert sum(row[1] for row in _PLANNING_SOURCE_OWNER_LEDGER) == 102
+    assert sum(row[2] for row in _PLANNING_SOURCE_OWNER_LEDGER) == 68
+    assert sum(row[3] for row in _PLANNING_SOURCE_OWNER_LEDGER) == 34
+    assert all(
+        total == replacement + n_a
+        for _, total, replacement, n_a in _PLANNING_SOURCE_OWNER_LEDGER
+    )
+    assert sum(rows for _cluster, rows in _PLANNING_GENERIC_N_A) == 34

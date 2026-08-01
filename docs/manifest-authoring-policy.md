@@ -34,9 +34,8 @@ Object-key sorting is used only for digest canonicalization; the committed file
 keeps the reviewed presentation order.
 
 Standalone validation does not need donor workflow functions, a sibling
-runtime checkout, or legacy asset paths. Source-conformance tests may compare
-against those references when their explicit environment variables are set,
-but the manifest and package bytes remain independently verifiable.
+runtime checkout, or legacy asset paths. It validates the packaged bytes
+through public APIs installed from Millrace and Millforge distributions.
 
 If a change alters a selected graph, terminal action, schema, runner binding,
 or asset, review it as a workflow behavior change rather than a digest-only
