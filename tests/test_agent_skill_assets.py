@@ -12,7 +12,7 @@ FROZEN_SKILL_DIGESTS = dict(
     (
         (
             "millrace-entrypoint-authoring/SKILL.md",
-            "02ff2df3d9f662413b71d7252349f67f71688f44f293815a226c957f38f38043",
+            "423d5f7b8d3c55bf27b9d9e39de6fedcd874570148e8c5cbe0ccc0c604884dbc",
         ),
         (
             "millrace-entrypoint-authoring/agents/openai.yaml",
@@ -68,7 +68,7 @@ FROZEN_SKILL_DIGESTS = dict(
         ),
         (
             "millrace-loop-configuration/SKILL.md",
-            "3961ab1c9b09897c82a1a0349de2d7e7f8d8b647b9776e85496b17a9668c45fd",
+            "24c503f0aee35ceab3e3a0de67bf8ec1b101b89d89e578273a9307e318c69d0e",
         ),
         (
             "millrace-loop-configuration/agents/openai.yaml",
@@ -109,6 +109,53 @@ def test_agent_skill_inventory_and_bytes_match_frozen_donor() -> None:
     }
     for relative_path, expected_digest in FROZEN_SKILL_DIGESTS.items():
         assert sha256(files[relative_path].read_bytes()).hexdigest() == expected_digest
+
+
+def test_agent_skill_guidance_covers_terminal_schema_and_recovery_boundaries() -> None:
+    entrypoint = (SKILL_ROOT / "millrace-entrypoint-authoring/SKILL.md").read_text()
+    loop = (SKILL_ROOT / "millrace-loop-configuration/SKILL.md").read_text()
+    combined = " ".join(f"{entrypoint}\n{loop}".split())
+
+    for required in (
+        "every legal terminal branch",
+        "exact marker-to-selected-schema/null handoff contract",
+        "runner dispatch must project exact selected terminal schema material",
+        "Examples must cover every branch",
+        "schema-invalid shapes",
+        "Runner output and rejected-result evidence are non-authoritative",
+        "selected workflow authority",
+        "not inferred from a folder or prompt prose",
+        "advisory package data",
+        "not runtime-installed authority",
+    ):
+        assert required in combined
+
+
+def test_new_generic_guidance_has_no_workflow_specific_coupling() -> None:
+    entrypoint = (SKILL_ROOT / "millrace-entrypoint-authoring/SKILL.md").read_text()
+    loop = (SKILL_ROOT / "millrace-loop-configuration/SKILL.md").read_text()
+    generic_sections = "\n".join(
+        (
+            entrypoint.split("## Selected Terminal Handoff Rules", maxsplit=1)[1]
+            .split("\n## ", maxsplit=1)[0],
+            loop.split("## Selected Terminal And Recovery Contracts", maxsplit=1)[1]
+            .split("\n## ", maxsplit=1)[0],
+        )
+    ).lower()
+
+    for forbidden_term in (
+        "recon",
+        "lad",
+        "luna",
+        "e2e",
+        "macos",
+        "planning",
+        "execution",
+        "probe",
+        "task",
+        "spec",
+    ):
+        assert forbidden_term not in generic_sections
 
 
 def test_agent_skills_are_not_workflow_manifest_authority() -> None:

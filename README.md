@@ -8,7 +8,7 @@ workflow definitions, entrypoint prompts, stage skills, and examples that make
 the runtime useful out of the box. It contains data only: no daemon, CLI,
 runner, provider, plugin, or installation hook.
 
-> **Release line:** This source and package are on the v0.22.0 release line.
+> **Release line:** This source and package are on the v0.22.2 release line.
 
 ## Included Workflows
 
@@ -57,8 +57,8 @@ The installed resource root is `millrace_workflow_package`; package data is
 non-executable. A direct installation contains package metadata and data only
 and does not transitively install `millrace-ai` or another member distribution.
 
-The `millrace==0.22.0` convenience meta-distribution selects and installs this
-exact tested combination: `millrace-ai==0.22.0`, `millrace-plus==0.22.0`, and
+The `millrace==0.22.2` convenience meta-distribution selects and installs this
+exact tested combination: `millrace-ai==0.22.2`, `millrace-plus==0.22.2`, and
 `millforge==0.1.0`. Member distributions version independently. Each
 `millrace` meta-distribution release pins one tested combination and may reuse
 an unchanged compatible member.

@@ -7,8 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "publish-to-pypi.yml"
-WHEEL = "millrace_plus-0.22.0-py3-none-any.whl"
-SDIST = "millrace_plus-0.22.0.tar.gz"
+WHEEL = "millrace_plus-0.22.2-py3-none-any.whl"
+SDIST = "millrace_plus-0.22.2.tar.gz"
 ACTION_PINS = {
     "actions/checkout": "df4cb1c069e1874edd31b4311f1884172cec0e10",
     "astral-sh/setup-uv": "37802adc94f370d6bfd71619e3f0bf239e1f3b78",
@@ -83,7 +83,7 @@ def test_release_workflow_accepts_only_exact_project_version_tag() -> None:
         version = tomllib.load(source)["project"]["version"]
     expected_ref = f"refs/tags/v{version}"
 
-    assert version == "0.22.0"
+    assert version == "0.22.2"
     assert _trigger_tags(workflow) == (f"v{version}",)
     cases = {
         expected_ref: True,

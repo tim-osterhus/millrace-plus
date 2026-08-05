@@ -11,7 +11,7 @@
     "package_format_version": "1",
     "package_id": "millrace.plus.official",
     "package_role": "workflow_package",
-    "package_version": "0.22.0",
+    "package_version": "0.22.2",
     "publication_scope": "public",
     "publisher": "Millrace",
     "repository_url": "https://github.com/tim-osterhus/millrace-plus"
@@ -6782,11 +6782,11 @@
       "required_assets": [
         {
           "asset_id": "planning.entrypoints.recon",
-          "content_digest": "sha256:bfb31ec43067704b14921146fcaeeff20c88801735458138ae6e2c11582cf72c"
+          "content_digest": "sha256:3e0401fa1297a57129ab12a0ad0f08f5ee8cb274b89b1d47221d68542ae2d49e"
         },
         {
           "asset_id": "planning.skills.recon_core",
-          "content_digest": "sha256:728ac33a8fd91bc253796baa3b90b010831c968ec191d14402b0cb3ba3cbb85c"
+          "content_digest": "sha256:835ea6d7b124a74a3bb0d331c4f8748d2f8fe12fe8cf85bc4ea169f61d9ff682"
         },
         {
           "asset_id": "planning.entrypoints.lad_planner",
@@ -11169,11 +11169,11 @@
       "required_assets": [
         {
           "asset_id": "planning.entrypoints.recon",
-          "content_digest": "sha256:bfb31ec43067704b14921146fcaeeff20c88801735458138ae6e2c11582cf72c"
+          "content_digest": "sha256:3e0401fa1297a57129ab12a0ad0f08f5ee8cb274b89b1d47221d68542ae2d49e"
         },
         {
           "asset_id": "planning.skills.recon_core",
-          "content_digest": "sha256:728ac33a8fd91bc253796baa3b90b010831c968ec191d14402b0cb3ba3cbb85c"
+          "content_digest": "sha256:835ea6d7b124a74a3bb0d331c4f8748d2f8fe12fe8cf85bc4ea169f61d9ff682"
         },
         {
           "asset_id": "planning.entrypoints.lad_planner",
@@ -17177,7 +17177,7 @@
         },
         {
           "asset_id": "vendor_selection.skills.request_intake_core",
-          "content_digest": "sha256:5f9dea6e4ac2074edbd3a288afa1090fb63441f5bc19cc1a66eb8722f6fc02d6"
+          "content_digest": "sha256:e1ae139ae9a2ae2685c540d61bb98482ac58db02c5e6be8c3c003cc50b08b159"
         },
         {
           "asset_id": "vendor_selection.entrypoints.policy_screener",
@@ -17197,19 +17197,19 @@
         },
         {
           "asset_id": "vendor_selection.entrypoints.catalog_sourcer",
-          "content_digest": "sha256:ce618ae374bfa51dedb67893c4756bebd773b337c63bc8e598849ffd026c471e"
+          "content_digest": "sha256:f470d90df56e87b519b4cf17c0c4155fcc7de4bbce51475bcf9d64d0897b8376"
         },
         {
           "asset_id": "vendor_selection.skills.catalog_sourcer_core",
-          "content_digest": "sha256:7365c311c4537aba4abefa0228e7675ed8eb3d20bb890c4c3e0dd160888ba98a"
+          "content_digest": "sha256:09fc91dd9caf07909466bffe3c45efe0be94711ceefd966eb30f5a21c5397a38"
         },
         {
           "asset_id": "vendor_selection.entrypoints.candidate_packager",
-          "content_digest": "sha256:a267e80ac858381657fb2fa955ebc4a7e09781381b9cf8def328e26a4c5cb15b"
+          "content_digest": "sha256:736ea920d8297b6261066af7375ac067c99bfb3823ebc5884981c48e30f68693"
         },
         {
           "asset_id": "vendor_selection.skills.candidate_packager_core",
-          "content_digest": "sha256:5f281f257f1bfd8e64c70754201b00743116705d4493f8bf59c0fb8fecd9febe"
+          "content_digest": "sha256:368bb273a16e1352848b9accfcc3ada63558874964c618f833c32723c784b3ec"
         },
         {
           "asset_id": "vendor_selection.entrypoints.rubric_evaluator",
@@ -17229,19 +17229,19 @@
         },
         {
           "asset_id": "vendor_selection.entrypoints.award_decider",
-          "content_digest": "sha256:88a55ca64c6f0240be1ec0d658cb4405209a7da4a177c0af221903e69225da9f"
+          "content_digest": "sha256:e9b40de45a2b1d572844a91f418f26c25e25dcc0b809c2ffb1a18d5343704d24"
         },
         {
           "asset_id": "vendor_selection.skills.award_decider_core",
-          "content_digest": "sha256:20f0fa7bb75e524da98b37c166b4381230e739dfcc4d3dd24089526cf41ed9ae"
+          "content_digest": "sha256:eec21c7107cc9f9ace77ae89aff42e48fd3e795121cf4ec437aef915eb99cc97"
         },
         {
           "asset_id": "vendor_selection.entrypoints.decision_packager",
-          "content_digest": "sha256:e75fd239d3f7205dca1a66a04f2e4b6d5bebd9f89153b7db12977c85ca2773fc"
+          "content_digest": "sha256:d31fbc98e4606424907cffd31d07d3c164d9444f0c66cd158a36944aedb61a3c"
         },
         {
           "asset_id": "vendor_selection.skills.decision_packager_core",
-          "content_digest": "sha256:e2807c450664bb700682e53c74539f320b225bef5dee1073519d849736d7134d"
+          "content_digest": "sha256:5de481850de6597c86034f5e930943342f27cf7d69aef1c71b7cac5e9e0241cb"
         }
       ],
       "selected_authority": {
@@ -17748,6 +17748,7 @@
             "schema": {
               "type": "object",
               "required": [
+                "source_request_id",
                 "bundle_id",
                 "decision_kind",
                 "selected_candidate_id",
@@ -17756,6 +17757,10 @@
                 "reason"
               ],
               "properties": {
+                "source_request_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
                 "bundle_id": {
                   "type": "string",
                   "min_length": 1
@@ -17936,10 +17941,6 @@
                       "min_length": 1
                     },
                     "conflict_report_ref": {
-                      "type": "string",
-                      "min_length": 1
-                    },
-                    "operator_decision_ref": {
                       "type": "string",
                       "min_length": 1
                     }
@@ -18735,6 +18736,7 @@
             ],
             "wait_scope": "lineage",
             "source_work_item_behavior": "leave_open",
+            "project_source_artifact": true,
             "unrelated_lineages_continue": true,
             "allowed_resolution_kinds": [
               "resume_recorded_source",
@@ -19538,8 +19540,8 @@
     {
       "asset_id": "planning.entrypoints.recon",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 3308,
-      "content_digest": "sha256:bfb31ec43067704b14921146fcaeeff20c88801735458138ae6e2c11582cf72c",
+      "byte_length": 4370,
+      "content_digest": "sha256:3e0401fa1297a57129ab12a0ad0f08f5ee8cb274b89b1d47221d68542ae2d49e",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/planning.lad/entrypoints/recon.md",
@@ -19549,8 +19551,8 @@
     {
       "asset_id": "planning.skills.recon_core",
       "asset_kind": "stage_skill",
-      "byte_length": 4369,
-      "content_digest": "sha256:728ac33a8fd91bc253796baa3b90b010831c968ec191d14402b0cb3ba3cbb85c",
+      "byte_length": 10961,
+      "content_digest": "sha256:835ea6d7b124a74a3bb0d331c4f8748d2f8fe12fe8cf85bc4ea169f61d9ff682",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/planning.lad/skills/recon-core.md",
@@ -19769,8 +19771,8 @@
     {
       "asset_id": "vendor_selection.skills.request_intake_core",
       "asset_kind": "stage_skill",
-      "byte_length": 5428,
-      "content_digest": "sha256:5f9dea6e4ac2074edbd3a288afa1090fb63441f5bc19cc1a66eb8722f6fc02d6",
+      "byte_length": 5405,
+      "content_digest": "sha256:e1ae139ae9a2ae2685c540d61bb98482ac58db02c5e6be8c3c003cc50b08b159",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/request_intake-core.md",
@@ -19824,8 +19826,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.catalog_sourcer",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 3349,
-      "content_digest": "sha256:ce618ae374bfa51dedb67893c4756bebd773b337c63bc8e598849ffd026c471e",
+      "byte_length": 3648,
+      "content_digest": "sha256:f470d90df56e87b519b4cf17c0c4155fcc7de4bbce51475bcf9d64d0897b8376",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/catalog_sourcer.md",
@@ -19835,8 +19837,8 @@
     {
       "asset_id": "vendor_selection.skills.catalog_sourcer_core",
       "asset_kind": "stage_skill",
-      "byte_length": 8694,
-      "content_digest": "sha256:7365c311c4537aba4abefa0228e7675ed8eb3d20bb890c4c3e0dd160888ba98a",
+      "byte_length": 8932,
+      "content_digest": "sha256:09fc91dd9caf07909466bffe3c45efe0be94711ceefd966eb30f5a21c5397a38",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/catalog_sourcer-core.md",
@@ -19846,8 +19848,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.candidate_packager",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 3189,
-      "content_digest": "sha256:a267e80ac858381657fb2fa955ebc4a7e09781381b9cf8def328e26a4c5cb15b",
+      "byte_length": 3337,
+      "content_digest": "sha256:736ea920d8297b6261066af7375ac067c99bfb3823ebc5884981c48e30f68693",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/candidate_packager.md",
@@ -19857,8 +19859,8 @@
     {
       "asset_id": "vendor_selection.skills.candidate_packager_core",
       "asset_kind": "stage_skill",
-      "byte_length": 5962,
-      "content_digest": "sha256:5f281f257f1bfd8e64c70754201b00743116705d4493f8bf59c0fb8fecd9febe",
+      "byte_length": 6139,
+      "content_digest": "sha256:368bb273a16e1352848b9accfcc3ada63558874964c618f833c32723c784b3ec",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/candidate_packager-core.md",
@@ -19912,8 +19914,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.award_decider",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 4409,
-      "content_digest": "sha256:88a55ca64c6f0240be1ec0d658cb4405209a7da4a177c0af221903e69225da9f",
+      "byte_length": 4741,
+      "content_digest": "sha256:e9b40de45a2b1d572844a91f418f26c25e25dcc0b809c2ffb1a18d5343704d24",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/award_decider.md",
@@ -19923,8 +19925,8 @@
     {
       "asset_id": "vendor_selection.skills.award_decider_core",
       "asset_kind": "stage_skill",
-      "byte_length": 14166,
-      "content_digest": "sha256:20f0fa7bb75e524da98b37c166b4381230e739dfcc4d3dd24089526cf41ed9ae",
+      "byte_length": 14752,
+      "content_digest": "sha256:eec21c7107cc9f9ace77ae89aff42e48fd3e795121cf4ec437aef915eb99cc97",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/award_decider-core.md",
@@ -19934,8 +19936,8 @@
     {
       "asset_id": "vendor_selection.entrypoints.decision_packager",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 3009,
-      "content_digest": "sha256:e75fd239d3f7205dca1a66a04f2e4b6d5bebd9f89153b7db12977c85ca2773fc",
+      "byte_length": 3948,
+      "content_digest": "sha256:d31fbc98e4606424907cffd31d07d3c164d9444f0c66cd158a36944aedb61a3c",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/entrypoints/decision_packager.md",
@@ -19945,8 +19947,8 @@
     {
       "asset_id": "vendor_selection.skills.decision_packager_core",
       "asset_kind": "stage_skill",
-      "byte_length": 4982,
-      "content_digest": "sha256:e2807c450664bb700682e53c74539f320b225bef5dee1073519d849736d7134d",
+      "byte_length": 18491,
+      "content_digest": "sha256:5de481850de6597c86034f5e930943342f27cf7d69aef1c71b7cac5e9e0241cb",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/vendor_selection/skills/decision_packager-core.md",
@@ -19963,7 +19965,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:b41be954b5da7bb5acdf1576f35a3c626163d79ca8692c91133c5b8c0dd4f17c",
+  "manifest_digest": "sha256:a5f007d20ac8c820aeab3a1c402d97636687ecf95b7e1cacb4b0153a6a9993f3",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",

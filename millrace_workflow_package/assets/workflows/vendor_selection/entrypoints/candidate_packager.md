@@ -12,6 +12,7 @@ Scope:
 Inputs from dispatch:
 - `workflow_id`, `workflow_version`, `stage_kind_id`, `graph_node_id`, `runner_binding_id`, `source_work_item_id`, `source_run_id`, selected plan fingerprint, and legal terminal markers.
 - Work item payload is a full `CandidateBundle`; preserve `approval_policy_hint`, `conflict_rules`, `deterministic_source_refs`, and every candidate `conflict_status`.
+- Preserve `CandidateBundle.source_requirement_id` byte-for-byte; it is the exact original `RequirementPacket.source_request_id` selected upstream.
 - Stage artifact schemas available here: CandidateBundle.
 
 Readable assets:

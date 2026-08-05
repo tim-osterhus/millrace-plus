@@ -1,13 +1,13 @@
 # Release Line
 
-Millrace Plus source and package use the v0.22.0 release line.
+Millrace Plus source and package use the v0.22.2 release line.
 
 ## Current Source Package
 
 | Field | Value |
 | --- | --- |
 | Distribution | `millrace-plus` |
-| Source version | `0.22.0` |
+| Source version | `0.22.2` |
 | Workflow package ID | `millrace.plus.official` |
 | Installed resource root | `millrace_workflow_package` |
 | Python | 3.11 or newer |
@@ -34,8 +34,8 @@ that executes Millrace. It has no CLI, daemon, runner, provider integration,
 plugin registration, marketplace client, post-install hook, or dependency on
 `millrace-ai`.
 
-The `millrace==0.22.0` convenience meta-distribution selects and installs this
-exact tested combination: `millrace-ai==0.22.0`, `millrace-plus==0.22.0`, and
+The `millrace==0.22.2` convenience meta-distribution selects and installs this
+exact tested combination: `millrace-ai==0.22.2`, `millrace-plus==0.22.2`, and
 `millforge==0.1.0`. Direct `millrace-plus` installation remains useful for
 tools that only need to inspect or distribute the package data.
 

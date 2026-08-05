@@ -11,6 +11,7 @@ Selected schemas for this stage. Treat each schema as closed.
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
+| `source_request_id` | yes | string; min_length 1 | Exact original request ID copied from `CandidateBundle.source_requirement_id`. |
 | `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
 | `decision_kind` | yes | enum [award, re_source, reject, operator_required, blocked] | Selected value from [award, re_source, reject, operator_required, blocked]. |
 | `selected_candidate_id` | yes | enum [vendor_alpha, vendor_beta, vendor_gamma, null] | Selected value from [vendor_alpha, vendor_beta, vendor_gamma, null]. |
@@ -39,13 +40,14 @@ Selected schemas for this stage. Treat each schema as closed.
 | `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
 | `selected_candidate_id` | yes | enum [vendor_alpha, vendor_beta, vendor_gamma, null] | Selected value from [vendor_alpha, vendor_beta, vendor_gamma, null]. |
 | `final_refusal_reason` | yes | enum [policy_blocked, no_viable_vendor, operator_rejected, blocked, null] | Selected value from [policy_blocked, no_viable_vendor, operator_rejected, blocked, null]. |
-| `evidence_refs` | yes | object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref, operator_decision_ref] | Nested selected-schema object. |
+| `evidence_refs` | yes | object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref] | Nested selected-schema object. |
 | `selected_plan_id` | yes | string; min_length 1 | Selected-schema field. |
 | `selected_plan_fingerprint` | yes | string; min_length 1 | Selected-schema field. |
 | `close_reason` | yes | enum [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked] | Selected value from [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked]. |
 
 Operator wait boundary:
 - `vendor_selection.award_operator_wait` is selected runtime authority, not model authority.
+- `AwardDecision.source_request_id` must exactly equal `CandidateBundle.source_requirement_id` for both `AWARD_READY` and `OPERATOR_REQUIRED`. Do not look up or reconstruct this identity from lineage, runtime evidence, storage, or any other artifact.
 - For `OPERATOR_REQUIRED`, produce an exact `AwardDecision` with `decision_kind` set to `operator_required` and `operator_gate_required` set to true.
 - Model output cannot resolve the selected local-operator gate.
 - Use joined source bundle `approval_policy_hint`, `conflict_rules`, `candidate_vendors[*].conflict_status`, and exact report provenance as selected evidence.
@@ -154,6 +156,7 @@ Valid examples:
   {
     "terminal_marker": "AWARD_READY",
     "artifact": {
+      "source_request_id": "e2e-vendor-selection-001",
       "bundle_id": "bundle-e2e-vendor-selection-001",
       "decision_kind": "award",
       "selected_candidate_id": "vendor_alpha",
@@ -188,6 +191,7 @@ Valid examples:
   {
     "terminal_marker": "OPERATOR_REQUIRED",
     "artifact": {
+      "source_request_id": "e2e-vendor-selection-001",
       "bundle_id": "bundle-e2e-vendor-selection-001",
       "decision_kind": "operator_required",
       "selected_candidate_id": "vendor_alpha",
@@ -259,6 +263,7 @@ Invalid examples:
     "example": {
       "terminal_marker": "OPERATOR_REQUIRED",
       "artifact": {
+        "source_request_id": "e2e-vendor-selection-001",
         "bundle_id": "bundle-e2e-vendor-selection-001",
         "decision_kind": "operator_required",
         "selected_candidate_id": "vendor_alpha",
@@ -275,6 +280,7 @@ Invalid examples:
     "example": {
       "terminal_marker": "OPERATOR_REQUIRED",
       "artifact": {
+        "source_request_id": "e2e-vendor-selection-001",
         "bundle_id": "bundle-e2e-vendor-selection-001",
         "decision_kind": "operator_required",
         "selected_candidate_id": "vendor_alpha",

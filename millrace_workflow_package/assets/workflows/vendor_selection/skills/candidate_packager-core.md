@@ -11,7 +11,7 @@ Selected schemas for this stage. Treat each schema as closed.
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
-| `source_requirement_id` | yes | string; min_length 1 | Selected-schema field. |
+| `source_requirement_id` | yes | string; min_length 1 | Exact original `RequirementPacket.source_request_id`; preserve it byte-for-byte. |
 | `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
 | `candidate_vendors` | yes | array; min_items 1; items object; unique_by `candidate_id` | Selected-schema array. |
 | `deterministic_source_refs` | yes | array; min_items 1; items string | Selected-schema array. |
@@ -19,6 +19,8 @@ Selected schemas for this stage. Treat each schema as closed.
 | `conflict_rules` | yes | array; min_items 1; items string | Preserve the selected conflict rules. |
 
 Each `candidate_vendors` item must include `candidate_id`, `vendor_label`, `capabilities`, `budget_band`, `catalog_ref`, and `conflict_status` with enum [clear, blocked]. Preserve the full `candidate_vendors` list; runtime-provided `generated_work_source.item_key` identifies the assigned candidate for each fanout target.
+
+Do not look up or reconstruct `source_requirement_id` from lineage, runtime evidence, storage, or any other artifact.
 
 ## Marker Artifact Protocol
 - CANDIDATES_READY: selected action `vendor_selection.candidate_packager.candidates_ready`; action kind `complete_work_item`; artifact schema `CandidateBundle`; emitted queue `none`; target stage `none`.

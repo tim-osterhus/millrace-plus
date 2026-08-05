@@ -39,7 +39,7 @@ _MANIFEST_DIGEST_DOMAIN_BYTES = b"millrace.wpkg.manifest.v1\0"
 _ASSET_DIGEST_DOMAIN_BYTES = b"millrace.wpkg.asset.v1\0"
 _PACKAGE_DIGEST_DOMAIN_BYTES = b"millrace.wpkg.archive.v1\0"
 _WORKFLOW_FREEZE_DOMAIN_BYTES = b"millrace.plus.workflow.freeze.v1\0"
-RELEASE_IDENTITY = "0.22.0"
+RELEASE_IDENTITY = "0.22.2"
 _EVIDENCE_PATTERN = re.compile(
     r"<!-- manifest-freeze-evidence:BEGIN -->\n"
     r"```json\n"
@@ -367,7 +367,7 @@ def test_release_identity_is_covered_by_canonical_manifest_digest() -> None:
     changed_identity = json.loads(json.dumps(manifest))
     changed_package = changed_identity["package"]
     assert isinstance(changed_package, dict)
-    changed_package["package_version"] = "0.22.1"
+    changed_package["package_version"] = "0.22.3"
 
     assert _manifest_digest(manifest) != _manifest_digest(changed_identity)
 

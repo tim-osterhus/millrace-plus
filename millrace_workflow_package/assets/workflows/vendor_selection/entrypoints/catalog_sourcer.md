@@ -11,7 +11,7 @@ Scope:
 
 Inputs from dispatch:
 - `workflow_id`, `workflow_version`, `stage_kind_id`, `graph_node_id`, `runner_binding_id`, `source_work_item_id`, `source_run_id`, selected plan fingerprint, and legal terminal markers.
-- Work item payload fields include selected `approval_policy_hint` and `conflict_rules`; preserve both in `CandidateBundle`.
+- Work item payload is the selected `RequirementPacket`. Set `CandidateBundle.source_requirement_id` to the exact `RequirementPacket.source_request_id`; preserve selected `approval_policy_hint` and `conflict_rules`.
 - Stage artifact schemas available here: CandidateBundle, DecisionPack.
 
 Readable assets:
@@ -25,6 +25,7 @@ Writable artifacts:
 Required evidence:
 - Explain selected input fields checked, selected package records used, and assumptions in runner evidence/report text.
 - Confirm selected candidate source refs and candidate `conflict_status` values came from package-selected catalog records.
+- `CandidateBundle.source_requirement_id` must exactly equal `RequirementPacket.source_request_id`. Do not look up or reconstruct this identity from lineage, runtime evidence, storage, or any other artifact.
 - Keep dispatch IDs, selected action IDs, selected plan fingerprints, package pins, and downstream context out of the artifact unless the selected schema declares them.
 
 Legal terminal markers rendered by runtime:

@@ -3,14 +3,14 @@ name: Publish to PyPI
 on:
   push:
     tags:
-      - v0.22.0
+      - v0.22.2
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      MILLRACE_REF: 703beebd542ac1dd90341342f89d8a82887adee9
-      MILLRACE_VERSION: 0.22.0
+      MILLRACE_REF: b84f50da9b0f07ce4964f61dd69feb548e2ef754
+      MILLRACE_VERSION: 0.22.2
       MILLFORGE_REF: d660194f5641f51b5010d58852fde268865ff24f
       MILLFORGE_VERSION: 0.1.0
     permissions:
@@ -93,8 +93,8 @@ jobs:
         run: |
           expected=(
             ".gitignore"
-            "millrace_plus-0.22.0-py3-none-any.whl"
-            "millrace_plus-0.22.0.tar.gz"
+            "millrace_plus-0.22.2-py3-none-any.whl"
+            "millrace_plus-0.22.2.tar.gz"
           )
           mapfile -t actual < <(find dist -maxdepth 1 -type f -printf '%f\n' | sort)
           mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
@@ -103,8 +103,8 @@ jobs:
             exit 1
           fi
           sha256sum --check --strict <<'SHA256'
-          36daed6f26ef2856341cafadbac5f1ed054574f9648e8a4e8da4fbbd21023d71  dist/millrace_plus-0.22.0-py3-none-any.whl
-          6ec96d01d9a00f140f6205ce73d72a3ce42d1edc1aca96734ab51b4f2b1f0676  dist/millrace_plus-0.22.0.tar.gz
+          7e9e78a680d15e7b3abb7af080791e0fc60d6a9ea354b13ea457f2e5f96af457  dist/millrace_plus-0.22.2-py3-none-any.whl
+          8af4547f8f0e60e42cfce0b05c7469e3b3e51efc816236d50c2cf2cad89464f3  dist/millrace_plus-0.22.2.tar.gz
           SHA256
       - name: Check source unchanged
         run: git diff --exit-code
@@ -113,12 +113,12 @@ jobs:
           name: pypi-distributions
           if-no-files-found: error
           path: |
-            dist/millrace_plus-0.22.0-py3-none-any.whl
-            dist/millrace_plus-0.22.0.tar.gz
+            dist/millrace_plus-0.22.2-py3-none-any.whl
+            dist/millrace_plus-0.22.2.tar.gz
 
   publish:
     needs: validate
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/tags/v0.22.0' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/tags/v0.22.2' }}
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -134,8 +134,8 @@ jobs:
         shell: bash
         run: |
           expected=(
-            "millrace_plus-0.22.0-py3-none-any.whl"
-            "millrace_plus-0.22.0.tar.gz"
+            "millrace_plus-0.22.2-py3-none-any.whl"
+            "millrace_plus-0.22.2.tar.gz"
           )
           mapfile -t actual < <(find dist -maxdepth 1 -type f -printf '%f\n' | sort)
           mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
@@ -144,8 +144,8 @@ jobs:
             exit 1
           fi
           sha256sum --check --strict <<'SHA256'
-          36daed6f26ef2856341cafadbac5f1ed054574f9648e8a4e8da4fbbd21023d71  dist/millrace_plus-0.22.0-py3-none-any.whl
-          6ec96d01d9a00f140f6205ce73d72a3ce42d1edc1aca96734ab51b4f2b1f0676  dist/millrace_plus-0.22.0.tar.gz
+          7e9e78a680d15e7b3abb7af080791e0fc60d6a9ea354b13ea457f2e5f96af457  dist/millrace_plus-0.22.2-py3-none-any.whl
+          8af4547f8f0e60e42cfce0b05c7469e3b3e51efc816236d50c2cf2cad89464f3  dist/millrace_plus-0.22.2.tar.gz
           SHA256
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
         with:

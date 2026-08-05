@@ -48,20 +48,20 @@ which workflow behavior should be official.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:b41be954b5da7bb5acdf1576f35a3c626163d79ca8692c91133c5b8c0dd4f17c",
-  "package_digest": "sha256:d24ec4fe99f90db854c59f8ad7f1264cc31a43a6b339de73f7bad4d0c8b2f4e5",
+  "manifest_digest": "sha256:a5f007d20ac8c820aeab3a1c402d97636687ecf95b7e1cacb4b0153a6a9993f3",
+  "package_digest": "sha256:73e1f562877aa0fb254f81be51847d200f816b8610cdc317e53cd8669351e15c",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
-    "package_version": "0.22.0",
+    "package_version": "0.22.2",
     "package_format_version": "1"
   },
   "selected_workflow_fingerprints": {
-    "execution.lad@0.1": "sha256:29e3749cdade3d8cffb269156943f28b7169be01a20019e29c4811a26fdb2f61",
-    "execution.lad_integrator@0.1": "sha256:5e45a3c95d041d6529078da3395d7b7000768aa06d2174cbc50c52f04dd153d1",
-    "lad.full@0.1": "sha256:fded44cdb1f3c1412f59fa63fa3806567503ff01556a0e885d2fc44354208b2e",
-    "planning.lad@0.1": "sha256:4b7a28fe3be94758154c0e161d901ebab9d77bf21c7bc7e60623dfba57bd14f4",
-    "simple_loop@0.1": "sha256:abe55d62d464b4fa556c91f16ca2e7f6b00a359c465bb4d15931e565f1e9bbf8",
-    "vendor_selection@0.1": "sha256:95abfd8982de90c4b9b4673a9f1f19e22a2a3c7eb85e199d5211ad7deed55655"
+    "execution.lad@0.1": "sha256:58cc3121ec49e4cc02fe05fead721a0561aa14836a3490aad3f2da14a6f7de2f",
+    "execution.lad_integrator@0.1": "sha256:42306959d3a25b19fae14338d73e27360b85cdc48042fb515731e04319b8cda7",
+    "lad.full@0.1": "sha256:bed3c3d4cbfd84bd2f5147d51424403d1f95f7a35b22d558589b69bffcc2c79b",
+    "planning.lad@0.1": "sha256:03ff08d9f31ceb2f6daf369297bde58cb05dc06868fd4cd2f9fc9e47a76c0628",
+    "simple_loop@0.1": "sha256:67c08c7262531a6bb09f7e01d213ed505e7b12bdf6fdfcd94ddeb5dc53673ab3",
+    "vendor_selection@0.1": "sha256:b9dd2604219bf634f8a54644a9368c694c89bb44bac2284b1d498da75a4ae405"
   },
   "asset_pins": [
     {
@@ -211,7 +211,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "planning.entrypoints.recon",
-      "content_digest": "sha256:bfb31ec43067704b14921146fcaeeff20c88801735458138ae6e2c11582cf72c",
+      "content_digest": "sha256:3e0401fa1297a57129ab12a0ad0f08f5ee8cb274b89b1d47221d68542ae2d49e",
       "package_path": "assets/workflows/planning.lad/entrypoints/recon.md"
     },
     {
@@ -241,7 +241,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "planning.skills.recon_core",
-      "content_digest": "sha256:728ac33a8fd91bc253796baa3b90b010831c968ec191d14402b0cb3ba3cbb85c",
+      "content_digest": "sha256:835ea6d7b124a74a3bb0d331c4f8748d2f8fe12fe8cf85bc4ea169f61d9ff682",
       "package_path": "assets/workflows/planning.lad/skills/recon-core.md"
     },
     {
@@ -286,17 +286,17 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "vendor_selection.entrypoints.award_decider",
-      "content_digest": "sha256:88a55ca64c6f0240be1ec0d658cb4405209a7da4a177c0af221903e69225da9f",
+      "content_digest": "sha256:e9b40de45a2b1d572844a91f418f26c25e25dcc0b809c2ffb1a18d5343704d24",
       "package_path": "assets/workflows/vendor_selection/entrypoints/award_decider.md"
     },
     {
       "asset_id": "vendor_selection.entrypoints.candidate_packager",
-      "content_digest": "sha256:a267e80ac858381657fb2fa955ebc4a7e09781381b9cf8def328e26a4c5cb15b",
+      "content_digest": "sha256:736ea920d8297b6261066af7375ac067c99bfb3823ebc5884981c48e30f68693",
       "package_path": "assets/workflows/vendor_selection/entrypoints/candidate_packager.md"
     },
     {
       "asset_id": "vendor_selection.entrypoints.catalog_sourcer",
-      "content_digest": "sha256:ce618ae374bfa51dedb67893c4756bebd773b337c63bc8e598849ffd026c471e",
+      "content_digest": "sha256:f470d90df56e87b519b4cf17c0c4155fcc7de4bbce51475bcf9d64d0897b8376",
       "package_path": "assets/workflows/vendor_selection/entrypoints/catalog_sourcer.md"
     },
     {
@@ -306,7 +306,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "vendor_selection.entrypoints.decision_packager",
-      "content_digest": "sha256:e75fd239d3f7205dca1a66a04f2e4b6d5bebd9f89153b7db12977c85ca2773fc",
+      "content_digest": "sha256:d31fbc98e4606424907cffd31d07d3c164d9444f0c66cd158a36944aedb61a3c",
       "package_path": "assets/workflows/vendor_selection/entrypoints/decision_packager.md"
     },
     {
@@ -331,17 +331,17 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "vendor_selection.skills.award_decider_core",
-      "content_digest": "sha256:20f0fa7bb75e524da98b37c166b4381230e739dfcc4d3dd24089526cf41ed9ae",
+      "content_digest": "sha256:eec21c7107cc9f9ace77ae89aff42e48fd3e795121cf4ec437aef915eb99cc97",
       "package_path": "assets/workflows/vendor_selection/skills/award_decider-core.md"
     },
     {
       "asset_id": "vendor_selection.skills.candidate_packager_core",
-      "content_digest": "sha256:5f281f257f1bfd8e64c70754201b00743116705d4493f8bf59c0fb8fecd9febe",
+      "content_digest": "sha256:368bb273a16e1352848b9accfcc3ada63558874964c618f833c32723c784b3ec",
       "package_path": "assets/workflows/vendor_selection/skills/candidate_packager-core.md"
     },
     {
       "asset_id": "vendor_selection.skills.catalog_sourcer_core",
-      "content_digest": "sha256:7365c311c4537aba4abefa0228e7675ed8eb3d20bb890c4c3e0dd160888ba98a",
+      "content_digest": "sha256:09fc91dd9caf07909466bffe3c45efe0be94711ceefd966eb30f5a21c5397a38",
       "package_path": "assets/workflows/vendor_selection/skills/catalog_sourcer-core.md"
     },
     {
@@ -351,7 +351,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "vendor_selection.skills.decision_packager_core",
-      "content_digest": "sha256:e2807c450664bb700682e53c74539f320b225bef5dee1073519d849736d7134d",
+      "content_digest": "sha256:5de481850de6597c86034f5e930943342f27cf7d69aef1c71b7cac5e9e0241cb",
       "package_path": "assets/workflows/vendor_selection/skills/decision_packager-core.md"
     },
     {
@@ -361,7 +361,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "vendor_selection.skills.request_intake_core",
-      "content_digest": "sha256:5f9dea6e4ac2074edbd3a288afa1090fb63441f5bc19cc1a66eb8722f6fc02d6",
+      "content_digest": "sha256:e1ae139ae9a2ae2685c540d61bb98482ac58db02c5e6be8c3c003cc50b08b159",
       "package_path": "assets/workflows/vendor_selection/skills/request_intake-core.md"
     },
     {

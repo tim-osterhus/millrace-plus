@@ -22,6 +22,29 @@ adapter config secrets in workflow packages, prompt assets, skill files, or
 evidence reports. Adapter config is local operator config, not package
 authority.
 
+## Selected Terminal Handoff Rules
+
+For every legal terminal branch, require an exact
+marker-to-selected-schema/null handoff contract. Copy the marker spelling and
+the selected artifact schema from workflow/package authority; state the exact
+artifact and observation candidate behavior, including when the selected
+branch has no artifact (`null`).
+
+The runner dispatch must project exact selected terminal schema material to the
+agent rather than expecting the agent to infer it from prompt prose, filenames,
+folders, or examples. Examples must cover every branch, including null-artifact
+branches, and schema-invalid shapes such as extra fields, missing fields, type
+mismatches, and marker/schema mismatches.
+
+Runner output and rejected-result evidence are non-authoritative. They can
+support a report, but they cannot create workflow authority or turn a rejected
+candidate into an accepted artifact.
+
+Rejection, retry, quarantine, and recovery behavior must be explicitly
+represented by selected workflow authority, not inferred from a folder or
+prompt prose. These skills are advisory package data, not runtime-installed
+authority.
+
 ## Do Not Overclaim
 
 - Do not state a command exists unless it appears in current CLI help or CLI

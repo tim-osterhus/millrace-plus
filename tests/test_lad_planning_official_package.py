@@ -1,20 +1,72 @@
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from millrace.compiler import compile_workflow
+from millrace.contracts.schema import validate_schema
 
 from support import package_conformance as conformance
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.22.0"
+PACKAGE_VERSION = "0.22.2"
 WORKFLOW_ID = "planning.lad"
+RECON_WORKFLOW_IDS = ("planning.lad", "lad.full")
 Record = dict[str, object]
+
+EXPECTED_RECON_AUTHORITY = {
+    "RECON_TO_EXECUTION": (
+        "planning.recon.to_execution",
+        "route",
+        "planning.recon_enqueue_task",
+        (
+            "lad_builder.millforge_runner",
+            "lad_builder",
+            "execution.lad.builder.start",
+            "task",
+        ),
+        "execution.artifacts.task",
+    ),
+    "RECON_TO_PLANNING": (
+        "planning.recon.to_planning",
+        "route",
+        "planning.recon_enqueue_spec",
+        (
+            "lad_planner.millforge_runner",
+            "lad_planner",
+            "planning.lad.planner.start",
+            "spec",
+        ),
+        "planning.artifacts.generated_spec",
+    ),
+    "RECON_NOOP": (
+        "planning.recon.noop",
+        "complete_work_item",
+        "planning.recon_noop",
+        (None, None, None, None),
+        "planning.artifacts.recon_packet",
+    ),
+    "RECON_BLOCKED": (
+        "planning.recon.recon_blocked",
+        "block_work_item",
+        "planning.recon_block_work_item",
+        (None, None, None, None),
+        "planning.artifacts.report",
+    ),
+    "BLOCKED": (
+        "planning.recon.blocked",
+        "block_work_item",
+        "planning.recon_blocked",
+        (None, None, None, None),
+        "planning.artifacts.report",
+    ),
+}
 
 
 def _manifest() -> dict[str, Any]:
@@ -41,6 +93,204 @@ def _error(result: object, code: str, path_suffix: str | None = None) -> object:
         and diagnostic.code == code
         and (path_suffix is None or diagnostic.declaration_path.endswith(path_suffix))
     )
+
+
+def _json_block_after(text: str, heading: str) -> object:
+    section = text.split(heading, maxsplit=1)[1].split("\n## ", maxsplit=1)[0]
+    json_block = section.split("```json", maxsplit=1)[1].split("```", maxsplit=1)[0]
+    return json.loads(json_block)
+
+
+def test_recon_proof_does_not_restate_package_authority() -> None:
+    test_source = Path(__file__).read_text()
+
+    for symbol in (
+        "_" + "RECON_MARKER_TO_ACTION",
+        "_" + "RECON_MARKER_TO_SCHEMA",
+        "_" + "RECON_SCHEMAS",
+        "def _" + "schema_accepts",
+    ):
+        assert symbol not in test_source
+
+
+def _selected_workflow_plan(tmp_path: Path, workflow_id: str) -> object:
+    return conformance.select_and_verify_package(
+        tmp_path / workflow_id.replace(".", "-"),
+        PACKAGE_ROOT,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=workflow_id,
+        workflow_version="0.1",
+    )
+
+
+def _recon_selected_authority(
+    plan: object,
+) -> tuple[object, object, tuple[Record, ...], dict[str, object]]:
+    stage = next(stage for stage in plan.stage_kinds if str(stage.id) == "recon")
+    binding = next(
+        binding
+        for binding in plan.runner_bindings
+        if str(binding.id) == "recon.millforge_runner"
+    )
+    outcomes = {
+        str(outcome.id): outcome
+        for outcome in plan.terminal_outcomes
+        if str(outcome.stage_kind_id) == "recon"
+    }
+    actions = {
+        str(action.outcome_id): action
+        for action in plan.terminal_actions
+        if str(action.stage_kind_id) == "recon"
+    }
+    options = []
+    for mapping in binding.terminal_result_mappings:
+        outcome = outcomes[str(mapping.outcome_id)]
+        action = actions[str(outcome.id)]
+        options.append(
+            {
+                "outcome_id": str(outcome.id),
+                "marker": outcome.marker,
+                "action_id": str(action.id),
+                "action_kind": action.action_kind,
+                "artifact_schema_id": (
+                    None
+                    if action.artifact_schema_id is None
+                    else str(action.artifact_schema_id)
+                ),
+            }
+        )
+    stage_schema_ids = {str(schema_id) for schema_id in stage.artifact_schema_ids}
+    schemas = {
+        str(schema.id): schema
+        for schema in plan.artifact_schemas
+        if str(schema.id) in stage_schema_ids
+    }
+    return stage, binding, tuple(options), schemas
+
+
+@pytest.mark.parametrize("workflow_id", RECON_WORKFLOW_IDS)
+def test_official_recon_workflows_preserve_independent_terminal_authority(
+    workflow_id: str,
+    tmp_path: Path,
+) -> None:
+    plan = _selected_workflow_plan(tmp_path, workflow_id)
+    expected = EXPECTED_RECON_AUTHORITY
+    outcomes = {
+        str(outcome.marker): outcome
+        for outcome in plan.terminal_outcomes
+        if str(outcome.stage_kind_id) == "recon"
+    }
+    actions = {
+        str(action.outcome_id): action
+        for action in plan.terminal_actions
+        if str(action.stage_kind_id) == "recon"
+    }
+
+    assert set(outcomes) == set(expected)
+    for marker, expected_authority in expected.items():
+        outcome = outcomes[marker]
+        action = actions[str(outcome.id)]
+        observed_authority = (
+            str(outcome.id),
+            action.action_kind,
+            str(action.id),
+            (
+                None
+                if action.runner_binding_id is None
+                else str(action.runner_binding_id),
+                None
+                if action.target_stage_kind_id is None
+                else str(action.target_stage_kind_id),
+                action.target_graph_node_id,
+                None
+                if action.emitted_queue_family_id is None
+                else str(action.emitted_queue_family_id),
+            ),
+            None
+            if action.artifact_schema_id is None
+            else str(action.artifact_schema_id),
+        )
+        assert observed_authority == expected_authority
+
+
+def _recon_provider_bundle(plan: object, tmp_path: Path) -> dict[str, Any]:
+    from millrace.adapters.codex import CodexAdapter, CodexAdapterConfig
+    from millrace.adapters.runner_contract import (
+        AdapterInvocationRequest,
+        RedactionPolicy,
+    )
+    from millrace.contracts.runner import RunnerDispatchEnvelope
+
+    stage, binding, options, schemas = _recon_selected_authority(plan)
+    projected_schema_ids = {
+        str(option["artifact_schema_id"])
+        for option in options
+        if option["artifact_schema_id"] is not None
+    }
+    policy = RedactionPolicy(policy_id="recon-test", secret_tokens=())
+    dispatch = RunnerDispatchEnvelope(
+        run_id="run.recon.test",
+        session_id="session.recon.test",
+        dispatch_generation=1,
+        session_fencing_token="session-fence.recon.test",
+        work_item_id="work.recon.test",
+        activation_id="activation.recon.test",
+        plan_fingerprint="sha256:" + "a" * 64,
+        plan_id=f"{plan.workflow.workflow_id}:0.1",
+        workflow_id=str(plan.workflow.workflow_id),
+        workflow_version=str(plan.workflow.workflow_version),
+        graph_id="planning.lad.graph",
+        claim_id="claim.recon.test",
+        generation=0,
+        fencing_token="fence.recon.test",
+        queue_family_id="probe",
+        stage_kind_id="recon",
+        graph_node_id="planning.lad.recon.start",
+        runner_binding_id=str(binding.id),
+        external_enqueue_route_id="probe",
+        entrypoint_asset_id=str(stage.asset_ids[0]),
+        skill_asset_ids=tuple(str(asset_id) for asset_id in stage.asset_ids[1:]),
+        artifact_schema_ids=tuple(
+            str(schema_id) for schema_id in stage.artifact_schema_ids
+        ),
+        work_item_payload={"source": "package-test"},
+        governance_context={},
+        terminal_options=options,
+    )
+    request = AdapterInvocationRequest(
+        adapter_id="recon-test",
+        selected_runner_binding_id=str(binding.id),
+        selected_adapter_kind="codex",
+        dispatch_envelope=dispatch,
+        session_id=dispatch.session_id,
+        dispatch_generation=dispatch.dispatch_generation,
+        session_fencing_token=dispatch.session_fencing_token,
+        timeout_seconds=float(binding.invocation_timeout_seconds),
+        correlation_id="correlation.recon.test",
+        redaction_policy=policy,
+        selected_component_pin=binding.component_pin,
+        selected_terminal_result_mappings=binding.terminal_result_mappings,
+        selected_artifact_schemas=tuple(
+            schemas[schema_id] for schema_id in sorted(projected_schema_ids)
+        ),
+    )
+    config = CodexAdapterConfig(
+        adapter_id="recon-test",
+        wrapper_mode="offline_fake",
+        wrapper_argv=("python", "-c", "pass"),
+        cwd=tmp_path,
+        env_allowlist={},
+        timeout_seconds=float(binding.invocation_timeout_seconds),
+        max_input_bundle_bytes=1_000_000,
+        max_stdout_bytes=1_000,
+        max_stderr_diagnostic_bytes=1_000,
+        redaction_policy=policy,
+    )
+    prepared = CodexAdapter(config)._transport_request(request)
+    stdin_bytes = getattr(prepared, "stdin_bytes", None)
+    assert isinstance(stdin_bytes, bytes)
+    return cast(dict[str, Any], json.loads(stdin_bytes))
 
 
 def test_planning_lad_authority_and_assets_are_package_owned() -> None:
@@ -82,6 +332,202 @@ def test_planning_lad_assets_keep_task_card_handoff_contract() -> None:
     assert "planning.artifacts.task_cards" in manager
     assert "## Completion Criteria" in planner
     assert "## Completion Criteria" in manager
+
+
+def test_planning_lad_recon_entrypoint_has_exact_inputs_and_handoffs() -> None:
+    entrypoint = (
+        PACKAGE_ROOT / "assets/workflows/planning.lad/entrypoints/recon.md"
+    ).read_text()
+    input_section = entrypoint.split("Inputs from dispatch:", maxsplit=1)[1].split(
+        "Readable assets:", maxsplit=1
+    )[0]
+    normalized_input = " ".join(input_section.split())
+    assert re.findall(r"`([^`]+)`", input_section) == ["probe", "stage_result"]
+    assert "No other input or queue family" in normalized_input
+    assert "never accept arbitrary payloads" in normalized_input
+    assert "missing, contradictory, or unsafe" in entrypoint.lower()
+    assert "schema-valid" in entrypoint
+
+
+@pytest.mark.parametrize("workflow_id", RECON_WORKFLOW_IDS)
+def test_official_recon_workflows_select_pins_and_project_terminal_authority(
+    workflow_id: str,
+    tmp_path: Path,
+) -> None:
+    manifest = _manifest()
+    plan = _selected_workflow_plan(tmp_path, workflow_id)
+    selected_pin = plan.workflow_package_pin
+    expected_pins = dict(conformance.selected_asset_pins(manifest, workflow_id))
+    recon_pins = {
+        asset_pin.asset_id: asset_pin.content_digest
+        for asset_pin in selected_pin.selected_asset_pins
+        if asset_pin.asset_id
+        in {"planning.entrypoints.recon", "planning.skills.recon_core"}
+    }
+    assert set(recon_pins) == {
+        "planning.entrypoints.recon",
+        "planning.skills.recon_core",
+    }
+    assert recon_pins == {
+        asset_id: digest
+        for asset_id, digest in expected_pins.items()
+        if asset_id in recon_pins
+    }
+
+    stage, binding, options, schemas = _recon_selected_authority(plan)
+    assert tuple(str(queue_id) for queue_id in stage.input_queue_family_ids) == (
+        "probe",
+        "stage_result",
+    )
+    assert set(binding.component_pin.legal_terminal_result_ids) == {
+        "BLOCKED",
+        "RECON_BLOCKED",
+        "RECON_NOOP",
+        "RECON_TO_EXECUTION",
+        "RECON_TO_PLANNING",
+    }
+    assert len(options) == 5
+    projected_schema_ids = {
+        str(option["artifact_schema_id"])
+        for option in options
+        if option["artifact_schema_id"] is not None
+    }
+    assert projected_schema_ids == {
+        "execution.artifacts.task",
+        "planning.artifacts.generated_spec",
+        "planning.artifacts.recon_packet",
+        "planning.artifacts.report",
+    }
+    assert len(projected_schema_ids) == 4
+    assert set(schemas) >= projected_schema_ids
+
+    bundle = _recon_provider_bundle(plan, tmp_path)
+    contracts = cast(
+        list[Record],
+        cast(Record, bundle["prompt"])["terminal_artifact_contracts"],
+    )
+    assert len(contracts) == len(options) == 5
+    contracts_by_marker = {
+        str(contract["marker"]): contract for contract in contracts
+    }
+    outcomes = {
+        str(outcome.id): outcome
+        for outcome in plan.terminal_outcomes
+        if str(outcome.stage_kind_id) == "recon"
+    }
+    actions = {
+        str(action.outcome_id): action
+        for action in plan.terminal_actions
+        if str(action.stage_kind_id) == "recon"
+    }
+    projected_schemas = {
+        str(schema["id"]): schema["schema"]
+        for schema in cast(list[Record], bundle["selected_artifact_schemas"])
+    }
+    for option in options:
+        marker = str(option["marker"])
+        contract = contracts_by_marker[marker]
+        outcome = outcomes[str(option["outcome_id"])]
+        action = actions[str(outcome.id)]
+        assert (
+            contract["outcome_id"],
+            contract["marker"],
+            contract["action_id"],
+            contract["action_kind"],
+            contract["artifact_schema_id"],
+        ) == (
+            str(outcome.id),
+            outcome.marker,
+            str(action.id),
+            action.action_kind,
+            None
+            if action.artifact_schema_id is None
+            else str(action.artifact_schema_id),
+        )
+        if action.artifact_schema_id is not None:
+            schema_id = str(action.artifact_schema_id)
+            assert contract["json_schema"] == projected_schemas[schema_id]
+
+
+@pytest.mark.parametrize("workflow_id", RECON_WORKFLOW_IDS)
+def test_recon_core_valid_examples_use_selected_terminal_schemas(
+    workflow_id: str,
+    tmp_path: Path,
+) -> None:
+    plan = _selected_workflow_plan(tmp_path, workflow_id)
+    _stage, _binding, options, schemas = _recon_selected_authority(plan)
+    bundle = _recon_provider_bundle(plan, tmp_path)
+    contracts = cast(
+        list[Record],
+        cast(Record, bundle["prompt"])["terminal_artifact_contracts"],
+    )
+    contracts_by_marker = {
+        str(contract["marker"]): contract for contract in contracts
+    }
+    core = (
+        PACKAGE_ROOT / "assets/workflows/planning.lad/skills/recon-core.md"
+    ).read_text()
+    examples = cast(list[Record], _json_block_after(core, "## Valid Branch Examples"))
+
+    assert len(examples) == len(options) == len(contracts)
+    assert {str(example["terminal_marker"]) for example in examples} == set(
+        contracts_by_marker
+    )
+    for example in examples:
+        marker = str(example["terminal_marker"])
+        schema = schemas[str(contracts_by_marker[marker]["artifact_schema_id"])]
+        artifact = example["artifact"]
+        observation = example["observation_payload"]
+        assert artifact == observation
+        assert validate_schema(schema.schema, artifact).accepted
+        assert validate_schema(schema.schema, observation).accepted
+
+        branch = core.split(f"### {marker}", maxsplit=1)[1].split(
+            "\n### ", maxsplit=1
+        )[0]
+        assert "Artifact candidate:" in branch
+        assert "Observation candidate:" in branch
+        assert "Completion condition:" in branch
+        assert "Evidence placement:" in branch
+        for field in schema.schema["required"]:
+            assert f"`{field}`" in branch
+
+
+@pytest.mark.parametrize("workflow_id", RECON_WORKFLOW_IDS)
+def test_recon_core_invalid_examples_use_selected_terminal_schemas(
+    workflow_id: str,
+    tmp_path: Path,
+) -> None:
+    plan = _selected_workflow_plan(tmp_path, workflow_id)
+    _stage, _binding, _options, schemas = _recon_selected_authority(plan)
+    bundle = _recon_provider_bundle(plan, tmp_path)
+    contracts = cast(
+        list[Record],
+        cast(Record, bundle["prompt"])["terminal_artifact_contracts"],
+    )
+    contracts_by_marker = {
+        str(contract["marker"]): contract for contract in contracts
+    }
+    core = (
+        PACKAGE_ROOT / "assets/workflows/planning.lad/skills/recon-core.md"
+    ).read_text()
+    examples = cast(
+        list[Record], _json_block_after(core, "## Invalid Branch Examples")
+    )
+    assert {
+        "extra_field",
+        "missing_field",
+        "type_mismatch",
+        "marker_schema_mismatch",
+    } <= {str(example["case"]) for example in examples}
+    for example in examples:
+        marker = str(example["terminal_marker"])
+        schema = schemas[str(contracts_by_marker[marker]["artifact_schema_id"])]
+        assert not validate_schema(schema.schema, example["artifact"]).accepted
+        assert not validate_schema(
+            schema.schema,
+            example["observation_payload"],
+        ).accepted
 
 
 def test_planning_lad_compiles_packaged_selected_authority() -> None:
@@ -232,6 +678,13 @@ def test_planning_lad_work_shaping_and_downstream_routes_are_exact() -> None:
             "planning.artifacts.recon_packet",
         ),
         "planning.recon_block_work_item": (
+            "block_work_item",
+            None,
+            None,
+            None,
+            "planning.artifacts.report",
+        ),
+        "planning.recon_blocked": (
             "block_work_item",
             None,
             None,

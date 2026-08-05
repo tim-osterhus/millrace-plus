@@ -30,11 +30,11 @@ PUBLIC_DOCS = (
     "docs/release.md",
     "docs/public-validation.md",
 )
-RELEASE_IDENTITY = "0.22.0"
-META_RELEASE_PIN = "`millrace==0.22.0`"
+RELEASE_IDENTITY = "0.22.2"
+META_RELEASE_PIN = "`millrace==0.22.2`"
 BUNDLE_MEMBER_PINS = (
-    "`millrace-ai==0.22.0`",
-    "`millrace-plus==0.22.0`",
+    "`millrace-ai==0.22.2`",
+    "`millrace-plus==0.22.2`",
     "`millforge==0.1.0`",
 )
 VERSIONING_RULES = (
@@ -93,7 +93,7 @@ def test_current_docs_preserve_public_package_and_evidence_boundaries() -> None:
     for required in (
         "official collection of ready-to-run Millrace workflows",
         "`millrace.plus.official`",
-        "source and package are on the v0.22.0 release line",
+        "source and package are on the v0.22.2 release line",
         "installed resource root is `millrace_workflow_package`",
         "package data is non-executable",
         "A direct installation contains package metadata and data only",

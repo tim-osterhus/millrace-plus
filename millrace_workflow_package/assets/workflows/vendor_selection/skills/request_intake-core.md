@@ -27,7 +27,7 @@ Selected schemas for this stage. Treat each schema as closed.
 | `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
 | `selected_candidate_id` | yes | enum [vendor_alpha, vendor_beta, vendor_gamma, null] | Selected value from [vendor_alpha, vendor_beta, vendor_gamma, null]. |
 | `final_refusal_reason` | yes | enum [policy_blocked, no_viable_vendor, operator_rejected, blocked, null] | Selected value from [policy_blocked, no_viable_vendor, operator_rejected, blocked, null]. |
-| `evidence_refs` | yes | object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref, operator_decision_ref] | Nested selected-schema object. |
+| `evidence_refs` | yes | object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref] | Nested selected-schema object. |
 | `selected_plan_id` | yes | string; min_length 1 | Selected-schema field. |
 | `selected_plan_fingerprint` | yes | string; min_length 1 | Selected-schema field. |
 | `close_reason` | yes | enum [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked] | Selected value from [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked]. |

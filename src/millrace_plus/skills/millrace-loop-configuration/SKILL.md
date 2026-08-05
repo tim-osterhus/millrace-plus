@@ -107,6 +107,27 @@ invent config fields that the compiler has not accepted.
   contain API keys, OAuth tokens, local credential paths, provider secrets, or
   adapter config secrets.
 
+## Selected Terminal And Recovery Contracts
+
+For every legal terminal branch, require an exact
+marker-to-selected-schema/null handoff contract. The selected workflow data
+must identify the marker, its exact artifact schema or `null`, the artifact and
+observation candidate behavior, and the observable completion condition.
+
+The runner dispatch must project exact selected terminal schema material to the
+agent rather than expecting the agent to infer it from prompt prose, folders,
+filenames, or examples. Examples must cover every branch, including
+null-artifact branches, and schema-invalid shapes such as extra fields, missing
+fields, type mismatches, and marker/schema mismatches.
+
+Runner output and rejected-result evidence are non-authoritative evidence. They
+cannot alter selected route, action, artifact, or recovery authority.
+
+Rejection, retry, quarantine, and recovery behavior must be explicitly
+represented by selected workflow authority, not inferred from a folder or
+prompt prose. These skills are advisory package data, not runtime-installed
+authority.
+
 ## Reference Map
 
 - `references/decision-tree-design.md`: read before authoring a decision

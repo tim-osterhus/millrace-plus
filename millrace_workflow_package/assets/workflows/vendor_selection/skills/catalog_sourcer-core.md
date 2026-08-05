@@ -11,7 +11,7 @@ Selected schemas for this stage. Treat each schema as closed.
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
-| `source_requirement_id` | yes | string; min_length 1 | Selected-schema field. |
+| `source_requirement_id` | yes | string; min_length 1 | Exact original request ID copied from `RequirementPacket.source_request_id`. |
 | `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
 | `candidate_vendors` | yes | array; min_items 1; items object; unique_by `candidate_id` | Selected-schema array. |
 | `deterministic_source_refs` | yes | array; min_items 1; items string | Selected-schema array. |
@@ -19,6 +19,8 @@ Selected schemas for this stage. Treat each schema as closed.
 | `conflict_rules` | yes | array; min_items 1; items string | Preserve the selected conflict rules. |
 
 Each `candidate_vendors` item must include `candidate_id`, `vendor_label`, `capabilities`, `budget_band`, `catalog_ref`, and `conflict_status` with enum [clear, blocked]. Preserve `conflict_status` exactly from the selected catalog records below.
+
+`CandidateBundle.source_requirement_id` must exactly equal `RequirementPacket.source_request_id`. Do not look up or reconstruct this identity from lineage, runtime evidence, storage, or any other artifact.
 
 `DecisionPack`
 
@@ -28,7 +30,7 @@ Each `candidate_vendors` item must include `candidate_id`, `vendor_label`, `capa
 | `bundle_id` | yes | string; min_length 1 | Selected-schema field. |
 | `selected_candidate_id` | yes | enum [vendor_alpha, vendor_beta, vendor_gamma, null] | Selected value from [vendor_alpha, vendor_beta, vendor_gamma, null]. |
 | `final_refusal_reason` | yes | enum [policy_blocked, no_viable_vendor, operator_rejected, blocked, null] | Selected value from [policy_blocked, no_viable_vendor, operator_rejected, blocked, null]. |
-| `evidence_refs` | yes | object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref, operator_decision_ref] | Nested selected-schema object. |
+| `evidence_refs` | yes | object; required [rubric_report_ref, conflict_report_ref]; allowed [rubric_report_ref, conflict_report_ref] | Nested selected-schema object. |
 | `selected_plan_id` | yes | string; min_length 1 | Selected-schema field. |
 | `selected_plan_fingerprint` | yes | string; min_length 1 | Selected-schema field. |
 | `close_reason` | yes | enum [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked] | Selected value from [awarded, policy_blocked, no_viable_vendor, operator_rejected, blocked]. |
