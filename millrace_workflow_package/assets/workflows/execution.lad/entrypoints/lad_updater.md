@@ -18,6 +18,10 @@ Readable assets:
 - `execution.skills.updater_core`.
 - Selected workflow context, artifact schemas, legal markers, and package asset pins named in dispatch.
 
+QA context handoff:
+- Read and preserve the exact `qa_context` carrier and trusted task-contract digest from the selected QA result.
+- Treat Checker and Doublechecker results as read-only evidence; do not replace the baseline with an update report.
+
 Writable artifacts:
 - execution.artifacts.stage_result
 - execution.artifacts.report

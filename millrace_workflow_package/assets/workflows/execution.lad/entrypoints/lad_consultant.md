@@ -18,6 +18,11 @@ Readable assets:
 - `execution.skills.consultant_core`.
 - Selected workflow context, artifact schemas, legal markers, and package asset pins named in dispatch.
 
+QA context handoff:
+- Preserve the exact `qa_context` when returning to a recorded execution source.
+- Dynamic Builder, Checker, Fixer, Doublechecker, Troubleshooter, and Updater targets receive the carrier unchanged.
+- Return the bounded decision as `consultant_evidence`; runtime owns any queue or escalation aftermath.
+
 Writable artifacts:
 - execution.artifacts.stage_result
 - execution.artifacts.report

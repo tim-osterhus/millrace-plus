@@ -84,6 +84,10 @@ Do not encode those rules only in prose. If the runtime must enforce a rule,
 declare it in workflow data and make the prompt explain the already-declared
 contract.
 
+QA schemas and projections must preserve a frozen task/root contract. Stage
+artifacts are evidence. Runtime owns remediation and queue aftermath. Mutable
+baselines/evidence are lineage/run authority, not package assets.
+
 ## Package Assets
 
 Every selected asset needs a stable asset ID, package-relative path, byte

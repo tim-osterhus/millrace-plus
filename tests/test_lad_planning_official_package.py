@@ -1,14 +1,48 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import subprocess
+import sys
+import time
 from collections.abc import Mapping
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from millrace.compiler import compile_workflow
+from millrace.compiler import authority_fingerprint, compile_workflow
+from millrace.contracts.compiled_plan import AuthorityValue
+from millrace.contracts.runner import (
+    RunnerDispatchEnvelope,
+    RunnerResultEvidence,
+    runner_result_payload,
+)
 from millrace.contracts.schema import validate_schema
+from millrace.contracts.state import ClosedWorkItemRecord, RunRecord, RuntimeState
+from millrace.contracts.transition import (
+    AdmitPlan,
+    ClaimWork,
+    EnqueueWork,
+    EvaluateCompletionBehavior,
+    InitializeWorkspace,
+    OpenClosureTarget,
+    RunnerResultObserved,
+    SelectDefaultPlan,
+    TransitionContext,
+    TransitionInput,
+    canonical_authority_mapping_bytes,
+)
+from millrace.kernel import apply, decide, empty_runtime_state
+from millrace.kernel.decision import _completion_request_payload
+from millrace.testing import (
+    decide_with_fake_runner_completion,
+    deterministic_context,
+    fake_runner_observation_payload,
+)
 
 from support import package_conformance as conformance
 
@@ -18,7 +52,38 @@ PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.22.2"
 WORKFLOW_ID = "planning.lad"
 RECON_WORKFLOW_IDS = ("planning.lad", "lad.full")
+ARBITER_WORKFLOW_IDS = ("planning.lad", "lad.full")
 Record = dict[str, object]
+
+UNRELATED_ARBITER_OBSERVATION = {
+    "observation_id": "unrelated-observation",
+    "summary": "The repository contains no additional closure-relevant finding.",
+}
+
+EXPECTED_CLOSURE_EVIDENCE_SCHEMA_IDS = {
+    "planning.lad": (
+        "planning.artifacts.task_cards",
+        "planning.artifacts.report",
+        "planning.artifacts.incident_report",
+        "execution.artifacts.checker_result",
+        "execution.artifacts.doublecheck_result",
+        "execution.artifacts.report",
+        "execution.artifacts.incident_report",
+    ),
+    "lad.full": (
+        "planning.artifacts.task_cards",
+        "planning.artifacts.report",
+        "planning.artifacts.incident_report",
+        "execution.artifacts.checker_result",
+        "execution.artifacts.doublecheck_result",
+        "execution.artifacts.report",
+        "execution.artifacts.incident_report",
+        "learning.artifacts.curator_decision",
+        "learning.artifacts.skill_install_report",
+        "learning.artifacts.skill_disposition",
+        "learning.artifacts.report",
+    ),
+}
 
 EXPECTED_RECON_AUTHORITY = {
     "RECON_TO_EXECUTION": (
@@ -99,6 +164,1341 @@ def _json_block_after(text: str, heading: str) -> object:
     section = text.split(heading, maxsplit=1)[1].split("\n## ", maxsplit=1)[0]
     json_block = section.split("```json", maxsplit=1)[1].split("```", maxsplit=1)[0]
     return json.loads(json_block)
+
+
+def _arbiter_authority(
+    plan: object,
+) -> tuple[object, object, object, dict[str, object], dict[str, object]]:
+    stage = next(stage for stage in plan.stage_kinds if str(stage.id) == "lad_arbiter")
+    binding = next(
+        binding
+        for binding in plan.runner_bindings
+        if str(binding.id) == "lad_arbiter.millforge_runner"
+    )
+    behavior = next(
+        behavior
+        for behavior in plan.completion_behaviors
+        if str(behavior.id) == "planning.closure.completion"
+    )
+    outcomes = {
+        str(outcome.id): outcome
+        for outcome in plan.terminal_outcomes
+        if str(outcome.stage_kind_id) == "lad_arbiter"
+    }
+    actions = {
+        str(action.outcome_id): action
+        for action in plan.terminal_actions
+        if str(action.stage_kind_id) == "lad_arbiter"
+    }
+    return stage, binding, behavior, outcomes, actions
+
+
+def _closure_verdict_payload() -> dict[str, Any]:
+    return {
+        "artifact_kind": "planning.artifacts.verdict",
+        "summary": "The selected closure criteria were evaluated.",
+        "closure_target_id": "closure-1",
+        "root_contract_digest": "sha256:" + "a" * 64,
+        "freshness_anchor_digest": "sha256:" + "b" * 64,
+        "rubric": {
+            "criteria": [
+                {
+                    "criterion_id": "criterion-1",
+                    "requirement": "The selected requirement is satisfied.",
+                    "evidence_rule": "Use current evidence.",
+                }
+            ]
+        },
+        "criterion_results": [
+            {
+                "criterion_id": "criterion-1",
+                "status": "passed",
+                "provenance": "fresh",
+                "evidence_refs": [
+                    {
+                        "evidence_id": "evidence-1",
+                        "summary": "Current evidence supports the criterion.",
+                    }
+                ],
+            }
+        ],
+        "observations": [],
+        "remediation_guidance": [],
+        "confidence": "high",
+        "residual_uncertainty": "none",
+    }
+
+
+def _arbiter_json_examples(text: str) -> dict[str, Any]:
+    pattern = re.compile(
+        r"^### (?P<label>[^\n]+)\n+```json\n(?P<payload>.*?)\n```",
+        re.MULTILINE | re.DOTALL,
+    )
+    return {
+        match.group("label"): json.loads(match.group("payload"))
+        for match in pattern.finditer(text)
+    }
+
+
+def _apply_planning_input(
+    state: RuntimeState,
+    transition_input: TransitionInput,
+    context: TransitionContext,
+) -> RuntimeState:
+    decision = decide(state, transition_input, context)
+    assert decision.accepted, decision.refusal
+    return apply(state, decision)
+
+
+def _arbiter_root_state(
+    plan: object,
+    *,
+    body: str = "Evaluate this closure target against the selected contract.",
+) -> tuple[RuntimeState, str, object, str]:
+    fingerprint = authority_fingerprint(plan)
+    state = empty_runtime_state()
+    for transition_input in (
+        InitializeWorkspace("initialize-arbiter-proof"),
+        AdmitPlan(
+            "admit-arbiter-proof",
+            selected_plan=plan,
+            authority_fingerprint=fingerprint,
+        ),
+        SelectDefaultPlan(
+            "select-arbiter-proof",
+            authority_fingerprint=fingerprint,
+        ),
+    ):
+        state = _apply_planning_input(
+            state,
+            transition_input,
+            deterministic_context(
+                transition_id=f"{transition_input.input_id}-transition"
+            ),
+        )
+
+    external_route = next(
+        route
+        for route in plan.external_enqueue_routes
+        if str(route.queue_family_id) == "spec"
+    )
+    root_payload: dict[str, object] = {
+        "title": "Arbiter proof root contract",
+        "body": body,
+        "root_source": {"kind": "spec", "source_id": "arbiter-proof-spec"},
+    }
+    state = _apply_planning_input(
+        state,
+        EnqueueWork(
+            "enqueue-arbiter-proof-root",
+            queue_family_id=external_route.queue_family_id,
+            payload=cast(Mapping[str, AuthorityValue], root_payload),
+        ),
+        deterministic_context(
+            transition_id="transition-enqueue-arbiter-proof-root",
+            work_item_id="arbiter-proof-root",
+            activation_id="arbiter-proof-root-activation",
+        ),
+    )
+    root = state.work_items["arbiter-proof-root"]
+    assert root.lineage_id is not None
+    state = replace(
+        state,
+        closed_work_items={
+            root.ref.work_item_id: ClosedWorkItemRecord(
+                record_id="closed-arbiter-proof-root",
+                work_item_id=root.ref.work_item_id,
+                source_run_id=None,
+                action_id=None,
+                created_by_input_id="close-arbiter-proof-root",
+            )
+        },
+    )
+    behavior = next(
+        behavior
+        for behavior in plan.completion_behaviors
+        if str(behavior.id) == "planning.closure.completion"
+    )
+    plan_ref = state.default_plan_ref
+    assert plan_ref is not None
+    state = _apply_planning_input(
+        state,
+        OpenClosureTarget(
+            "open-arbiter-proof",
+            selected_plan_ref=plan_ref,
+            completion_behavior_id=str(behavior.id),
+            closure_target_id="arbiter-proof-target",
+            lineage_id=root.lineage_id,
+            root_source_kind="spec",
+            root_source_id="arbiter-proof-spec",
+            closure_root_work_item_id=root.ref.work_item_id,
+            request_kind=behavior.request_kind,
+            target_graph_node_id=behavior.target_graph_node_id,
+            evidence_window={"kind": "lineage", "lineage_id": root.lineage_id},
+        ),
+        deterministic_context(transition_id="transition-open-arbiter-proof"),
+    )
+    return state, fingerprint, behavior, root.ref.work_item_id
+
+
+def _claim_planning_activation(
+    state: RuntimeState,
+    activation_id: str,
+    *,
+    tag: str,
+) -> tuple[RuntimeState, RunRecord]:
+    activation = state.activations[activation_id]
+    run_id = f"run-{tag}"
+    state = _apply_planning_input(
+        state,
+        ClaimWork(f"claim-{tag}", activation_id=activation_id),
+        deterministic_context(
+            transition_id=f"transition-claim-{tag}",
+            work_item_id=activation.work_item_id,
+            activation_id=activation_id,
+            run_id=run_id,
+            claim_id=f"claim-{tag}",
+            fencing_token=f"fence-{tag}",
+        ),
+    )
+    return state, state.runs[run_id]
+
+
+def _arbiter_marker(plan: object, action_id: str) -> str:
+    action = next(
+        action for action in plan.terminal_actions if str(action.id) == str(action_id)
+    )
+    return next(
+        str(outcome.marker)
+        for outcome in plan.terminal_outcomes
+        if outcome.id == action.outcome_id
+    )
+
+
+def _arbiter_action_decision(
+    state: RuntimeState,
+    plan: object,
+    fingerprint: str,
+    *,
+    run: RunRecord,
+    action_id: str,
+    tag: str,
+    artifact_payload: Mapping[str, AuthorityValue],
+) -> object:
+    activation = state.activations[run.activation_id]
+    observation = RunnerResultObserved(
+        f"observe-{tag}",
+        run_id=run.run_ref.run_id,
+        payload=fake_runner_observation_payload(
+            run=run,
+            activation=activation,
+            plan_fingerprint=fingerprint,
+            marker=_arbiter_marker(plan, action_id),
+            artifact_payload=artifact_payload,
+        ),
+        observed_at=0,
+    )
+    return decide_with_fake_runner_completion(
+        state,
+        observation,
+        deterministic_context(
+            transition_id=f"transition-observe-{tag}",
+            work_item_id=f"work-target-{tag}",
+            activation_id=f"activation-target-{tag}",
+            run_id=run.run_ref.run_id,
+            claim_id=run.run_ref.claim_id,
+            fencing_token=run.run_ref.fencing_token,
+        ),
+    )
+
+
+def _run_arbiter_action(
+    state: RuntimeState,
+    plan: object,
+    fingerprint: str,
+    *,
+    run: RunRecord,
+    action_id: str,
+    tag: str,
+    artifact_payload: Mapping[str, AuthorityValue],
+) -> tuple[RuntimeState, object, str]:
+    decision = _arbiter_action_decision(
+        state,
+        plan,
+        fingerprint,
+        run=run,
+        action_id=action_id,
+        tag=tag,
+        artifact_payload=artifact_payload,
+    )
+    assert decision.accepted, decision.refusal
+    return apply(state, decision), decision, f"activation-target-{tag}"
+
+
+def _arbiter_rubric() -> dict[str, object]:
+    return {
+        "criteria": [
+            {
+                "criterion_id": "root-contract-criterion",
+                "requirement": "The closure target satisfies the root contract.",
+                "evidence_rule": "Use current evidence produced after the anchor.",
+            }
+        ]
+    }
+
+
+def _arbiter_verdict(
+    snapshot: Mapping[str, object],
+    rubric: Mapping[str, object],
+    *,
+    marker: str,
+    evidence_id: str,
+    observations: tuple[Mapping[str, object], ...] = (),
+) -> dict[str, object]:
+    gap = marker == "gap"
+    blocked = marker == "blocked"
+    return {
+        "artifact_kind": "planning.artifacts.verdict",
+        "summary": "The selected closure contract was evaluated.",
+        "closure_target_id": snapshot["closure_target_id"],
+        "root_contract_digest": cast(
+            Mapping[str, object], snapshot["root_contract"]
+        )["payload_digest"],
+        "freshness_anchor_digest": snapshot["freshness_anchor_digest"],
+        "rubric": rubric,
+        "criterion_results": [
+            {
+                "criterion_id": "root-contract-criterion",
+                "status": "blocked" if blocked else "failed" if gap else "passed",
+                "provenance": "missing" if blocked else "fresh",
+                "evidence_refs": []
+                if blocked
+                else [{"evidence_id": evidence_id, "summary": "Current evidence."}],
+            }
+        ],
+        "observations": [dict(observation) for observation in observations],
+        "remediation_guidance": (
+            [
+                {
+                    "guidance_id": "guidance-root-contract",
+                    "summary": "Address the root-contract criterion.",
+                    "criterion_refs": [
+                        {"criterion_id": "root-contract-criterion"}
+                    ],
+                }
+            ]
+            if gap
+            else []
+        ),
+        "confidence": "high",
+        "residual_uncertainty": "none",
+    }
+
+
+def _close_arbiter_lineage_work(
+    state: RuntimeState,
+    *,
+    lineage_id: str,
+    tag: str,
+) -> RuntimeState:
+    closed = dict(state.closed_work_items)
+    for work_item_id, work_item in state.work_items.items():
+        if work_item.lineage_id != lineage_id or work_item_id in closed:
+            continue
+        closed[work_item_id] = ClosedWorkItemRecord(
+            record_id=f"closed-{tag}-{work_item_id}",
+            work_item_id=work_item_id,
+            source_run_id=None,
+            action_id=None,
+            created_by_input_id=f"close-{tag}",
+        )
+    return replace(state, closed_work_items=closed)
+
+
+def _arbiter_boundary_fixture(
+    plan: object,
+    *,
+    target_bytes: int,
+) -> tuple[RuntimeState, str, object, object, Mapping[str, AuthorityValue], str]:
+    stage, _binding, behavior, _outcomes, _actions = _arbiter_authority(plan)
+    base_state, fingerprint, base_behavior, root_work_item_id = _arbiter_root_state(
+        plan
+    )
+    base_target = base_state.closure_targets["arbiter-proof-target"]
+    base_root = base_state.work_items[root_work_item_id]
+
+    def with_body(body: str) -> RuntimeState:
+        root = replace(
+            base_root,
+            payload={**base_root.payload, "body": body},
+        )
+        return replace(
+            base_state,
+            work_items={**base_state.work_items, root_work_item_id: root},
+        )
+
+    for suffix_length in range(4):
+        empty_body = "x" * suffix_length
+        empty_payload, refusal = _completion_request_payload(
+            state=with_body(empty_body),
+            target=base_target,
+            behavior=base_behavior,
+            stage=stage,
+        )
+        assert refusal is None
+        assert empty_payload is not None
+        remaining = target_bytes - len(canonical_authority_mapping_bytes(empty_payload))
+        if remaining < 4 or remaining % 4:
+            continue
+        body = "𐀀" * (remaining // 4) + empty_body
+        candidate_state = with_body(body)
+        payload, refusal = _completion_request_payload(
+            state=candidate_state,
+            target=base_target,
+            behavior=base_behavior,
+            stage=stage,
+        )
+        assert refusal is None
+        assert payload is not None
+        if len(canonical_authority_mapping_bytes(payload)) != target_bytes:
+            continue
+
+        final_state, final_fingerprint, final_behavior, final_root_id = (
+            _arbiter_root_state(plan, body=body)
+        )
+        final_target = final_state.closure_targets["arbiter-proof-target"]
+        final_root = final_state.work_items[final_root_id]
+        final_payload, final_refusal = _completion_request_payload(
+            state=final_state,
+            target=final_target,
+            behavior=final_behavior,
+            stage=stage,
+        )
+        assert final_refusal is None
+        assert final_payload is not None
+        assert len(canonical_authority_mapping_bytes(final_payload)) == target_bytes
+        assert final_root.payload["body"] == body
+        return (
+            final_state,
+            final_fingerprint,
+            final_behavior,
+            stage,
+            final_payload,
+            body,
+        )
+    raise AssertionError("could not materialize exact closure request boundary")
+
+
+def _arbiter_selected_asset_material(stage: object) -> dict[str, object]:
+    manifest = _manifest()
+    assets = conformance.assets_by_id(manifest)
+    return {
+        str(asset_id): {
+            "body": (
+                PACKAGE_ROOT / str(assets[str(asset_id)]["package_path"])
+            ).read_text()
+        }
+        for asset_id in stage.asset_ids
+    }
+
+
+def _arbiter_terminal_options(
+    plan: object,
+    binding: object,
+) -> tuple[dict[str, object], ...]:
+    _stage, _binding, _behavior, outcomes, actions = _arbiter_authority(plan)
+    return tuple(
+        {
+            "outcome_id": str(outcome.id),
+            "marker": outcome.marker,
+            "action_id": str(action.id),
+            "action_kind": action.action_kind,
+            "artifact_schema_id": (
+                None
+                if action.artifact_schema_id is None
+                else str(action.artifact_schema_id)
+            ),
+        }
+        for mapping in binding.terminal_result_mappings
+        for outcome in (outcomes[str(mapping.outcome_id)],)
+        for action in (actions[str(outcome.id)],)
+    )
+
+
+class _ArbiterSelectedOutputRequirement(SimpleNamespace):
+    def __init__(
+        self,
+        *,
+        required: bool,
+        json_schema: dict[str, object],
+    ) -> None:
+        canonical = json.dumps(
+            json_schema,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        super().__init__(
+            required=required,
+            json_schema=json_schema,
+            canonical_schema_bytes=canonical,
+            schema_sha256=hashlib.sha256(canonical).hexdigest(),
+        )
+
+
+class _ArbiterTerminalSelectedOutputRequirement(SimpleNamespace):
+    pass
+
+
+class _ArbiterSelectedOutputAbsent(SimpleNamespace):
+    def __init__(self) -> None:
+        super().__init__(present=False)
+
+
+class _ArbiterSelectedOutputPresent(SimpleNamespace):
+    def __init__(self, value: object) -> None:
+        super().__init__(present=True, value=value)
+
+
+def _arbiter_boundary_provider() -> ModuleType:
+    provider = ModuleType("millforge")
+    for provider_record_name in (
+        "StageIdentity",
+        "HarnessTaskInput",
+        "CompiledHarnessIdentity",
+        "CompiledHarnessHash",
+        "CompiledHarnessRef",
+        "CapabilityGrant",
+        "CapabilityEnvelope",
+        "RunDirRef",
+        "TimeoutRef",
+        "CancellationRef",
+        "ModelProfileRef",
+    ):
+        setattr(
+            provider,
+            provider_record_name,
+            lambda **kwargs: SimpleNamespace(**kwargs),
+        )
+    provider.HarnessExecutionRequest = lambda **kwargs: SimpleNamespace(**kwargs)
+    provider.SelectedOutputRequirement = _ArbiterSelectedOutputRequirement
+    provider.TerminalSelectedOutputRequirement = (
+        _ArbiterTerminalSelectedOutputRequirement
+    )
+    provider.SelectedOutputAbsent = _ArbiterSelectedOutputAbsent
+    provider.SelectedOutputPresent = _ArbiterSelectedOutputPresent
+    return provider
+
+
+class _ArbiterBoundaryFacade:
+    def __init__(
+        self,
+        pin: object,
+        *,
+        observations: tuple[Mapping[str, object], ...] = (),
+    ) -> None:
+        self.calls = 0
+        self.instructions: list[str] = []
+        self.requests: list[object] = []
+        self._pin = pin
+        self._observations = observations
+        self.descriptor = SimpleNamespace(
+            runner_id=pin.component_id,
+            runner_version=pin.component_version,
+            package_name=pin.provider_distribution,
+            package_version=pin.provider_version,
+            descriptor_sha256=pin.descriptor_sha256,
+            required_capability_ids=tuple(
+                str(value) for value in pin.required_capability_ids
+            ),
+            legal_terminal_result_ids=tuple(pin.legal_terminal_result_ids),
+        )
+        self.components = SimpleNamespace(
+            options=SimpleNamespace(load_context_files=False),
+            metadata=SimpleNamespace(context_file_count=0),
+            compiled_plan=SimpleNamespace(
+                harness_id=pin.component_id,
+                harness_version=pin.component_version,
+                compiled_sha256="sha256:" + "c" * 64,
+            ),
+            capability_envelope=SimpleNamespace(
+                grants=tuple(
+                    SimpleNamespace(capability_id=str(value))
+                    for value in pin.required_capability_ids
+                )
+            ),
+            model_profile=SimpleNamespace(profile_id="boundary-profile"),
+        )
+
+    def invocation_evidence_for(self, request: object) -> object:
+        records = [
+            {
+                "required": item.selected_output.required,
+                "schema_sha256": item.selected_output.schema_sha256,
+                "terminal_result": item.terminal_result,
+            }
+            for item in request.selected_output_requirements
+        ]
+        records.sort(key=lambda item: item["terminal_result"].encode("utf-8"))
+        requirements_digest = hashlib.sha256(
+            json.dumps(
+                records,
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
+        return SimpleNamespace(
+            request_id=request.request_id,
+            run_id=request.run_id,
+            descriptor_sha256=self._pin.descriptor_sha256,
+            context_file_count=0,
+            selected_output_requirements_sha256=requirements_digest,
+        )
+
+    async def execute(self, request: object) -> object:
+        self.calls += 1
+        self.requests.append(request)
+        instruction = request.task.instruction
+        self.instructions.append(instruction)
+        decoded = cast(dict[str, object], json.loads(instruction))
+        work_item_payload = cast(
+            Mapping[str, object], decoded["work_item_payload"]
+        )
+        snapshot = cast(
+            Mapping[str, object],
+            work_item_payload["closure_evidence_snapshot"],
+        )
+        verdict = _arbiter_verdict(
+            snapshot,
+            _arbiter_rubric(),
+            marker="pass",
+            evidence_id="boundary-evidence",
+            observations=self._observations,
+        )
+        requirement = next(
+            item
+            for item in request.selected_output_requirements
+            if item.terminal_result == "ARBITER_COMPLETE"
+        )
+        selected_output = _ArbiterSelectedOutputPresent(verdict)
+        schema_digest = requirement.selected_output.schema_sha256
+        intent = SimpleNamespace(
+            request_id=request.request_id,
+            run_id=request.run_id,
+            stage=request.stage,
+            terminal_result="ARBITER_COMPLETE",
+            summary="boundary result",
+            artifact_refs=(),
+            selected_output=selected_output,
+            selected_output_schema_sha256=schema_digest,
+        )
+        return SimpleNamespace(
+            status="completed",
+            result_class="domain_terminal",
+            request_id=request.request_id,
+            run_id=request.run_id,
+            stage=request.stage,
+            terminal_intent=intent,
+            compiled_harness=request.compiled_harness,
+            selected_output=selected_output,
+            selected_output_schema_sha256=schema_digest,
+            diagnostic=SimpleNamespace(code="safe", message="safe"),
+            usage=None,
+        )
+
+    async def aclose(self) -> None:
+        return None
+
+
+def _arbiter_millforge_dispatch(
+    plan: object,
+    *,
+    closure_payload: Mapping[str, AuthorityValue],
+    workspace_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    observations: tuple[Mapping[str, object], ...] = (),
+    run_id: str = "run-arbiter-boundary",
+    session_id: str = "session-arbiter-boundary",
+    dispatch_generation: int = 1,
+    session_fencing_token: str = "session-fence-arbiter-boundary",
+    work_item_id: str = "work-arbiter-boundary",
+    activation_id: str = "activation-arbiter-boundary",
+    claim_id: str = "claim-arbiter-boundary",
+    generation: int = 0,
+    fencing_token: str = "fence-arbiter-boundary",
+    correlation_id: str = "correlation-arbiter-boundary",
+    adapter_id: str = "arbiter-boundary",
+) -> SimpleNamespace:
+    from millrace.adapters.millforge import MillforgeAdapter, MillforgeAdapterConfig
+    from millrace.adapters.runner_contract import (
+        AdapterInvocationRequest,
+        RedactionPolicy,
+    )
+
+    stage, binding, behavior, _outcomes, _actions = _arbiter_authority(plan)
+    fingerprint = authority_fingerprint(plan)
+    pin = binding.component_pin
+    assert pin is not None
+    verdict_schema = next(
+        schema
+        for schema in plan.artifact_schemas
+        if str(schema.id) == "planning.artifacts.verdict"
+    )
+    selected_asset_material = _arbiter_selected_asset_material(stage)
+    terminal_options = _arbiter_terminal_options(plan, binding)
+    facade = _ArbiterBoundaryFacade(pin, observations=observations)
+    monkeypatch.setitem(sys.modules, "millforge", _arbiter_boundary_provider())
+    redaction_policy = RedactionPolicy(policy_id="boundary", secret_tokens=())
+    dispatch = RunnerDispatchEnvelope(
+        run_id=run_id,
+        session_id=session_id,
+        dispatch_generation=dispatch_generation,
+        session_fencing_token=session_fencing_token,
+        work_item_id=work_item_id,
+        activation_id=activation_id,
+        plan_fingerprint=fingerprint,
+        plan_id=f"{plan.workflow.workflow_id}:{plan.workflow.workflow_version}",
+        workflow_id=str(plan.workflow.workflow_id),
+        workflow_version=str(plan.workflow.workflow_version),
+        graph_id="planning.lad.graph",
+        claim_id=claim_id,
+        generation=generation,
+        fencing_token=fencing_token,
+        queue_family_id=str(behavior.request_queue_family_id),
+        stage_kind_id=str(stage.id),
+        graph_node_id=behavior.target_graph_node_id,
+        runner_binding_id=str(binding.id),
+        external_enqueue_route_id=None,
+        entrypoint_asset_id=str(stage.asset_ids[0]),
+        skill_asset_ids=tuple(str(asset_id) for asset_id in stage.asset_ids[1:]),
+        artifact_schema_ids=tuple(
+            str(schema_id) for schema_id in stage.artifact_schema_ids
+        ),
+        work_item_payload=closure_payload,
+        governance_context={
+            "capabilities": tuple(
+                {
+                    "id": str(capability_id),
+                    "support_status": "supported",
+                    "grant_status": "granted",
+                }
+                for capability_id in binding.required_capability_ids
+            )
+        },
+        terminal_options=terminal_options,
+    )
+    request = AdapterInvocationRequest(
+        adapter_id=adapter_id,
+        selected_runner_binding_id=str(binding.id),
+        selected_adapter_kind="millforge",
+        dispatch_envelope=dispatch,
+        session_id=dispatch.session_id,
+        dispatch_generation=dispatch.dispatch_generation,
+        session_fencing_token=dispatch.session_fencing_token,
+        timeout_seconds=float(binding.invocation_timeout_seconds),
+        correlation_id=correlation_id,
+        redaction_policy=redaction_policy,
+        selected_asset_material=selected_asset_material,
+        selected_component_pin=pin,
+        selected_terminal_result_mappings=binding.terminal_result_mappings,
+        selected_artifact_schemas=(verdict_schema,),
+    )
+    adapter = MillforgeAdapter(
+        MillforgeAdapterConfig(
+            adapter_id=adapter_id,
+            facade=facade,
+            workspace_root=workspace_root,
+            timeout_seconds=10,
+            redaction_policy=redaction_policy,
+        )
+    )
+    return SimpleNamespace(
+        adapter=adapter,
+        request=request,
+        dispatch=dispatch,
+        facade=facade,
+        fingerprint=fingerprint,
+        stage=stage,
+        binding=binding,
+        behavior=behavior,
+        pin=pin,
+        verdict_schema=verdict_schema,
+        selected_asset_material=selected_asset_material,
+        terminal_options=terminal_options,
+    )
+
+
+@pytest.mark.parametrize("workflow_id", ARBITER_WORKFLOW_IDS)
+def test_selected_arbiter_evaluations_reuse_rubric_and_bound_post_anchor_evidence(
+    workflow_id: str,
+    tmp_path: Path,
+) -> None:
+    plan = _selected_workflow_plan(tmp_path, workflow_id)
+    state, fingerprint, behavior, root_work_item_id = _arbiter_root_state(plan)
+    plan_ref = state.default_plan_ref
+    assert plan_ref is not None
+    root = state.work_items[root_work_item_id]
+    assert root.lineage_id is not None
+
+    state = _apply_planning_input(
+        state,
+        EvaluateCompletionBehavior(
+            "evaluate-arbiter-first",
+            selected_plan_ref=plan_ref,
+            completion_behavior_id=str(behavior.id),
+            closure_target_id="arbiter-proof-target",
+        ),
+        deterministic_context(
+            transition_id="transition-evaluate-arbiter-first",
+            work_item_id="work-target-first",
+            activation_id="activation-target-first",
+        ),
+    )
+    state, first_run = _claim_planning_activation(
+        state,
+        "activation-target-first",
+        tag="arbiter-first",
+    )
+    first_snapshot = cast(
+        Mapping[str, object],
+        state.work_items[first_run.work_item_id].payload[
+            "closure_evidence_snapshot"
+        ],
+    )
+    assert first_snapshot["prior_verdict"] is None
+    rubric = _arbiter_rubric()
+    first_verdict = _arbiter_verdict(
+        first_snapshot,
+        rubric,
+        marker="gap",
+        evidence_id="first-gap-evidence",
+    )
+    state, _first_decision, remediation_activation_id = _run_arbiter_action(
+        state,
+        plan,
+        fingerprint,
+        run=first_run,
+        action_id=behavior.gap_action_id,
+        tag="arbiter-first-gap",
+        artifact_payload=first_verdict,
+    )
+    assert len(state.remediation_work_records) == 1
+    first_verdict_artifact = next(
+        artifact
+        for artifact in state.artifacts.values()
+        if str(artifact.schema_id) == "planning.artifacts.verdict"
+    )
+    assert canonical_authority_mapping_bytes(
+        cast(Mapping[str, AuthorityValue], first_verdict_artifact.payload["rubric"])
+    ) == canonical_authority_mapping_bytes(rubric)
+    assert first_verdict_artifact.payload["criterion_results"][0]["criterion_id"] == (
+        "root-contract-criterion"
+    )
+
+    state, auditor_run = _claim_planning_activation(
+        state,
+        remediation_activation_id,
+        tag="arbiter-auditor",
+    )
+    state, _blocked_decision, mechanic_activation_id = _run_arbiter_action(
+        state,
+        plan,
+        fingerprint,
+        run=auditor_run,
+        action_id="planning.route_auditor_blocked",
+        tag="arbiter-auditor-blocked",
+        artifact_payload={},
+    )
+    state, mechanic_run = _claim_planning_activation(
+        state,
+        mechanic_activation_id,
+        tag="arbiter-mechanic",
+    )
+    post_anchor_report = {
+        "artifact_kind": "planning.artifacts.report",
+        "summary": "The remediation returned current evidence to the recorded source.",
+    }
+    state, _recovered_decision, _returned_activation_id = _run_arbiter_action(
+        state,
+        plan,
+        fingerprint,
+        run=mechanic_run,
+        action_id="planning.return_mechanic_recovered",
+        tag="arbiter-mechanic-recovered",
+        artifact_payload=post_anchor_report,
+    )
+    report_artifacts = [
+        artifact
+        for artifact in state.artifacts.values()
+        if str(artifact.schema_id) == "planning.artifacts.report"
+    ]
+    assert len(report_artifacts) == 1
+    assert report_artifacts[0].payload == post_anchor_report
+    assert state.work_items[report_artifacts[0].work_item_id].lineage_id == (
+        root.lineage_id
+    )
+    transition_ids = tuple(transition.record_id for transition in state.transitions)
+    assert transition_ids.index(
+        report_artifacts[0].transition_id
+    ) > transition_ids.index(first_verdict_artifact.transition_id)
+
+    state = _close_arbiter_lineage_work(
+        state, lineage_id=root.lineage_id, tag="before-second"
+    )
+    state = _apply_planning_input(
+        state,
+        EvaluateCompletionBehavior(
+            "evaluate-arbiter-second",
+            selected_plan_ref=plan_ref,
+            completion_behavior_id=str(behavior.id),
+            closure_target_id="arbiter-proof-target",
+        ),
+        deterministic_context(
+            transition_id="transition-evaluate-arbiter-second",
+            work_item_id="work-target-second",
+            activation_id="activation-target-second",
+        ),
+    )
+    state, second_run = _claim_planning_activation(
+        state,
+        "activation-target-second",
+        tag="arbiter-second",
+    )
+    second_snapshot = cast(
+        Mapping[str, object],
+        state.work_items[second_run.work_item_id].payload[
+            "closure_evidence_snapshot"
+        ],
+    )
+    prior_verdict = cast(Mapping[str, object], second_snapshot["prior_verdict"])
+    assert canonical_authority_mapping_bytes(
+        cast(Mapping[str, AuthorityValue], prior_verdict["payload"])
+    ) == canonical_authority_mapping_bytes(first_verdict)
+    assert canonical_authority_mapping_bytes(
+        cast(Mapping[str, AuthorityValue], prior_verdict["payload"])["rubric"]
+    ) == canonical_authority_mapping_bytes(rubric)
+    assert (
+        second_snapshot["freshness_anchor_digest"]
+        == first_verdict_artifact.payload_digest
+    )
+    assert [
+        canonical_authority_mapping_bytes(
+            cast(Mapping[str, AuthorityValue], evidence["payload"])
+        )
+        for evidence in cast(
+            tuple[Mapping[str, object], ...], second_snapshot["evidence_artifacts"]
+        )
+    ] == [canonical_authority_mapping_bytes(post_anchor_report)]
+
+    stale_verdict = _arbiter_verdict(
+        second_snapshot,
+        rubric,
+        marker="pass",
+        evidence_id="post-anchor-evidence",
+    )
+    stale_verdict["freshness_anchor_digest"] = cast(
+        Mapping[str, object], second_snapshot["root_contract"]
+    )["payload_digest"]
+    stale_decision = _arbiter_action_decision(
+        state,
+        plan,
+        fingerprint,
+        run=second_run,
+        action_id=behavior.pass_action_id,
+        tag="arbiter-second-stale-anchor",
+        artifact_payload=stale_verdict,
+    )
+    assert not stale_decision.accepted
+    assert stale_decision.refusal is not None
+    assert stale_decision.refusal.reason == "closure_freshness_anchor_mismatch"
+
+    state, _second_decision, _ = _run_arbiter_action(
+        state,
+        plan,
+        fingerprint,
+        run=second_run,
+        action_id=behavior.pass_action_id,
+        tag="arbiter-second-pass",
+        artifact_payload=_arbiter_verdict(
+            second_snapshot,
+            rubric,
+            marker="pass",
+            evidence_id="post-anchor-evidence",
+        ),
+    )
+    assert state.closure_targets["arbiter-proof-target"].status == "closed"
+    assert len(state.remediation_work_records) == 1
+    assert len(state.closure_terminal_records) == 1
+
+
+def _git_porcelain(repo: Path, *arguments: str) -> str:
+    result = subprocess.run(
+        ["git", *arguments],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout
+
+
+@pytest.mark.parametrize("workflow_id", ARBITER_WORKFLOW_IDS)
+def test_arbiter_cooperative_dispatch_leaves_a_fresh_git_repo_unchanged(
+    workflow_id: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from millrace.adapters.runner_contract import AdapterSuccessResult, StartedSession
+
+    repo = tmp_path / "arbiter-repo"
+    (repo / "src").mkdir(parents=True)
+    (repo / "tests").mkdir()
+    (repo / "src" / "app.py").write_text("def answer() -> int:\n    return 42\n")
+    (repo / "tests" / "test_app.py").write_text(
+        "from src.app import answer\n\n"
+        "def test_answer() -> None:\n    assert answer() == 42\n"
+    )
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "qa@example.test"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "config", "user.name", "QA"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "add", "src/app.py", "tests/test_app.py"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "commit", "-qm", "seed repository"], cwd=repo, check=True)
+    before_status = _git_porcelain(repo, "status", "--porcelain=v1")
+    before_staged_diff = _git_porcelain(repo, "diff", "--cached", "--name-only")
+    before_unstaged_diff = _git_porcelain(repo, "diff", "--name-only")
+    before_files = _git_porcelain(repo, "ls-files")
+
+    plan = _selected_workflow_plan(tmp_path, workflow_id)
+    state, fingerprint, behavior, _root_work_item_id = _arbiter_root_state(plan)
+    plan_ref = state.default_plan_ref
+    assert plan_ref is not None
+    state = _apply_planning_input(
+        state,
+        EvaluateCompletionBehavior(
+            "evaluate-arbiter-no-mutation",
+            selected_plan_ref=plan_ref,
+            completion_behavior_id=str(behavior.id),
+            closure_target_id="arbiter-proof-target",
+        ),
+        deterministic_context(
+            transition_id="transition-evaluate-arbiter-no-mutation",
+            work_item_id="work-target-no-mutation",
+            activation_id="activation-target-no-mutation",
+        ),
+    )
+    state, run = _claim_planning_activation(
+        state,
+        "activation-target-no-mutation",
+        tag="arbiter-no-mutation",
+    )
+    harness = _arbiter_millforge_dispatch(
+        plan,
+        closure_payload=cast(
+            Mapping[str, AuthorityValue], state.work_items[run.work_item_id].payload
+        ),
+        workspace_root=repo,
+        monkeypatch=monkeypatch,
+        run_id=run.run_ref.run_id,
+        session_id=f"session-{run.run_ref.run_id}",
+        session_fencing_token=f"session-fence-{run.run_ref.run_id}",
+        work_item_id=run.work_item_id,
+        activation_id=run.activation_id,
+        claim_id=run.run_ref.claim_id,
+        generation=run.run_ref.generation,
+        fencing_token=run.run_ref.fencing_token,
+        correlation_id=f"correlation-{run.run_ref.run_id}",
+    )
+    assert harness.fingerprint == fingerprint
+    assert harness.adapter.config.workspace_root == repo.resolve()
+    started = harness.adapter.start_session(harness.request)
+    assert isinstance(started, StartedSession), (
+        getattr(started, "adapter_error", None),
+        getattr(getattr(started, "adapter_error", None), "diagnostics", None),
+    )
+    deadline = time.monotonic() + 2
+    outcome = None
+    while outcome is None and time.monotonic() < deadline:
+        outcome = started.handle.poll_completion()
+        if outcome is None:
+            time.sleep(0.001)
+    assert isinstance(outcome, AdapterSuccessResult)
+    assert outcome.marker == "ARBITER_COMPLETE"
+    assert harness.facade.calls == 1
+    assert len(harness.facade.requests) == 1
+    provider_request = harness.facade.requests[0]
+    assert provider_request.run_id == run.run_ref.run_id
+    assert provider_request.work_item_id == run.work_item_id
+    assert provider_request.selected_output_requirements
+    selected_schema_digest = (
+        provider_request.selected_output_requirements[0].selected_output.schema_sha256
+    )
+    assert {
+        item.terminal_result for item in provider_request.selected_output_requirements
+    } == {
+        str(mapping.runner_result_id)
+        for mapping in harness.binding.terminal_result_mappings
+    }
+    assert all(
+        item.selected_output.schema_sha256 == selected_schema_digest
+        for item in provider_request.selected_output_requirements
+    )
+    assert harness.request.selected_artifact_schemas == (harness.verdict_schema,)
+    assert harness.dispatch.entrypoint_asset_id == "planning.entrypoints.lad_arbiter"
+    assert harness.dispatch.skill_asset_ids == ("planning.skills.arbiter_core",)
+    assert harness.dispatch.artifact_schema_ids == ("planning.artifacts.verdict",)
+    assert harness.dispatch.terminal_options == harness.terminal_options
+    assert {
+        option["marker"] for option in harness.terminal_options
+    } == {"ARBITER_COMPLETE", "REMEDIATION_NEEDED", "BLOCKED"}
+    assert all(
+        option["artifact_schema_id"] == "planning.artifacts.verdict"
+        for option in harness.terminal_options
+    )
+    decoded_instruction = cast(
+        dict[str, object], json.loads(provider_request.task.instruction)
+    )
+    assert decoded_instruction["entrypoint_asset_id"] == (
+        "planning.entrypoints.lad_arbiter"
+    )
+    assert decoded_instruction["skill_asset_ids"] == ["planning.skills.arbiter_core"]
+    assert decoded_instruction["selected_asset_material"] == (
+        harness.selected_asset_material
+    )
+    assert decoded_instruction["terminal_options"] == list(harness.terminal_options)
+
+    assert outcome.artifact_payload_candidate is not None
+    echo = outcome.dispatch_echo
+    evidence = RunnerResultEvidence(
+        run_id=echo.run_id,
+        session_id=echo.session_id,
+        dispatch_generation=echo.dispatch_generation,
+        session_fencing_token=echo.session_fencing_token,
+        plan_fingerprint=echo.plan_fingerprint,
+        claim_id=echo.claim_id,
+        generation=echo.generation,
+        fencing_token=echo.fencing_token,
+        stage_kind_id=echo.stage_kind_id,
+        graph_node_id=echo.graph_node_id,
+        runner_binding_id=echo.runner_binding_id,
+        marker=cast(str, outcome.marker),
+        adapter_provenance=outcome.adapter_provenance,
+        observation_payload={},
+        artifact_payload=outcome.artifact_payload_candidate,
+    )
+    observed = RunnerResultObserved(
+        "observe-arbiter-no-mutation-pass",
+        run_id=run.run_ref.run_id,
+        payload=runner_result_payload(evidence),
+        observed_at=0,
+    )
+    before_remediation = state.remediation_work_records
+    decision = decide_with_fake_runner_completion(
+        state,
+        observed,
+        deterministic_context(
+            transition_id="transition-observe-arbiter-no-mutation-pass",
+            work_item_id="work-target-arbiter-no-mutation-pass",
+            activation_id="activation-target-arbiter-no-mutation-pass",
+            run_id=run.run_ref.run_id,
+            claim_id=run.run_ref.claim_id,
+            fencing_token=run.run_ref.fencing_token,
+        ),
+    )
+    assert decision.accepted, decision.refusal
+    state = apply(state, decision)
+    assert state.closure_targets["arbiter-proof-target"].status == "closed"
+    assert state.remediation_work_records == before_remediation == {}
+    assert _git_porcelain(repo, "status", "--porcelain=v1") == before_status == ""
+    assert _git_porcelain(repo, "diff", "--cached", "--name-only") == (
+        before_staged_diff
+    )
+    assert _git_porcelain(repo, "diff", "--name-only") == before_unstaged_diff
+    assert _git_porcelain(repo, "ls-files") == before_files
+    for artifact in state.artifacts.values():
+        assert not {"queue", "remediation", "incident"}.intersection(artifact.payload)
+
+
+@pytest.mark.parametrize("workflow_id", ARBITER_WORKFLOW_IDS)
+def test_arbiter_complete_unrelated_observation_is_non_blocking(
+    workflow_id: str,
+    tmp_path: Path,
+) -> None:
+    plan = _selected_workflow_plan(tmp_path, workflow_id)
+    state, fingerprint, behavior, _root_work_item_id = _arbiter_root_state(plan)
+    assert fingerprint in state.admitted_plans
+    plan_ref = state.default_plan_ref
+    assert plan_ref is not None
+    state = _apply_planning_input(
+        state,
+        EvaluateCompletionBehavior(
+            "evaluate-arbiter-unrelated-observation",
+            selected_plan_ref=plan_ref,
+            completion_behavior_id=str(behavior.id),
+            closure_target_id="arbiter-proof-target",
+        ),
+        deterministic_context(
+            transition_id="transition-evaluate-arbiter-unrelated-observation",
+            work_item_id="work-target-unrelated-observation",
+            activation_id="activation-target-unrelated-observation",
+        ),
+    )
+    state, run = _claim_planning_activation(
+        state,
+        "activation-target-unrelated-observation",
+        tag="arbiter-unrelated-observation",
+    )
+    snapshot = cast(
+        Mapping[str, object],
+        state.work_items[run.work_item_id].payload["closure_evidence_snapshot"],
+    )
+    verdict = _arbiter_verdict(
+        snapshot,
+        _arbiter_rubric(),
+        marker="pass",
+        evidence_id="unrelated-observation-evidence",
+        observations=(UNRELATED_ARBITER_OBSERVATION,),
+    )
+    before_remediation = state.remediation_work_records
+    state, decision, _ = _run_arbiter_action(
+        state,
+        plan,
+        fingerprint,
+        run=run,
+        action_id=behavior.pass_action_id,
+        tag="arbiter-unrelated-observation-pass",
+        artifact_payload=cast(Mapping[str, AuthorityValue], verdict),
+    )
+    assert decision.accepted
+    assert state.closure_targets["arbiter-proof-target"].status == "closed"
+    assert len(state.closure_terminal_records) == 1
+    assert next(iter(state.closure_terminal_records.values())).terminal_kind == "passed"
+    assert state.remediation_work_records == before_remediation == {}
+
+    verdict_artifacts = [
+        artifact
+        for artifact in state.artifacts.values()
+        if str(artifact.schema_id) == "planning.artifacts.verdict"
+    ]
+    assert len(verdict_artifacts) == 1
+    assert len(state.artifacts) == 1
+    assert canonical_authority_mapping_bytes(
+        cast(Mapping[str, AuthorityValue], verdict_artifacts[0].payload)
+    ) == canonical_authority_mapping_bytes(
+        cast(Mapping[str, AuthorityValue], verdict)
+    )
+    stored_observations = cast(
+        tuple[Mapping[str, AuthorityValue], ...],
+        verdict_artifacts[0].payload["observations"],
+    )
+    assert len(stored_observations) == 1
+    assert canonical_authority_mapping_bytes(stored_observations[0]) == (
+        canonical_authority_mapping_bytes(UNRELATED_ARBITER_OBSERVATION)
+    )
+    assert all(
+        artifact.payload.get("observations") != [UNRELATED_ARBITER_OBSERVATION]
+        for artifact in state.artifacts.values()
+        if artifact.artifact_id != verdict_artifacts[0].artifact_id
+    )
+
+
+@pytest.mark.parametrize("workflow_id", ARBITER_WORKFLOW_IDS)
+def test_selected_arbiter_boundary_uses_actual_millforge_serializer(
+    workflow_id: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = _selected_workflow_plan(tmp_path, workflow_id)
+    _state, fingerprint, behavior, stage, closure_payload, astral_body = (
+        _arbiter_boundary_fixture(plan, target_bytes=16384)
+    )
+    harness = _arbiter_millforge_dispatch(
+        plan,
+        closure_payload=closure_payload,
+        workspace_root=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    assert harness.fingerprint == fingerprint
+    assert harness.behavior.request_payload_byte_limit == 16384
+    assert tuple(str(asset_id) for asset_id in stage.asset_ids) == (
+        "planning.entrypoints.lad_arbiter",
+        "planning.skills.arbiter_core",
+    )
+    assert set(harness.selected_asset_material) == {
+        "planning.entrypoints.lad_arbiter",
+        "planning.skills.arbiter_core",
+    }
+    from millrace.adapters.runner_contract import AdapterSuccessResult, StartedSession
+
+    started = harness.adapter.start_session(harness.request)
+    assert isinstance(started, StartedSession), (
+        getattr(started, "adapter_error", None),
+        getattr(getattr(started, "adapter_error", None), "diagnostics", None),
+    )
+    deadline = time.monotonic() + 2
+    outcome = None
+    while outcome is None and time.monotonic() < deadline:
+        outcome = started.handle.poll_completion()
+        if outcome is None:
+            time.sleep(0.001)
+    assert isinstance(outcome, AdapterSuccessResult)
+    assert harness.facade.calls == 1
+    assert len(harness.facade.instructions) == 1
+    assert len(harness.facade.requests) == 1
+    instruction = harness.facade.instructions[0]
+    assert len(instruction.encode("utf-8")) < 65536
+    assert "\\ud800\\udc00" in instruction
+    decoded_instruction = cast(dict[str, object], json.loads(instruction))
+    assert (
+        decoded_instruction["entrypoint_asset_id"]
+        == "planning.entrypoints.lad_arbiter"
+    )
+    assert decoded_instruction["skill_asset_ids"] == ["planning.skills.arbiter_core"]
+    assert decoded_instruction["selected_asset_material"] == (
+        harness.selected_asset_material
+    )
+    assert decoded_instruction["work_item_payload"]
+    assert astral_body in cast(
+        str,
+        decoded_instruction["work_item_payload"]["closure_evidence_snapshot"][
+            "root_contract"
+        ]["payload"]["body"],
+    )
+
+    over_state, over_fingerprint, over_behavior, over_root_id = _arbiter_root_state(
+        plan,
+        body=astral_body + "x",
+    )
+    over_plan_ref = over_state.default_plan_ref
+    assert over_plan_ref is not None
+    over_decision = decide(
+        over_state,
+        EvaluateCompletionBehavior(
+            "evaluate-arbiter-overflow",
+            selected_plan_ref=over_plan_ref,
+            completion_behavior_id=str(over_behavior.id),
+            closure_target_id="arbiter-proof-target",
+        ),
+        deterministic_context(
+            transition_id="transition-evaluate-arbiter-overflow",
+            work_item_id="work-arbiter-overflow",
+            activation_id="activation-arbiter-overflow",
+        ),
+    )
+    assert over_fingerprint == fingerprint
+    assert over_root_id in over_state.work_items
+    assert not over_decision.accepted
+    assert over_decision.refusal is not None
+    assert over_decision.refusal.reason == "closure_request_payload_limit_exceeded"
+    assert harness.facade.calls == 1
 
 
 def test_recon_proof_does_not_restate_package_authority() -> None:
@@ -604,12 +2004,11 @@ def test_planning_lad_compiles_packaged_selected_authority() -> None:
         "generated_task",
         "generated_spec",
         "planner_disposition",
-        "task_cards",
-        "incident_report",
-        "report",
-        "rubric",
-        "verdict",
-    }
+            "task_cards",
+            "incident_report",
+            "report",
+            "verdict",
+        }
     planning_stages = {
         "recon",
         "lad_planner",
@@ -931,6 +2330,226 @@ def test_planning_lad_closure_and_remediation_authority_is_exact() -> None:
         "closure_target_and_source_artifact",
         "refuse",
     )
+
+
+@pytest.mark.parametrize("workflow_id", ARBITER_WORKFLOW_IDS)
+def test_arbiter_selected_authority_is_one_strict_verdict_contract(
+    workflow_id: str,
+    tmp_path: Path,
+) -> None:
+    plan = _selected_workflow_plan(tmp_path, workflow_id)
+    stage, binding, behavior, outcomes, actions = _arbiter_authority(plan)
+    verdict_schema = next(
+        schema
+        for schema in plan.artifact_schemas
+        if str(schema.id) == "planning.artifacts.verdict"
+    )
+    stage_schema_ids = tuple(str(schema_id) for schema_id in stage.artifact_schema_ids)
+    stage_output_queue_ids = tuple(
+        str(queue_id) for queue_id in stage.output_queue_family_ids
+    )
+    assert stage_schema_ids == ("planning.artifacts.verdict",)
+    assert stage_output_queue_ids == ("verdict",)
+    assert "planning.artifacts.incident_report" in {
+        str(schema.id) for schema in plan.artifact_schemas
+    }
+    assert "planning.artifacts.rubric" not in {
+        str(schema.id) for schema in plan.artifact_schemas
+    }
+    assert "rubric" not in {str(queue.id) for queue in plan.queue_families}
+
+    expected_top_level = {
+        "artifact_kind",
+        "summary",
+        "closure_target_id",
+        "root_contract_digest",
+        "freshness_anchor_digest",
+        "rubric",
+        "criterion_results",
+        "observations",
+        "remediation_guidance",
+        "confidence",
+        "residual_uncertainty",
+    }
+    properties = verdict_schema.schema["properties"]
+    assert isinstance(properties, Mapping)
+    assert set(properties) == expected_top_level
+    assert set(verdict_schema.schema["required"]) == expected_top_level
+    assert validate_schema(verdict_schema.schema, _closure_verdict_payload()).accepted
+
+    invalid_nested = deepcopy(_closure_verdict_payload())
+    invalid_nested["rubric"]["criteria"][0]["extra"] = "undeclared"
+    assert not validate_schema(verdict_schema.schema, invalid_nested).accepted
+
+    duplicate_criteria = deepcopy(_closure_verdict_payload())
+    duplicate_criteria["rubric"]["criteria"].append(
+        duplicate_criteria["rubric"]["criteria"][0].copy()
+    )
+    assert not validate_schema(verdict_schema.schema, duplicate_criteria).accepted
+
+    actions_by_marker = {
+        str(outcome.marker): actions[str(outcome.id)]
+        for outcome in outcomes.values()
+    }
+    assert set(actions_by_marker) == {
+        "ARBITER_COMPLETE",
+        "REMEDIATION_NEEDED",
+        "BLOCKED",
+    }
+    assert {
+        marker: str(action.artifact_schema_id)
+        for marker, action in actions_by_marker.items()
+    } == {
+        "ARBITER_COMPLETE": "planning.artifacts.verdict",
+        "REMEDIATION_NEEDED": "planning.artifacts.verdict",
+        "BLOCKED": "planning.artifacts.verdict",
+    }
+    assert (
+        tuple(str(schema_id) for schema_id in behavior.evidence_artifact_schema_ids)
+        == EXPECTED_CLOSURE_EVIDENCE_SCHEMA_IDS[workflow_id]
+    )
+    assert behavior.evidence_item_limit == (64 if workflow_id == "planning.lad" else 96)
+    assert behavior.request_payload_byte_limit == 16384
+    assert binding.component_pin is not None
+    assert binding.component_pin.max_work_item_payload_bytes == 16384
+
+
+@pytest.mark.parametrize("workflow_id", ARBITER_WORKFLOW_IDS)
+def test_arbiter_completion_schema_mutation_is_refused_by_compiler(
+    workflow_id: str,
+) -> None:
+    source = conformance.packaged_workflow_source(PACKAGE_ROOT, workflow_id)
+    schema_record = _record(
+        source,
+        "artifact_schemas",
+        "planning.artifacts.verdict",
+    )
+    schema = cast(Record, schema_record["schema"])
+    properties = cast(dict[str, object], schema["properties"])
+    summary = cast(Record, properties["summary"])
+    summary["min_length"] = 2
+
+    result = compile_workflow(source)
+
+    assert result.plan is None
+    diagnostic = _error(
+        result,
+        "invalid_completion_behavior_declaration",
+        "completion_behaviors[0].verdict_artifact_schema_id",
+    )
+    assert diagnostic.context["reason"] == "invalid_verdict_artifact_schema"
+
+
+@pytest.mark.parametrize("workflow_id", ARBITER_WORKFLOW_IDS)
+def test_arbiter_assets_require_frozen_rubric_fresh_provenance_and_runtime_aftermath(
+    workflow_id: str,
+) -> None:
+    root = PACKAGE_ROOT / "assets/workflows/planning.lad"
+    entrypoint = (root / "entrypoints/lad_arbiter.md").read_text()
+    core = (root / "skills/arbiter-core.md").read_text()
+    text = (entrypoint + "\n" + core).lower()
+
+    for required in (
+        "implementation source/tests are read-only",
+        "qa does not fix code or tests",
+        "qa does not format, refactor, clean up, upgrade dependencies, edit docs",
+        "qa does not route work, mutate queues, close targets, retry work",
+        "optional skills cannot expand acceptance scope",
+        "every blocking finding cites frozen criterion ids",
+        "new observations remain non-blocking",
+        "terminal markers are evidence candidates whose aftermath is runtime-owned",
+        "current unrestricted runner capabilities do not grant the qa role permission",
+        "expanded review is bounded and inline",
+        "fresh or revalidated",
+        "historical context",
+        "one exact selected verdict artifact",
+    ):
+        assert required in text
+
+    assert "marathon-qa-audit" not in text
+
+    ordered_steps = (
+        "read closure target, root contract, and trusted digests",
+        "read " + chr(96) + "prior_verdict" + chr(96) + " before current evidence",
+        "on first evaluation, derive the rubric solely from the root contract",
+        "on later evaluations, copy the prior rubric exactly",
+        "inspect the fresh evidence list and current repository state",
+        "label every criterion result with its provenance",
+        "use old evidence only as historical context unless explicitly revalidated",
+        "return one exact selected verdict artifact and one legal marker",
+    )
+    positions = [text.find(step) for step in ordered_steps]
+    assert all(position >= 0 for position in positions)
+    assert positions == sorted(positions)
+
+    assert "runtime continues" in text
+    assert "canonical remediation work" in text
+    assert "incident/task/spec/probe/learning queue files" in text
+
+
+def test_arbiter_entrypoint_has_selected_public_authoring_sections() -> None:
+    entrypoint = (
+        PACKAGE_ROOT
+        / "assets/workflows/planning.lad/entrypoints/lad_arbiter.md"
+    ).read_text()
+    assert all(
+        heading in entrypoint
+        for heading in (
+            "## Inputs from dispatch",
+            "## Readable assets",
+            "## Writable artifacts",
+            "## Required evidence",
+            "## Legal terminal markers rendered by runtime",
+            "## Forbidden claims",
+        )
+    )
+
+
+def test_arbiter_assets_allow_null_prior_verdict_only_on_first_evaluation() -> None:
+    root = PACKAGE_ROOT / "assets/workflows/planning.lad"
+    expected = (
+        "A first evaluation legally receives `prior_verdict: null` and creates "
+        "the rubric from `root_contract`. Only a later evaluation is blocked "
+        "when its required prior verdict or freshness anchor is absent or "
+        "contradictory."
+    )
+    for asset in (
+        root / "entrypoints/lad_arbiter.md",
+        root / "skills/arbiter-core.md",
+    ):
+        assert expected in asset.read_text()
+
+
+def test_arbiter_core_validation_examples_are_parseable_and_schema_valid_or_invalid(
+) -> None:
+    source = conformance.packaged_workflow_source(PACKAGE_ROOT, "planning.lad")
+    verdict_schema = cast(
+        dict[str, object],
+        _record(source, "artifact_schemas", "planning.artifacts.verdict")["schema"],
+    )
+    core = (
+        PACKAGE_ROOT / "assets/workflows/planning.lad/skills/arbiter-core.md"
+    ).read_text()
+    examples = _arbiter_json_examples(core)
+    assert set(examples) == {
+        "Valid JSON example",
+        "Invalid JSON example: extra field",
+        "Invalid JSON example: missing required field",
+        "Invalid JSON example: wrong type",
+    }
+    assert validate_schema(verdict_schema, examples["Valid JSON example"]).accepted
+    assert not validate_schema(
+        verdict_schema,
+        examples["Invalid JSON example: extra field"],
+    ).accepted
+    assert not validate_schema(
+        verdict_schema,
+        examples["Invalid JSON example: missing required field"],
+    ).accepted
+    assert not validate_schema(
+        verdict_schema,
+        examples["Invalid JSON example: wrong type"],
+    ).accepted
 
 
 @pytest.mark.parametrize(

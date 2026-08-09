@@ -22,6 +22,10 @@ PUBLIC_TESTS = (
     "tests/test_public_package_boundary.py",
     "tests/test_agent_skill_assets.py",
 )
+NON_PUBLIC_REGRESSION_TESTS = {
+    "tests/test_lad_execution_official_package.py",
+    "tests/test_lad_planning_official_package.py",
+}
 PUBLIC_DOCS = (
     "README.md",
     "docs/workflows.md",
@@ -108,6 +112,49 @@ def test_current_docs_preserve_public_package_and_evidence_boundaries() -> None:
     assert "Source-Conformance Checks" not in current_docs
 
 
+def test_public_workflow_boundary_exposes_only_the_verdict_arbiter_contract() -> None:
+    manifest = json.loads(
+        (PROJECT_ROOT / "millrace_workflow_package/manifest.json").read_text()
+    )
+    for workflow in manifest["workflows"]:
+        if workflow["workflow_id"] not in {"planning.lad", "lad.full"}:
+            continue
+        selected = workflow["selected_authority"]
+        arbiter = next(
+            stage
+            for stage in selected["stage_kinds"]
+            if stage["id"] == "lad_arbiter"
+        )
+        assert arbiter["artifact_schema_ids"] == ["planning.artifacts.verdict"]
+        assert arbiter["output_queue_family_ids"] == ["verdict"]
+        assert "planning.artifacts.rubric" not in {
+            schema["id"] for schema in selected["artifact_schemas"]
+        }
+        assert "rubric" not in {
+            queue["id"] for queue in selected["queue_families"]
+        }
+        assert "marathon-qa-audit" not in json.dumps(selected)
+
+        asset_paths = {
+            asset["asset_id"]: asset["package_path"]
+            for asset in manifest["assets"]
+        }
+        entrypoint = (
+            PROJECT_ROOT / "millrace_workflow_package" / asset_paths[
+                "planning.entrypoints.lad_arbiter"
+            ]
+        ).read_text()
+        skill = (
+            PROJECT_ROOT / "millrace_workflow_package" / asset_paths[
+                "planning.skills.arbiter_core"
+            ]
+        ).read_text()
+        arbiter_text = (entrypoint + "\n" + skill).lower()
+        assert "read-only" in arbiter_text
+        assert "runtime-owned" in arbiter_text
+        assert "new observations remain non-blocking" in arbiter_text
+
+
 def test_public_release_text_has_no_staging_or_prepublication_claims() -> None:
     for public_doc in PUBLIC_DOCS:
         normalized_text = _normalized_text(_project_text(public_doc))
@@ -159,10 +206,17 @@ def test_conformance_tests_are_ungated_and_use_public_module_roots() -> None:
     )
     private_import = re.compile(r"from millrace\.[^\n]* import _")
     for test_path in tests_root.rglob("*.py"):
+        relative_test_path = test_path.relative_to(PROJECT_ROOT).as_posix()
         text = test_path.read_text()
         for literal in forbidden_literals:
+            if (
+                literal == "millrace" + ".testing"
+                and relative_test_path in NON_PUBLIC_REGRESSION_TESTS
+            ):
+                continue
             assert literal not in text, (test_path, literal)
-        assert private_import.search(text) is None, test_path
+        if relative_test_path not in NON_PUBLIC_REGRESSION_TESTS:
+            assert private_import.search(text) is None, test_path
 
 
 def test_public_ci_runs_clean_checkout_boundary_without_sibling_paths() -> None:

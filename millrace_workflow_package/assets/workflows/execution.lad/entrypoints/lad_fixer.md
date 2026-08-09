@@ -18,6 +18,11 @@ Readable assets:
 - `execution.skills.fixer_core`.
 - Selected workflow context, artifact schemas, legal markers, and package asset pins named in dispatch.
 
+QA context handoff:
+- Read the exact `qa_context` carrier, the accepted Checker baseline, and the current Fixer or Doublechecker evidence.
+- Repair only the received fix contract. Preserve every `qa_context` field unchanged in the route to Doublechecker.
+- Return the repair result as `fixer_evidence`; it is evidence for re-validation, not a replacement baseline.
+
 Writable artifacts:
 - execution.artifacts.stage_result
 - execution.artifacts.report

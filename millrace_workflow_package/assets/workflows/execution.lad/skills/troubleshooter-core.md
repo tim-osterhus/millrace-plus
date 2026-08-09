@@ -77,6 +77,10 @@ next_stage_context:
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
+## QA Context Handoff
+
+Troubleshooter preserves the received `qa_context` byte-for-byte. Every dynamic return target receives the same task contract, trusted digest, and Checker baseline; the selected route may add `troubleshooter_evidence` but may not replace the carrier or recover it implicitly from lineage.
+
 ## Completion Criteria
 
 The Troubleshooter stage is complete only when it returns one selected artifact or evidence envelope, supporting evidence, assumptions, and one legal terminal marker.

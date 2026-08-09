@@ -7,6 +7,8 @@ from hashlib import sha256
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
@@ -42,6 +44,116 @@ _PACKAGE_PROVENANCE_FIELDS = frozenset(
 )
 _MANIFEST_DIGEST_DOMAIN_BYTES = b"millrace.wpkg.manifest.v1\0"
 _ASSET_DIGEST_DOMAIN_BYTES = b"millrace.wpkg.asset.v1\0"
+
+
+def _expected_closure_verdict_schema() -> dict[str, object]:
+    string = {"min_length": 1, "type": "string"}
+    criterion = {
+        "properties": {
+            "criterion_id": string,
+            "requirement": string,
+            "evidence_rule": string,
+        },
+        "required": ["criterion_id", "requirement", "evidence_rule"],
+        "type": "object",
+    }
+    evidence_ref = {
+        "properties": {"evidence_id": string, "summary": string},
+        "required": ["evidence_id", "summary"],
+        "type": "object",
+    }
+    criterion_result = {
+        "properties": {
+            "criterion_id": string,
+            "status": {"enum": ["passed", "failed", "blocked"]},
+            "provenance": {
+                "enum": [
+                    "fresh",
+                    "revalidated",
+                    "historical_only",
+                    "missing",
+                ]
+            },
+            "evidence_refs": {
+                "items": evidence_ref,
+                "type": "array",
+                "unique_by": "evidence_id",
+            },
+        },
+        "required": [
+            "criterion_id",
+            "status",
+            "provenance",
+            "evidence_refs",
+        ],
+        "type": "object",
+    }
+    observation = {
+        "properties": {"observation_id": string, "summary": string},
+        "required": ["observation_id", "summary"],
+        "type": "object",
+    }
+    guidance_ref = {
+        "properties": {"criterion_id": string},
+        "required": ["criterion_id"],
+        "type": "object",
+    }
+    guidance = {
+        "properties": {
+            "guidance_id": string,
+            "summary": string,
+            "criterion_refs": {
+                "items": guidance_ref,
+                "min_items": 1,
+                "type": "array",
+                "unique_by": "criterion_id",
+            },
+        },
+        "required": ["guidance_id", "summary", "criterion_refs"],
+        "type": "object",
+    }
+    properties = {
+        "artifact_kind": string,
+        "summary": string,
+        "closure_target_id": string,
+        "root_contract_digest": string,
+        "freshness_anchor_digest": string,
+        "rubric": {
+            "properties": {
+                "criteria": {
+                    "items": criterion,
+                    "min_items": 1,
+                    "type": "array",
+                    "unique_by": "criterion_id",
+                }
+            },
+            "required": ["criteria"],
+            "type": "object",
+        },
+        "criterion_results": {
+            "items": criterion_result,
+            "min_items": 1,
+            "type": "array",
+            "unique_by": "criterion_id",
+        },
+        "observations": {
+            "items": observation,
+            "type": "array",
+            "unique_by": "observation_id",
+        },
+        "remediation_guidance": {
+            "items": guidance,
+            "type": "array",
+            "unique_by": "guidance_id",
+        },
+        "confidence": {"enum": ["high", "medium", "low"]},
+        "residual_uncertainty": string,
+    }
+    return {
+        "properties": properties,
+        "required": list(properties),
+        "type": "object",
+    }
 
 
 def _load_manifest() -> dict[str, Any]:
@@ -256,6 +368,97 @@ def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
         for required_asset in workflow["required_assets"]:
             asset_id = str(required_asset["asset_id"])
             assert required_asset["content_digest"] == asset_digests[asset_id]
+
+
+@pytest.mark.parametrize("workflow_id", ("planning.lad", "lad.full"))
+def test_selected_arbiter_authority_is_exact_in_both_workflow_manifests(
+    workflow_id: str,
+) -> None:
+    manifest = _load_manifest()
+    workflow = next(
+        workflow
+        for workflow in _workflows(manifest)
+        if workflow["workflow_id"] == workflow_id
+    )
+    selected = workflow["selected_authority"]
+    schemas = selected["artifact_schemas"]
+    schema_ids = {str(schema["id"]) for schema in schemas}
+    verdict = next(
+        schema for schema in schemas if schema["id"] == "planning.artifacts.verdict"
+    )
+    arbiter = next(
+        stage
+        for stage in selected["stage_kinds"]
+        if stage["id"] == "lad_arbiter"
+    )
+    behavior = selected["completion_behaviors"][0]
+    runner = next(
+        binding
+        for binding in selected["runner_bindings"]
+        if binding["id"] == "lad_arbiter.millforge_runner"
+    )
+    actions = {
+        action["id"]: action
+        for action in selected["terminal_actions"]
+        if action.get("stage_kind_id") == "lad_arbiter"
+    }
+    outcomes = {
+        outcome["id"]: outcome
+        for outcome in selected["terminal_outcomes"]
+        if outcome.get("stage_kind_id") == "lad_arbiter"
+    }
+
+    assert verdict["schema"] == _expected_closure_verdict_schema()
+
+    assert "planning.artifacts.rubric" not in schema_ids
+    assert "rubric" not in {
+        str(queue["id"]) for queue in selected["queue_families"]
+    }
+    assert arbiter["artifact_schema_ids"] == ["planning.artifacts.verdict"]
+    assert arbiter["output_queue_family_ids"] == ["verdict"]
+    assert "planning.artifacts.incident_report" in schema_ids
+    assert behavior["evidence_item_limit"] == (
+        64 if workflow_id == "planning.lad" else 96
+    )
+    assert behavior["evidence_artifact_schema_ids"] == (
+        [
+            "planning.artifacts.task_cards",
+            "planning.artifacts.report",
+            "planning.artifacts.incident_report",
+            "execution.artifacts.checker_result",
+            "execution.artifacts.doublecheck_result",
+            "execution.artifacts.report",
+            "execution.artifacts.incident_report",
+        ]
+        if workflow_id == "planning.lad"
+        else [
+            "planning.artifacts.task_cards",
+            "planning.artifacts.report",
+            "planning.artifacts.incident_report",
+            "execution.artifacts.checker_result",
+            "execution.artifacts.doublecheck_result",
+            "execution.artifacts.report",
+            "execution.artifacts.incident_report",
+            "learning.artifacts.curator_decision",
+            "learning.artifacts.skill_install_report",
+            "learning.artifacts.skill_disposition",
+            "learning.artifacts.report",
+        ]
+    )
+    assert behavior["request_payload_byte_limit"] == 16384
+    assert runner["component_pin"]["max_work_item_payload_bytes"] == 16384
+    assert {
+        outcomes[action["outcome_id"]]["marker"]: action["artifact_schema_id"]
+        for action in actions.values()
+    } == {
+        "ARBITER_COMPLETE": "planning.artifacts.verdict",
+        "REMEDIATION_NEEDED": "planning.artifacts.verdict",
+        "BLOCKED": "planning.artifacts.verdict",
+    }
+    assert "marathon-qa-audit" not in json.dumps(
+        workflow["selected_authority"],
+        sort_keys=True,
+    )
 
 
 def test_public_workflow_package_declares_expected_workflows_only() -> None:

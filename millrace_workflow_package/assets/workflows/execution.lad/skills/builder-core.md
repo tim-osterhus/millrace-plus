@@ -84,6 +84,10 @@ next_stage_context:
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
+## QA Context Handoff
+
+Builder accepts either the direct initial task payload or the normalized re-entry form. When `qa_context` is present, preserve its exact `task_contract`, `task_contract_digest`, `checker_baseline`, and `checker_baseline_digest` values. The route projection carries Builder output as `implementation_evidence`; Builder does not recover missing context through lineage lookup.
+
 ## Completion Criteria
 
 The Builder stage is complete only when it returns one selected artifact or evidence envelope, supporting evidence, assumptions, and one legal terminal marker.

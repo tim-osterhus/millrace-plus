@@ -77,6 +77,10 @@ next_stage_context:
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
+## QA Context Handoff
+
+Updater receives `qa_context` and preserves all four carrier fields unchanged. Its own result is an `updater_evidence` field only; it does not rewrite the Checker baseline, task digest, queues, or runtime aftermath.
+
 ## Completion Criteria
 
 The Updater stage is complete only when it returns one selected artifact or evidence envelope, supporting evidence, assumptions, and one legal terminal marker.

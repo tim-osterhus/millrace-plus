@@ -51,6 +51,11 @@ closure. The resulting tasks move into the same LAD Execution stages used by
 the execution-only configurations. Failed closure checks can create explicit
 remediation work rather than silently reopening completed work.
 
+The accepted Checker artifact is the immutable execution baseline. The accepted
+Arbiter verdict carries the reusable rubric for the closure target. Later
+evaluations use bounded post-anchor evidence. Observations do not promote work
+automatically from outside the active baseline or rubric.
+
 ## `lad.full`
 
 Full LAD adds a Learning plane to Planning and Execution. Learning stages can

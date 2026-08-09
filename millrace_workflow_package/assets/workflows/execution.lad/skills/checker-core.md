@@ -7,83 +7,135 @@ description: Use when executing the Checker stage for a selected Millrace execut
 
 ## Artifact Schema
 
-Produce one selected artifact declared for the active stage. The selected dispatch context decides which schema is legal for the current run.
+For every normal Checker marker, return exactly one `execution.artifacts.checker_result`.
+The selected schema is strict: undeclared properties and duplicate IDs are invalid.
 
-`execution.artifacts.stage_result`
+Required top-level fields:
 
-| Field | Required | Type | Meaning |
-| --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `execution.artifacts.stage_result`. |
-| `summary` | yes | string | QA result or fix-needed summary. |
+- `artifact_kind`: constant `execution.artifacts.checker_result`.
+- `summary`: non-empty string.
+- `task_contract_digest`: non-empty trusted digest from `qa_context`.
+- `criteria`: non-empty objects with `criterion_id`, `requirement`, and `evidence_rule`; unique by `criterion_id`.
+- `findings`: objects with `finding_id`, `observed_gap`, `impact`, `repair_surface`, non-empty `criterion_refs` unique by `criterion_id`, and non-empty `post_fix_check_refs` unique by `check_id`; unique by `finding_id`.
+- `observations`: objects with `observation_id` and `summary`; unique by `observation_id`.
+- `checks`: objects with `check_id`, `command_or_method`, and `result` equal to `passed`, `failed`, or `unavailable`; unique by `check_id`.
 
-`execution.artifacts.report`
+Every ID and narrative is non-empty. Each reference object contains only its named ID. Do not claim or write `execution.artifacts.integration_report`; Integrator evidence may be read but is read-only.
 
-| Field | Required | Type | Meaning |
-| --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `execution.artifacts.report`. |
-| `summary` | yes | string | Validation evidence summary. |
+## QA Context and Marker Rules
 
-`execution.artifacts.integration_report`
-
-| Field | Required | Type | Meaning |
-| --- | --- | --- | --- |
-| `artifact_kind` | yes | string | Must be `execution.artifacts.integration_report`. |
-| `summary` | yes | string | Integrator evidence considered when selected. |
-
-Evidence and assumptions belong in the runner evidence envelope unless the selected schema explicitly includes them.
-
-## Handoff Format
+Read the complete `qa_context` carrier:
 
 ```text
-artifact_id:
-artifact_kind:
-produced_by_stage: lad_checker
-source_work_item_id:
-source_run_id:
-terminal_marker:
-summary:
-fields:
-evidence:
-assumptions:
-next_stage_context:
+qa_context:
+  task_contract
+  task_contract_digest
+  checker_baseline
+  checker_baseline_digest
 ```
 
-## Valid Example
+On the first accepted normal Checker result, fill the two null baseline fields with this exact Checker payload and its runtime-projected artifact digest. On later activations, preserve both existing values exactly. The baseline is the accepted Checker result, not a separate expectations file.
 
-```text
-artifact_id: lad_checker-result-1
-artifact_kind: execution.artifacts.stage_result
-produced_by_stage: lad_checker
-source_work_item_id: work-1
-source_run_id: run-1
-terminal_marker: CHECKER_PASS
-summary: Expectations were written first; named checks passed with evidence.
-fields:
-  artifact_kind: execution.artifacts.stage_result
-  summary: Expectations were written first; named checks passed with evidence.
-evidence:
-  - Dispatch input and selected schema were checked.
-assumptions: []
-next_stage_context:
-  selected_context_only: true
-```
+- `CHECKER_PASS`: `findings` is empty and criterion evidence supports pass.
+- `FIX_NEEDED`: at least one criterion-linked finding exists.
+- `BLOCKED`: required task or baseline evidence is contradictory or unavailable.
+- Unrelated observations never determine the marker and never become fix criteria.
 
-## Invalid Examples
+Every blocking finding cites frozen criterion IDs. Expanded review is bounded and inline: use it only when the task or dispatch requires it or narrow evidence cannot support an honest judgment; supplementary observations do not change the baseline.
 
-- Missing `artifact_kind`: invalid because the selected artifact schema cannot be verified.
-- Unsupported marker: invalid because the marker is not declared for this selected stage.
-- Passes the task without expectations or reproducible validation evidence.
-- Runtime claim in artifact text: invalid because selected workflow data defines aftermath.
+Checker is observation-only with respect to runtime aftermath. Do not fix source/tests, mutate Git or queues, route work, close targets, retry work, approve effects, grant capabilities, or create canonical follow-up work. Current unrestricted runner capabilities do not grant this QA role permission to implement changes. Terminal markers are evidence candidates whose aftermath is runtime-owned.
 
 ## Validation Checklist
 
-- Required fields for the selected artifact schema are present.
-- Evidence supports the summary and marker choice.
-- Assumptions and missing data are explicit.
-- Terminal marker is legal for `lad_checker` in the selected workflow.
-- Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
-- Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
+- [ ] Read `qa_context` before implementation evidence and preserve its accepted baseline on re-entry.
+- [ ] Return every required field with non-empty IDs/narratives and unique criterion, finding, observation, and check IDs.
+- [ ] Link every finding to frozen criteria and post-fix checks; keep supplementary observations non-blocking.
+- [ ] Validate the exact selected schema and return one legal marker with one result artifact.
+- [ ] Refuse undeclared properties, missing required fields, wrong types, duplicate IDs, and invented Integrator ownership.
+
+## Parseable JSON Examples
+
+## Valid Example
+
+```json
+{
+  "artifact_kind": "execution.artifacts.checker_result",
+  "summary": "The frozen criteria were checked with reproducible evidence.",
+  "task_contract_digest": "sha256:trusted-task",
+  "criteria": [
+    {
+      "criterion_id": "criterion-1",
+      "requirement": "The requested behavior is present.",
+      "evidence_rule": "Run the named test command."
+    }
+  ],
+  "findings": [],
+  "observations": [
+    {
+      "observation_id": "observation-1",
+      "summary": "An unrelated note was recorded without changing the marker."
+    }
+  ],
+  "checks": [
+    {
+      "check_id": "check-1",
+      "command_or_method": "pytest -q",
+      "result": "passed"
+    }
+  ]
+}
+```
+
+The invalid examples below are refusal cases, not templates to emit.
+
+### Invalid: extra property
+
+```json
+{
+  "artifact_kind": "execution.artifacts.checker_result",
+  "summary": "The frozen criteria were checked with reproducible evidence.",
+  "task_contract_digest": "sha256:trusted-task",
+  "criteria": [
+    {
+      "criterion_id": "criterion-1",
+      "requirement": "The requested behavior is present.",
+      "evidence_rule": "Run the named test command.",
+      "extra": true
+    }
+  ],
+  "findings": [],
+  "observations": [],
+  "checks": []
+}
+```
+
+### Invalid: missing required field
+
+```json
+{
+  "artifact_kind": "execution.artifacts.checker_result",
+  "summary": "The frozen criteria were checked with reproducible evidence.",
+  "task_contract_digest": "sha256:trusted-task",
+  "findings": [],
+  "observations": [],
+  "checks": []
+}
+```
+
+### Invalid: wrong type
+
+```json
+{
+  "artifact_kind": "execution.artifacts.checker_result",
+  "summary": "The frozen criteria were checked with reproducible evidence.",
+  "task_contract_digest": "sha256:trusted-task",
+  "criteria": {},
+  "findings": [],
+  "observations": [],
+  "checks": []
+}
+```
 
 ## Completion Criteria
 
-The Checker stage is complete only when it returns one selected artifact or evidence envelope, supporting evidence, assumptions, and one legal terminal marker.
+The Checker stage is complete only when it returns one strict typed Checker result, exact criterion-linked evidence, assumptions or unavailable evidence, and one legal marker. It must not select `execution.artifacts.stage_result` except through the named runtime-failure-exhausted action.

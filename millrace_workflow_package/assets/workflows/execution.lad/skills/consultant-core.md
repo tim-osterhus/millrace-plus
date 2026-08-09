@@ -84,6 +84,10 @@ next_stage_context:
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
+## QA Context Handoff
+
+Consultant preserves `qa_context` unchanged when a recorded source is resumed. Its route may add `consultant_evidence`, but Consultant does not replace the task contract or Checker baseline, mutate queues, or author canonical follow-up work.
+
 ## Completion Criteria
 
 The Consultant stage is complete only when it returns one selected artifact or evidence envelope, supporting evidence, assumptions, and one legal terminal marker.

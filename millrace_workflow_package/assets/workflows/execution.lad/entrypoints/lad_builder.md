@@ -18,6 +18,11 @@ Readable assets:
 - `execution.skills.builder_core`.
 - Selected workflow context, artifact schemas, legal markers, and package asset pins named in dispatch.
 
+QA context handoff:
+- The initial external task may be the direct task payload. A re-entry from Troubleshooter is the normalized form containing `qa_context`.
+- Preserve the exact `qa_context` carrier when it is present; do not use implicit lineage lookup to reconstruct it.
+- Return implementation evidence for the selected route without replacing `task_contract`, `task_contract_digest`, `checker_baseline`, or `checker_baseline_digest`.
+
 Writable artifacts:
 - execution.artifacts.stage_result
 - execution.artifacts.report

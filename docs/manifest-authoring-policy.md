@@ -48,100 +48,100 @@ which workflow behavior should be official.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:a5f007d20ac8c820aeab3a1c402d97636687ecf95b7e1cacb4b0153a6a9993f3",
-  "package_digest": "sha256:73e1f562877aa0fb254f81be51847d200f816b8610cdc317e53cd8669351e15c",
+  "manifest_digest": "sha256:abe132bc2a89f5aea650a8907eb07c4db808f10de28c39acf019e8879940e3fc",
+  "package_digest": "sha256:deab1b2e0b4da291416a3acbbf5502b9ddec337cb06d48c28ab7f3726262a48a",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
     "package_version": "0.22.2",
     "package_format_version": "1"
   },
   "selected_workflow_fingerprints": {
-    "execution.lad@0.1": "sha256:58cc3121ec49e4cc02fe05fead721a0561aa14836a3490aad3f2da14a6f7de2f",
-    "execution.lad_integrator@0.1": "sha256:42306959d3a25b19fae14338d73e27360b85cdc48042fb515731e04319b8cda7",
-    "lad.full@0.1": "sha256:bed3c3d4cbfd84bd2f5147d51424403d1f95f7a35b22d558589b69bffcc2c79b",
-    "planning.lad@0.1": "sha256:03ff08d9f31ceb2f6daf369297bde58cb05dc06868fd4cd2f9fc9e47a76c0628",
+    "execution.lad@0.1": "sha256:37fabd7ab3e727e936630a8869e3b7e3361096bf1e4259ef48f73bb6986239b4",
+    "execution.lad_integrator@0.1": "sha256:b3d6686886dd3fedce280520cd94b17dc67fe98f1caaaeb14310a6dbf1b9b3a4",
+    "lad.full@0.1": "sha256:13c7731641f5b2ecc16221e97dbb4b1a49ba10790369293ef659878cb0853397",
+    "planning.lad@0.1": "sha256:96f651c2d12be3cc03234ee4952c1ec2a4b42c418f9615edac45073a432b2c08",
     "simple_loop@0.1": "sha256:67c08c7262531a6bb09f7e01d213ed505e7b12bdf6fdfcd94ddeb5dc53673ab3",
     "vendor_selection@0.1": "sha256:b9dd2604219bf634f8a54644a9368c694c89bb44bac2284b1d498da75a4ae405"
   },
   "asset_pins": [
     {
       "asset_id": "execution.entrypoints.lad_builder",
-      "content_digest": "sha256:19a156cb712c90a0fbb9b05e615888924a18b2f91c56e28c6139ab6f87728d96",
+      "content_digest": "sha256:2ae327cd582353e2510de7dff31ee55eb70f4ffcdfa2d2303db6bd2201b92a8c",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_builder.md"
     },
     {
       "asset_id": "execution.entrypoints.lad_checker",
-      "content_digest": "sha256:3e8e6de621e39777dcf29ec541aec64f0dff49f88a1beb2adda6539458312e2e",
+      "content_digest": "sha256:4444f19a996e9329f2ec0bda4c9b3c61600f29e91d362b05c1777713e2dc369a",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_checker.md"
     },
     {
       "asset_id": "execution.entrypoints.lad_consultant",
-      "content_digest": "sha256:0d0835e20be607f87c0d36dea5efa5590f53fb1fd6925be3e077d7968247944e",
+      "content_digest": "sha256:af500ad1e542b4ad582931a12549c72544ac4709c819931daa7800c4f133952f",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_consultant.md"
     },
     {
       "asset_id": "execution.entrypoints.lad_doublechecker",
-      "content_digest": "sha256:fcc3e335bc80281fabec9a90811cd71de71013aeb38ed7b49a83227f8e08d5b6",
+      "content_digest": "sha256:9af86c634a8159967489118ecba47a965b1685a62180cfa4789c079f196167d0",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_doublechecker.md"
     },
     {
       "asset_id": "execution.entrypoints.lad_fixer",
-      "content_digest": "sha256:b4fda612930a57de459286aa2c4e7bf34668398661609178d026e472bc7ff539",
+      "content_digest": "sha256:9af21092225299aab1ba99311fa3c32933ab9d5c44597a257004b0aed59a9917",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_fixer.md"
     },
     {
       "asset_id": "execution.entrypoints.lad_integrator",
-      "content_digest": "sha256:3a15bed62a92b3f59de7ae951106ffb986b09bb105e146e9980876765872e527",
+      "content_digest": "sha256:4ab997199cf5eacdc6026cda02d5abafe972011dc852ba8a4bae20c5ca13f980",
       "package_path": "assets/workflows/execution.lad_integrator/entrypoints/lad_integrator.md"
     },
     {
       "asset_id": "execution.entrypoints.lad_troubleshooter",
-      "content_digest": "sha256:6323f1c2a0bcc6ed4d3111ff38c1eca3b0415422ad6582559cc5f10b003aa669",
+      "content_digest": "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_troubleshooter.md"
     },
     {
       "asset_id": "execution.entrypoints.lad_updater",
-      "content_digest": "sha256:970e595a57836a50ac4bb283bcc89e2723b529f89182308b4ebc07c72d56ae3e",
+      "content_digest": "sha256:f72aa2b7fe13d6eb78be2aa62184dc67d644e0a7834f0b1fefb6d232ab3f6544",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_updater.md"
     },
     {
       "asset_id": "execution.skills.builder_core",
-      "content_digest": "sha256:f36388c774a90472973eb76ed7d6299ef4bade7e5ea2803a6a888dc214db17b0",
+      "content_digest": "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8",
       "package_path": "assets/workflows/execution.lad/skills/builder-core.md"
     },
     {
       "asset_id": "execution.skills.checker_core",
-      "content_digest": "sha256:980118b3a7a25af854fd4ec3e713339a90e3ad33cb4c88f43da8c4dace32aea7",
+      "content_digest": "sha256:81a4b59af7f82d91951dfa08d5d2d7f6fce548d8f2b370fe7c8dd99d26fc7140",
       "package_path": "assets/workflows/execution.lad/skills/checker-core.md"
     },
     {
       "asset_id": "execution.skills.consultant_core",
-      "content_digest": "sha256:45248383572d967fd7ce82d72fef2e7b66a6ae1873bed1a03164bb40e6f61ac2",
+      "content_digest": "sha256:ac23328c80c9445f5302ebd361b25fded1c4b36fd0bc8e6cebff563e808cfe55",
       "package_path": "assets/workflows/execution.lad/skills/consultant-core.md"
     },
     {
       "asset_id": "execution.skills.doublechecker_core",
-      "content_digest": "sha256:ea3d1e139a619851e23542bdbf5d707259fe0fd0f3b044ac43d0ae47224c1bf5",
+      "content_digest": "sha256:0ce450272d17ca87534064c798a0aa8e63ec69703f91140e356e5b22a49b9026",
       "package_path": "assets/workflows/execution.lad/skills/doublechecker-core.md"
     },
     {
       "asset_id": "execution.skills.fixer_core",
-      "content_digest": "sha256:4d50ae7da3d72a86e199d273ab2177044a93480d1a0fdcd24a50c4f1191cfd44",
+      "content_digest": "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862",
       "package_path": "assets/workflows/execution.lad/skills/fixer-core.md"
     },
     {
       "asset_id": "execution.skills.integrator_core",
-      "content_digest": "sha256:05173905835ee94e2ec6f243d3bbdbd35adb9d0d16bdc9061f9df3d85c491564",
+      "content_digest": "sha256:380105b6251148c888602d73ce4b2da41cabe24d57c8df2a6761ccd4d04e2d91",
       "package_path": "assets/workflows/execution.lad_integrator/skills/integrator-core.md"
     },
     {
       "asset_id": "execution.skills.troubleshooter_core",
-      "content_digest": "sha256:752bae8b7588e765af3856189e593ee748c4088ee37da3f7823988e50f6f1cab",
+      "content_digest": "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188",
       "package_path": "assets/workflows/execution.lad/skills/troubleshooter-core.md"
     },
     {
       "asset_id": "execution.skills.updater_core",
-      "content_digest": "sha256:6a6995fcfd4113100ddfebbe2991e0e5e6e1c14a28ce6fd90348eafba133e37b",
+      "content_digest": "sha256:728998443904834ab25ca2f05da420b7d8b74f738fe506523df91902fefdbee2",
       "package_path": "assets/workflows/execution.lad/skills/updater-core.md"
     },
     {
@@ -186,7 +186,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "planning.entrypoints.lad_arbiter",
-      "content_digest": "sha256:1a71824684a7a9ea1b9799627cc86107e5c6a7dc26b068d424d46983cb2c8844",
+      "content_digest": "sha256:635ce98cd9cfde35aea167cd2708ad146326f8df189a9a05f083af6fae0c5a44",
       "package_path": "assets/workflows/planning.lad/entrypoints/lad_arbiter.md"
     },
     {
@@ -216,7 +216,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "planning.skills.arbiter_core",
-      "content_digest": "sha256:4ad12a01c6ecf72a61627fd00b3bacc43602dd21af5fd2641b8466c667e88109",
+      "content_digest": "sha256:bb1d2a5705db190d441b38090330f024c276cd29956f3dcfb6dd0f420e9ec99f",
       "package_path": "assets/workflows/planning.lad/skills/arbiter-core.md"
     },
     {

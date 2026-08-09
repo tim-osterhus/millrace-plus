@@ -84,6 +84,10 @@ next_stage_context:
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
+## QA Context Handoff
+
+Read the normalized `qa_context` from Builder and preserve its task contract, trusted digest, and any existing Checker baseline exactly. The route to Checker adds `implementation_evidence` and this stage's `integration_evidence`; it must not flatten either artifact over `qa_context` or infer context from lineage.
+
 ## Completion Criteria
 
 The Integrator stage is complete only when it returns one selected artifact or evidence envelope, supporting evidence, assumptions, and one legal terminal marker.

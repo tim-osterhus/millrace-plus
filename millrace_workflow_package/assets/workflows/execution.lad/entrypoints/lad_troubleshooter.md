@@ -18,6 +18,11 @@ Readable assets:
 - `execution.skills.troubleshooter_core`.
 - Selected workflow context, artifact schemas, legal markers, and package asset pins named in dispatch.
 
+QA context handoff:
+- Preserve the exact `qa_context` received from the failed source work item.
+- Dynamic returns to Builder, Checker, Fixer, Doublechecker, or Updater carry that same carrier; do not use implicit lineage lookup.
+- Return diagnosis as `troubleshooter_evidence` without changing the task contract or Checker baseline.
+
 Writable artifacts:
 - execution.artifacts.stage_result
 - execution.artifacts.report

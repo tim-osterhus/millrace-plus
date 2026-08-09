@@ -77,6 +77,10 @@ next_stage_context:
 - Text does not claim route, queue, approval, capability, effect, package, or durable-state behavior by itself.
 - Text includes no API keys, OAuth tokens, local credential paths, provider secrets, or adapter config secrets.
 
+## QA Context Handoff
+
+Fixer receives `qa_context` plus the accepted Checker baseline and the latest criterion-linked repair evidence. Preserve `task_contract`, `task_contract_digest`, `checker_baseline`, and `checker_baseline_digest` exactly. Add only the selected repair result as `fixer_evidence` for Doublechecker; never substitute a Fixer result for the Checker baseline.
+
 ## Completion Criteria
 
 The Fixer stage is complete only when it returns one selected artifact or evidence envelope, supporting evidence, assumptions, and one legal terminal marker.

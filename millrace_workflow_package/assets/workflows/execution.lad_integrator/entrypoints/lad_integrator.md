@@ -18,6 +18,11 @@ Readable assets:
 - `execution.skills.integrator_core`.
 - Selected workflow context, artifact schemas, legal markers, and package asset pins named in dispatch.
 
+QA context handoff:
+- Read the normalized `qa_context` carrier and trusted task-contract digest from Builder.
+- Preserve the carrier byte-for-byte and pass Builder output as `implementation_evidence`.
+- Return the selected Integrator output as `integration_evidence`; Checker may read it but does not own it.
+
 Writable artifacts:
 - execution.artifacts.integration_report
 - execution.artifacts.stage_result

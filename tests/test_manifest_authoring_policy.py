@@ -8,6 +8,8 @@ from hashlib import sha256
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 POLICY_DOC = PROJECT_ROOT / "docs" / "manifest-authoring-policy.md"
@@ -88,7 +90,10 @@ def _selected_package_pin(manifest: dict[str, Any]) -> dict[str, str]:
 
 def _policy_evidence() -> dict[str, Any]:
     assert POLICY_DOC.is_file(), f"missing manifest policy doc: {POLICY_DOC}"
-    match = _EVIDENCE_PATTERN.search(POLICY_DOC.read_text())
+    policy = POLICY_DOC.read_text()
+    assert policy.count("<!-- manifest-freeze-evidence:BEGIN -->") == 1
+    assert policy.count("<!-- manifest-freeze-evidence:END -->") == 1
+    match = _EVIDENCE_PATTERN.search(policy)
     assert match is not None, "missing manifest freeze evidence block"
     evidence = json.loads(match.group("json"))
     assert isinstance(evidence, dict)
@@ -344,8 +349,95 @@ def test_manifest_authoring_policy_declares_frozen_source_of_truth() -> None:
     assert "tests/test_manifest_authoring_policy.py" in public_validation
 
 
+def test_qa_documentation_names_frozen_contract_and_runtime_aftermath() -> None:
+    workflows = " ".join(
+        (PROJECT_ROOT / "docs" / "workflows.md").read_text().lower().split()
+    )
+    authoring = " ".join(
+        (PROJECT_ROOT / "docs" / "authoring.md").read_text().lower().split()
+    )
+
+    for required in (
+        "accepted checker artifact",
+        "immutable execution baseline",
+        "accepted arbiter verdict",
+        "reusable rubric",
+        "post-anchor",
+        "bounded",
+        "observations do not promote work automatically",
+    ):
+        assert required in workflows
+
+    for required in (
+        "frozen task/root contract",
+        "stage artifacts are evidence",
+        "runtime owns remediation",
+        "queue aftermath",
+        "mutable baselines/evidence",
+        "lineage/run authority",
+        "not package assets",
+    ):
+        assert required in authoring
+
+
 def test_manifest_freeze_evidence_matches_current_package_bytes() -> None:
     assert _policy_evidence() == _expected_policy_evidence()
+
+
+@pytest.mark.parametrize("workflow_id", ("planning.lad", "lad.full"))
+def test_manifest_authority_requires_the_selected_arbiter_contract(
+    workflow_id: str,
+) -> None:
+    manifest = _load_manifest()
+    workflow = next(
+        workflow
+        for workflow in _workflows(manifest)
+        if workflow["workflow_id"] == workflow_id
+    )
+    selected = workflow["selected_authority"]
+    arbiter = next(
+        stage
+        for stage in selected["stage_kinds"]
+        if stage["id"] == "lad_arbiter"
+    )
+    behavior = selected["completion_behaviors"][0]
+    runner = next(
+        binding
+        for binding in selected["runner_bindings"]
+        if binding["id"] == "lad_arbiter.millforge_runner"
+    )
+    verdict = next(
+        schema
+        for schema in selected["artifact_schemas"]
+        if schema["id"] == "planning.artifacts.verdict"
+    )
+
+    assert arbiter["artifact_schema_ids"] == ["planning.artifacts.verdict"]
+    assert arbiter["output_queue_family_ids"] == ["verdict"]
+    assert "planning.artifacts.rubric" not in {
+        schema["id"] for schema in selected["artifact_schemas"]
+    }
+    assert "rubric" not in {
+        queue["id"] for queue in selected["queue_families"]
+    }
+    assert behavior["request_payload_byte_limit"] == 16384
+    assert behavior["evidence_item_limit"] == (
+        64 if workflow_id == "planning.lad" else 96
+    )
+    assert runner["component_pin"]["max_work_item_payload_bytes"] == 16384
+    assert set(verdict["schema"]["required"]) == {
+        "artifact_kind",
+        "summary",
+        "closure_target_id",
+        "root_contract_digest",
+        "freshness_anchor_digest",
+        "rubric",
+        "criterion_results",
+        "observations",
+        "remediation_guidance",
+        "confidence",
+        "residual_uncertainty",
+    }
 
 
 def test_manifest_json_uses_canonical_authoring_format() -> None:
