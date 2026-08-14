@@ -20,7 +20,11 @@ from millrace.adapters.runner_contract import (
     RedactionPolicy,
     StartedSession,
 )
-from millrace.compiler import authority_fingerprint, compile_workflow
+from millrace.compiler import (
+    authority_fingerprint,
+    canonical_authority_bytes,
+    compile_workflow,
+)
 from millrace.contracts import SelectedCompiledPlan
 from millrace.contracts.compiled_plan import AuthorityValue, TerminalActionDeclaration
 from millrace.contracts.runner import RunnerDispatchEnvelope
@@ -58,6 +62,111 @@ PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.22.2"
 WORKFLOW_IDS = ("execution.lad", "execution.lad_integrator")
 QA_SCOPE_IDS = (*WORKFLOW_IDS, "planning.lad", "lad.full")
+CODEX_CONTROL_WORKFLOW_ID = "execution.lad_codex_control"
+CODEX_TREATMENT_WORKFLOW_ID = "execution.lad_codex_semantic_worktree"
+CODEX_WORKFLOW_IDS = (
+    CODEX_CONTROL_WORKFLOW_ID,
+    CODEX_TREATMENT_WORKFLOW_ID,
+)
+_CODEX_TREATMENT_ASSET_PREFIX = (
+    "execution.lad_codex_semantic_worktree"
+)
+_CODEX_ROUTER_ASSET_ID = f"{_CODEX_TREATMENT_ASSET_PREFIX}.context_router"
+_CODEX_ENTRYPOINT_ASSET_IDS = {
+    stage: f"{_CODEX_TREATMENT_ASSET_PREFIX}.entrypoints.{stage}"
+    for stage in (
+        "lad_builder",
+        "lad_checker",
+        "lad_fixer",
+        "lad_doublechecker",
+        "lad_updater",
+    )
+}
+_CODEX_UPDATER_SKILL_ASSET_ID = (
+    f"{_CODEX_TREATMENT_ASSET_PREFIX}.skills.updater_core"
+)
+_CODEX_CONTEXT_SCHEMA_ID = "execution.artifacts.context_update_report"
+_CODEX_CONTEXT_BINDING_IDS = {
+    stage: f"{CODEX_TREATMENT_WORKFLOW_ID}.{stage}_context"
+    for stage in (
+        "lad_builder",
+        "lad_checker",
+        "lad_fixer",
+        "lad_doublechecker",
+        "lad_updater",
+    )
+}
+_CODEX_TREATMENT_ACTION_TARGET_STAGES = {
+    "execution.route_builder_complete": "lad_checker",
+    "execution.route_checker_pass": "lad_updater",
+    "execution.route_checker_fix_needed": "lad_fixer",
+    "execution.route_fixer_complete": "lad_doublechecker",
+    "execution.route_doublechecker_pass": "lad_updater",
+    "execution.route_doublechecker_fix_needed": "lad_fixer",
+    "execution.return_troubleshooter_complete": "lad_builder",
+}
+_REFERENCE_LAD_CANONICAL_AUTHORITY_SHA256 = (
+    "59d80b330996a3d27461acb15494fb52ad83d52aa80ea35b73199447c4e2aff4"
+)
+_REFERENCE_LAD_CANONICAL_AUTHORITY_BYTE_LENGTH = 67880
+_REFERENCE_LAD_SELECTED_ASSET_PINS = (
+    (
+        "execution.entrypoints.lad_builder",
+        "sha256:2ae327cd582353e2510de7dff31ee55eb70f4ffcdfa2d2303db6bd2201b92a8c",
+    ),
+    (
+        "execution.skills.builder_core",
+        "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8",
+    ),
+    (
+        "execution.entrypoints.lad_checker",
+        "sha256:4444f19a996e9329f2ec0bda4c9b3c61600f29e91d362b05c1777713e2dc369a",
+    ),
+    (
+        "execution.skills.checker_core",
+        "sha256:81a4b59af7f82d91951dfa08d5d2d7f6fce548d8f2b370fe7c8dd99d26fc7140",
+    ),
+    (
+        "execution.entrypoints.lad_fixer",
+        "sha256:9af21092225299aab1ba99311fa3c32933ab9d5c44597a257004b0aed59a9917",
+    ),
+    (
+        "execution.skills.fixer_core",
+        "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862",
+    ),
+    (
+        "execution.entrypoints.lad_doublechecker",
+        "sha256:9af86c634a8159967489118ecba47a965b1685a62180cfa4789c079f196167d0",
+    ),
+    (
+        "execution.skills.doublechecker_core",
+        "sha256:0ce450272d17ca87534064c798a0aa8e63ec69703f91140e356e5b22a49b9026",
+    ),
+    (
+        "execution.entrypoints.lad_updater",
+        "sha256:f72aa2b7fe13d6eb78be2aa62184dc67d644e0a7834f0b1fefb6d232ab3f6544",
+    ),
+    (
+        "execution.skills.updater_core",
+        "sha256:728998443904834ab25ca2f05da420b7d8b74f738fe506523df91902fefdbee2",
+    ),
+    (
+        "execution.entrypoints.lad_troubleshooter",
+        "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb",
+    ),
+    (
+        "execution.skills.troubleshooter_core",
+        "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188",
+    ),
+    (
+        "execution.entrypoints.lad_consultant",
+        "sha256:af500ad1e542b4ad582931a12549c72544ac4709c819931daa7800c4f133952f",
+    ),
+    (
+        "execution.skills.consultant_core",
+        "sha256:ac23328c80c9445f5302ebd361b25fded1c4b36fd0bc8e6cebff563e808cfe55",
+    ),
+)
 Record = dict[str, object]
 
 _NORMALIZING_ROUTE_IDS = frozenset(
@@ -109,6 +218,255 @@ def _records(source: dict[str, object], section: str) -> list[Record]:
 
 def _record(source: dict[str, object], section: str, record_id: str) -> Record:
     return next(item for item in _records(source, section) if item["id"] == record_id)
+
+
+def _codex_source(workflow_id: str) -> dict[str, object]:
+    manifest = _manifest()
+    workflows = conformance.workflows_by_id(manifest)
+    assert workflow_id in workflows, f"missing public Codex workflow {workflow_id}"
+    return conformance.packaged_workflow_source(PACKAGE_ROOT, workflow_id)
+
+
+def _source_context_bindings(source: dict[str, object]) -> list[Record]:
+    return cast(list[Record], source.get("context_bindings", []))
+
+
+def _codex_descriptor_digest(runner: Record) -> str:
+    component = cast(Record, runner["component_pin"])
+    stage_kind_id = cast(list[object], runner["stage_kind_ids"])[0]
+    descriptor = {
+        "record_kind": "millrace.codex.wrapper_component_descriptor",
+        "wrapper_schema_version": 4,
+        "provider_distribution": "@openai/codex",
+        "provider_version": "0.147.0",
+        "stage_kind_id": stage_kind_id,
+        "required_capability_ids": component["required_capability_ids"],
+        "legal_terminal_result_ids": component["legal_terminal_result_ids"],
+    }
+    return hashlib.sha256(_canonical_payload_bytes(descriptor)).hexdigest()
+
+
+def _runner_records(source: dict[str, object]) -> tuple[Record, ...]:
+    return tuple(_records(source, "runner_bindings"))
+
+
+def _codex_asset_normalization() -> dict[str, str]:
+    return {
+        **{
+            asset_id: f"execution.entrypoints.{stage}"
+            for stage, asset_id in _CODEX_ENTRYPOINT_ASSET_IDS.items()
+        },
+        _CODEX_UPDATER_SKILL_ASSET_ID: "execution.skills.updater_core",
+    }
+
+
+def _normalize_lad_authority(source: dict[str, object]) -> dict[str, object]:
+    """Normalize only the workflow-local IDs permitted by the parity contract."""
+
+    source_workflow_id = str(cast(Record, source["workflow"])["id"])
+    is_treatment = source_workflow_id == CODEX_TREATMENT_WORKFLOW_ID
+    normalized = deepcopy(source)
+    normalized.pop("assets", None)
+    workflow = cast(Record, normalized["workflow"])
+    workflow["id"] = "execution.lad"
+    workflow["name"] = "LAD Execution"
+
+    graph = _records(normalized, "graphs")[0]
+    graph["id"] = "execution.lad.graph"
+    graph["node_ids"] = tuple(
+        node_id.replace(
+            f"{CODEX_CONTROL_WORKFLOW_ID}.", "execution.lad."
+        ).replace(
+            f"{CODEX_TREATMENT_WORKFLOW_ID}.", "execution.lad."
+        )
+        for node_id in cast(list[str], graph["node_ids"])
+    )
+
+    def normalize_runner_id(value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        return value.replace(".codex_runner", ".runner").replace(
+            ".millforge_runner", ".runner"
+        )
+
+    def normalize_graph_node(value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        return value.replace(
+            f"{CODEX_CONTROL_WORKFLOW_ID}.", "execution.lad."
+        ).replace(
+            f"{CODEX_TREATMENT_WORKFLOW_ID}.", "execution.lad."
+        )
+
+    asset_mapping = _codex_asset_normalization()
+    for runner in _records(normalized, "runner_bindings"):
+        runner["id"] = normalize_runner_id(runner["id"])
+        runner.pop("adapter_kind", None)
+        runner.pop("component_pin", None)
+    for stage in _records(normalized, "stage_kinds"):
+        stage["runner_binding_id"] = normalize_runner_id(
+            stage["runner_binding_id"]
+        )
+        stage["asset_ids"] = tuple(
+            asset_mapping.get(str(asset_id), asset_id)
+            for asset_id in cast(list[object], stage["asset_ids"])
+        )
+    for route in _records(normalized, "external_enqueue_routes"):
+        route["id"] = normalize_graph_node(route["id"])
+        route["graph_node_id"] = normalize_graph_node(route["graph_node_id"])
+        route["runner_binding_id"] = normalize_runner_id(
+            route["runner_binding_id"]
+        )
+    for action in _records(normalized, "terminal_actions"):
+        action_id = str(action["id"])
+        if "target_graph_node_id" in action:
+            action["target_graph_node_id"] = normalize_graph_node(
+                action["target_graph_node_id"]
+            )
+        if "runner_binding_id" in action:
+            action["runner_binding_id"] = normalize_runner_id(
+                action["runner_binding_id"]
+            )
+        selector = action.get("dynamic_target_selector")
+        if isinstance(selector, Mapping):
+            targets = selector.get("targets")
+            if isinstance(targets, Mapping):
+                for target in targets.values():
+                    if not isinstance(target, Mapping):
+                        continue
+                    if "target_graph_node_id" in target:
+                        target["target_graph_node_id"] = normalize_graph_node(
+                            target["target_graph_node_id"]
+                        )
+                    if "runner_binding_id" in target:
+                        target["runner_binding_id"] = normalize_runner_id(
+                            target["runner_binding_id"]
+                        )
+        if action_id in _CODEX_TREATMENT_ACTION_TARGET_STAGES:
+            action["asset_ids"] = tuple(
+                asset_mapping.get(str(asset_id), asset_id)
+                for asset_id in cast(list[object], action["asset_ids"])
+            )
+            selector = action.get("dynamic_target_selector")
+            if action_id == "execution.return_troubleshooter_complete" and isinstance(
+                selector, Mapping
+            ):
+                targets = selector.get("targets")
+                if isinstance(targets, Mapping):
+                    for target in targets.values():
+                        if isinstance(target, Mapping) and "asset_ids" in target:
+                            target["asset_ids"] = tuple(
+                                asset_mapping.get(str(asset_id), asset_id)
+                                for asset_id in cast(
+                                    list[object], target["asset_ids"]
+                                )
+                            )
+        if (
+            is_treatment
+            and
+            action_id == "execution.close_updater_complete"
+            and action.get("artifact_schema_id") == _CODEX_CONTEXT_SCHEMA_ID
+        ):
+            action["artifact_schema_id"] = "execution.artifacts.report"
+    for option in _records(normalized, "intervention_options"):
+        if "target_graph_node_id" in option:
+            option["target_graph_node_id"] = normalize_graph_node(
+                option["target_graph_node_id"]
+            )
+        if "target_runner_binding_id" in option:
+            option["target_runner_binding_id"] = normalize_runner_id(
+                option["target_runner_binding_id"]
+            )
+    for stage in _records(normalized, "stage_kinds"):
+        schema_ids = cast(list[object], stage["artifact_schema_ids"])
+        if is_treatment and str(stage["id"]) == "lad_updater":
+            schema_ids = [
+                "execution.artifacts.report"
+                if schema_id == _CODEX_CONTEXT_SCHEMA_ID
+                else schema_id
+                for schema_id in schema_ids
+            ]
+            schema_ids = list(dict.fromkeys(schema_ids))
+        stage["artifact_schema_ids"] = tuple(
+            schema_ids
+        )
+    normalized["artifact_schemas"] = [
+        schema
+        for schema in _records(normalized, "artifact_schemas")
+        if not (
+            is_treatment
+            and
+            schema["id"] == _CODEX_CONTEXT_SCHEMA_ID
+            and schema.get("schema") == _context_update_report_schema()
+        )
+    ]
+    normalized.pop("context_bindings", None)
+    return normalized
+
+
+def _context_update_report_schema() -> dict[str, object]:
+    string_schema = {"type": "string"}
+    evidence_refs = {"type": "array", "items": string_schema}
+    return {
+        "type": "object",
+        "required": ["changes", "proposals"],
+        "properties": {
+            "changes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "path",
+                        "change_kind",
+                        "evidence_refs",
+                        "classification",
+                    ],
+                    "properties": {
+                        "path": string_schema,
+                        "change_kind": {
+                            "enum": ["create", "modify", "delete"]
+                        },
+                        "before_sha256": string_schema,
+                        "after_sha256": string_schema,
+                        "evidence_refs": evidence_refs,
+                        "classification": {"const": "direct_write"},
+                    },
+                },
+            },
+            "proposals": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "path",
+                        "proposed_content",
+                        "proposed_content_sha256",
+                        "evidence_refs",
+                        "classification",
+                    ],
+                    "properties": {
+                        "path": string_schema,
+                        "proposed_content": string_schema,
+                        "proposed_content_sha256": string_schema,
+                        "evidence_refs": evidence_refs,
+                        "classification": {"const": "protected_proposal"},
+                    },
+                },
+            },
+            "no_op_reason": string_schema,
+        },
+    }
+
+
+def _json_example(text: str, heading: str) -> Record:
+    start = text.index(heading)
+    next_heading = text.find("\n## ", start + len(heading))
+    section = text[start:] if next_heading == -1 else text[start:next_heading]
+    match = re.search(r"```json\n(.*?)\n```", section, flags=re.DOTALL)
+    assert match is not None, heading
+    value = json.loads(match.group(1))
+    assert isinstance(value, dict)
+    return cast(Record, value)
 
 
 def _error(result: object, code: str) -> object:
@@ -1000,7 +1358,14 @@ def test_execution_lad_authority_and_assets_are_package_owned() -> None:
         asset_id for asset_id in assets if asset_id.startswith("execution.")
     }
 
-    assert len(execution_assets) == 16
+    assert len(
+        execution_assets
+        - {
+            asset_id
+            for asset_id in execution_assets
+            if asset_id.startswith(f"{_CODEX_TREATMENT_ASSET_PREFIX}.")
+        }
+    ) == 16
     for workflow_id in WORKFLOW_IDS:
         workflow = workflows[workflow_id]
         selected = cast(dict[str, object], workflow["selected_authority"])
@@ -1011,6 +1376,602 @@ def test_execution_lad_authority_and_assets_are_package_owned() -> None:
             str(required["asset_id"])
             for required in cast(list[dict[str, object]], workflow["required_assets"])
         } <= execution_assets
+
+
+def test_existing_execution_lad_authority_and_asset_pins_are_byte_frozen() -> None:
+    manifest = _manifest()
+    workflow = conformance.workflows_by_id(manifest)["execution.lad"]
+    selected_authority = cast(dict[str, object], workflow["selected_authority"])
+    canonical_bytes = canonical_authority_bytes(selected_authority)
+
+    assert len(canonical_bytes) == _REFERENCE_LAD_CANONICAL_AUTHORITY_BYTE_LENGTH
+    assert hashlib.sha256(canonical_bytes).hexdigest() == (
+        _REFERENCE_LAD_CANONICAL_AUTHORITY_SHA256
+    )
+    assert conformance.selected_asset_pins(manifest, "execution.lad") == (
+        tuple(sorted(_REFERENCE_LAD_SELECTED_ASSET_PINS))
+    )
+
+
+def test_public_codex_workflow_selectors_are_present_and_distinct() -> None:
+    manifest = _manifest()
+    selectors = {
+        (str(workflow["workflow_id"]), str(workflow["workflow_version"]))
+        for workflow in cast(list[Record], manifest["workflows"])
+    }
+
+    assert {
+        (CODEX_CONTROL_WORKFLOW_ID, "0.1"),
+        (CODEX_TREATMENT_WORKFLOW_ID, "0.1"),
+    } <= selectors
+    workflows = conformance.workflows_by_id(manifest)
+    assert workflows[CODEX_CONTROL_WORKFLOW_ID]["display"]["name"] != (
+        workflows[CODEX_TREATMENT_WORKFLOW_ID]["display"]["name"]
+    )
+
+
+def test_codex_runner_components_and_mappings_are_exact_and_identical() -> None:
+    reference = _source()
+    control = _codex_source(CODEX_CONTROL_WORKFLOW_ID)
+    treatment = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    reference_runners = {
+        str(runner["stage_kind_ids"][0]): runner
+        for runner in _runner_records(reference)
+    }
+    control_runners = _runner_records(control)
+    treatment_runners = _runner_records(treatment)
+
+    assert control_runners == treatment_runners
+    assert {
+        str(runner["id"]) for runner in control_runners
+    } == {
+        f"{stage}.codex_runner"
+        for stage in (
+            "lad_builder",
+            "lad_checker",
+            "lad_fixer",
+            "lad_doublechecker",
+            "lad_updater",
+            "lad_troubleshooter",
+            "lad_consultant",
+        )
+    }
+    for runner in control_runners:
+        stage = str(cast(list[object], runner["stage_kind_ids"])[0])
+        reference_runner = reference_runners[stage]
+        component = cast(Record, runner["component_pin"])
+        reference_component = cast(Record, reference_runner["component_pin"])
+
+        assert runner["adapter_kind"] == "codex"
+        assert runner["required_capability_ids"] == (
+            reference_runner["required_capability_ids"]
+        )
+        assert runner["terminal_result_mappings"] == (
+            reference_runner["terminal_result_mappings"]
+        )
+        assert component["component_kind"] == "runner"
+        assert component["component_id"] == "millrace-codex-wrapper"
+        assert component["component_version"] == "4"
+        assert component["provider_distribution"] == "@openai/codex"
+        assert component["provider_version"] == "0.147.0"
+        assert component["descriptor_media_type"] == "application/json"
+        assert "wrapper_protocol_version" not in runner
+        assert "wrapper_protocol_version" not in component
+        assert component["required_capability_ids"] == (
+            reference_component["required_capability_ids"]
+        )
+        assert component["legal_terminal_result_ids"] == (
+            reference_component["legal_terminal_result_ids"]
+        )
+        assert component["descriptor_sha256"] == _codex_descriptor_digest(runner)
+
+
+def test_codex_control_and_treatment_match_reference_after_normalization() -> None:
+    reference = _normalize_lad_authority(_source())
+    control = _normalize_lad_authority(_codex_source(CODEX_CONTROL_WORKFLOW_ID))
+    treatment = _normalize_lad_authority(
+        _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    )
+
+    assert control == reference
+    assert treatment == reference
+
+
+def test_treatment_terminal_actions_select_assets_for_their_target_stage() -> None:
+    treatment = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    stage_assets = {
+        str(stage["id"]): tuple(cast(list[object], stage["asset_ids"]))
+        for stage in _records(treatment, "stage_kinds")
+    }
+    actions = {
+        str(action["id"]): action
+        for action in _records(treatment, "terminal_actions")
+    }
+
+    for action_id, target_stage in _CODEX_TREATMENT_ACTION_TARGET_STAGES.items():
+        assert tuple(cast(list[object], actions[action_id]["asset_ids"])) == (
+            stage_assets[target_stage]
+        )
+
+    selector = cast(
+        Record,
+        actions["execution.return_troubleshooter_complete"][
+            "dynamic_target_selector"
+        ],
+    )
+    for target in cast(dict[str, Record], selector["targets"]).values():
+        if "asset_ids" in target:
+            assert tuple(cast(list[object], target["asset_ids"])) == stage_assets[
+                str(target["target_stage_kind_id"])
+            ]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "unrelated_stage_schema",
+        "unrelated_terminal_schema",
+        "unauthorized_asset",
+        "other_authority",
+    ),
+)
+def test_lad_parity_normalization_rejects_hostile_treatment_mutations(
+    mutation: str,
+) -> None:
+    control = _codex_source(CODEX_CONTROL_WORKFLOW_ID)
+    treatment = deepcopy(_codex_source(CODEX_TREATMENT_WORKFLOW_ID))
+
+    if mutation == "unrelated_stage_schema":
+        _record(treatment, "stage_kinds", "lad_checker")["artifact_schema_ids"] = (
+            _CODEX_CONTEXT_SCHEMA_ID,
+        )
+    elif mutation == "unrelated_terminal_schema":
+        _record(
+            treatment, "terminal_actions", "execution.route_builder_complete"
+        )["artifact_schema_id"] = _CODEX_CONTEXT_SCHEMA_ID
+    elif mutation == "unauthorized_asset":
+        action = _record(
+            treatment, "terminal_actions", "execution.route_builder_complete"
+        )
+        action["asset_ids"] = (
+            *cast(list[object], action["asset_ids"]),
+            f"{_CODEX_TREATMENT_ASSET_PREFIX}.entrypoints.unauthorized",
+        )
+    else:
+        _record(treatment, "terminal_actions", "execution.route_builder_complete")[
+            "emitted_queue_family_id"
+        ] = "task"
+
+    assert _normalize_lad_authority(treatment) != _normalize_lad_authority(control)
+
+
+@pytest.mark.parametrize("mutation", ("stage", "terminal_action"))
+def test_lad_parity_normalization_only_substitutes_treatment_context_schema(
+    mutation: str,
+) -> None:
+    reference = _source()
+    control = deepcopy(_codex_source(CODEX_CONTROL_WORKFLOW_ID))
+    if mutation == "stage":
+        stage = _record(control, "stage_kinds", "lad_updater")
+        schema_ids = list(cast(list[object], stage["artifact_schema_ids"]))
+        schema_ids[schema_ids.index("execution.artifacts.report")] = (
+            _CODEX_CONTEXT_SCHEMA_ID
+        )
+        stage["artifact_schema_ids"] = schema_ids
+    else:
+        _record(
+            control, "terminal_actions", "execution.close_updater_complete"
+        )["artifact_schema_id"] = _CODEX_CONTEXT_SCHEMA_ID
+
+    assert _normalize_lad_authority(control) != _normalize_lad_authority(reference)
+
+
+def test_semantic_worktree_context_bindings_are_exact_and_control_is_unbound() -> None:
+    control = _codex_source(CODEX_CONTROL_WORKFLOW_ID)
+    treatment = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    assert _source_context_bindings(control) == []
+
+    roots = (
+        "millrace-agents/shared/conventions",
+        "millrace-agents/shared/decisions",
+        "millrace-agents/shared/references",
+        "millrace-agents/shared/workspace-map/wiki",
+        "docs",
+    )
+    common_required = [
+        {
+            "source_kind": "dispatch_material",
+            "source_ref": "current",
+            "max_files": 1,
+            "max_bytes": 1048576,
+        },
+        {
+            "source_kind": "workspace_relative_root",
+            "source_ref": "millrace-agents/MILLRACE.md",
+            "max_files": 1,
+            "max_bytes": 65536,
+        },
+        {
+            "source_kind": "workspace_relative_root",
+            "source_ref": "millrace-agents/shared/CONTEXT.md",
+            "max_files": 1,
+            "max_bytes": 262144,
+        },
+    ]
+    expected: dict[str, Record] = {}
+    for stage in _CODEX_CONTEXT_BINDING_IDS:
+        required = deepcopy(common_required)
+        if stage != "lad_builder":
+            required.append(
+                {
+                    "source_kind": "accepted_lineage_artifacts",
+                    "source_ref": "current_lineage",
+                    "max_files": 64,
+                    "max_bytes": 1048576,
+                }
+            )
+        if stage in {"lad_fixer", "lad_doublechecker", "lad_updater"}:
+            required.append(
+                {
+                    "source_kind": "lineage_attempt_history",
+                    "source_ref": "current_lineage",
+                    "max_files": 64,
+                    "max_bytes": 1048576,
+                }
+            )
+        if stage == "lad_updater":
+            required.extend(
+                [
+                    {
+                        "source_kind": "workspace_relative_root",
+                        "source_ref": root,
+                        "max_files": 256,
+                        "max_bytes": 4194304,
+                    }
+                    for root in roots
+                ]
+            )
+            required.extend(
+                [
+                    {
+                        "source_kind": "workspace_relative_root",
+                        "source_ref": "README.md",
+                        "max_files": 1,
+                        "max_bytes": 262144,
+                    },
+                    {
+                        "source_kind": "workspace_relative_root",
+                        "source_ref": "millrace-agents/shared/skills",
+                        "max_files": 256,
+                        "max_bytes": 4194304,
+                    },
+                ]
+            )
+            discoverable = []
+            write_rules = [
+                {"relative_root": root, "disposition": "direct_write"}
+                for root in (
+                    "README.md",
+                    "docs",
+                    "millrace-agents/shared/conventions",
+                    "millrace-agents/shared/decisions",
+                    "millrace-agents/shared/references",
+                    "millrace-agents/shared/workspace-map/wiki",
+                    "millrace-agents/shared/CONTEXT.md",
+                )
+            ] + [
+                {
+                    "relative_root": root,
+                    "disposition": "protected_proposal",
+                }
+                for root in (
+                    "millrace-agents/MILLRACE.md",
+                    "millrace-agents/shared/skills",
+                )
+            ]
+        else:
+            discoverable = [
+                {
+                    "source_kind": "workspace_relative_root",
+                    "source_ref": root,
+                    "max_files": 256,
+                    "max_bytes": 4194304,
+                }
+                for root in roots
+            ]
+            write_rules = None
+        binding = {
+            "id": _CODEX_CONTEXT_BINDING_IDS[stage],
+            "stage_kind_id": stage,
+            "router_asset_id": _CODEX_ROUTER_ASSET_ID,
+            "checkout_root": "millrace-agents/checkouts",
+            "required_sources": required,
+            "discoverable_sources": discoverable,
+        }
+        if write_rules is not None:
+            binding["write_rules"] = write_rules
+            binding["writeback_terminal_action_id"] = (
+                "execution.close_updater_complete"
+            )
+            binding["writeback_artifact_schema_id"] = _CODEX_CONTEXT_SCHEMA_ID
+        expected[stage] = binding
+
+    actual = {
+        str(binding["stage_kind_id"]): binding
+        for binding in _source_context_bindings(treatment)
+    }
+    assert actual == expected
+    assert set(actual) == set(_CODEX_CONTEXT_BINDING_IDS)
+    for stage, binding in actual.items():
+        if stage != "lad_updater":
+            assert "writeback_terminal_action_id" not in binding
+            assert "writeback_artifact_schema_id" not in binding
+
+
+def test_context_bindings_are_absent_from_reference_and_unrelated_workflows() -> None:
+    manifest = _manifest()
+    workflows = conformance.workflows_by_id(manifest)
+    workflow_ids = (
+        CODEX_CONTROL_WORKFLOW_ID,
+        "execution.lad",
+        "execution.lad_integrator",
+        "planning.lad",
+        "lad.full",
+        "simple_loop",
+        "vendor_selection",
+    )
+    for workflow_id in workflow_ids:
+        selected = cast(
+            dict[str, object], workflows[workflow_id]["selected_authority"]
+        )
+        assert selected.get("context_bindings", []) == []
+
+
+def test_treatment_assets_and_context_update_schema_are_content_contracts() -> None:
+    manifest = _manifest()
+    assets = conformance.assets_by_id(manifest)
+    expected_paths = {
+        _CODEX_ROUTER_ASSET_ID: (
+            "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md"
+        ),
+        **{
+            asset_id: (
+                "assets/workflows/execution.lad_codex_semantic_worktree/"
+                f"entrypoints/{stage}.md"
+            )
+            for stage, asset_id in _CODEX_ENTRYPOINT_ASSET_IDS.items()
+        },
+        _CODEX_UPDATER_SKILL_ASSET_ID: (
+            "assets/workflows/execution.lad_codex_semantic_worktree/skills/updater-core.md"
+        ),
+    }
+    assert set(expected_paths) <= set(assets)
+    treatment = conformance.workflows_by_id(manifest)[CODEX_TREATMENT_WORKFLOW_ID]
+    required_ids = {
+        str(asset["asset_id"])
+        for asset in cast(list[Record], treatment["required_assets"])
+    }
+    assert set(expected_paths) <= required_ids
+    treatment_source = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    assert _CODEX_ROUTER_ASSET_ID not in {
+        str(asset_id)
+        for stage in _records(treatment_source, "stage_kinds")
+        for asset_id in cast(list[object], stage["asset_ids"])
+    }
+    for asset_id, package_path in expected_paths.items():
+        asset = assets[asset_id]
+        assert asset["package_path"] == package_path
+        assert asset["encoding"] == "utf-8"
+        assert asset["selection"] == "required"
+    router_asset = assets[_CODEX_ROUTER_ASSET_ID]
+    router_bytes = (
+        PACKAGE_ROOT / str(router_asset["package_path"])
+    ).read_bytes()
+    assert router_asset["asset_kind"] == "template"
+    assert router_asset["byte_length"] == 1297
+    assert router_asset["byte_length"] == len(router_bytes)
+    assert router_asset["content_digest"] == (
+        "sha256:cca7527f05cfc8f69b180f2148993d9bba7c7c61d0f929e50d7da062ccf6b813"
+    )
+    assert router_asset["content_digest"] == conformance.asset_digest(router_bytes)
+
+    texts = conformance.asset_texts(PACKAGE_ROOT, manifest, set(expected_paths))
+    required_headings = (
+        "Role:",
+        "Scope:",
+        "Inputs from dispatch:",
+        "Readable assets:",
+        "Writable artifacts:",
+        "Required evidence:",
+        "Legal terminal markers rendered by runtime:",
+        "Forbidden claims:",
+        "How to return evidence:",
+        "When to stop:",
+    )
+    entrypoint_texts = {
+        asset_id: text
+        for asset_id, text in texts.items()
+        if ".entrypoints." in asset_id
+    }
+    assert len(entrypoint_texts) == 5
+    for text in entrypoint_texts.values():
+        lower_text = text.lower()
+        for heading in required_headings:
+            assert sum(
+                line.startswith(heading) for line in text.splitlines()
+            ) == 1
+        for phrase in (
+            "immutable checkout evidence",
+            "runtime authority",
+            "read all required material first",
+            "live project root",
+            "selected runner protocol",
+            ".millrace/",
+            "generated projections",
+            "checkouts",
+            "queues",
+            "work items",
+            "accepted artifacts",
+            "executable skills",
+            "protected policy",
+        ):
+            assert phrase.lower() in lower_text
+    assert "assigned project source" in texts[
+        _CODEX_ENTRYPOINT_ASSET_IDS["lad_builder"]
+    ]
+    assert "assigned project source" in texts[_CODEX_ENTRYPOINT_ASSET_IDS["lad_fixer"]]
+    for stage in ("lad_checker", "lad_doublechecker"):
+        assert "review-only" in texts[_CODEX_ENTRYPOINT_ASSET_IDS[stage]]
+    updater = texts[_CODEX_ENTRYPOINT_ASSET_IDS["lad_updater"]]
+    for path in (
+        "README.md",
+        "docs",
+        "millrace-agents/shared/conventions",
+        "millrace-agents/shared/decisions",
+        "millrace-agents/shared/references",
+        "millrace-agents/shared/workspace-map/wiki",
+        "millrace-agents/shared/CONTEXT.md",
+        "millrace-agents/MILLRACE.md",
+        "millrace-agents/shared/skills",
+    ):
+        assert path in updater
+    router = texts[_CODEX_ROUTER_ASSET_ID]
+    assert "required material" in router
+    assert "immutable checkout evidence" in router
+    assert "live project root" in router
+    assert "selected runner protocol" in router
+    conformance.assert_no_runtime_authority_claims(texts)
+
+    updater_core = texts[_CODEX_UPDATER_SKILL_ASSET_ID]
+    assert "## Artifact Schema" in updater_core
+    assert "## Valid Example" in updater_core
+    assert "### Invalid: extra field" in updater_core
+    assert "### Invalid: missing required field" in updater_core
+    assert "### Invalid: wrong type" in updater_core
+    assert "## Completion Criteria" in updater_core
+    json_examples = re.findall(
+        r"```json\n(.*?)\n```", updater_core, flags=re.DOTALL
+    )
+    assert len(json_examples) >= 4
+    assert all(isinstance(json.loads(example), dict) for example in json_examples)
+
+    schema = _record(
+        treatment_source, "artifact_schemas", _CODEX_CONTEXT_SCHEMA_ID
+    )
+    assert schema["schema"] == _context_update_report_schema()
+    valid = {"changes": [], "proposals": []}
+    assert validate_schema(schema["schema"], valid).accepted
+    invalid_extra = {
+        "changes": [
+            {
+                "path": "docs/example.md",
+                "change_kind": "modify",
+                "evidence_refs": [],
+                "classification": "direct_write",
+                "extra": True,
+            }
+        ],
+        "proposals": [],
+    }
+    assert not validate_schema(schema["schema"], invalid_extra).accepted
+    assert not validate_schema(schema["schema"], {"proposals": []}).accepted
+    assert not validate_schema(
+        schema["schema"], {"changes": {}, "proposals": []}
+    ).accepted
+
+
+def test_treatment_updater_examples_are_schema_and_digest_semantic() -> None:
+    manifest = _manifest()
+    treatment_source = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    updater_core = conformance.asset_texts(
+        PACKAGE_ROOT,
+        manifest,
+        {_CODEX_UPDATER_SKILL_ASSET_ID},
+    )[_CODEX_UPDATER_SKILL_ASSET_ID]
+    schema = _record(
+        treatment_source, "artifact_schemas", _CODEX_CONTEXT_SCHEMA_ID
+    )["schema"]
+
+    valid = _json_example(updater_core, "## Valid Example")
+    assert cast(list[object], valid["changes"])
+    assert cast(list[object], valid["proposals"])
+    assert "no_op_reason" not in valid
+
+    digest_pattern = re.compile(r"^sha256:[0-9a-f]{64}$")
+    for change in cast(list[Record], valid["changes"]):
+        for field in ("before_sha256", "after_sha256"):
+            if field in change:
+                assert digest_pattern.fullmatch(str(change[field]))
+    for proposal in cast(list[Record], valid["proposals"]):
+        digest = str(proposal["proposed_content_sha256"])
+        content = str(proposal["proposed_content"])
+        assert digest_pattern.fullmatch(digest)
+        assert digest == "sha256:" + hashlib.sha256(
+            content.encode("utf-8")
+        ).hexdigest()
+    assert validate_schema(schema, valid).accepted
+
+    no_op = _json_example(updater_core, "## Valid No-op Example")
+    assert no_op["changes"] == []
+    assert no_op["proposals"] == []
+    assert isinstance(no_op.get("no_op_reason"), str)
+    assert str(no_op["no_op_reason"]).strip()
+    assert validate_schema(schema, no_op).accepted
+
+    for heading in (
+        "### Invalid: extra field",
+        "### Invalid: missing required field",
+        "### Invalid: wrong type",
+    ):
+        invalid = _json_example(updater_core, heading)
+        assert not validate_schema(schema, invalid).accepted
+
+
+@pytest.mark.parametrize("workflow_id", CODEX_WORKFLOW_IDS)
+def test_codex_workflows_compile_declared_selected_authority(
+    workflow_id: str,
+) -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, workflow_id)
+
+    assert str(plan.workflow.workflow_id) == workflow_id
+    bindings = {
+        str(binding.stage_kind_id): binding for binding in plan.context_bindings
+    }
+    if workflow_id == CODEX_CONTROL_WORKFLOW_ID:
+        assert bindings == {}
+    else:
+        assert set(bindings) == set(_CODEX_CONTEXT_BINDING_IDS)
+        updater = bindings["lad_updater"]
+        assert str(updater.router_asset_id) == _CODEX_ROUTER_ASSET_ID
+        assert str(updater.writeback_terminal_action_id) == (
+            "execution.close_updater_complete"
+        )
+        assert str(updater.writeback_artifact_schema_id) == _CODEX_CONTEXT_SCHEMA_ID
+
+
+@pytest.mark.parametrize("workflow_id", CODEX_WORKFLOW_IDS)
+def test_codex_workflows_select_and_verify_through_installed_public_api(
+    tmp_path: Path,
+    workflow_id: str,
+) -> None:
+    manifest = _manifest()
+    plan = conformance.select_and_verify_package(
+        tmp_path / workflow_id,
+        PACKAGE_ROOT,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=workflow_id,
+        workflow_version="0.1",
+    )
+
+    conformance.assert_selected_package_pin(
+        plan,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=workflow_id,
+        workflow_version="0.1",
+        selected_asset_pins=conformance.selected_asset_pins(manifest, workflow_id),
+    )
 
 
 @pytest.mark.parametrize("workflow_id", WORKFLOW_IDS)
@@ -1045,11 +2006,24 @@ def test_execution_lad_assets_keep_authoring_boundaries() -> None:
     }
     texts = conformance.asset_texts(PACKAGE_ROOT, manifest, asset_ids)
     for asset_id, text in texts.items():
-        headings = (
-            ("Role:", "Scope:", "Legal terminal markers rendered by runtime:")
-            if ".entrypoints." in asset_id
-            else ("## Artifact Schema", "## Valid Example", "## Completion Criteria")
-        )
+        if ".entrypoints." in asset_id:
+            headings = (
+                "Role:",
+                "Scope:",
+                "Legal terminal markers rendered by runtime:",
+            )
+        elif asset_id == _CODEX_ROUTER_ASSET_ID:
+            headings = (
+                "# Context Router",
+                "required material",
+                "live project root",
+            )
+        else:
+            headings = (
+                "## Artifact Schema",
+                "## Valid Example",
+                "## Completion Criteria",
+            )
         assert all(heading in text for heading in headings)
     conformance.assert_no_runtime_authority_claims(texts)
 

@@ -17,6 +17,8 @@ WORKFLOW_SELECTORS = {
     ("simple_loop", "0.1"),
     ("execution.lad", "0.1"),
     ("execution.lad_integrator", "0.1"),
+    ("execution.lad_codex_control", "0.1"),
+    ("execution.lad_codex_semantic_worktree", "0.1"),
     ("planning.lad", "0.1"),
     ("lad.full", "0.1"),
     ("vendor_selection", "0.1"),
@@ -350,10 +352,11 @@ def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
         str(asset["asset_id"]): str(asset["content_digest"])
         for asset in _assets(manifest)
     }
-    assert len(asset_digests) == 62
+    assert len(asset_digests) == 69
     assert {asset["asset_kind"] for asset in _assets(manifest)} == {
         "entrypoint_prompt",
         "stage_skill",
+        "template",
     }
     for asset in _assets(manifest):
         package_path = str(asset["package_path"])
@@ -514,3 +517,77 @@ def test_public_archive_bytes_are_deterministic_and_data_only() -> None:
         assert member.gname == ""
         assert member.mtime == 0
         assert member.mode == 0o644
+
+
+def test_codex_workflows_close_exactly_over_the_declared_package_bytes() -> None:
+    manifest = _load_manifest()
+    assets = {str(asset["asset_id"]): asset for asset in _assets(manifest)}
+    workflows = {
+        str(workflow["workflow_id"]): workflow
+        for workflow in _workflows(manifest)
+    }
+    treatment_prefix = "execution.lad_codex_semantic_worktree"
+    treatment_paths = {
+        str(asset["package_path"])
+        for asset in _assets(manifest)
+        if str(asset["asset_id"]).startswith(f"{treatment_prefix}.")
+    }
+
+    router = assets["execution.lad_codex_semantic_worktree.context_router"]
+    router_bytes = (PACKAGE_ROOT / str(router["package_path"])).read_bytes()
+    treatment_required_ids = {
+        str(required["asset_id"])
+        for required in workflows["execution.lad_codex_semantic_worktree"][
+            "required_assets"
+        ]
+    }
+    assert router["asset_kind"] == "template"
+    assert router["package_path"] == (
+        "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md"
+    )
+    assert router["byte_length"] == 1297
+    assert router["byte_length"] == len(router_bytes)
+    assert router["content_digest"] == (
+        "sha256:cca7527f05cfc8f69b180f2148993d9bba7c7c61d0f929e50d7da062ccf6b813"
+    )
+    assert router["content_digest"] == _asset_digest(router_bytes)
+    assert router["asset_id"] in treatment_required_ids
+
+    assert treatment_paths == {
+        "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md",
+        "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_builder.md",
+        "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_checker.md",
+        "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_fixer.md",
+        "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_doublechecker.md",
+        "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_updater.md",
+        "assets/workflows/execution.lad_codex_semantic_worktree/skills/updater-core.md",
+    }
+    for workflow_id in (
+        "execution.lad_codex_control",
+        "execution.lad_codex_semantic_worktree",
+    ):
+        required_assets = workflows[workflow_id]["required_assets"]
+        for required in required_assets:
+            asset_id = str(required["asset_id"])
+            assert asset_id in assets
+            assert required["content_digest"] == assets[asset_id]["content_digest"]
+    control_assets = {
+        str(asset["asset_id"])
+        for asset in workflows["execution.lad_codex_control"]["required_assets"]
+    }
+    treatment_assets = {
+        str(asset["asset_id"])
+        for asset in workflows["execution.lad_codex_semantic_worktree"][
+            "required_assets"
+        ]
+    }
+    assert not control_assets & {
+        asset_id
+        for asset_id in assets
+        if asset_id.startswith(f"{treatment_prefix}.")
+    }
+    assert {
+        asset_id
+        for asset_id in assets
+        if asset_id.startswith(f"{treatment_prefix}.")
+    } <= treatment_assets

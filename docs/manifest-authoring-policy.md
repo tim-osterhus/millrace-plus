@@ -48,8 +48,8 @@ which workflow behavior should be official.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:abe132bc2a89f5aea650a8907eb07c4db808f10de28c39acf019e8879940e3fc",
-  "package_digest": "sha256:deab1b2e0b4da291416a3acbbf5502b9ddec337cb06d48c28ab7f3726262a48a",
+  "manifest_digest": "sha256:e1fdd11094f322c0cf8ca83b9e4b1e31a75bb0da56803b82664204024d8da286",
+  "package_digest": "sha256:c9678b97454dc980fc21ef05d5d29821633938b3f29407673d82aa756a6d0724",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
     "package_version": "0.22.2",
@@ -57,6 +57,8 @@ which workflow behavior should be official.
   },
   "selected_workflow_fingerprints": {
     "execution.lad@0.1": "sha256:37fabd7ab3e727e936630a8869e3b7e3361096bf1e4259ef48f73bb6986239b4",
+    "execution.lad_codex_control@0.1": "sha256:8551e70fe2bdc7cb90dfb9bd514ef3fa329b0037f5d9e95fca1fa1c0b641a2dd",
+    "execution.lad_codex_semantic_worktree@0.1": "sha256:b25fc3e42ef36e8616339f2aa505669add7339596dba8a4663bf62d59f5c35f4",
     "execution.lad_integrator@0.1": "sha256:b3d6686886dd3fedce280520cd94b17dc67fe98f1caaaeb14310a6dbf1b9b3a4",
     "lad.full@0.1": "sha256:13c7731641f5b2ecc16221e97dbb4b1a49ba10790369293ef659878cb0853397",
     "planning.lad@0.1": "sha256:96f651c2d12be3cc03234ee4952c1ec2a4b42c418f9615edac45073a432b2c08",
@@ -103,6 +105,41 @@ which workflow behavior should be official.
       "asset_id": "execution.entrypoints.lad_updater",
       "content_digest": "sha256:f72aa2b7fe13d6eb78be2aa62184dc67d644e0a7834f0b1fefb6d232ab3f6544",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_updater.md"
+    },
+    {
+      "asset_id": "execution.lad_codex_semantic_worktree.context_router",
+      "content_digest": "sha256:cca7527f05cfc8f69b180f2148993d9bba7c7c61d0f929e50d7da062ccf6b813",
+      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md"
+    },
+    {
+      "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_builder",
+      "content_digest": "sha256:e95ef52689e96bf6d3f591872c399a2b64420befe5fe5a265d8b145dd8bdeaaf",
+      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_builder.md"
+    },
+    {
+      "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_checker",
+      "content_digest": "sha256:e8dacdcc27cac96e7b2b93071e52200500e2c51bf607e57d5f438e68fd752bbd",
+      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_checker.md"
+    },
+    {
+      "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_doublechecker",
+      "content_digest": "sha256:e158679fb69c2c63f6082b90f2027a3fbdff2caf15cb715461f36a1dbf29e469",
+      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_doublechecker.md"
+    },
+    {
+      "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_fixer",
+      "content_digest": "sha256:82da3295473e03a9e407a499ab3b90b69a8b8ca1707499aea51bcd803914bafc",
+      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_fixer.md"
+    },
+    {
+      "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_updater",
+      "content_digest": "sha256:22f5f5ca054a16242e4852471436ce166d275dca3096d1dfb51e9d112f6578f7",
+      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_updater.md"
+    },
+    {
+      "asset_id": "execution.lad_codex_semantic_worktree.skills.updater_core",
+      "content_digest": "sha256:4f5426983fd665ec5a0daeef4756fd559cd27594911dd69ec157b8b1a8b5eee1",
+      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/skills/updater-core.md"
     },
     {
       "asset_id": "execution.skills.builder_core",
