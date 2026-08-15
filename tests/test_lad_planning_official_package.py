@@ -13,6 +13,7 @@ from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any, cast
 
+import millrace.kernel._closure_lifecycle as _closure
 import pytest
 from millrace.compiler import authority_fingerprint, compile_workflow
 from millrace.contracts.compiled_plan import AuthorityValue
@@ -22,7 +23,7 @@ from millrace.contracts.runner import (
     runner_result_payload,
 )
 from millrace.contracts.schema import validate_schema
-from millrace.contracts.state import ClosedWorkItemRecord, RunRecord, RuntimeState
+from millrace.contracts.state import RunRecord, RuntimeState
 from millrace.contracts.transition import (
     AdmitPlan,
     ClaimWork,
@@ -250,6 +251,47 @@ def _apply_planning_input(
     return apply(state, decision)
 
 
+def _arbiter_target_id(state: RuntimeState) -> str:
+    assert len(state.closure_targets) == 1
+    return next(iter(state.closure_targets))
+
+
+def _arbiter_evaluate_transition(
+    state: RuntimeState,
+    behavior: Any,
+) -> tuple[EvaluateCompletionBehavior, TransitionContext]:
+    target = state.closure_targets[_arbiter_target_id(state)]
+    target_key = _closure.closure_target_key_for(target)
+    progress = _closure.closure_target_progress(
+        state,
+        target=target,
+        behavior=behavior,
+    )
+    assert progress.status == "ready", progress
+    readiness = _closure.assess_closure_readiness(
+        state,
+        lineage_id=target_key.lineage_id,
+        plan_ref=target_key.selected_plan_ref,
+        target_key=target_key,
+    )
+    assert readiness.status == "settled"
+    input_id, context = _closure.closure_lifecycle_identity(
+        "evaluate",
+        target_key,
+        readiness.anchor_digest,
+        progress.evidence_anchor,
+    )
+    return (
+        EvaluateCompletionBehavior(
+            input_id,
+            selected_plan_ref=target.selected_plan_ref,
+            completion_behavior_id=str(behavior.id),
+            closure_target_id=target.closure_target_id,
+        ),
+        context,
+    )
+
+
 def _arbiter_root_state(
     plan: object,
     *,
@@ -302,18 +344,50 @@ def _arbiter_root_state(
     )
     root = state.work_items["arbiter-proof-root"]
     assert root.lineage_id is not None
-    state = replace(
+    state, root_run = _claim_planning_activation(
         state,
-        closed_work_items={
-            root.ref.work_item_id: ClosedWorkItemRecord(
-                record_id="closed-arbiter-proof-root",
-                work_item_id=root.ref.work_item_id,
-                source_run_id=None,
-                action_id=None,
-                created_by_input_id="close-arbiter-proof-root",
-            )
+        "arbiter-proof-root-activation",
+        tag="arbiter-proof-root",
+    )
+    planner_decision = _arbiter_action_decision(
+        state,
+        plan,
+        fingerprint,
+        run=root_run,
+        action_id="planning.route_planner_complete",
+        tag="arbiter-proof-root",
+        artifact_payload={
+            "artifact_kind": "planning.artifacts.stage_result",
+            "summary": "The planner completed the root contract.",
         },
     )
+    assert planner_decision.accepted, planner_decision.refusal
+    state = apply(state, planner_decision)
+    state, manager_run = _claim_planning_activation(
+        state,
+        "activation-target-arbiter-proof-root",
+        tag="arbiter-proof-manager",
+    )
+    manager_decision = _arbiter_action_decision(
+        state,
+        plan,
+        fingerprint,
+        run=manager_run,
+        action_id="planning.close_manager_complete",
+        tag="arbiter-proof-manager",
+        artifact_payload={
+            "artifact_kind": "task_cards",
+            "cards": [
+                {
+                    "task_card_id": "arbiter-proof-card",
+                    "title": "Arbiter proof",
+                    "body": "The root contract is ready for closure evaluation.",
+                }
+            ],
+        },
+    )
+    assert manager_decision.accepted, manager_decision.refusal
+    state = apply(state, manager_decision)
     behavior = next(
         behavior
         for behavior in plan.completion_behaviors
@@ -321,22 +395,40 @@ def _arbiter_root_state(
     )
     plan_ref = state.default_plan_ref
     assert plan_ref is not None
+    open_target = OpenClosureTarget(
+        "open-arbiter-proof",
+        selected_plan_ref=plan_ref,
+        completion_behavior_id=str(behavior.id),
+        closure_target_id="arbiter-proof-target",
+        lineage_id=root.lineage_id,
+        root_source_kind="spec",
+        root_source_id="arbiter-proof-spec",
+        closure_root_work_item_id=root.ref.work_item_id,
+        request_kind=behavior.request_kind,
+        target_graph_node_id=behavior.target_graph_node_id,
+        evidence_window={"kind": "lineage", "lineage_id": root.lineage_id},
+    )
+    target_key = _closure.closure_target_key_for(open_target)
+    readiness = _closure.assess_closure_readiness(
+        state,
+        lineage_id=target_key.lineage_id,
+        plan_ref=target_key.selected_plan_ref,
+        target_key=target_key,
+    )
+    assert readiness.status == "settled"
+    open_input_id, open_context = _closure.closure_lifecycle_identity(
+        "open",
+        target_key,
+        readiness.anchor_digest,
+    )
     state = _apply_planning_input(
         state,
-        OpenClosureTarget(
-            "open-arbiter-proof",
-            selected_plan_ref=plan_ref,
-            completion_behavior_id=str(behavior.id),
-            closure_target_id="arbiter-proof-target",
-            lineage_id=root.lineage_id,
-            root_source_kind="spec",
-            root_source_id="arbiter-proof-spec",
-            closure_root_work_item_id=root.ref.work_item_id,
-            request_kind=behavior.request_kind,
-            target_graph_node_id=behavior.target_graph_node_id,
-            evidence_window={"kind": "lineage", "lineage_id": root.lineage_id},
+        replace(
+            open_target,
+            input_id=open_input_id,
+            closure_target_id=_closure.closure_target_id(target_key),
         ),
-        deterministic_context(transition_id="transition-open-arbiter-proof"),
+        open_context,
     )
     return state, fingerprint, behavior, root.ref.work_item_id
 
@@ -495,24 +587,72 @@ def _arbiter_verdict(
     }
 
 
-def _close_arbiter_lineage_work(
+def _settle_arbiter_returned_auditor(
     state: RuntimeState,
+    plan: object,
+    fingerprint: str,
     *,
-    lineage_id: str,
+    activation_id: str,
     tag: str,
 ) -> RuntimeState:
-    closed = dict(state.closed_work_items)
-    for work_item_id, work_item in state.work_items.items():
-        if work_item.lineage_id != lineage_id or work_item_id in closed:
-            continue
-        closed[work_item_id] = ClosedWorkItemRecord(
-            record_id=f"closed-{tag}-{work_item_id}",
-            work_item_id=work_item_id,
-            source_run_id=None,
-            action_id=None,
-            created_by_input_id=f"close-{tag}",
-        )
-    return replace(state, closed_work_items=closed)
+    state, auditor_run = _claim_planning_activation(
+        state,
+        activation_id,
+        tag=f"{tag}-auditor",
+    )
+    state, _, planner_activation_id = _run_arbiter_action(
+        state,
+        plan,
+        fingerprint,
+        run=auditor_run,
+        action_id="planning.route_auditor_complete",
+        tag=f"{tag}-auditor-complete",
+        artifact_payload={
+            "artifact_kind": "planning.artifacts.stage_result",
+            "summary": "The auditor returned the recovered evidence.",
+        },
+    )
+    state, planner_run = _claim_planning_activation(
+        state,
+        planner_activation_id,
+        tag=f"{tag}-planner",
+    )
+    state, _, manager_activation_id = _run_arbiter_action(
+        state,
+        plan,
+        fingerprint,
+        run=planner_run,
+        action_id="planning.route_planner_complete",
+        tag=f"{tag}-planner-complete",
+        artifact_payload={
+            "artifact_kind": "planning.artifacts.stage_result",
+            "summary": "The planner completed the returned evidence.",
+        },
+    )
+    state, manager_run = _claim_planning_activation(
+        state,
+        manager_activation_id,
+        tag=f"{tag}-manager",
+    )
+    state, _, _ = _run_arbiter_action(
+        state,
+        plan,
+        fingerprint,
+        run=manager_run,
+        action_id="planning.close_manager_complete",
+        tag=f"{tag}-manager-complete",
+        artifact_payload={
+            "artifact_kind": "task_cards",
+            "cards": [
+                {
+                    "task_card_id": f"{tag}-card",
+                    "title": "Recovered evidence",
+                    "body": "The returned evidence is settled.",
+                }
+            ],
+        },
+    )
+    return state
 
 
 def _arbiter_boundary_fixture(
@@ -521,27 +661,24 @@ def _arbiter_boundary_fixture(
     target_bytes: int,
 ) -> tuple[RuntimeState, str, object, object, Mapping[str, AuthorityValue], str]:
     stage, _binding, behavior, _outcomes, _actions = _arbiter_authority(plan)
-    base_state, fingerprint, base_behavior, root_work_item_id = _arbiter_root_state(
-        plan
+    _base_state, fingerprint, base_behavior, _root_work_item_id = (
+        _arbiter_root_state(plan)
     )
-    base_target = base_state.closure_targets["arbiter-proof-target"]
-    base_root = base_state.work_items[root_work_item_id]
 
     def with_body(body: str) -> RuntimeState:
-        root = replace(
-            base_root,
-            payload={**base_root.payload, "body": body},
+        state, _fingerprint, _behavior, _root_id = _arbiter_root_state(
+            plan,
+            body=body,
         )
-        return replace(
-            base_state,
-            work_items={**base_state.work_items, root_work_item_id: root},
-        )
+        return state
 
     for suffix_length in range(4):
-        empty_body = "x" * suffix_length
+        empty_body = "x" * (suffix_length + 1)
+        empty_state = with_body(empty_body)
+        empty_target = empty_state.closure_targets[_arbiter_target_id(empty_state)]
         empty_payload, refusal = _completion_request_payload(
-            state=with_body(empty_body),
-            target=base_target,
+            state=empty_state,
+            target=empty_target,
             behavior=base_behavior,
             stage=stage,
         )
@@ -552,9 +689,12 @@ def _arbiter_boundary_fixture(
             continue
         body = "𐀀" * (remaining // 4) + empty_body
         candidate_state = with_body(body)
+        candidate_target = candidate_state.closure_targets[
+            _arbiter_target_id(candidate_state)
+        ]
         payload, refusal = _completion_request_payload(
             state=candidate_state,
-            target=base_target,
+            target=candidate_target,
             behavior=base_behavior,
             stage=stage,
         )
@@ -566,7 +706,7 @@ def _arbiter_boundary_fixture(
         final_state, final_fingerprint, final_behavior, final_root_id = (
             _arbiter_root_state(plan, body=body)
         )
-        final_target = final_state.closure_targets["arbiter-proof-target"]
+        final_target = final_state.closure_targets[_arbiter_target_id(final_state)]
         final_root = final_state.work_items[final_root_id]
         final_payload, final_refusal = _completion_request_payload(
             state=final_state,
@@ -936,28 +1076,17 @@ def test_selected_arbiter_evaluations_reuse_rubric_and_bound_post_anchor_evidenc
 ) -> None:
     plan = _selected_workflow_plan(tmp_path, workflow_id)
     state, fingerprint, behavior, root_work_item_id = _arbiter_root_state(plan)
-    plan_ref = state.default_plan_ref
-    assert plan_ref is not None
     root = state.work_items[root_work_item_id]
     assert root.lineage_id is not None
 
-    state = _apply_planning_input(
-        state,
-        EvaluateCompletionBehavior(
-            "evaluate-arbiter-first",
-            selected_plan_ref=plan_ref,
-            completion_behavior_id=str(behavior.id),
-            closure_target_id="arbiter-proof-target",
-        ),
-        deterministic_context(
-            transition_id="transition-evaluate-arbiter-first",
-            work_item_id="work-target-first",
-            activation_id="activation-target-first",
-        ),
+    evaluate_input, evaluate_context = _arbiter_evaluate_transition(
+        state, behavior
     )
+    state = _apply_planning_input(state, evaluate_input, evaluate_context)
+    first_evaluation = next(iter(state.closure_evaluations.values()))
     state, first_run = _claim_planning_activation(
         state,
-        "activation-target-first",
+        first_evaluation.target_activation_id,
         tag="arbiter-first",
     )
     first_snapshot = cast(
@@ -1019,7 +1148,7 @@ def test_selected_arbiter_evaluations_reuse_rubric_and_bound_post_anchor_evidenc
         "artifact_kind": "planning.artifacts.report",
         "summary": "The remediation returned current evidence to the recorded source.",
     }
-    state, _recovered_decision, _returned_activation_id = _run_arbiter_action(
+    state, _recovered_decision, returned_activation_id = _run_arbiter_action(
         state,
         plan,
         fingerprint,
@@ -1027,6 +1156,13 @@ def test_selected_arbiter_evaluations_reuse_rubric_and_bound_post_anchor_evidenc
         action_id="planning.return_mechanic_recovered",
         tag="arbiter-mechanic-recovered",
         artifact_payload=post_anchor_report,
+    )
+    state = _settle_arbiter_returned_auditor(
+        state,
+        plan,
+        fingerprint,
+        activation_id=returned_activation_id,
+        tag="arbiter-returned",
     )
     report_artifacts = [
         artifact
@@ -1043,26 +1179,19 @@ def test_selected_arbiter_evaluations_reuse_rubric_and_bound_post_anchor_evidenc
         report_artifacts[0].transition_id
     ) > transition_ids.index(first_verdict_artifact.transition_id)
 
-    state = _close_arbiter_lineage_work(
-        state, lineage_id=root.lineage_id, tag="before-second"
+    evaluate_input, evaluate_context = _arbiter_evaluate_transition(
+        state, behavior
     )
-    state = _apply_planning_input(
-        state,
-        EvaluateCompletionBehavior(
-            "evaluate-arbiter-second",
-            selected_plan_ref=plan_ref,
-            completion_behavior_id=str(behavior.id),
-            closure_target_id="arbiter-proof-target",
-        ),
-        deterministic_context(
-            transition_id="transition-evaluate-arbiter-second",
-            work_item_id="work-target-second",
-            activation_id="activation-target-second",
-        ),
+    state = _apply_planning_input(state, evaluate_input, evaluate_context)
+    second_evaluation = tuple(
+        record
+        for record in state.closure_evaluations.values()
+        if record.record_id != first_evaluation.record_id
     )
+    assert len(second_evaluation) == 1
     state, second_run = _claim_planning_activation(
         state,
-        "activation-target-second",
+        second_evaluation[0].target_activation_id,
         tag="arbiter-second",
     )
     second_snapshot = cast(
@@ -1089,7 +1218,21 @@ def test_selected_arbiter_evaluations_reuse_rubric_and_bound_post_anchor_evidenc
         for evidence in cast(
             tuple[Mapping[str, object], ...], second_snapshot["evidence_artifacts"]
         )
-    ] == [canonical_authority_mapping_bytes(post_anchor_report)]
+    ] == [
+        canonical_authority_mapping_bytes(post_anchor_report),
+        canonical_authority_mapping_bytes(
+            {
+                "artifact_kind": "task_cards",
+                "cards": [
+                    {
+                        "task_card_id": "arbiter-returned-card",
+                        "title": "Recovered evidence",
+                        "body": "The returned evidence is settled.",
+                    }
+                ],
+            }
+        ),
+    ]
 
     stale_verdict = _arbiter_verdict(
         second_snapshot,
@@ -1127,7 +1270,7 @@ def test_selected_arbiter_evaluations_reuse_rubric_and_bound_post_anchor_evidenc
             evidence_id="post-anchor-evidence",
         ),
     )
-    assert state.closure_targets["arbiter-proof-target"].status == "closed"
+    assert state.closure_targets[_arbiter_target_id(state)].status == "closed"
     assert len(state.remediation_work_records) == 1
     assert len(state.closure_terminal_records) == 1
 
@@ -1179,25 +1322,14 @@ def test_arbiter_cooperative_dispatch_leaves_a_fresh_git_repo_unchanged(
 
     plan = _selected_workflow_plan(tmp_path, workflow_id)
     state, fingerprint, behavior, _root_work_item_id = _arbiter_root_state(plan)
-    plan_ref = state.default_plan_ref
-    assert plan_ref is not None
-    state = _apply_planning_input(
-        state,
-        EvaluateCompletionBehavior(
-            "evaluate-arbiter-no-mutation",
-            selected_plan_ref=plan_ref,
-            completion_behavior_id=str(behavior.id),
-            closure_target_id="arbiter-proof-target",
-        ),
-        deterministic_context(
-            transition_id="transition-evaluate-arbiter-no-mutation",
-            work_item_id="work-target-no-mutation",
-            activation_id="activation-target-no-mutation",
-        ),
+    evaluate_input, evaluate_context = _arbiter_evaluate_transition(
+        state, behavior
     )
+    state = _apply_planning_input(state, evaluate_input, evaluate_context)
+    evaluation = next(iter(state.closure_evaluations.values()))
     state, run = _claim_planning_activation(
         state,
-        "activation-target-no-mutation",
+        evaluation.target_activation_id,
         tag="arbiter-no-mutation",
     )
     harness = _arbiter_millforge_dispatch(
@@ -1315,7 +1447,7 @@ def test_arbiter_cooperative_dispatch_leaves_a_fresh_git_repo_unchanged(
     )
     assert decision.accepted, decision.refusal
     state = apply(state, decision)
-    assert state.closure_targets["arbiter-proof-target"].status == "closed"
+    assert state.closure_targets[_arbiter_target_id(state)].status == "closed"
     assert state.remediation_work_records == before_remediation == {}
     assert _git_porcelain(repo, "status", "--porcelain=v1") == before_status == ""
     assert _git_porcelain(repo, "diff", "--cached", "--name-only") == (
@@ -1335,25 +1467,14 @@ def test_arbiter_complete_unrelated_observation_is_non_blocking(
     plan = _selected_workflow_plan(tmp_path, workflow_id)
     state, fingerprint, behavior, _root_work_item_id = _arbiter_root_state(plan)
     assert fingerprint in state.admitted_plans
-    plan_ref = state.default_plan_ref
-    assert plan_ref is not None
-    state = _apply_planning_input(
-        state,
-        EvaluateCompletionBehavior(
-            "evaluate-arbiter-unrelated-observation",
-            selected_plan_ref=plan_ref,
-            completion_behavior_id=str(behavior.id),
-            closure_target_id="arbiter-proof-target",
-        ),
-        deterministic_context(
-            transition_id="transition-evaluate-arbiter-unrelated-observation",
-            work_item_id="work-target-unrelated-observation",
-            activation_id="activation-target-unrelated-observation",
-        ),
+    evaluate_input, evaluate_context = _arbiter_evaluate_transition(
+        state, behavior
     )
+    state = _apply_planning_input(state, evaluate_input, evaluate_context)
+    evaluation = next(iter(state.closure_evaluations.values()))
     state, run = _claim_planning_activation(
         state,
-        "activation-target-unrelated-observation",
+        evaluation.target_activation_id,
         tag="arbiter-unrelated-observation",
     )
     snapshot = cast(
@@ -1378,7 +1499,7 @@ def test_arbiter_complete_unrelated_observation_is_non_blocking(
         artifact_payload=cast(Mapping[str, AuthorityValue], verdict),
     )
     assert decision.accepted
-    assert state.closure_targets["arbiter-proof-target"].status == "closed"
+    assert state.closure_targets[_arbiter_target_id(state)].status == "closed"
     assert len(state.closure_terminal_records) == 1
     assert next(iter(state.closure_terminal_records.values())).terminal_kind == "passed"
     assert state.remediation_work_records == before_remediation == {}
@@ -1389,7 +1510,7 @@ def test_arbiter_complete_unrelated_observation_is_non_blocking(
         if str(artifact.schema_id) == "planning.artifacts.verdict"
     ]
     assert len(verdict_artifacts) == 1
-    assert len(state.artifacts) == 1
+    assert len(state.artifacts) == 3
     assert canonical_authority_mapping_bytes(
         cast(Mapping[str, AuthorityValue], verdict_artifacts[0].payload)
     ) == canonical_authority_mapping_bytes(
@@ -1477,21 +1598,13 @@ def test_selected_arbiter_boundary_uses_actual_millforge_serializer(
         plan,
         body=astral_body + "x",
     )
-    over_plan_ref = over_state.default_plan_ref
-    assert over_plan_ref is not None
+    over_evaluate_input, over_evaluate_context = _arbiter_evaluate_transition(
+        over_state, over_behavior
+    )
     over_decision = decide(
         over_state,
-        EvaluateCompletionBehavior(
-            "evaluate-arbiter-overflow",
-            selected_plan_ref=over_plan_ref,
-            completion_behavior_id=str(over_behavior.id),
-            closure_target_id="arbiter-proof-target",
-        ),
-        deterministic_context(
-            transition_id="transition-evaluate-arbiter-overflow",
-            work_item_id="work-arbiter-overflow",
-            activation_id="activation-arbiter-overflow",
-        ),
+        over_evaluate_input,
+        over_evaluate_context,
     )
     assert over_fingerprint == fingerprint
     assert over_root_id in over_state.work_items

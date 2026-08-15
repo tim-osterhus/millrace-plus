@@ -474,7 +474,7 @@ def test_vendor_selection_wait_projection_and_plan_admission_are_exact(
 ) -> None:
     plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
     wait = plan.operator_waits[0]
-    assert plan.schema_version == 16
+    assert plan.schema_version == 17
     assert wait.schema_version == 2
     assert wait.project_source_artifact is True
 
@@ -486,7 +486,7 @@ def test_vendor_selection_wait_projection_and_plan_admission_are_exact(
         workflow_id=WORKFLOW_ID,
         workflow_version="0.1",
     )
-    assert selected.schema_version == 16
+    assert selected.schema_version == 17
     assert selected.operator_waits[0].project_source_artifact is True
 
 
