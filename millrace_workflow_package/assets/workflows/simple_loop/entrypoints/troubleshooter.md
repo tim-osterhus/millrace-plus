@@ -17,6 +17,9 @@ Inputs from dispatch:
 Readable assets:
 - `simple_loop.troubleshooter_core_skill`.
 - Selected workflow context and artifact schemas named in dispatch.
+- Declared `simple_loop.troubleshooter_context` files, including
+  `selected_attempts/since_last_accepted_transition` and the typed
+  `simple_loop.troubleshooting_report` schema.
 
 Writable artifacts:
 - `simple_loop.troubleshooting_report`.

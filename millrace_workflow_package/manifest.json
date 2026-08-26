@@ -32,15 +32,15 @@
         },
         {
           "asset_id": "simple_loop.worker_prompt",
-          "content_digest": "sha256:d5949f2bef43d29fedd54c20ad832d0bba76f88db314048f18a04599daabcaeb"
+          "content_digest": "sha256:4aaddb4cdd36a27f135b52e8e4308db5d81f74e86acb0dc5cb5dbe7ee2cb3709"
         },
         {
           "asset_id": "simple_loop.reviewer_prompt",
-          "content_digest": "sha256:aca1ed01b5d4f1a2eb3a2bc4f13c972882601dd19491c88ff92a6de50556b2c3"
+          "content_digest": "sha256:c39670a62f9b0311e40e2eb3f065059b01325e28f6e40b4684212997d965d2b2"
         },
         {
           "asset_id": "simple_loop.troubleshooter_prompt",
-          "content_digest": "sha256:e42d3d306dece493afe5577f6a6b2f50030e23795a23b7a327cd1de6bf01573b"
+          "content_digest": "sha256:d238c70b0f70e3d06ec04b8a3f97cd3e31241a6b32fd3f04215a6b783ebd7aaf"
         },
         {
           "asset_id": "simple_loop.manager_core_skill",
@@ -57,6 +57,10 @@
         {
           "asset_id": "simple_loop.troubleshooter_core_skill",
           "content_digest": "sha256:e841f3da62681fed0d75b28a79da9048c1068b8623c6fc7529912962a64ccf8f"
+        },
+        {
+          "asset_id": "simple_loop.context_router",
+          "content_digest": "sha256:f2609ab35c232a423fc0f15826e14024d5edc0e50ec58b610611c7568682cdfc"
         }
       ],
       "required_dependencies": [],
@@ -1472,6 +1476,111 @@
             "support_status": "supported",
             "grant_status": "granted",
             "approval_policy_id": null
+          }
+        ],
+        "context_bindings": [
+          {
+            "id": "simple_loop.worker_context",
+            "stage_kind_id": "simple_loop.worker",
+            "router_asset_id": "simple_loop.context_router",
+            "max_hydrated_files": 256,
+            "max_hydrated_bytes": 4194304,
+            "materialization_retention": "until_session_durable_terminal",
+            "checkout_root": "simple-loop-worker",
+            "mutation_policy": "forbid_selected_roots",
+            "required_sources": [
+              {
+                "source_kind": "dispatch_material",
+                "source_ref": "current",
+                "max_files": 1,
+                "max_bytes": 1048576
+              },
+              {
+                "source_kind": "selected_artifacts",
+                "source_ref": "direct_predecessors",
+                "max_files": 64,
+                "max_bytes": 1048576
+              }
+            ],
+            "discoverable_sources": [
+              {
+                "source_kind": "workspace_relative_root",
+                "source_ref": "docs",
+                "max_files": 256,
+                "max_bytes": 4194304
+              }
+            ],
+            "write_rules": [],
+            "writeback_terminal_action_id": null,
+            "writeback_artifact_schema_id": null
+          },
+          {
+            "id": "simple_loop.reviewer_context",
+            "stage_kind_id": "simple_loop.reviewer",
+            "router_asset_id": "simple_loop.context_router",
+            "max_hydrated_files": 256,
+            "max_hydrated_bytes": 4194304,
+            "materialization_retention": "until_session_durable_terminal",
+            "checkout_root": "simple-loop-reviewer",
+            "mutation_policy": "forbid_selected_roots",
+            "required_sources": [
+              {
+                "source_kind": "dispatch_material",
+                "source_ref": "current",
+                "max_files": 1,
+                "max_bytes": 1048576
+              },
+              {
+                "source_kind": "selected_artifacts",
+                "source_ref": "direct_predecessors",
+                "max_files": 64,
+                "max_bytes": 1048576
+              }
+            ],
+            "discoverable_sources": [],
+            "write_rules": [],
+            "writeback_terminal_action_id": null,
+            "writeback_artifact_schema_id": null
+          },
+          {
+            "id": "simple_loop.troubleshooter_context",
+            "stage_kind_id": "simple_loop.troubleshooter",
+            "router_asset_id": "simple_loop.context_router",
+            "max_hydrated_files": 256,
+            "max_hydrated_bytes": 4194304,
+            "materialization_retention": "until_session_durable_terminal",
+            "checkout_root": "simple-loop-troubleshooter",
+            "mutation_policy": "forbid_selected_roots",
+            "required_sources": [
+              {
+                "source_kind": "dispatch_material",
+                "source_ref": "current",
+                "max_files": 1,
+                "max_bytes": 1048576
+              },
+              {
+                "source_kind": "selected_artifacts",
+                "source_ref": "direct_predecessors",
+                "max_files": 64,
+                "max_bytes": 1048576
+              },
+              {
+                "source_kind": "selected_attempts",
+                "source_ref": "since_last_accepted_transition",
+                "max_files": 64,
+                "max_bytes": 1048576
+              },
+              {
+                "source_kind": "workspace_relative_root",
+                "source_ref": "troubleshooting",
+                "max_files": 64,
+                "max_bytes": 1048576
+              }
+            ],
+            "discoverable_sources": [],
+            "write_rules": [],
+            "writeback_terminal_action_id": null,
+            "writeback_artifact_schema_id": null
           }
         ]
       },
@@ -29639,7 +29748,7 @@
                 "max_bytes": 262144
               },
               {
-                "source_kind": "accepted_lineage_artifacts",
+                "source_kind": "selected_artifacts",
                 "source_ref": "current_lineage",
                 "max_files": 64,
                 "max_bytes": 1048576
@@ -29703,13 +29812,13 @@
                 "max_bytes": 262144
               },
               {
-                "source_kind": "accepted_lineage_artifacts",
+                "source_kind": "selected_artifacts",
                 "source_ref": "current_lineage",
                 "max_files": 64,
                 "max_bytes": 1048576
               },
               {
-                "source_kind": "lineage_attempt_history",
+                "source_kind": "selected_attempts",
                 "source_ref": "current_lineage",
                 "max_files": 64,
                 "max_bytes": 1048576
@@ -29773,13 +29882,13 @@
                 "max_bytes": 262144
               },
               {
-                "source_kind": "accepted_lineage_artifacts",
+                "source_kind": "selected_artifacts",
                 "source_ref": "current_lineage",
                 "max_files": 64,
                 "max_bytes": 1048576
               },
               {
-                "source_kind": "lineage_attempt_history",
+                "source_kind": "selected_attempts",
                 "source_ref": "current_lineage",
                 "max_files": 64,
                 "max_bytes": 1048576
@@ -29843,13 +29952,13 @@
                 "max_bytes": 262144
               },
               {
-                "source_kind": "accepted_lineage_artifacts",
+                "source_kind": "selected_artifacts",
                 "source_ref": "current_lineage",
                 "max_files": 64,
                 "max_bytes": 1048576
               },
               {
-                "source_kind": "lineage_attempt_history",
+                "source_kind": "selected_attempts",
                 "source_ref": "current_lineage",
                 "max_files": 64,
                 "max_bytes": 1048576
@@ -29961,8 +30070,8 @@
     {
       "asset_id": "simple_loop.worker_prompt",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2387,
-      "content_digest": "sha256:d5949f2bef43d29fedd54c20ad832d0bba76f88db314048f18a04599daabcaeb",
+      "byte_length": 2601,
+      "content_digest": "sha256:4aaddb4cdd36a27f135b52e8e4308db5d81f74e86acb0dc5cb5dbe7ee2cb3709",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/simple_loop/entrypoints/worker.md",
@@ -29972,8 +30081,8 @@
     {
       "asset_id": "simple_loop.reviewer_prompt",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2313,
-      "content_digest": "sha256:aca1ed01b5d4f1a2eb3a2bc4f13c972882601dd19491c88ff92a6de50556b2c3",
+      "byte_length": 2416,
+      "content_digest": "sha256:c39670a62f9b0311e40e2eb3f065059b01325e28f6e40b4684212997d965d2b2",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/simple_loop/entrypoints/reviewer.md",
@@ -29983,8 +30092,8 @@
     {
       "asset_id": "simple_loop.troubleshooter_prompt",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2078,
-      "content_digest": "sha256:e42d3d306dece493afe5577f6a6b2f50030e23795a23b7a327cd1de6bf01573b",
+      "byte_length": 2257,
+      "content_digest": "sha256:d238c70b0f70e3d06ec04b8a3f97cd3e31241a6b32fd3f04215a6b783ebd7aaf",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/simple_loop/entrypoints/troubleshooter.md",
@@ -30032,6 +30141,17 @@
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/simple_loop/skills/troubleshooter-core.md",
+      "selected_authority_participation": "yes",
+      "selection": "required"
+    },
+    {
+      "asset_id": "simple_loop.context_router",
+      "asset_kind": "template",
+      "byte_length": 579,
+      "content_digest": "sha256:f2609ab35c232a423fc0f15826e14024d5edc0e50ec58b610611c7568682cdfc",
+      "encoding": "utf-8",
+      "media_type": "text/markdown; charset=utf-8",
+      "package_path": "assets/workflows/simple_loop/context/router.md",
       "selected_authority_participation": "yes",
       "selection": "required"
     },
@@ -30716,7 +30836,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:e1fdd11094f322c0cf8ca83b9e4b1e31a75bb0da56803b82664204024d8da286",
+  "manifest_digest": "sha256:36fbc70f945f31c958d1ce9c7eb6a8972fb82e7dacf8e38a7bab4c25ec44dd09",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",

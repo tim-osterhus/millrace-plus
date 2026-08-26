@@ -433,3 +433,131 @@ def test_simple_loop_unselected_schema_does_not_change_authority() -> None:
     assert result.plan is not None
 
     assert canonical_authority_bytes(result.plan) == canonical_authority_bytes(base)
+
+
+def test_simple_loop_context_bindings_are_scoped_and_typed() -> None:
+    source = _source()
+    bindings = _records(source, "context_bindings")
+    by_stage = {str(binding["stage_kind_id"]): binding for binding in bindings}
+
+    assert set(by_stage) == {
+        "simple_loop.worker",
+        "simple_loop.reviewer",
+        "simple_loop.troubleshooter",
+    }
+    assert all(str(binding["id"]).startswith("simple_loop.") for binding in bindings)
+    assert all(
+        binding["router_asset_id"] == "simple_loop.context_router"
+        for binding in bindings
+    )
+    for binding in bindings:
+        assert binding["mutation_policy"] == "forbid_selected_roots"
+        assert binding["write_rules"] == []
+        assert binding["writeback_terminal_action_id"] is None
+        assert binding["writeback_artifact_schema_id"] is None
+
+    required_pairs = {
+        stage_id: {
+            (item["source_kind"], item["source_ref"])
+            for item in by_stage[stage_id]["required_sources"]
+        }
+        for stage_id in by_stage
+    }
+    for stage_id in ("simple_loop.worker", "simple_loop.reviewer"):
+        assert ("selected_artifacts", "direct_predecessors") in required_pairs[
+            stage_id
+        ]
+    assert ("selected_artifacts", "direct_predecessors") in required_pairs[
+        "simple_loop.troubleshooter"
+    ]
+    assert (
+        "selected_attempts",
+        "since_last_accepted_transition",
+    ) in required_pairs["simple_loop.troubleshooter"]
+
+    troubleshooter_stage = _record(source, "stage_kinds", "simple_loop.troubleshooter")
+    assert troubleshooter_stage["artifact_schema_ids"] == [
+        "simple_loop.troubleshooting_report"
+    ]
+    troubleshooter_actions = {
+        action["id"]: action
+        for action in _records(source, "terminal_actions")
+        if str(action["id"]).startswith("simple_loop.troubleshooter.")
+    }
+    assert set(troubleshooter_actions) == {
+        "simple_loop.troubleshooter.operator_needed",
+        "simple_loop.troubleshooter.resolved",
+        "simple_loop.troubleshooter.unresolved",
+    }
+    assert all(
+        action["artifact_schema_id"] == "simple_loop.troubleshooting_report"
+        for action in troubleshooter_actions.values()
+    )
+
+
+def test_simple_loop_context_catalog_is_selected_by_one_named_stage() -> None:
+    source = _source()
+    bindings = _records(source, "context_bindings")
+    catalog_items = [
+        (binding, item)
+        for binding in bindings
+        for item in binding.get("discoverable_sources", ())
+        if item["source_kind"] == "workspace_relative_root"
+    ]
+
+    assert len(catalog_items) == 1
+    catalog_binding, catalog_item = catalog_items[0]
+    assert catalog_binding["stage_kind_id"] == "simple_loop.worker"
+    assert catalog_item["source_ref"] == "docs"
+
+    entrypoint_text = "\n".join(
+        (PACKAGE_ROOT / "assets/workflows/simple_loop/entrypoints" / name).read_text()
+        for name in ("worker.md", "reviewer.md", "troubleshooter.md")
+    )
+    assert entrypoint_text.count("millrace context select docs") == 1
+
+
+def test_context_selector_names_are_canonical() -> None:
+    manifest = _manifest()
+    source_pairs = {
+        (item["source_kind"], item["source_ref"])
+        for workflow in conformance.workflows_by_id(manifest).values()
+        for item in (
+            source
+            for binding in cast(
+                list[dict[str, object]],
+                cast(dict[str, object], workflow["selected_authority"]).get(
+                    "context_bindings", []
+                ),
+            )
+            for source in cast(list[dict[str, object]], binding["required_sources"])
+        )
+    }
+
+    assert ("selected_artifacts", "current_lineage") in source_pairs
+    assert ("selected_attempts", "current_lineage") in source_pairs
+    assert not source_pairs & {
+        ("accepted_lineage_artifacts", "current_lineage"),
+        ("lineage_attempt_history", "current_lineage"),
+    }
+
+
+def test_simple_loop_context_router_is_a_required_packaged_asset() -> None:
+    manifest = _manifest()
+    workflow = conformance.workflows_by_id(manifest)[WORKFLOW_ID]
+    required_assets = {
+        str(asset["asset_id"]) for asset in workflow["required_assets"]
+    }
+    assets = {
+        str(asset["asset_id"]): asset
+        for asset in cast(list[dict[str, object]], manifest["assets"])
+    }
+
+    assert "simple_loop.context_router" in required_assets
+    router = assets["simple_loop.context_router"]
+    assert router["asset_kind"] == "template"
+    assert router["encoding"] == "utf-8"
+    assert router["media_type"] == "text/markdown; charset=utf-8"
+    assert router["package_path"] == "assets/workflows/simple_loop/context/router.md"
+    assert router["selected_authority_participation"] == "yes"
+    assert router["selection"] == "required"

@@ -352,7 +352,7 @@ def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
         str(asset["asset_id"]): str(asset["content_digest"])
         for asset in _assets(manifest)
     }
-    assert len(asset_digests) == 69
+    assert len(asset_digests) == 70
     assert {asset["asset_kind"] for asset in _assets(manifest)} == {
         "entrypoint_prompt",
         "stage_skill",

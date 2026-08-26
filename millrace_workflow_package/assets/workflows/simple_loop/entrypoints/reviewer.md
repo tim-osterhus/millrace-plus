@@ -18,6 +18,8 @@ Inputs from dispatch:
 Readable assets:
 - `simple_loop.reviewer_core_skill`.
 - Selected workflow context and artifact schemas named in dispatch.
+- Declared `simple_loop.reviewer_context` files, including
+  `selected_artifacts/direct_predecessors`.
 
 Writable artifacts:
 - Review evidence for accepted work.

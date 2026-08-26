@@ -18,6 +18,10 @@ Inputs from dispatch:
 Readable assets:
 - `simple_loop.worker_core_skill`.
 - Selected workflow context and artifact schemas named in dispatch.
+- Declared `simple_loop.worker_context` files, including
+  `selected_artifacts/direct_predecessors`.
+- For the named discoverable catalog entry, run `millrace context select docs`;
+  do not read the whole catalog.
 
 Writable artifacts:
 - `simple_loop.work_result` when work is completed.
