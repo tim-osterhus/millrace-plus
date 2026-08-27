@@ -47,24 +47,6 @@ which workflow behavior should be official.
 <!-- manifest-freeze-evidence:BEGIN -->
 ```json
 {
-  "policy": "frozen-manifest",
-  "manifest_digest": "sha256:e1fdd11094f322c0cf8ca83b9e4b1e31a75bb0da56803b82664204024d8da286",
-  "package_digest": "sha256:c9678b97454dc980fc21ef05d5d29821633938b3f29407673d82aa756a6d0724",
-  "selected_package_pin": {
-    "package_id": "millrace.plus.official",
-    "package_version": "0.22.2",
-    "package_format_version": "1"
-  },
-  "selected_workflow_fingerprints": {
-    "execution.lad@0.1": "sha256:37fabd7ab3e727e936630a8869e3b7e3361096bf1e4259ef48f73bb6986239b4",
-    "execution.lad_codex_control@0.1": "sha256:8551e70fe2bdc7cb90dfb9bd514ef3fa329b0037f5d9e95fca1fa1c0b641a2dd",
-    "execution.lad_codex_semantic_worktree@0.1": "sha256:b25fc3e42ef36e8616339f2aa505669add7339596dba8a4663bf62d59f5c35f4",
-    "execution.lad_integrator@0.1": "sha256:b3d6686886dd3fedce280520cd94b17dc67fe98f1caaaeb14310a6dbf1b9b3a4",
-    "lad.full@0.1": "sha256:13c7731641f5b2ecc16221e97dbb4b1a49ba10790369293ef659878cb0853397",
-    "planning.lad@0.1": "sha256:96f651c2d12be3cc03234ee4952c1ec2a4b42c418f9615edac45073a432b2c08",
-    "simple_loop@0.1": "sha256:67c08c7262531a6bb09f7e01d213ed505e7b12bdf6fdfcd94ddeb5dc53673ab3",
-    "vendor_selection@0.1": "sha256:b9dd2604219bf634f8a54644a9368c694c89bb44bac2284b1d498da75a4ae405"
-  },
   "asset_pins": [
     {
       "asset_id": "execution.entrypoints.lad_builder",
@@ -98,7 +80,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "execution.entrypoints.lad_troubleshooter",
-      "content_digest": "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb",
+      "content_digest": "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_troubleshooter.md"
     },
     {
@@ -108,32 +90,32 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "execution.lad_codex_semantic_worktree.context_router",
-      "content_digest": "sha256:cca7527f05cfc8f69b180f2148993d9bba7c7c61d0f929e50d7da062ccf6b813",
+      "content_digest": "sha256:00053a2572581acd9441ebc8c1199accee49073afe87190a60bf847fec25d129",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md"
     },
     {
       "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_builder",
-      "content_digest": "sha256:e95ef52689e96bf6d3f591872c399a2b64420befe5fe5a265d8b145dd8bdeaaf",
+      "content_digest": "sha256:839385509979a7fad68fd5069289bf95589670f1d9b273e2f774f42527b222b5",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_builder.md"
     },
     {
       "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_checker",
-      "content_digest": "sha256:e8dacdcc27cac96e7b2b93071e52200500e2c51bf607e57d5f438e68fd752bbd",
+      "content_digest": "sha256:32a10558a77fe49613b53eb0779bd64dc5d14e6d8cdd6230dd70897aedfaec0b",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_checker.md"
     },
     {
       "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_doublechecker",
-      "content_digest": "sha256:e158679fb69c2c63f6082b90f2027a3fbdff2caf15cb715461f36a1dbf29e469",
+      "content_digest": "sha256:e99a49e9e5cbe59273ca01b052662e3d945a7c52dd6f7ff07be22b63cbb1904b",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_doublechecker.md"
     },
     {
       "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_fixer",
-      "content_digest": "sha256:82da3295473e03a9e407a499ab3b90b69a8b8ca1707499aea51bcd803914bafc",
+      "content_digest": "sha256:1f4547179ea2de9eac48231c547689d96c8995bbccf221ded60b7c1d4bea7bbb",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_fixer.md"
     },
     {
       "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_updater",
-      "content_digest": "sha256:22f5f5ca054a16242e4852471436ce166d275dca3096d1dfb51e9d112f6578f7",
+      "content_digest": "sha256:27d0e0f522d417c197f3538df47ad4ce9737c190eedc9e903acf45c1400b47ef",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_updater.md"
     },
     {
@@ -143,7 +125,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "execution.skills.builder_core",
-      "content_digest": "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8",
+      "content_digest": "sha256:d789eb8a142451cffd3476b11671ab7b636a3e704c109d204c82db3e9d5d3dac",
       "package_path": "assets/workflows/execution.lad/skills/builder-core.md"
     },
     {
@@ -163,7 +145,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "execution.skills.fixer_core",
-      "content_digest": "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862",
+      "content_digest": "sha256:5834155f56f905c2a6344932cdaddd6ffd7f5d6f131e7027f33c6452c6acae75",
       "package_path": "assets/workflows/execution.lad/skills/fixer-core.md"
     },
     {
@@ -173,7 +155,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "execution.skills.troubleshooter_core",
-      "content_digest": "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188",
+      "content_digest": "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b",
       "package_path": "assets/workflows/execution.lad/skills/troubleshooter-core.md"
     },
     {
@@ -282,6 +264,11 @@ which workflow behavior should be official.
       "package_path": "assets/workflows/planning.lad/skills/recon-core.md"
     },
     {
+      "asset_id": "simple_loop.context_router",
+      "content_digest": "sha256:f2609ab35c232a423fc0f15826e14024d5edc0e50ec58b610611c7568682cdfc",
+      "package_path": "assets/workflows/simple_loop/context/router.md"
+    },
+    {
       "asset_id": "simple_loop.manager_core_skill",
       "content_digest": "sha256:f6c0728e9dfdf04d7d11b5b9e8dac86795a8eaeacebd544abc3fcb807f528d4c",
       "package_path": "assets/workflows/simple_loop/skills/manager-core.md"
@@ -298,7 +285,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "simple_loop.reviewer_prompt",
-      "content_digest": "sha256:aca1ed01b5d4f1a2eb3a2bc4f13c972882601dd19491c88ff92a6de50556b2c3",
+      "content_digest": "sha256:c39670a62f9b0311e40e2eb3f065059b01325e28f6e40b4684212997d965d2b2",
       "package_path": "assets/workflows/simple_loop/entrypoints/reviewer.md"
     },
     {
@@ -308,7 +295,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "simple_loop.troubleshooter_prompt",
-      "content_digest": "sha256:e42d3d306dece493afe5577f6a6b2f50030e23795a23b7a327cd1de6bf01573b",
+      "content_digest": "sha256:d238c70b0f70e3d06ec04b8a3f97cd3e31241a6b32fd3f04215a6b783ebd7aaf",
       "package_path": "assets/workflows/simple_loop/entrypoints/troubleshooter.md"
     },
     {
@@ -318,7 +305,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "simple_loop.worker_prompt",
-      "content_digest": "sha256:d5949f2bef43d29fedd54c20ad832d0bba76f88db314048f18a04599daabcaeb",
+      "content_digest": "sha256:4aaddb4cdd36a27f135b52e8e4308db5d81f74e86acb0dc5cb5dbe7ee2cb3709",
       "package_path": "assets/workflows/simple_loop/entrypoints/worker.md"
     },
     {
@@ -411,7 +398,25 @@ which workflow behavior should be official.
       "content_digest": "sha256:8f736c7d764e3d31d87e43d9310a4b28116cfec40d1bfe1ec8eec7da36e1b669",
       "package_path": "assets/workflows/vendor_selection/skills/rubric_evaluator-core.md"
     }
-  ]
+  ],
+  "manifest_digest": "sha256:cef079a6601cf1f9dffd764957dcdbfddd94f60b3f314711086b29c06039507a",
+  "package_digest": "sha256:7958992ba51e598ff2a3c3abbf633ba1aa618e2becc416a2eabef35c4cd6494e",
+  "policy": "frozen-manifest",
+  "selected_package_pin": {
+    "package_format_version": "1",
+    "package_id": "millrace.plus.official",
+    "package_version": "0.22.3"
+  },
+  "selected_workflow_fingerprints": {
+    "execution.lad@0.1": "sha256:195fbe1c5a982366b214373e65d8a20b0393605af4dbc1aff361a0413a589fdd",
+    "execution.lad_codex_control@0.1": "sha256:3b88a81c2c6a29ffca95ae1a9052e6e44df48c8c64a1c894b36aa85da3c2ac46",
+    "execution.lad_codex_semantic_worktree@0.2": "sha256:a8869898be7957d317fcd2b3441b656bbc7dbeb007fa7974c0c1745f8114f975",
+    "execution.lad_integrator@0.1": "sha256:5f0e8093b007b2e026034cdda8222804bba0deeaec90441fe97c54097c6d2a28",
+    "lad.full@0.1": "sha256:60e075360d232d99b2e57cafbbe5afaf0a10be1fb8546429718e1ee943db3b77",
+    "planning.lad@0.1": "sha256:5d5b2420bedf88f4baf3acea78de444356cb5fe9d6921f2c953db76643baa78c",
+    "simple_loop@0.1": "sha256:6712ff418127e9464096ee69ae80e0d1c8b7f1d6d17b2226f9fd9fe8b40c22da",
+    "vendor_selection@0.1": "sha256:41430d1a6c96149209f2983d66c68fbd0ae7d030b3ae01061ec8c2971c3c9e27"
+  }
 }
 ```
 <!-- manifest-freeze-evidence:END -->

@@ -4,9 +4,11 @@ Role: Implement the assigned task in the live project root while preserving the 
 
 Scope: Read all required material first. Use immutable checkout evidence for context only, identify the live project root separately, and edit assigned project source narrowly. Do not edit governed context surfaces.
 
-Inputs from dispatch: Use the selected task, dispatch material, task contract, selected assets, and any declared context bundle. Preserve the received work-item and lineage identifiers.
+Inputs from dispatch: Use the selected task, dispatch material, task contract, selected artifacts, and any declared context bundle. Preserve the received work-item and lineage identifiers. On recovery re-entry, consume the accepted Troubleshooter repair plan only when it is supplied as a direct predecessor.
 
-Readable assets: Read the selected entrypoint, Builder core skill, context router output, required dispatch material, and every declared source before making an edit. Treat checkout evidence as immutable evidence, not runtime authority.
+Readable assets: Read the selected entrypoint, Builder core skill, context router output, and required dispatch and artifact material before making an edit. Catalog entries are optional metadata until you select a named entry on demand for a relevant convention, decision, reference, workspace-map page, or document. Never read every catalog entry. Treat checkout evidence as immutable evidence, not runtime authority.
+
+Governed Builder artifact: For this semantic workflow, return `execution.artifacts.builder_result` with the task-contract digest, dispatch digest, canonical changed paths, bounded checks, assumptions, unavailable evidence, and remaining work. Do not replace these identifiers with free text.
 
 Writable artifacts: Write only assigned project source and the selected stage result through the selected runner protocol. Do not write directly to runtime state or context reports.
 

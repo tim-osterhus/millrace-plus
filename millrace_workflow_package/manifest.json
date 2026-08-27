@@ -2,7 +2,7 @@
   "record_kind": "millrace.workflow_package_manifest",
   "manifest_format_version": "1",
   "package": {
-    "base_millrace_compatibility": ">=0.22,<0.23",
+    "base_millrace_compatibility": ">=0.22.3,<0.23",
     "display": {
       "name": "Millrace Plus Official Workflows",
       "role": "public workflow package"
@@ -11,7 +11,7 @@
     "package_format_version": "1",
     "package_id": "millrace.plus.official",
     "package_role": "workflow_package",
-    "package_version": "0.22.2",
+    "package_version": "0.22.3",
     "publication_scope": "public",
     "publisher": "Millrace",
     "repository_url": "https://github.com/tim-osterhus/millrace-plus"
@@ -1603,7 +1603,7 @@
         },
         {
           "asset_id": "execution.skills.builder_core",
-          "content_digest": "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8"
+          "content_digest": "sha256:d789eb8a142451cffd3476b11671ab7b636a3e704c109d204c82db3e9d5d3dac"
         },
         {
           "asset_id": "execution.entrypoints.lad_checker",
@@ -1619,7 +1619,7 @@
         },
         {
           "asset_id": "execution.skills.fixer_core",
-          "content_digest": "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862"
+          "content_digest": "sha256:5834155f56f905c2a6344932cdaddd6ffd7f5d6f131e7027f33c6452c6acae75"
         },
         {
           "asset_id": "execution.entrypoints.lad_doublechecker",
@@ -1639,11 +1639,11 @@
         },
         {
           "asset_id": "execution.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb"
+          "content_digest": "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c"
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188"
+          "content_digest": "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b"
         },
         {
           "asset_id": "execution.entrypoints.lad_consultant",
@@ -4901,7 +4901,7 @@
         },
         {
           "asset_id": "execution.skills.builder_core",
-          "content_digest": "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8"
+          "content_digest": "sha256:d789eb8a142451cffd3476b11671ab7b636a3e704c109d204c82db3e9d5d3dac"
         },
         {
           "asset_id": "execution.entrypoints.lad_integrator",
@@ -4925,7 +4925,7 @@
         },
         {
           "asset_id": "execution.skills.fixer_core",
-          "content_digest": "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862"
+          "content_digest": "sha256:5834155f56f905c2a6344932cdaddd6ffd7f5d6f131e7027f33c6452c6acae75"
         },
         {
           "asset_id": "execution.entrypoints.lad_doublechecker",
@@ -4945,11 +4945,11 @@
         },
         {
           "asset_id": "execution.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb"
+          "content_digest": "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c"
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188"
+          "content_digest": "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b"
         },
         {
           "asset_id": "execution.entrypoints.lad_consultant",
@@ -8599,7 +8599,7 @@
         },
         {
           "asset_id": "execution.skills.builder_core",
-          "content_digest": "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8"
+          "content_digest": "sha256:d789eb8a142451cffd3476b11671ab7b636a3e704c109d204c82db3e9d5d3dac"
         },
         {
           "asset_id": "execution.entrypoints.lad_checker",
@@ -8615,7 +8615,7 @@
         },
         {
           "asset_id": "execution.skills.fixer_core",
-          "content_digest": "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862"
+          "content_digest": "sha256:5834155f56f905c2a6344932cdaddd6ffd7f5d6f131e7027f33c6452c6acae75"
         },
         {
           "asset_id": "execution.entrypoints.lad_doublechecker",
@@ -8635,11 +8635,11 @@
         },
         {
           "asset_id": "execution.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb"
+          "content_digest": "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c"
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188"
+          "content_digest": "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b"
         },
         {
           "asset_id": "execution.entrypoints.lad_consultant",
@@ -13955,7 +13955,7 @@
         },
         {
           "asset_id": "execution.skills.builder_core",
-          "content_digest": "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8"
+          "content_digest": "sha256:d789eb8a142451cffd3476b11671ab7b636a3e704c109d204c82db3e9d5d3dac"
         },
         {
           "asset_id": "execution.entrypoints.lad_checker",
@@ -13971,7 +13971,7 @@
         },
         {
           "asset_id": "execution.skills.fixer_core",
-          "content_digest": "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862"
+          "content_digest": "sha256:5834155f56f905c2a6344932cdaddd6ffd7f5d6f131e7027f33c6452c6acae75"
         },
         {
           "asset_id": "execution.entrypoints.lad_doublechecker",
@@ -13991,11 +13991,11 @@
         },
         {
           "asset_id": "execution.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb"
+          "content_digest": "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c"
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188"
+          "content_digest": "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b"
         },
         {
           "asset_id": "execution.entrypoints.lad_consultant",
@@ -22993,7 +22993,7 @@
         },
         {
           "asset_id": "execution.skills.builder_core",
-          "content_digest": "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8"
+          "content_digest": "sha256:d789eb8a142451cffd3476b11671ab7b636a3e704c109d204c82db3e9d5d3dac"
         },
         {
           "asset_id": "execution.entrypoints.lad_checker",
@@ -23009,7 +23009,7 @@
         },
         {
           "asset_id": "execution.skills.fixer_core",
-          "content_digest": "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862"
+          "content_digest": "sha256:5834155f56f905c2a6344932cdaddd6ffd7f5d6f131e7027f33c6452c6acae75"
         },
         {
           "asset_id": "execution.entrypoints.lad_doublechecker",
@@ -23029,11 +23029,11 @@
         },
         {
           "asset_id": "execution.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb"
+          "content_digest": "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c"
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188"
+          "content_digest": "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b"
         },
         {
           "asset_id": "execution.entrypoints.lad_consultant",
@@ -26287,15 +26287,15 @@
       "required_assets": [
         {
           "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_builder",
-          "content_digest": "sha256:e95ef52689e96bf6d3f591872c399a2b64420befe5fe5a265d8b145dd8bdeaaf"
+          "content_digest": "sha256:839385509979a7fad68fd5069289bf95589670f1d9b273e2f774f42527b222b5"
         },
         {
           "asset_id": "execution.skills.builder_core",
-          "content_digest": "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8"
+          "content_digest": "sha256:d789eb8a142451cffd3476b11671ab7b636a3e704c109d204c82db3e9d5d3dac"
         },
         {
           "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_checker",
-          "content_digest": "sha256:e8dacdcc27cac96e7b2b93071e52200500e2c51bf607e57d5f438e68fd752bbd"
+          "content_digest": "sha256:32a10558a77fe49613b53eb0779bd64dc5d14e6d8cdd6230dd70897aedfaec0b"
         },
         {
           "asset_id": "execution.skills.checker_core",
@@ -26303,15 +26303,15 @@
         },
         {
           "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_fixer",
-          "content_digest": "sha256:82da3295473e03a9e407a499ab3b90b69a8b8ca1707499aea51bcd803914bafc"
+          "content_digest": "sha256:1f4547179ea2de9eac48231c547689d96c8995bbccf221ded60b7c1d4bea7bbb"
         },
         {
           "asset_id": "execution.skills.fixer_core",
-          "content_digest": "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862"
+          "content_digest": "sha256:5834155f56f905c2a6344932cdaddd6ffd7f5d6f131e7027f33c6452c6acae75"
         },
         {
           "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_doublechecker",
-          "content_digest": "sha256:e158679fb69c2c63f6082b90f2027a3fbdff2caf15cb715461f36a1dbf29e469"
+          "content_digest": "sha256:e99a49e9e5cbe59273ca01b052662e3d945a7c52dd6f7ff07be22b63cbb1904b"
         },
         {
           "asset_id": "execution.skills.doublechecker_core",
@@ -26319,7 +26319,7 @@
         },
         {
           "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_updater",
-          "content_digest": "sha256:22f5f5ca054a16242e4852471436ce166d275dca3096d1dfb51e9d112f6578f7"
+          "content_digest": "sha256:27d0e0f522d417c197f3538df47ad4ce9737c190eedc9e903acf45c1400b47ef"
         },
         {
           "asset_id": "execution.lad_codex_semantic_worktree.skills.updater_core",
@@ -26327,11 +26327,11 @@
         },
         {
           "asset_id": "execution.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb"
+          "content_digest": "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c"
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188"
+          "content_digest": "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b"
         },
         {
           "asset_id": "execution.entrypoints.lad_consultant",
@@ -26343,7 +26343,7 @@
         },
         {
           "asset_id": "execution.lad_codex_semantic_worktree.context_router",
-          "content_digest": "sha256:cca7527f05cfc8f69b180f2148993d9bba7c7c61d0f929e50d7da062ccf6b813"
+          "content_digest": "sha256:00053a2572581acd9441ebc8c1199accee49073afe87190a60bf847fec25d129"
         }
       ],
       "required_dependencies": [],
@@ -26859,6 +26859,375 @@
                 }
               }
             }
+          },
+          {
+            "id": "execution.artifacts.builder_result",
+            "presentation": {
+              "display_name": "Builder result"
+            },
+            "schema": {
+              "properties": {
+                "artifact_kind": {
+                  "const": "execution.artifacts.builder_result"
+                },
+                "summary": {
+                  "min_length": 1,
+                  "type": "string"
+                },
+                "task_contract_digest": {
+                  "min_length": 1,
+                  "type": "string"
+                },
+                "dispatch_digest": {
+                  "min_length": 1,
+                  "type": "string"
+                },
+                "canonical_changed_paths": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 64,
+                  "type": "array"
+                },
+                "checks": {
+                  "items": {
+                    "properties": {
+                      "command": {
+                        "min_length": 1,
+                        "type": "string"
+                      },
+                      "result_classification": {
+                        "enum": [
+                          "passed",
+                          "failed",
+                          "unavailable"
+                        ]
+                      },
+                      "evidence": {
+                        "items": {
+                          "min_length": 1,
+                          "type": "string"
+                        },
+                        "max_items": 16,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "command",
+                      "result_classification",
+                      "evidence"
+                    ],
+                    "type": "object"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "assumptions": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "unavailable_evidence": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "remaining_work": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "artifact_kind",
+                "summary",
+                "task_contract_digest",
+                "dispatch_digest",
+                "canonical_changed_paths",
+                "checks",
+                "assumptions",
+                "unavailable_evidence",
+                "remaining_work"
+              ],
+              "type": "object"
+            }
+          },
+          {
+            "id": "execution.artifacts.fixer_result",
+            "presentation": {
+              "display_name": "Fixer result"
+            },
+            "schema": {
+              "properties": {
+                "artifact_kind": {
+                  "const": "execution.artifacts.fixer_result"
+                },
+                "summary": {
+                  "min_length": 1,
+                  "type": "string"
+                },
+                "original_finding_ids": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "baseline_digest": {
+                  "min_length": 1,
+                  "type": "string"
+                },
+                "canonical_changed_paths": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 64,
+                  "type": "array"
+                },
+                "before_checks": {
+                  "items": {
+                    "properties": {
+                      "command": {
+                        "min_length": 1,
+                        "type": "string"
+                      },
+                      "result_classification": {
+                        "enum": [
+                          "passed",
+                          "failed",
+                          "unavailable"
+                        ]
+                      },
+                      "evidence": {
+                        "items": {
+                          "min_length": 1,
+                          "type": "string"
+                        },
+                        "max_items": 16,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "command",
+                      "result_classification",
+                      "evidence"
+                    ],
+                    "type": "object"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "after_checks": {
+                  "items": {
+                    "properties": {
+                      "command": {
+                        "min_length": 1,
+                        "type": "string"
+                      },
+                      "result_classification": {
+                        "enum": [
+                          "passed",
+                          "failed",
+                          "unavailable"
+                        ]
+                      },
+                      "evidence": {
+                        "items": {
+                          "min_length": 1,
+                          "type": "string"
+                        },
+                        "max_items": 16,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "command",
+                      "result_classification",
+                      "evidence"
+                    ],
+                    "type": "object"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "preserved_contract_digests": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 8,
+                  "type": "array"
+                },
+                "preserved_artifact_digests": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "assumptions": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "unavailable_evidence": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "remaining_findings": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "artifact_kind",
+                "summary",
+                "original_finding_ids",
+                "baseline_digest",
+                "canonical_changed_paths",
+                "before_checks",
+                "after_checks",
+                "preserved_contract_digests",
+                "preserved_artifact_digests",
+                "assumptions",
+                "unavailable_evidence",
+                "remaining_findings"
+              ],
+              "type": "object"
+            }
+          },
+          {
+            "id": "execution.artifacts.troubleshooter_repair_plan",
+            "presentation": {
+              "display_name": "Troubleshooter repair plan"
+            },
+            "schema": {
+              "properties": {
+                "artifact_kind": {
+                  "const": "execution.artifacts.troubleshooter_repair_plan"
+                },
+                "summary": {
+                  "min_length": 1,
+                  "type": "string"
+                },
+                "failed_session_id": {
+                  "min_length": 1,
+                  "type": "string"
+                },
+                "failed_stage_id": {
+                  "min_length": 1,
+                  "type": "string"
+                },
+                "failure_classification": {
+                  "enum": [
+                    "narrow_repair",
+                    "baseline_invalidated",
+                    "unchanged_source_review_execution_failure",
+                    "unrecoverable"
+                  ]
+                },
+                "evidence_refs": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "diagnosed_scope": {
+                  "min_length": 1,
+                  "type": "string"
+                },
+                "baseline_invalidated": {
+                  "type": "boolean"
+                },
+                "reentry_stage": {
+                  "enum": [
+                    "fixer",
+                    "builder",
+                    "checker",
+                    "none"
+                  ]
+                },
+                "artifact_dependencies": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "context_dependencies": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "repair_instructions": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "stop_conditions": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "max_items": 32,
+                  "type": "array"
+                },
+                "unrecoverable_reason": {
+                  "min_length": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "artifact_kind",
+                "summary",
+                "failed_session_id",
+                "failed_stage_id",
+                "failure_classification",
+                "evidence_refs",
+                "diagnosed_scope",
+                "baseline_invalidated",
+                "reentry_stage",
+                "artifact_dependencies",
+                "context_dependencies",
+                "repair_instructions",
+                "stop_conditions",
+                "unrecoverable_reason"
+              ],
+              "type": "object"
+            }
           }
         ],
         "capabilities": [
@@ -27315,7 +27684,9 @@
               "execution.route_fixer_complete",
               "execution.route_doublechecker_pass",
               "execution.close_updater_complete",
-              "execution.return_troubleshooter_complete"
+              "execution.return_troubleshooter_complete",
+              "execution.return_troubleshooter_baseline_invalidated",
+              "execution.return_troubleshooter_review_retry"
             ],
             "return_action_ids": [
               "execution.return_consultant_recovered"
@@ -27353,7 +27724,9 @@
               "execution.route_fixer_complete",
               "execution.route_doublechecker_pass",
               "execution.close_updater_complete",
-              "execution.return_troubleshooter_complete"
+              "execution.return_troubleshooter_complete",
+              "execution.return_troubleshooter_baseline_invalidated",
+              "execution.return_troubleshooter_review_retry"
             ],
             "return_action_ids": [
               "execution.return_troubleshooter_recovered"
@@ -27709,7 +28082,7 @@
               "provider_distribution": "@openai/codex",
               "provider_version": "0.147.0",
               "descriptor_media_type": "application/json",
-              "descriptor_sha256": "7100ae9f652bfb2dc4d9912f60841b05e2d1438a98816c296061c74d12e31153",
+              "descriptor_sha256": "671ddf738c44a5811ae2ac0f66b0deee464d4289a4626c4945d8d7e0c34378ac",
               "required_capability_ids": [
                 "terminal.intent",
                 "unrestricted.filesystem.read",
@@ -27717,20 +28090,17 @@
                 "unrestricted.process.execute"
               ],
               "legal_terminal_result_ids": [
-                "BLOCKED",
                 "RUNTIME_FAILURE",
                 "RUNTIME_FAILURE_ESCALATE",
-                "TROUBLESHOOT_COMPLETE",
+                "TROUBLESHOOT_BASELINE_INVALIDATED",
+                "TROUBLESHOOT_NARROW_REPAIR",
                 "TROUBLESHOOT_QUARANTINE",
-                "TROUBLESHOOT_RECOVERED"
+                "TROUBLESHOOT_RECOVERED",
+                "TROUBLESHOOT_REVIEW_RETRY",
+                "TROUBLESHOOT_UNRECOVERABLE"
               ]
             },
             "terminal_result_mappings": [
-              {
-                "stage_kind_id": "lad_troubleshooter",
-                "runner_result_id": "BLOCKED",
-                "outcome_id": "execution.lad_troubleshooter.blocked"
-              },
               {
                 "stage_kind_id": "lad_troubleshooter",
                 "runner_result_id": "RUNTIME_FAILURE",
@@ -27743,7 +28113,12 @@
               },
               {
                 "stage_kind_id": "lad_troubleshooter",
-                "runner_result_id": "TROUBLESHOOT_COMPLETE",
+                "runner_result_id": "TROUBLESHOOT_BASELINE_INVALIDATED",
+                "outcome_id": "execution.lad_troubleshooter.baseline_invalidated"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "runner_result_id": "TROUBLESHOOT_NARROW_REPAIR",
                 "outcome_id": "execution.lad_troubleshooter.complete"
               },
               {
@@ -27755,6 +28130,16 @@
                 "stage_kind_id": "lad_troubleshooter",
                 "runner_result_id": "TROUBLESHOOT_RECOVERED",
                 "outcome_id": "execution.lad_troubleshooter.recovered"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "runner_result_id": "TROUBLESHOOT_REVIEW_RETRY",
+                "outcome_id": "execution.lad_troubleshooter.review_retry"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "runner_result_id": "TROUBLESHOOT_UNRECOVERABLE",
+                "outcome_id": "execution.lad_troubleshooter.blocked"
               }
             ]
           },
@@ -27830,7 +28215,9 @@
             "artifact_schema_ids": [
               "execution.artifacts.task",
               "execution.artifacts.stage_result",
-              "execution.artifacts.report"
+              "execution.artifacts.report",
+              "execution.artifacts.builder_result",
+              "execution.artifacts.troubleshooter_repair_plan"
             ],
             "asset_ids": [
               "execution.lad_codex_semantic_worktree.entrypoints.lad_builder",
@@ -27864,7 +28251,9 @@
             "artifact_schema_ids": [
               "execution.artifacts.stage_result",
               "execution.artifacts.report",
-              "execution.artifacts.checker_result"
+              "execution.artifacts.checker_result",
+              "execution.artifacts.builder_result",
+              "execution.artifacts.troubleshooter_repair_plan"
             ],
             "asset_ids": [
               "execution.lad_codex_semantic_worktree.entrypoints.lad_checker",
@@ -27899,7 +28288,9 @@
               "execution.artifacts.stage_result",
               "execution.artifacts.report",
               "execution.artifacts.checker_result",
-              "execution.artifacts.doublecheck_result"
+              "execution.artifacts.doublecheck_result",
+              "execution.artifacts.fixer_result",
+              "execution.artifacts.troubleshooter_repair_plan"
             ],
             "asset_ids": [
               "execution.lad_codex_semantic_worktree.entrypoints.lad_fixer",
@@ -27932,7 +28323,8 @@
             "artifact_schema_ids": [
               "execution.artifacts.stage_result",
               "execution.artifacts.report",
-              "execution.artifacts.doublecheck_result"
+              "execution.artifacts.doublecheck_result",
+              "execution.artifacts.fixer_result"
             ],
             "asset_ids": [
               "execution.lad_codex_semantic_worktree.entrypoints.lad_doublechecker",
@@ -28002,7 +28394,8 @@
               "execution.artifacts.stage_result",
               "execution.artifacts.report",
               "execution.artifacts.checker_result",
-              "execution.artifacts.doublecheck_result"
+              "execution.artifacts.doublecheck_result",
+              "execution.artifacts.troubleshooter_repair_plan"
             ],
             "asset_ids": [
               "execution.entrypoints.lad_troubleshooter",
@@ -28011,6 +28404,8 @@
             "declared_outcome_ids": [
               "execution.lad_troubleshooter.complete",
               "execution.lad_troubleshooter.blocked",
+              "execution.lad_troubleshooter.review_retry",
+              "execution.lad_troubleshooter.baseline_invalidated",
               "execution.lad_troubleshooter.recovered",
               "execution.lad_troubleshooter.recovery_blocked",
               "execution.lad_troubleshooter.runtime_failed",
@@ -28070,7 +28465,7 @@
         ],
         "terminal_actions": [
           {
-            "artifact_schema_id": "execution.artifacts.stage_result",
+            "artifact_schema_id": "execution.artifacts.builder_result",
             "asset_ids": [
               "execution.lad_codex_semantic_worktree.entrypoints.lad_checker",
               "execution.skills.checker_core"
@@ -28551,7 +28946,7 @@
             "target_stage_kind_id": "lad_troubleshooter"
           },
           {
-            "artifact_schema_id": "execution.artifacts.stage_result",
+            "artifact_schema_id": "execution.artifacts.fixer_result",
             "asset_ids": [
               "execution.lad_codex_semantic_worktree.entrypoints.lad_doublechecker",
               "execution.skills.doublechecker_core"
@@ -28777,52 +29172,11 @@
             "target_stage_kind_id": "lad_troubleshooter"
           },
           {
-            "artifact_schema_id": "execution.artifacts.report",
+            "artifact_schema_id": "execution.artifacts.troubleshooter_repair_plan",
             "asset_ids": [
-              "execution.lad_codex_semantic_worktree.entrypoints.lad_builder",
-              "execution.skills.builder_core"
+              "execution.lad_codex_semantic_worktree.entrypoints.lad_fixer",
+              "execution.skills.fixer_core"
             ],
-            "dynamic_target_selector": {
-              "disallowed_targets": [
-                "consultant"
-              ],
-              "field_names": [
-                "resume_stage"
-              ],
-              "kind": "observation_payload_route_target",
-              "targets": {
-                "builder": {
-                  "emitted_queue_family_id": "stage_result",
-                  "runner_binding_id": "lad_builder.codex_runner",
-                  "target_graph_node_id": "execution.lad_codex_semantic_worktree.builder.start",
-                  "target_stage_kind_id": "lad_builder"
-                },
-                "checker": {
-                  "emitted_queue_family_id": "stage_result",
-                  "runner_binding_id": "lad_checker.codex_runner",
-                  "target_graph_node_id": "execution.lad_codex_semantic_worktree.checker.start",
-                  "target_stage_kind_id": "lad_checker"
-                },
-                "doublechecker": {
-                  "emitted_queue_family_id": "stage_result",
-                  "runner_binding_id": "lad_doublechecker.codex_runner",
-                  "target_graph_node_id": "execution.lad_codex_semantic_worktree.doublechecker.start",
-                  "target_stage_kind_id": "lad_doublechecker"
-                },
-                "fixer": {
-                  "emitted_queue_family_id": "stage_result",
-                  "runner_binding_id": "lad_fixer.codex_runner",
-                  "target_graph_node_id": "execution.lad_codex_semantic_worktree.fixer.start",
-                  "target_stage_kind_id": "lad_fixer"
-                },
-                "updater": {
-                  "emitted_queue_family_id": "stage_result",
-                  "runner_binding_id": "lad_updater.codex_runner",
-                  "target_graph_node_id": "execution.lad_codex_semantic_worktree.updater.start",
-                  "target_stage_kind_id": "lad_updater"
-                }
-              }
-            },
             "emitted_queue_family_id": "stage_result",
             "id": "execution.return_troubleshooter_complete",
             "kind": "route",
@@ -28848,21 +29202,26 @@
             "presentation": {
               "display_name": "execution.return_troubleshooter_complete"
             },
-            "runner_binding_id": "lad_builder.codex_runner",
+            "runner_binding_id": "lad_fixer.codex_runner",
             "stage_kind_id": "lad_troubleshooter",
-            "target_graph_node_id": "execution.lad_codex_semantic_worktree.builder.start",
-            "target_stage_kind_id": "lad_builder"
+            "target_graph_node_id": "execution.lad_codex_semantic_worktree.fixer.start",
+            "target_stage_kind_id": "lad_fixer",
+            "artifact_field_conditions": {
+              "failure_classification": "narrow_repair",
+              "baseline_invalidated": false,
+              "reentry_stage": "fixer"
+            }
           },
           {
-            "artifact_schema_id": "execution.artifacts.stage_result",
+            "artifact_schema_id": "execution.artifacts.troubleshooter_repair_plan",
             "asset_ids": [
-              "execution.entrypoints.lad_consultant",
-              "execution.skills.consultant_core"
+              "execution.lad_codex_semantic_worktree.entrypoints.lad_builder",
+              "execution.skills.builder_core"
             ],
             "emitted_queue_family_id": "stage_result",
-            "id": "execution.route_troubleshooter_blocked",
+            "id": "execution.return_troubleshooter_baseline_invalidated",
             "kind": "route",
-            "outcome_id": "execution.lad_troubleshooter.blocked",
+            "outcome_id": "execution.lad_troubleshooter.baseline_invalidated",
             "payload_projection": {
               "kind": "object",
               "fields": {
@@ -28882,12 +29241,73 @@
               }
             },
             "presentation": {
+              "display_name": "execution.return_troubleshooter_baseline_invalidated"
+            },
+            "runner_binding_id": "lad_builder.codex_runner",
+            "stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad_codex_semantic_worktree.builder.start",
+            "target_stage_kind_id": "lad_builder",
+            "artifact_field_conditions": {
+              "failure_classification": "baseline_invalidated",
+              "baseline_invalidated": true,
+              "reentry_stage": "builder"
+            }
+          },
+          {
+            "artifact_schema_id": "execution.artifacts.troubleshooter_repair_plan",
+            "asset_ids": [
+              "execution.lad_codex_semantic_worktree.entrypoints.lad_checker",
+              "execution.skills.checker_core"
+            ],
+            "emitted_queue_family_id": "stage_result",
+            "id": "execution.return_troubleshooter_review_retry",
+            "kind": "route",
+            "outcome_id": "execution.lad_troubleshooter.review_retry",
+            "payload_projection": {
+              "kind": "object",
+              "fields": {
+                "qa_context": {
+                  "kind": "source",
+                  "path": [
+                    "work_item_payload",
+                    "qa_context"
+                  ]
+                },
+                "troubleshooter_evidence": {
+                  "kind": "source",
+                  "path": [
+                    "artifact_payload"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "execution.return_troubleshooter_review_retry"
+            },
+            "runner_binding_id": "lad_checker.codex_runner",
+            "stage_kind_id": "lad_troubleshooter",
+            "target_graph_node_id": "execution.lad_codex_semantic_worktree.checker.start",
+            "target_stage_kind_id": "lad_checker",
+            "artifact_field_conditions": {
+              "failure_classification": "unchanged_source_review_execution_failure",
+              "baseline_invalidated": false,
+              "reentry_stage": "checker"
+            }
+          },
+          {
+            "artifact_schema_id": "execution.artifacts.troubleshooter_repair_plan",
+            "id": "execution.route_troubleshooter_blocked",
+            "kind": "block_work_item",
+            "outcome_id": "execution.lad_troubleshooter.blocked",
+            "presentation": {
               "display_name": "execution.route_troubleshooter_blocked"
             },
-            "runner_binding_id": "lad_consultant.codex_runner",
             "stage_kind_id": "lad_troubleshooter",
-            "target_graph_node_id": "execution.lad_codex_semantic_worktree.consultant.start",
-            "target_stage_kind_id": "lad_consultant"
+            "artifact_field_conditions": {
+              "failure_classification": "unrecoverable",
+              "baseline_invalidated": false,
+              "reentry_stage": "none"
+            }
           },
           {
             "artifact_schema_id": "execution.artifacts.report",
@@ -29024,7 +29444,7 @@
             "target_stage_kind_id": "lad_troubleshooter"
           },
           {
-            "artifact_schema_id": "execution.artifacts.report",
+            "artifact_schema_id": "execution.artifacts.troubleshooter_repair_plan",
             "id": "execution.return_troubleshooter_recovered",
             "kind": "return_to_recorded_source",
             "outcome_id": "execution.lad_troubleshooter.recovered",
@@ -29034,7 +29454,7 @@
             "stage_kind_id": "lad_troubleshooter"
           },
           {
-            "artifact_schema_id": "execution.artifacts.report",
+            "artifact_schema_id": "execution.artifacts.troubleshooter_repair_plan",
             "id": "execution.quarantine_troubleshooter_blocked",
             "kind": "quarantine_lineage",
             "outcome_id": "execution.lad_troubleshooter.recovery_blocked",
@@ -29419,17 +29839,33 @@
           },
           {
             "id": "execution.lad_troubleshooter.complete",
-            "marker": "TROUBLESHOOT_COMPLETE",
+            "marker": "TROUBLESHOOT_NARROW_REPAIR",
             "presentation": {
-              "display_name": "Troubleshoot complete"
+              "display_name": "Troubleshooter narrow repair"
             },
             "stage_kind_id": "lad_troubleshooter"
           },
           {
             "id": "execution.lad_troubleshooter.blocked",
-            "marker": "BLOCKED",
+            "marker": "TROUBLESHOOT_UNRECOVERABLE",
             "presentation": {
-              "display_name": "Troubleshooter blocked"
+              "display_name": "Troubleshooter unrecoverable"
+            },
+            "stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "id": "execution.lad_troubleshooter.baseline_invalidated",
+            "marker": "TROUBLESHOOT_BASELINE_INVALIDATED",
+            "presentation": {
+              "display_name": "Troubleshooter baseline invalidated"
+            },
+            "stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "id": "execution.lad_troubleshooter.review_retry",
+            "marker": "TROUBLESHOOT_REVIEW_RETRY",
+            "presentation": {
+              "display_name": "Troubleshooter review retry"
             },
             "stage_kind_id": "lad_troubleshooter"
           },
@@ -29662,7 +30098,7 @@
           "id": "execution.lad_codex_semantic_worktree",
           "name": "LAD Codex Semantic Worktree",
           "required_extensions": [],
-          "version": "0.1"
+          "version": "0.2"
         },
         "context_bindings": [
           {
@@ -29670,6 +30106,10 @@
             "stage_kind_id": "lad_builder",
             "router_asset_id": "execution.lad_codex_semantic_worktree.context_router",
             "checkout_root": "millrace-agents/checkouts",
+            "max_hydrated_files": 256,
+            "max_hydrated_bytes": 4194304,
+            "mutation_policy": "forbid_selected_roots",
+            "materialization_retention": "until_session_durable_terminal",
             "required_sources": [
               {
                 "source_kind": "dispatch_material",
@@ -29688,38 +30128,45 @@
                 "source_ref": "millrace-agents/shared/CONTEXT.md",
                 "max_files": 1,
                 "max_bytes": 262144
+              },
+              {
+                "source_kind": "selected_artifacts",
+                "source_ref": "direct_predecessors",
+                "empty_policy": "omit_if_absent",
+                "max_files": 64,
+                "max_bytes": 1048576
               }
             ],
             "discoverable_sources": [
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/conventions",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/decisions",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/references",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/workspace-map/wiki",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "docs",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               }
             ]
           },
@@ -29728,6 +30175,10 @@
             "stage_kind_id": "lad_checker",
             "router_asset_id": "execution.lad_codex_semantic_worktree.context_router",
             "checkout_root": "millrace-agents/checkouts",
+            "max_hydrated_files": 256,
+            "max_hydrated_bytes": 4194304,
+            "mutation_policy": "forbid_selected_roots",
+            "materialization_retention": "until_session_durable_terminal",
             "required_sources": [
               {
                 "source_kind": "dispatch_material",
@@ -29736,20 +30187,8 @@
                 "max_bytes": 1048576
               },
               {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/MILLRACE.md",
-                "max_files": 1,
-                "max_bytes": 65536
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/shared/CONTEXT.md",
-                "max_files": 1,
-                "max_bytes": 262144
-              },
-              {
                 "source_kind": "selected_artifacts",
-                "source_ref": "current_lineage",
+                "source_ref": "direct_predecessors",
                 "max_files": 64,
                 "max_bytes": 1048576
               }
@@ -29758,32 +30197,26 @@
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/conventions",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/decisions",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/references",
-                "max_files": 256,
-                "max_bytes": 4194304
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/shared/workspace-map/wiki",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "docs",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               }
             ]
           },
@@ -29792,6 +30225,10 @@
             "stage_kind_id": "lad_fixer",
             "router_asset_id": "execution.lad_codex_semantic_worktree.context_router",
             "checkout_root": "millrace-agents/checkouts",
+            "max_hydrated_files": 256,
+            "max_hydrated_bytes": 4194304,
+            "mutation_policy": "forbid_selected_roots",
+            "materialization_retention": "until_session_durable_terminal",
             "required_sources": [
               {
                 "source_kind": "dispatch_material",
@@ -29800,26 +30237,14 @@
                 "max_bytes": 1048576
               },
               {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/MILLRACE.md",
-                "max_files": 1,
-                "max_bytes": 65536
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/shared/CONTEXT.md",
-                "max_files": 1,
-                "max_bytes": 262144
-              },
-              {
                 "source_kind": "selected_artifacts",
-                "source_ref": "current_lineage",
+                "source_ref": "direct_predecessors",
                 "max_files": 64,
                 "max_bytes": 1048576
               },
               {
                 "source_kind": "selected_attempts",
-                "source_ref": "current_lineage",
+                "source_ref": "since_last_accepted_transition",
                 "max_files": 64,
                 "max_bytes": 1048576
               }
@@ -29828,32 +30253,26 @@
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/conventions",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/decisions",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/references",
-                "max_files": 256,
-                "max_bytes": 4194304
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/shared/workspace-map/wiki",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "docs",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               }
             ]
           },
@@ -29862,6 +30281,48 @@
             "stage_kind_id": "lad_doublechecker",
             "router_asset_id": "execution.lad_codex_semantic_worktree.context_router",
             "checkout_root": "millrace-agents/checkouts",
+            "max_hydrated_files": 256,
+            "max_hydrated_bytes": 4194304,
+            "mutation_policy": "forbid_selected_roots",
+            "materialization_retention": "until_session_durable_terminal",
+            "required_sources": [
+              {
+                "source_kind": "selected_artifacts",
+                "source_ref": "direct_predecessors",
+                "max_files": 64,
+                "max_bytes": 1048576
+              },
+              {
+                "source_kind": "selected_attempts",
+                "source_ref": "since_last_accepted_transition",
+                "max_files": 64,
+                "max_bytes": 1048576
+              }
+            ],
+            "discoverable_sources": [
+              {
+                "source_kind": "workspace_relative_root",
+                "source_ref": "millrace-agents/shared/references",
+                "max_files": 64,
+                "max_bytes": 1048576
+              },
+              {
+                "source_kind": "workspace_relative_root",
+                "source_ref": "docs",
+                "max_files": 64,
+                "max_bytes": 1048576
+              }
+            ]
+          },
+          {
+            "id": "execution.lad_codex_semantic_worktree.lad_troubleshooter_context",
+            "stage_kind_id": "lad_troubleshooter",
+            "router_asset_id": "execution.lad_codex_semantic_worktree.context_router",
+            "checkout_root": "millrace-agents/checkouts",
+            "max_hydrated_files": 256,
+            "max_hydrated_bytes": 4194304,
+            "mutation_policy": "forbid_selected_roots",
+            "materialization_retention": "until_session_durable_terminal",
             "required_sources": [
               {
                 "source_kind": "dispatch_material",
@@ -29870,26 +30331,14 @@
                 "max_bytes": 1048576
               },
               {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/MILLRACE.md",
-                "max_files": 1,
-                "max_bytes": 65536
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/shared/CONTEXT.md",
-                "max_files": 1,
-                "max_bytes": 262144
-              },
-              {
                 "source_kind": "selected_artifacts",
-                "source_ref": "current_lineage",
+                "source_ref": "direct_predecessors",
                 "max_files": 64,
                 "max_bytes": 1048576
               },
               {
                 "source_kind": "selected_attempts",
-                "source_ref": "current_lineage",
+                "source_ref": "since_last_accepted_transition",
                 "max_files": 64,
                 "max_bytes": 1048576
               }
@@ -29898,32 +30347,26 @@
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/conventions",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/decisions",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/references",
-                "max_files": 256,
-                "max_bytes": 4194304
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/shared/workspace-map/wiki",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "docs",
-                "max_files": 256,
-                "max_bytes": 4194304
+                "max_files": 64,
+                "max_bytes": 1048576
               }
             ]
           },
@@ -29932,24 +30375,16 @@
             "stage_kind_id": "lad_updater",
             "router_asset_id": "execution.lad_codex_semantic_worktree.context_router",
             "checkout_root": "millrace-agents/checkouts",
+            "max_hydrated_files": 256,
+            "max_hydrated_bytes": 4194304,
+            "mutation_policy": "reconcile_selected_writes",
+            "materialization_retention": "until_session_durable_terminal",
             "required_sources": [
               {
                 "source_kind": "dispatch_material",
                 "source_ref": "current",
                 "max_files": 1,
                 "max_bytes": 1048576
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/MILLRACE.md",
-                "max_files": 1,
-                "max_bytes": 65536
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "millrace-agents/shared/CONTEXT.md",
-                "max_files": 1,
-                "max_bytes": 262144
               },
               {
                 "source_kind": "selected_artifacts",
@@ -29962,6 +30397,12 @@
                 "source_ref": "current_lineage",
                 "max_files": 64,
                 "max_bytes": 1048576
+              },
+              {
+                "source_kind": "workspace_relative_root",
+                "source_ref": "millrace-agents/MILLRACE.md",
+                "max_files": 1,
+                "max_bytes": 65536
               },
               {
                 "source_kind": "workspace_relative_root",
@@ -29992,6 +30433,12 @@
                 "source_ref": "docs",
                 "max_files": 256,
                 "max_bytes": 4194304
+              },
+              {
+                "source_kind": "workspace_relative_root",
+                "source_ref": "millrace-agents/shared/CONTEXT.md",
+                "max_files": 1,
+                "max_bytes": 262144
               },
               {
                 "source_kind": "workspace_relative_root",
@@ -30052,7 +30499,7 @@
       },
       "visibility": "public",
       "workflow_id": "execution.lad_codex_semantic_worktree",
-      "workflow_version": "0.1"
+      "workflow_version": "0.2"
     }
   ],
   "assets": [
@@ -30169,8 +30616,8 @@
     {
       "asset_id": "execution.skills.builder_core",
       "asset_kind": "stage_skill",
-      "byte_length": 3442,
-      "content_digest": "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8",
+      "byte_length": 4556,
+      "content_digest": "sha256:d789eb8a142451cffd3476b11671ab7b636a3e704c109d204c82db3e9d5d3dac",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad/skills/builder-core.md",
@@ -30213,8 +30660,8 @@
     {
       "asset_id": "execution.skills.fixer_core",
       "asset_kind": "stage_skill",
-      "byte_length": 3090,
-      "content_digest": "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862",
+      "byte_length": 4423,
+      "content_digest": "sha256:5834155f56f905c2a6344932cdaddd6ffd7f5d6f131e7027f33c6452c6acae75",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad/skills/fixer-core.md",
@@ -30268,8 +30715,8 @@
     {
       "asset_id": "execution.entrypoints.lad_troubleshooter",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2746,
-      "content_digest": "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb",
+      "byte_length": 4428,
+      "content_digest": "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_troubleshooter.md",
@@ -30279,8 +30726,8 @@
     {
       "asset_id": "execution.skills.troubleshooter_core",
       "asset_kind": "stage_skill",
-      "byte_length": 3141,
-      "content_digest": "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188",
+      "byte_length": 5367,
+      "content_digest": "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad/skills/troubleshooter-core.md",
@@ -30752,8 +31199,8 @@
     {
       "asset_id": "execution.lad_codex_semantic_worktree.context_router",
       "asset_kind": "template",
-      "byte_length": 1297,
-      "content_digest": "sha256:cca7527f05cfc8f69b180f2148993d9bba7c7c61d0f929e50d7da062ccf6b813",
+      "byte_length": 1617,
+      "content_digest": "sha256:00053a2572581acd9441ebc8c1199accee49073afe87190a60bf847fec25d129",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md",
@@ -30763,8 +31210,8 @@
     {
       "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_builder",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2107,
-      "content_digest": "sha256:e95ef52689e96bf6d3f591872c399a2b64420befe5fe5a265d8b145dd8bdeaaf",
+      "byte_length": 2705,
+      "content_digest": "sha256:839385509979a7fad68fd5069289bf95589670f1d9b273e2f774f42527b222b5",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_builder.md",
@@ -30774,8 +31221,8 @@
     {
       "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_checker",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2159,
-      "content_digest": "sha256:e8dacdcc27cac96e7b2b93071e52200500e2c51bf607e57d5f438e68fd752bbd",
+      "byte_length": 2298,
+      "content_digest": "sha256:32a10558a77fe49613b53eb0779bd64dc5d14e6d8cdd6230dd70897aedfaec0b",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_checker.md",
@@ -30785,8 +31232,8 @@
     {
       "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_fixer",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2245,
-      "content_digest": "sha256:82da3295473e03a9e407a499ab3b90b69a8b8ca1707499aea51bcd803914bafc",
+      "byte_length": 2781,
+      "content_digest": "sha256:1f4547179ea2de9eac48231c547689d96c8995bbccf221ded60b7c1d4bea7bbb",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_fixer.md",
@@ -30796,8 +31243,8 @@
     {
       "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_doublechecker",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2223,
-      "content_digest": "sha256:e158679fb69c2c63f6082b90f2027a3fbdff2caf15cb715461f36a1dbf29e469",
+      "byte_length": 2388,
+      "content_digest": "sha256:e99a49e9e5cbe59273ca01b052662e3d945a7c52dd6f7ff07be22b63cbb1904b",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_doublechecker.md",
@@ -30807,8 +31254,8 @@
     {
       "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_updater",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 2713,
-      "content_digest": "sha256:22f5f5ca054a16242e4852471436ce166d275dca3096d1dfb51e9d112f6578f7",
+      "byte_length": 2877,
+      "content_digest": "sha256:27d0e0f522d417c197f3538df47ad4ce9737c190eedc9e903acf45c1400b47ef",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_updater.md",
@@ -30829,14 +31276,14 @@
   ],
   "dependencies": [],
   "compatibility": {
-    "base_millrace": ">=0.22,<0.23",
+    "base_millrace": ">=0.22.3,<0.23",
     "package_contract": "v0.22"
   },
   "canonicalization": {
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:36fbc70f945f31c958d1ce9c7eb6a8972fb82e7dacf8e38a7bab4c25ec44dd09",
+  "manifest_digest": "sha256:cef079a6601cf1f9dffd764957dcdbfddd94f60b3f314711086b29c06039507a",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",

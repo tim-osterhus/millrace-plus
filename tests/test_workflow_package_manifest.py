@@ -8,17 +8,20 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
+from millrace.compiler import compile_workflow
+
+from support import package_conformance as conformance
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.22.2"
+PACKAGE_VERSION = "0.22.3"
 WORKFLOW_SELECTORS = {
     ("simple_loop", "0.1"),
     ("execution.lad", "0.1"),
     ("execution.lad_integrator", "0.1"),
     ("execution.lad_codex_control", "0.1"),
-    ("execution.lad_codex_semantic_worktree", "0.1"),
+    ("execution.lad_codex_semantic_worktree", "0.2"),
     ("planning.lad", "0.1"),
     ("lad.full", "0.1"),
     ("vendor_selection", "0.1"),
@@ -545,10 +548,10 @@ def test_codex_workflows_close_exactly_over_the_declared_package_bytes() -> None
     assert router["package_path"] == (
         "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md"
     )
-    assert router["byte_length"] == 1297
+    assert router["byte_length"] == 1617
     assert router["byte_length"] == len(router_bytes)
     assert router["content_digest"] == (
-        "sha256:cca7527f05cfc8f69b180f2148993d9bba7c7c61d0f929e50d7da062ccf6b813"
+        "sha256:00053a2572581acd9441ebc8c1199accee49073afe87190a60bf847fec25d129"
     )
     assert router["content_digest"] == _asset_digest(router_bytes)
     assert router["asset_id"] in treatment_required_ids
@@ -591,3 +594,25 @@ def test_codex_workflows_close_exactly_over_the_declared_package_bytes() -> None
         for asset_id in assets
         if asset_id.startswith(f"{treatment_prefix}.")
     } <= treatment_assets
+
+
+def test_governed_semantic_lad_uses_runtime_schema_18_and_0223_pin() -> None:
+    manifest = _load_manifest()
+    package = manifest["package"]
+    assert package["package_version"] == PACKAGE_VERSION
+    assert package["base_millrace_compatibility"] == ">=0.22.3,<0.23"
+    assert manifest["compatibility"]["base_millrace"] == ">=0.22.3,<0.23"
+
+    workflow = next(
+        item
+        for item in _workflows(manifest)
+        if item["workflow_id"] == "execution.lad_codex_semantic_worktree"
+    )
+    assert workflow["workflow_version"] == "0.2"
+    result = compile_workflow(
+        conformance.packaged_workflow_source(
+            PACKAGE_ROOT, "execution.lad_codex_semantic_worktree"
+        )
+    )
+    assert result.plan is not None, result.diagnostics
+    assert result.plan.schema_version == 18

@@ -50,7 +50,7 @@ from support import package_conformance as conformance
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.22.2"
+PACKAGE_VERSION = "0.22.3"
 WORKFLOW_ID = "planning.lad"
 RECON_WORKFLOW_IDS = ("planning.lad", "lad.full")
 ARBITER_WORKFLOW_IDS = ("planning.lad", "lad.full")

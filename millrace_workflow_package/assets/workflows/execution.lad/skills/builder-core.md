@@ -32,6 +32,38 @@ Produce one selected artifact declared for the active stage. The selected dispat
 
 Evidence and assumptions belong in the runner evidence envelope unless the selected schema explicitly includes them.
 
+## Governed Builder Result
+
+When the selected workflow declares `execution.artifacts.builder_result`,
+produce that strict artifact instead of a free-text stage result. Required
+fields are `artifact_kind`, `summary`, `task_contract_digest`,
+`dispatch_digest`, canonical `canonical_changed_paths`, bounded `checks`,
+`assumptions`, `unavailable_evidence`, and `remaining_work`. Each check has a
+command, a `result_classification` of `passed`, `failed`, or `unavailable`, and
+bounded evidence. Required dispatch and predecessor evidence comes first. A
+relevant catalog entry may be selected by its named path on demand; never read
+every catalog entry.
+
+```json
+{
+  "artifact_kind": "execution.artifacts.builder_result",
+  "summary": "Implemented the requested change.",
+  "task_contract_digest": "sha256:task",
+  "dispatch_digest": "sha256:dispatch",
+  "canonical_changed_paths": ["src/example.py"],
+  "checks": [
+    {
+      "command": "pytest -q",
+      "result_classification": "passed",
+      "evidence": ["tests passed"]
+    }
+  ],
+  "assumptions": [],
+  "unavailable_evidence": [],
+  "remaining_work": []
+}
+```
+
 ## Handoff Format
 
 ```text

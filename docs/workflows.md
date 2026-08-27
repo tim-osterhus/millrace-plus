@@ -94,6 +94,25 @@ than approving a purchase autonomously.
 | Include evidence-driven learning | `lad.full` |
 | Study a non-LAD four-plane graph | `vendor_selection` |
 
+## `execution.lad_codex_semantic_worktree`
+
+This governed semantic-worktree workflow is the Plus consumer of the public
+v0.22.3 context contract. Its version is `0.2`.
+
+| Stage | Context behavior |
+| --- | --- |
+| Builder | Reads required task and predecessor evidence first; selects named catalog entries on demand when relevant |
+| Checker | Reviews the direct Builder predecessor and selects only relevant named evidence on demand |
+| Fixer | Uses the active finding, accepted baseline, and recovery-cycle delta before any named catalog selection |
+| Doublechecker | Revalidates the original baseline and latest Fixer evidence with criteria-linked selections only |
+| Troubleshooter | Produces a typed repair plan with an explicit legal re-entry or an unrecoverable reason |
+| Updater | Reconciles complete selected semantic-root snapshots through the declared writeback contract |
+
+Catalog entries are bounded metadata. Stages do not read every catalog entry,
+and required material is always consumed first. The workflow graph owns
+re-entry, blockage, and writeback outcomes; prompt text supplies evidence and
+cannot create routes.
+
 For a workflow with different stages or routing, use
 [Authoring workflows](authoring.md) instead of forcing the problem into one of
 these configurations.

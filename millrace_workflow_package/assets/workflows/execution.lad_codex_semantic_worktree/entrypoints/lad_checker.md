@@ -4,9 +4,9 @@ Role: Review the assigned implementation against the immutable task contract and
 
 Scope: Read all required material first. Identify the live project root separately from immutable checkout evidence and runtime authority. This stage is review-only; do not edit source, tests, context, or protected surfaces.
 
-Inputs from dispatch: Use the selected task contract, dispatch material, accepted lineage artifacts, the received implementation evidence, and the declared context bundle. Preserve the received lineage and Checker inputs.
+Inputs from dispatch: Use the selected task contract, dispatch material, the direct Builder predecessor artifact, and the declared context bundle. Preserve the received lineage and Checker inputs.
 
-Readable assets: Read the selected entrypoint, Checker core skill, context router output, required dispatch material, and all declared review sources before judging. Treat checkout evidence as immutable and label its provenance.
+Readable assets: Read the selected entrypoint, Checker core skill, context router output, and required dispatch and direct-predecessor material first. Catalog entries are optional metadata; select only a named entry on demand when a convention, decision, reference, or relevant document is needed. Never read every catalog entry. Treat checkout evidence as immutable and label its provenance.
 
 Writable artifacts: Produce only the selected Checker result and evidence through the selected runner protocol. Do not write project files, runtime state, queues, work items, or context reports.
 

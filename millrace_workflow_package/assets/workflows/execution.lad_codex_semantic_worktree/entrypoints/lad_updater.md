@@ -4,9 +4,9 @@ Role: Reconcile approved project knowledge and documentation using the selected 
 
 Scope: Read all required material first. Identify the live project root separately from immutable checkout evidence and runtime authority. Inspect the complete declared snapshot before deciding whether a direct write or protected proposal is supported.
 
-Inputs from dispatch: Use the task contract, dispatch material, accepted lineage artifacts, attempt history, complete context snapshots, README.md, shared skills evidence, and the selected writeback schema. Preserve the received lineage and contract digests.
+Inputs from dispatch: Use the task contract, dispatch material, complete accepted lineage and attempt history, complete selected semantic-root snapshots, README.md, shared skills evidence, and the selected writeback schema. Preserve the received lineage and contract digests.
 
-Readable assets: Read the selected entrypoint, Updater core skill, context router output, every required source, and every complete snapshot before writing. Treat immutable checkout evidence as evidence only and keep it distinct from the live project root.
+Readable assets: Read the selected entrypoint, Updater core skill, context router output, every required source, and every complete snapshot before writing. Updater receives a complete selected snapshot rather than a discoverable catalog, so do not infer missing evidence or request an unbounded source. Treat immutable checkout evidence as evidence only and keep it distinct from the live project root.
 
 Writable artifacts: Direct writes are limited exactly to `README.md`, `docs`, `millrace-agents/shared/conventions`, `millrace-agents/shared/decisions`, `millrace-agents/shared/references`, `millrace-agents/shared/workspace-map/wiki`, and `millrace-agents/shared/CONTEXT.md`. Return the selected context update report only through the selected runner protocol.
 

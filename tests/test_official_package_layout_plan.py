@@ -8,7 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 OFFICIAL_PACKAGE_ID = "millrace.plus.official"
 TEMPORARY_SCAFFOLD_PACKAGE_ID = "millrace.plus.scaffold"
-RELEASE_IDENTITY = "0.22.2"
+RELEASE_IDENTITY = "0.22.3"
 
 
 def _shipped_manifest() -> dict[str, object]:
@@ -24,7 +24,7 @@ def test_readme_documents_public_official_workflow_package() -> None:
     for required in (
         "`millrace_workflow_package/`",
         "`millrace.plus.official`",
-        "source and package are on the v0.22.2 release line",
+        "source and package are on the v0.22.3 release line",
         "installed resource root is `millrace_workflow_package`",
         "`simple_loop`",
         "`execution.lad`",
@@ -33,7 +33,7 @@ def test_readme_documents_public_official_workflow_package() -> None:
         "`lad.full`",
         "`vendor_selection`",
         "package data is non-executable",
-        "`millrace==0.22.2` convenience meta-distribution",
+        "`millrace==0.22.3` convenience meta-distribution",
     ):
         assert required in readme
     assert "PLUS-" not in readme

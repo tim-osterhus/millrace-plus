@@ -17,7 +17,6 @@ PUBLIC_TESTS = (
     "tests/test_package_metadata.py",
     "tests/test_manifest_authoring_policy.py",
     "tests/test_official_package_layout_plan.py",
-    "tests/test_workflow_package_manifest.py",
     "tests/test_workflow_package_installed_smoke.py",
     "tests/test_public_package_boundary.py",
     "tests/test_agent_skill_assets.py",
@@ -25,6 +24,7 @@ PUBLIC_TESTS = (
 NON_PUBLIC_REGRESSION_TESTS = {
     "tests/test_lad_execution_official_package.py",
     "tests/test_lad_planning_official_package.py",
+    "tests/test_workflow_package_manifest.py",
 }
 PUBLIC_DOCS = (
     "README.md",
@@ -34,11 +34,11 @@ PUBLIC_DOCS = (
     "docs/release.md",
     "docs/public-validation.md",
 )
-RELEASE_IDENTITY = "0.22.2"
-META_RELEASE_PIN = "`millrace==0.22.2`"
+RELEASE_IDENTITY = "0.22.3"
+META_RELEASE_PIN = "`millrace==0.22.3`"
 BUNDLE_MEMBER_PINS = (
-    "`millrace-ai==0.22.2`",
-    "`millrace-plus==0.22.2`",
+    "`millrace-ai==0.22.3`",
+    "`millrace-plus==0.22.3`",
     "`millforge==0.1.0`",
 )
 VERSIONING_RULES = (
@@ -97,7 +97,7 @@ def test_current_docs_preserve_public_package_and_evidence_boundaries() -> None:
     for required in (
         "official collection of ready-to-run Millrace workflows",
         "`millrace.plus.official`",
-        "source and package are on the v0.22.2 release line",
+        "source and package are on the v0.22.3 release line",
         "installed resource root is `millrace_workflow_package`",
         "package data is non-executable",
         "A direct installation contains package metadata and data only",

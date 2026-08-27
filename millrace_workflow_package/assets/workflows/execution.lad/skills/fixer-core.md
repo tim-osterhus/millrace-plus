@@ -25,6 +25,42 @@ Produce one selected artifact declared for the active stage. The selected dispat
 
 Evidence and assumptions belong in the runner evidence envelope unless the selected schema explicitly includes them.
 
+## Governed Fixer Result
+
+When the selected workflow declares `execution.artifacts.fixer_result`,
+produce that strict artifact instead of a free-text stage result. Required
+fields are `artifact_kind`, `summary`, `original_finding_ids`,
+`baseline_digest`, canonical `canonical_changed_paths`, bounded
+`before_checks` and `after_checks`, `preserved_contract_digests`,
+`preserved_artifact_digests`, `assumptions`, `unavailable_evidence`, and
+`remaining_findings`. Each check has a command, a `result_classification` of
+`passed`, `failed`, or `unavailable`, and bounded evidence. Required finding,
+baseline, and attempt evidence comes first. A relevant catalog entry may be
+selected by its named path on demand; never read every catalog entry.
+
+```json
+{
+  "artifact_kind": "execution.artifacts.fixer_result",
+  "summary": "Applied the assigned repair.",
+  "original_finding_ids": ["finding-1"],
+  "baseline_digest": "sha256:baseline",
+  "canonical_changed_paths": ["src/example.py"],
+  "before_checks": [],
+  "after_checks": [
+    {
+      "command": "pytest -q",
+      "result_classification": "passed",
+      "evidence": ["tests passed"]
+    }
+  ],
+  "preserved_contract_digests": ["sha256:task"],
+  "preserved_artifact_digests": ["sha256:checker"],
+  "assumptions": [],
+  "unavailable_evidence": [],
+  "remaining_findings": []
+}
+```
+
 ## Handoff Format
 
 ```text

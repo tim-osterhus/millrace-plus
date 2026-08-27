@@ -28,7 +28,7 @@ from millrace.compiler import (
 from millrace.contracts import SelectedCompiledPlan
 from millrace.contracts.compiled_plan import AuthorityValue, TerminalActionDeclaration
 from millrace.contracts.runner import RunnerDispatchEnvelope
-from millrace.contracts.schema import validate_schema
+from millrace.contracts.schema import validate_schema, validate_schema_declaration
 from millrace.contracts.state import Activation, CounterRecord, RunRecord, RuntimeState
 from millrace.contracts.transition import (
     AdmitPlan,
@@ -59,7 +59,7 @@ from support import package_conformance as conformance
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.22.2"
+PACKAGE_VERSION = "0.22.3"
 WORKFLOW_IDS = ("execution.lad", "execution.lad_integrator")
 QA_SCOPE_IDS = (*WORKFLOW_IDS, "planning.lad", "lad.full")
 CODEX_CONTROL_WORKFLOW_ID = "execution.lad_codex_control"
@@ -93,6 +93,7 @@ _CODEX_CONTEXT_BINDING_IDS = {
         "lad_checker",
         "lad_fixer",
         "lad_doublechecker",
+        "lad_troubleshooter",
         "lad_updater",
     )
 }
@@ -103,7 +104,9 @@ _CODEX_TREATMENT_ACTION_TARGET_STAGES = {
     "execution.route_fixer_complete": "lad_doublechecker",
     "execution.route_doublechecker_pass": "lad_updater",
     "execution.route_doublechecker_fix_needed": "lad_fixer",
-    "execution.return_troubleshooter_complete": "lad_builder",
+    "execution.return_troubleshooter_complete": "lad_fixer",
+    "execution.return_troubleshooter_baseline_invalidated": "lad_builder",
+    "execution.return_troubleshooter_review_retry": "lad_checker",
 }
 _REFERENCE_LAD_CANONICAL_AUTHORITY_SHA256 = (
     "59d80b330996a3d27461acb15494fb52ad83d52aa80ea35b73199447c4e2aff4"
@@ -116,7 +119,7 @@ _REFERENCE_LAD_SELECTED_ASSET_PINS = (
     ),
     (
         "execution.skills.builder_core",
-        "sha256:788f2d4c20a33dd3ac642811602f075db73cbaef52b6f8e47973d4c7f5af92e8",
+        "sha256:d789eb8a142451cffd3476b11671ab7b636a3e704c109d204c82db3e9d5d3dac",
     ),
     (
         "execution.entrypoints.lad_checker",
@@ -132,7 +135,7 @@ _REFERENCE_LAD_SELECTED_ASSET_PINS = (
     ),
     (
         "execution.skills.fixer_core",
-        "sha256:12d9a20f19033d43d4bb91d78057c21f7e934cce2741fe9e296fe30aa6c27862",
+        "sha256:5834155f56f905c2a6344932cdaddd6ffd7f5d6f131e7027f33c6452c6acae75",
     ),
     (
         "execution.entrypoints.lad_doublechecker",
@@ -152,11 +155,11 @@ _REFERENCE_LAD_SELECTED_ASSET_PINS = (
     ),
     (
         "execution.entrypoints.lad_troubleshooter",
-        "sha256:44f71a17256cc8c6a31882198772f3d52bde91d159eb6033b9a718c7612a07cb",
+        "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c",
     ),
     (
         "execution.skills.troubleshooter_core",
-        "sha256:1eac963513d5e9289882c8043e5dccfc2154a315b416c45c4787587ec9ea2188",
+        "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b",
     ),
     (
         "execution.entrypoints.lad_consultant",
@@ -1402,7 +1405,7 @@ def test_public_codex_workflow_selectors_are_present_and_distinct() -> None:
 
     assert {
         (CODEX_CONTROL_WORKFLOW_ID, "0.1"),
-        (CODEX_TREATMENT_WORKFLOW_ID, "0.1"),
+        (CODEX_TREATMENT_WORKFLOW_ID, "0.2"),
     } <= selectors
     workflows = conformance.workflows_by_id(manifest)
     assert workflows[CODEX_CONTROL_WORKFLOW_ID]["display"]["name"] != (
@@ -1421,7 +1424,15 @@ def test_codex_runner_components_and_mappings_are_exact_and_identical() -> None:
     control_runners = _runner_records(control)
     treatment_runners = _runner_records(treatment)
 
-    assert control_runners == treatment_runners
+    assert tuple(
+        runner
+        for runner in control_runners
+        if runner["stage_kind_ids"] != ["lad_troubleshooter"]
+    ) == tuple(
+        runner
+        for runner in treatment_runners
+        if runner["stage_kind_ids"] != ["lad_troubleshooter"]
+    )
     assert {
         str(runner["id"]) for runner in control_runners
     } == {
@@ -1474,7 +1485,7 @@ def test_codex_control_and_treatment_match_reference_after_normalization() -> No
     )
 
     assert control == reference
-    assert treatment == reference
+    assert treatment != reference
 
 
 def test_treatment_terminal_actions_select_assets_for_their_target_stage() -> None:
@@ -1493,17 +1504,12 @@ def test_treatment_terminal_actions_select_assets_for_their_target_stage() -> No
             stage_assets[target_stage]
         )
 
-    selector = cast(
-        Record,
-        actions["execution.return_troubleshooter_complete"][
-            "dynamic_target_selector"
-        ],
-    )
-    for target in cast(dict[str, Record], selector["targets"]).values():
-        if "asset_ids" in target:
-            assert tuple(cast(list[object], target["asset_ids"])) == stage_assets[
-                str(target["target_stage_kind_id"])
-            ]
+    for action_id in (
+        "execution.return_troubleshooter_complete",
+        "execution.return_troubleshooter_baseline_invalidated",
+        "execution.return_troubleshooter_review_retry",
+    ):
+        assert "dynamic_target_selector" not in actions[action_id]
 
 
 @pytest.mark.parametrize(
@@ -1700,7 +1706,7 @@ def test_semantic_worktree_context_bindings_are_exact_and_control_is_unbound() -
         str(binding["stage_kind_id"]): binding
         for binding in _source_context_bindings(treatment)
     }
-    assert actual == expected
+    assert set(actual) == set(expected)
     assert set(actual) == set(_CODEX_CONTEXT_BINDING_IDS)
     for stage, binding in actual.items():
         if stage != "lad_updater":
@@ -1717,7 +1723,6 @@ def test_context_bindings_are_absent_from_reference_and_unrelated_workflows() ->
         "execution.lad_integrator",
         "planning.lad",
         "lad.full",
-        "simple_loop",
         "vendor_selection",
     )
     for workflow_id in workflow_ids:
@@ -1768,10 +1773,10 @@ def test_treatment_assets_and_context_update_schema_are_content_contracts() -> N
         PACKAGE_ROOT / str(router_asset["package_path"])
     ).read_bytes()
     assert router_asset["asset_kind"] == "template"
-    assert router_asset["byte_length"] == 1297
+    assert router_asset["byte_length"] == 1617
     assert router_asset["byte_length"] == len(router_bytes)
     assert router_asset["content_digest"] == (
-        "sha256:cca7527f05cfc8f69b180f2148993d9bba7c7c61d0f929e50d7da062ccf6b813"
+        "sha256:00053a2572581acd9441ebc8c1199accee49073afe87190a60bf847fec25d129"
     )
     assert router_asset["content_digest"] == conformance.asset_digest(router_bytes)
 
@@ -1961,7 +1966,9 @@ def test_codex_workflows_select_and_verify_through_installed_public_api(
         package_id=PACKAGE_ID,
         package_version=PACKAGE_VERSION,
         workflow_id=workflow_id,
-        workflow_version="0.1",
+        workflow_version=(
+            "0.2" if workflow_id == CODEX_TREATMENT_WORKFLOW_ID else "0.1"
+        ),
     )
 
     conformance.assert_selected_package_pin(
@@ -1969,7 +1976,9 @@ def test_codex_workflows_select_and_verify_through_installed_public_api(
         package_id=PACKAGE_ID,
         package_version=PACKAGE_VERSION,
         workflow_id=workflow_id,
-        workflow_version="0.1",
+        workflow_version=(
+            "0.2" if workflow_id == CODEX_TREATMENT_WORKFLOW_ID else "0.1"
+        ),
         selected_asset_pins=conformance.selected_asset_pins(manifest, workflow_id),
     )
 
@@ -4129,3 +4138,454 @@ def test_selected_checker_authoring_contracts_and_json_refusals_are_explicit() -
         assert len(examples) >= 4
         for example in examples:
             json.loads(example)
+
+
+
+
+def test_runtime_supports_required_maximum_collection_bounds() -> None:
+    bounded_schema = {
+        "type": "object",
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {"type": "string"},
+                "max_items": 8,
+            }
+        },
+        "required": ["items"],
+    }
+    result = validate_schema_declaration(bounded_schema)
+    assert result.accepted, result.issues
+
+
+_GOVERNED_BUILDER_SCHEMA_ID = "execution.artifacts.builder_result"
+_GOVERNED_FIXER_SCHEMA_ID = "execution.artifacts.fixer_result"
+_GOVERNED_REPAIR_PLAN_SCHEMA_ID = "execution.artifacts.troubleshooter_repair_plan"
+_GOVERNED_CONTEXT_STAGES = (
+    "lad_builder",
+    "lad_checker",
+    "lad_fixer",
+    "lad_doublechecker",
+    "lad_troubleshooter",
+    "lad_updater",
+)
+_GOVERNED_CATALOG_ROOTS = (
+    "millrace-agents/shared/conventions",
+    "millrace-agents/shared/decisions",
+    "millrace-agents/shared/references",
+    "millrace-agents/shared/workspace-map/wiki",
+    "docs",
+)
+
+
+def _assert_closed_bounded_schema(node: Record) -> None:
+    assert node["type"] == "object"
+    properties = cast(Record, node["properties"])
+    assert set(cast(list[object], node["required"])) == set(properties)
+    for value in properties.values():
+        child = cast(Record, value)
+        if child.get("type") == "object":
+            _assert_closed_bounded_schema(child)
+        elif child.get("type") == "array":
+            assert type(child.get("max_items")) is int
+            assert 0 <= int(child["max_items"]) <= 256
+            item = child.get("items")
+            if isinstance(item, dict) and item.get("type") == "object":
+                _assert_closed_bounded_schema(cast(Record, item))
+
+
+def test_governed_lad_result_schemas_are_closed_and_bounded() -> None:
+    source = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    schemas = {
+        str(schema["id"]): cast(Record, schema["schema"])
+        for schema in _records(source, "artifact_schemas")
+    }
+    expected = {
+        _GOVERNED_BUILDER_SCHEMA_ID: {
+            "artifact_kind",
+            "summary",
+            "task_contract_digest",
+            "dispatch_digest",
+            "canonical_changed_paths",
+            "checks",
+            "assumptions",
+            "unavailable_evidence",
+            "remaining_work",
+        },
+        _GOVERNED_FIXER_SCHEMA_ID: {
+            "artifact_kind",
+            "summary",
+            "original_finding_ids",
+            "baseline_digest",
+            "canonical_changed_paths",
+            "before_checks",
+            "after_checks",
+            "preserved_contract_digests",
+            "preserved_artifact_digests",
+            "assumptions",
+            "unavailable_evidence",
+            "remaining_findings",
+        },
+        _GOVERNED_REPAIR_PLAN_SCHEMA_ID: {
+            "artifact_kind",
+            "summary",
+            "failed_session_id",
+            "failed_stage_id",
+            "failure_classification",
+            "evidence_refs",
+            "diagnosed_scope",
+            "baseline_invalidated",
+            "reentry_stage",
+            "artifact_dependencies",
+            "context_dependencies",
+            "repair_instructions",
+            "stop_conditions",
+            "unrecoverable_reason",
+        },
+    }
+    for schema_id, property_names in expected.items():
+        schema = schemas[schema_id]
+        assert set(cast(Record, schema["properties"])) == property_names
+        _assert_closed_bounded_schema(schema)
+
+    builder = {
+        "artifact_kind": _GOVERNED_BUILDER_SCHEMA_ID,
+        "summary": "built",
+        "task_contract_digest": "sha256:task",
+        "dispatch_digest": "sha256:dispatch",
+        "canonical_changed_paths": ["src/example.py"],
+        "checks": [
+            {
+                "command": "pytest -q",
+                "result_classification": "passed",
+                "evidence": ["evidence:pytest"],
+            }
+        ],
+        "assumptions": [],
+        "unavailable_evidence": [],
+        "remaining_work": [],
+    }
+    fixer = {
+        "artifact_kind": _GOVERNED_FIXER_SCHEMA_ID,
+        "summary": "fixed",
+        "original_finding_ids": ["finding-1"],
+        "baseline_digest": "sha256:baseline",
+        "canonical_changed_paths": ["src/example.py"],
+        "before_checks": [],
+        "after_checks": [],
+        "preserved_contract_digests": ["sha256:task"],
+        "preserved_artifact_digests": ["sha256:checker"],
+        "assumptions": [],
+        "unavailable_evidence": [],
+        "remaining_findings": [],
+    }
+    repair_plan = {
+        "artifact_kind": _GOVERNED_REPAIR_PLAN_SCHEMA_ID,
+        "summary": "repair plan",
+        "failed_session_id": "session-1",
+        "failed_stage_id": "lad_fixer",
+        "failure_classification": "narrow_repair",
+        "evidence_refs": ["evidence:failure"],
+        "diagnosed_scope": "one finding",
+        "baseline_invalidated": False,
+        "reentry_stage": "fixer",
+        "artifact_dependencies": ["execution.artifacts.checker_result"],
+        "context_dependencies": ["selected_artifacts/direct_predecessors"],
+        "repair_instructions": ["apply the finding"],
+        "stop_conditions": ["stop when the finding check passes"],
+        "unrecoverable_reason": "none",
+    }
+    for schema_id, payload in (
+        (_GOVERNED_BUILDER_SCHEMA_ID, builder),
+        (_GOVERNED_FIXER_SCHEMA_ID, fixer),
+        (_GOVERNED_REPAIR_PLAN_SCHEMA_ID, repair_plan),
+    ):
+        assert validate_schema(schemas[schema_id], payload).accepted
+        corrupted = deepcopy(payload)
+        corrupted["unexpected"] = True
+        assert not validate_schema(schemas[schema_id], corrupted).accepted
+    bad_check = deepcopy(builder)
+    cast(list[Record], bad_check["checks"])[0]["unexpected"] = True
+    assert not validate_schema(schemas[_GOVERNED_BUILDER_SCHEMA_ID], bad_check).accepted
+
+
+def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
+) -> None:
+    source = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    bindings = _source_context_bindings(source)
+    assert tuple(str(binding["stage_kind_id"]) for binding in bindings) == (
+        _GOVERNED_CONTEXT_STAGES
+    )
+    assert len(bindings) == 6
+    expected_required = {
+        "lad_builder": {
+            ("dispatch_material", "current"),
+            ("workspace_relative_root", "millrace-agents/MILLRACE.md"),
+            ("workspace_relative_root", "millrace-agents/shared/CONTEXT.md"),
+            ("selected_artifacts", "direct_predecessors"),
+        },
+        "lad_checker": {
+            ("dispatch_material", "current"),
+            ("selected_artifacts", "direct_predecessors"),
+        },
+        "lad_fixer": {
+            ("dispatch_material", "current"),
+            ("selected_artifacts", "direct_predecessors"),
+            ("selected_attempts", "since_last_accepted_transition"),
+        },
+        "lad_doublechecker": {
+            ("selected_artifacts", "direct_predecessors"),
+            ("selected_attempts", "since_last_accepted_transition"),
+        },
+        "lad_troubleshooter": {
+            ("dispatch_material", "current"),
+            ("selected_artifacts", "direct_predecessors"),
+            ("selected_attempts", "since_last_accepted_transition"),
+        },
+        "lad_updater": {
+            ("dispatch_material", "current"),
+            ("selected_artifacts", "current_lineage"),
+            ("selected_attempts", "current_lineage"),
+            ("workspace_relative_root", "millrace-agents/MILLRACE.md"),
+            ("workspace_relative_root", "millrace-agents/shared/CONTEXT.md"),
+            *(
+                ("workspace_relative_root", root)
+                for root in (
+                    *_GOVERNED_CATALOG_ROOTS,
+                    "README.md",
+                    "millrace-agents/shared/skills",
+                )
+            ),
+        },
+    }
+    expected_discoverable = {
+        "lad_builder": set(
+            ("workspace_relative_root", root) for root in _GOVERNED_CATALOG_ROOTS
+        ),
+        "lad_checker": {
+            ("workspace_relative_root", root)
+            for root in (
+                "millrace-agents/shared/conventions",
+                "millrace-agents/shared/decisions",
+                "millrace-agents/shared/references",
+                "docs",
+            )
+        },
+        "lad_fixer": {
+            ("workspace_relative_root", root)
+            for root in (
+                "millrace-agents/shared/conventions",
+                "millrace-agents/shared/decisions",
+                "millrace-agents/shared/references",
+                "docs",
+            )
+        },
+        "lad_doublechecker": {
+            ("workspace_relative_root", root)
+            for root in ("millrace-agents/shared/references", "docs")
+        },
+        "lad_troubleshooter": {
+            ("workspace_relative_root", root)
+            for root in (
+                "millrace-agents/shared/conventions",
+                "millrace-agents/shared/decisions",
+                "millrace-agents/shared/references",
+                "docs",
+            )
+        },
+    }
+    for binding in bindings:
+        stage = str(binding["stage_kind_id"])
+        assert binding["router_asset_id"] == _CODEX_ROUTER_ASSET_ID
+        assert binding["mutation_policy"] == (
+            "reconcile_selected_writes"
+            if stage == "lad_updater"
+            else "forbid_selected_roots"
+        )
+        assert binding["materialization_retention"] == (
+            "until_session_durable_terminal"
+        )
+        assert 0 < binding["max_hydrated_files"] <= 256
+        assert 0 < binding["max_hydrated_bytes"] <= 4 * 1024 * 1024
+        required = cast(list[Record], binding["required_sources"])
+        discoverable = cast(list[Record], binding["discoverable_sources"])
+        required_pairs = {
+            (str(item["source_kind"]), str(item["source_ref"]))
+            for item in required
+        }
+        assert required_pairs == expected_required[stage]
+        if stage in expected_discoverable:
+            discoverable_pairs = {
+                (str(item["source_kind"]), str(item["source_ref"]))
+                for item in discoverable
+            }
+            assert discoverable_pairs == expected_discoverable[stage]
+        else:
+            assert discoverable == []
+        for item in (*required, *discoverable):
+            assert item["source_kind"] != "catalog"
+            assert 0 < item["max_files"] <= 256
+            assert 0 < item["max_bytes"] <= 4 * 1024 * 1024
+    updater = next(
+        binding
+        for binding in bindings
+        if binding["stage_kind_id"] == "lad_updater"
+    )
+    builder = next(
+        binding
+        for binding in bindings
+        if binding["stage_kind_id"] == "lad_builder"
+    )
+    builder_predecessors = next(
+        source
+        for source in cast(list[Record], builder["required_sources"])
+        if source["source_kind"] == "selected_artifacts"
+        and source["source_ref"] == "direct_predecessors"
+    )
+    assert builder_predecessors["empty_policy"] == "omit_if_absent"
+    for binding in bindings:
+        for source in (
+            *cast(list[Record], binding["required_sources"]),
+            *cast(list[Record], binding["discoverable_sources"]),
+        ):
+            if source is builder_predecessors:
+                continue
+            assert source.get("empty_policy", "require_nonempty") == (
+                "require_nonempty"
+            )
+    assert updater["writeback_artifact_schema_id"] == _CODEX_CONTEXT_SCHEMA_ID
+    assert updater["writeback_terminal_action_id"] == "execution.close_updater_complete"
+
+
+def test_troubleshooter_reentry_uses_typed_conditions_and_exact_graph_targets() -> None:
+    source = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    expected_routes = {
+        "execution.return_troubleshooter_complete": (
+            "narrow_repair",
+            False,
+            "fixer",
+            "lad_fixer",
+            "execution.lad_codex_semantic_worktree.fixer.start",
+        ),
+        "execution.return_troubleshooter_baseline_invalidated": (
+            "baseline_invalidated",
+            True,
+            "builder",
+            "lad_builder",
+            "execution.lad_codex_semantic_worktree.builder.start",
+        ),
+        "execution.return_troubleshooter_review_retry": (
+            "unchanged_source_review_execution_failure",
+            False,
+            "checker",
+            "lad_checker",
+            "execution.lad_codex_semantic_worktree.checker.start",
+        ),
+    }
+    for action_id, (
+        classification,
+        baseline_invalidated,
+        reentry_stage,
+        stage,
+        graph_node,
+    ) in expected_routes.items():
+        action = _record(source, "terminal_actions", action_id)
+        assert action["artifact_schema_id"] == _GOVERNED_REPAIR_PLAN_SCHEMA_ID
+        assert "dynamic_target_selector" not in action
+        assert action["kind"] == "route"
+        assert action["target_stage_kind_id"] == stage
+        assert action["target_graph_node_id"] == graph_node
+        assert action["emitted_queue_family_id"] == "stage_result"
+        assert action["runner_binding_id"] == f"{stage}.codex_runner"
+        assert action["artifact_field_conditions"] == {
+            "failure_classification": classification,
+            "baseline_invalidated": baseline_invalidated,
+            "reentry_stage": reentry_stage,
+        }
+
+    repair_schema = _record(
+        source, "artifact_schemas", _GOVERNED_REPAIR_PLAN_SCHEMA_ID
+    )["schema"]
+    failure_classification = cast(
+        Record, cast(Record, repair_schema)["properties"]
+    )["failure_classification"]
+    assert failure_classification["enum"] == [
+        "narrow_repair",
+        "baseline_invalidated",
+        "unchanged_source_review_execution_failure",
+        "unrecoverable",
+    ]
+    assert cast(Record, cast(Record, repair_schema)["properties"])[
+        "baseline_invalidated"
+    ]["type"] == "boolean"
+    assert cast(Record, cast(Record, repair_schema)["properties"])[
+        "reentry_stage"
+    ]["enum"] == ["fixer", "builder", "checker", "none"]
+
+    blocked = _record(
+        source,
+        "terminal_actions",
+        "execution.route_troubleshooter_blocked",
+    )
+    assert blocked["kind"] == "block_work_item"
+    assert blocked["artifact_field_conditions"] == {
+        "failure_classification": "unrecoverable",
+        "baseline_invalidated": False,
+        "reentry_stage": "none",
+    }
+    assert "target_graph_node_id" not in blocked
+    assert "runner_binding_id" not in blocked
+    outcomes = {
+        str(outcome["marker"]): str(outcome["id"])
+        for outcome in cast(list[Record], source["terminal_outcomes"])
+        if outcome["stage_kind_id"] == "lad_troubleshooter"
+    }
+    assert outcomes["TROUBLESHOOT_NARROW_REPAIR"] == (
+        "execution.lad_troubleshooter.complete"
+    )
+    assert outcomes["TROUBLESHOOT_BASELINE_INVALIDATED"] == (
+        "execution.lad_troubleshooter.baseline_invalidated"
+    )
+    assert outcomes["TROUBLESHOOT_REVIEW_RETRY"] == (
+        "execution.lad_troubleshooter.review_retry"
+    )
+    assert outcomes["TROUBLESHOOT_UNRECOVERABLE"] == (
+        "execution.lad_troubleshooter.blocked"
+    )
+    assert (
+        _record(
+            source,
+            "terminal_actions",
+            "execution.close_troubleshooter_runtime_failure_exhausted",
+        )["kind"]
+        == "block_work_item"
+    )
+
+    semantic_assets = conformance.asset_texts(
+        PACKAGE_ROOT,
+        _manifest(),
+        {
+            _CODEX_ROUTER_ASSET_ID,
+            *_CODEX_ENTRYPOINT_ASSET_IDS.values(),
+            _CODEX_UPDATER_SKILL_ASSET_ID,
+        },
+    )
+    troubleshooter_assets = conformance.asset_texts(
+        PACKAGE_ROOT,
+        _manifest(),
+        {
+            "execution.entrypoints.lad_troubleshooter",
+            "execution.skills.troubleshooter_core",
+        },
+    )
+    prompts = "\n".join(
+        (*semantic_assets.values(), *troubleshooter_assets.values())
+    ).lower()
+    assert "named" in prompts
+    assert "on demand" in prompts
+    assert "review execution failure" in prompts
+    assert "baseline_invalidated" in prompts
+    assert "narrow repair" in prompts
+    assert "unrecoverable" in prompts
+    assert "read the entire catalog" not in prompts
+    assert "read all catalog" not in prompts

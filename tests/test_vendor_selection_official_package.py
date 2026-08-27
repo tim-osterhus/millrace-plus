@@ -20,7 +20,7 @@ from support import package_conformance as conformance
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.22.2"
+PACKAGE_VERSION = "0.22.3"
 WORKFLOW_ID = "vendor_selection"
 Record = dict[str, object]
 
@@ -474,7 +474,7 @@ def test_vendor_selection_wait_projection_and_plan_admission_are_exact(
 ) -> None:
     plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, WORKFLOW_ID)
     wait = plan.operator_waits[0]
-    assert plan.schema_version == 17
+    assert plan.schema_version == 18
     assert wait.schema_version == 2
     assert wait.project_source_artifact is True
 
@@ -486,7 +486,7 @@ def test_vendor_selection_wait_projection_and_plan_admission_are_exact(
         workflow_id=WORKFLOW_ID,
         workflow_version="0.1",
     )
-    assert selected.schema_version == 17
+    assert selected.schema_version == 18
     assert selected.operator_waits[0].project_source_artifact is True
 
 
