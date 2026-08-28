@@ -95,8 +95,8 @@ jobs:
             exit 1
           fi
           sha256sum --check --strict <<'SHA256'
-          0f1658b23a5a01f7c30bccea0c04e4b931628b81a0c3df247b7002f3b969cc5c  dist/millrace_plus-0.22.3-py3-none-any.whl
-          9aa83f8ebc2cf11af7fc5e3766a8f48c9dcd2daea35d66a3fbc3839c50a5f57f  dist/millrace_plus-0.22.3.tar.gz
+          81fdf9d3dd83278ee8d797c7fa41ab41ba0a6e00f898bd183a7468d36c6796b6  dist/millrace_plus-0.22.3-py3-none-any.whl
+          28365bd1d889c472ff3d547233cbc0c1718686023c8f9231de1d0934ddc5a275  dist/millrace_plus-0.22.3.tar.gz
           SHA256
       - name: Check source unchanged
         run: git diff --exit-code
@@ -136,8 +136,8 @@ jobs:
             exit 1
           fi
           sha256sum --check --strict <<'SHA256'
-          0f1658b23a5a01f7c30bccea0c04e4b931628b81a0c3df247b7002f3b969cc5c  dist/millrace_plus-0.22.3-py3-none-any.whl
-          9aa83f8ebc2cf11af7fc5e3766a8f48c9dcd2daea35d66a3fbc3839c50a5f57f  dist/millrace_plus-0.22.3.tar.gz
+          81fdf9d3dd83278ee8d797c7fa41ab41ba0a6e00f898bd183a7468d36c6796b6  dist/millrace_plus-0.22.3-py3-none-any.whl
+          28365bd1d889c472ff3d547233cbc0c1718686023c8f9231de1d0934ddc5a275  dist/millrace_plus-0.22.3.tar.gz
           SHA256
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
         with:
