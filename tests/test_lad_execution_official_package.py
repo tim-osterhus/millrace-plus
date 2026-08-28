@@ -3921,7 +3921,6 @@ _GOVERNED_CATALOG_ROOTS = (
     "millrace-agents/shared/decisions",
     "millrace-agents/shared/references",
     "millrace-agents/shared/workspace-map/wiki",
-    "docs",
 )
 
 
@@ -4099,6 +4098,7 @@ def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
                 ("workspace_relative_root", root)
                 for root in (
                     *_GOVERNED_CATALOG_ROOTS,
+                    "docs",
                     "README.md",
                     "millrace-agents/shared/skills",
                 )
@@ -4124,7 +4124,6 @@ def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
                 "millrace-agents/shared/conventions",
                 "millrace-agents/shared/decisions",
                 "millrace-agents/shared/references",
-                "docs",
             )
         },
         "lad_doublechecker": {
@@ -4137,7 +4136,6 @@ def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
                 "millrace-agents/shared/conventions",
                 "millrace-agents/shared/decisions",
                 "millrace-agents/shared/references",
-                "docs",
             )
         },
     }
@@ -4202,6 +4200,26 @@ def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
             )
     assert updater["writeback_artifact_schema_id"] == _CODEX_CONTEXT_SCHEMA_ID
     assert updater["writeback_terminal_action_id"] == "execution.close_updater_complete"
+
+
+def test_mutating_stages_do_not_select_project_docs_as_immutable_context() -> None:
+    bindings = {
+        str(binding["stage_kind_id"]): binding
+        for binding in _source_context_bindings(_codex_source(SEMANTIC_WORKFLOW_ID))
+    }
+
+    for stage in ("lad_builder", "lad_fixer", "lad_troubleshooter"):
+        binding = bindings[stage]
+        assert binding["mutation_policy"] == "forbid_selected_roots"
+        selected_roots = {
+            str(source["source_ref"])
+            for source in (
+                *cast(list[Record], binding["required_sources"]),
+                *cast(list[Record], binding["discoverable_sources"]),
+            )
+            if source["source_kind"] == "workspace_relative_root"
+        }
+        assert "docs" not in selected_roots
 
 
 def test_troubleshooter_reentry_uses_typed_conditions_and_exact_graph_targets() -> None:

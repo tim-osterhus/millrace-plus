@@ -114,6 +114,12 @@ and required material is always consumed first. The workflow graph owns
 re-entry, blockage, and writeback outcomes; prompt text supplies evidence and
 cannot create routes.
 
+Builder, Fixer, and Troubleshooter leave mutable project documentation in the
+project working tree rather than hydrating it into their immutable context
+checkouts. Checker and Doublechecker may select documentation for read-only
+review, while Updater changes selected documentation only through its explicit
+writeback contract.
+
 For a workflow with different stages or routing, use
 [Authoring workflows](authoring.md) instead of forcing the problem into one of
 these configurations.

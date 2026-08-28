@@ -27075,12 +27075,6 @@
                 "source_ref": "millrace-agents/shared/workspace-map/wiki",
                 "max_files": 64,
                 "max_bytes": 1048576
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "docs",
-                "max_files": 64,
-                "max_bytes": 1048576
               }
             ]
           },
@@ -27181,12 +27175,6 @@
                 "source_ref": "millrace-agents/shared/references",
                 "max_files": 64,
                 "max_bytes": 1048576
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "docs",
-                "max_files": 64,
-                "max_bytes": 1048576
               }
             ]
           },
@@ -27273,12 +27261,6 @@
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/references",
-                "max_files": 64,
-                "max_bytes": 1048576
-              },
-              {
-                "source_kind": "workspace_relative_root",
-                "source_ref": "docs",
                 "max_files": 64,
                 "max_bytes": 1048576
               }
@@ -28197,7 +28179,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:353d51c2eba5c8381864e886e7df70e56aaadb31029aeaf642ac1790817bb1db",
+  "manifest_digest": "sha256:8ee1b854f81d3579fed7ef662ce84d4cee15ebab52eede1d68f9e975516d7e19",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",
