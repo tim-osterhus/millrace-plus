@@ -206,7 +206,7 @@ def test_release_workflow_runs_source_and_exact_wheel_conformance_boundaries() -
         validate_job.index("- name: Test") : validate_job.index("- name: Lint")
     ]
 
-    assert "MILLRACE_REF: 4855c871cd29fd1806879c619791bf4e0fdf03ee" in (
+    assert "MILLRACE_REF: b26cd7a96ec376fbba1ccc412818c01709cfd782" in (
         validate_job
     )
     assert "MILLRACE_VERSION: 0.22.3" in validate_job
