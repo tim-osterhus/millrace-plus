@@ -845,6 +845,8 @@ class _ArbiterBoundaryFacade:
         self.descriptor = SimpleNamespace(
             runner_id=pin.component_id,
             runner_version=pin.component_version,
+            harness_id="millforge.base.unrestricted_agent.v1",
+            harness_version=1,
             package_name=pin.provider_distribution,
             package_version=pin.provider_version,
             descriptor_sha256=pin.descriptor_sha256,
@@ -857,8 +859,8 @@ class _ArbiterBoundaryFacade:
             options=SimpleNamespace(load_context_files=False),
             metadata=SimpleNamespace(context_file_count=0),
             compiled_plan=SimpleNamespace(
-                harness_id=pin.component_id,
-                harness_version=pin.component_version,
+                harness_id="millforge.base.unrestricted_agent.v1",
+                harness_version=1,
                 compiled_sha256="sha256:" + "c" * 64,
             ),
             capability_envelope=SimpleNamespace(
