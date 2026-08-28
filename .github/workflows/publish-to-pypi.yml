@@ -9,7 +9,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      MILLRACE_REF: 32e0c4e5025b4d9e0c08e1cb7950ad3423935396
+      MILLRACE_REF: 00303d9ec3410f3803f793cd7e722c24c84f7b1e
       MILLRACE_VERSION: 0.22.3
       MILLFORGE_REF: d660194f5641f51b5010d58852fde268865ff24f
       MILLFORGE_VERSION: 0.1.0
