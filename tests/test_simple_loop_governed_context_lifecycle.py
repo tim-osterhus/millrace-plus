@@ -86,9 +86,11 @@ class _SimpleLoopAdapter:
         self,
         workspace: Path,
         *,
+        block_manager: bool = False,
         mutate_worker_root: bool = False,
     ) -> None:
         self.workspace = workspace
+        self.block_manager = block_manager
         self.mutate_worker_root = mutate_worker_root
         self.requests: list[AdapterInvocationRequest] = []
 
@@ -96,6 +98,9 @@ class _SimpleLoopAdapter:
         self.requests.append(request)
         stage = request.dispatch_envelope.stage_kind_id
         marker, artifact = _result_for_stage(stage)
+        if self.block_manager and stage == "simple_loop.manager":
+            marker = "BLOCKED"
+            artifact = None
         if self.mutate_worker_root and stage == "simple_loop.worker":
             (self.workspace / "docs" / "context.md").write_text(
                 "mutated by forbidden worker\n",
@@ -136,6 +141,8 @@ def _result_for_stage(stage: str) -> tuple[str, Mapping[str, object]]:
                 "title": "Lifecycle proof",
                 "objective": "Exercise the packaged simple loop.",
                 "completion_definition": "The governed lifecycle is durable.",
+                "evidence": ["The source prompt was checked."],
+                "assumptions": [],
             },
         )
     if stage == "simple_loop.worker":
@@ -144,6 +151,8 @@ def _result_for_stage(stage: str) -> tuple[str, Mapping[str, object]]:
             {
                 "artifact_kind": "simple_loop.work_result",
                 "summary": "The lifecycle proof is complete.",
+                "evidence": ["The completion definition was checked."],
+                "assumptions": [],
             },
         )
     if stage == "simple_loop.reviewer":
@@ -153,6 +162,19 @@ def _result_for_stage(stage: str) -> tuple[str, Mapping[str, object]]:
                 "changes": [],
                 "proposals": [],
                 "no_op_reason": "No selected documentation write was required.",
+            },
+        )
+    if stage == "simple_loop.troubleshooter":
+        return (
+            "UNRESOLVED",
+            {
+                "artifact_kind": "simple_loop.troubleshooting_report",
+                "result": "The required source remains absent.",
+                "blocker_cause": "The required source was not supplied.",
+                "attempted_repair": "No repair was attempted.",
+                "next_route": "unresolved_return",
+                "evidence": ["Manager returned BLOCKED."],
+                "assumptions": [],
             },
         )
     raise AssertionError(f"unexpected stage: {stage}")
@@ -313,4 +335,52 @@ def test_packaged_simple_loop_refuses_forbidden_recovery_root_mutation(
         after.runner_sessions[worker_request.session_id],
     )
     assert attribution == {"status": "missing"}
+    runtime.close()
+
+
+def test_packaged_simple_loop_prepares_troubleshooter_after_artifactless_block(
+    tmp_path: Path,
+) -> None:
+    runtime = _runtime(tmp_path)
+    troubleshooting = runtime.paths.workspace_path / "troubleshooting"
+    troubleshooting.mkdir()
+    (troubleshooting / "guide.md").write_text(
+        "Report evidence without inventing missing inputs.\n",
+        encoding="utf-8",
+    )
+    adapter = _SimpleLoopAdapter(
+        runtime.paths.workspace_path,
+        block_manager=True,
+    )
+
+    manager = run_bounded_execution_unit(runtime, local_config=_config(adapter))
+    troubleshooter = run_bounded_execution_unit(
+        runtime,
+        local_config=_config(adapter),
+    )
+    state = runtime.store.load_runtime_state(runtime.cas_store)
+
+    assert manager.code == "observation_accepted"
+    assert troubleshooter.code == "observation_accepted", (
+        troubleshooter.code,
+        troubleshooter.adapter_error_kind,
+        troubleshooter.diagnostics,
+        [(record.input_kind, record.reason) for record in state.refusals],
+    )
+    assert [
+        request.dispatch_envelope.stage_kind_id for request in adapter.requests
+    ] == ["simple_loop.manager", "simple_loop.troubleshooter"]
+    request = adapter.requests[-1]
+    session = state.runner_sessions[request.session_id]
+    manifest = decode_context_checkout_manifest(
+        runtime.cas_store.get_bytes(session.context_manifest_digest)
+    )
+    assert (
+        "selected_artifacts",
+        "direct_predecessors",
+        "source_missing",
+    ) in {
+        (omission.source_kind, omission.source_ref, omission.reason)
+        for omission in manifest.omissions
+    }
     runtime.close()

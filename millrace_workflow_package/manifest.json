@@ -103,6 +103,21 @@
                   "min_length": 1,
                   "type": "string"
                 },
+                "evidence": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "min_items": 1,
+                  "type": "array"
+                },
+                "assumptions": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
                 "objective": {
                   "min_length": 1,
                   "type": "string"
@@ -121,7 +136,9 @@
                 "source_prompt_id",
                 "title",
                 "objective",
-                "completion_definition"
+                "completion_definition",
+                "evidence",
+                "assumptions"
               ],
               "type": "object"
             }
@@ -143,11 +160,28 @@
                   },
                   "min_items": 1,
                   "type": "array"
+                },
+                "evidence": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "min_items": 1,
+                  "type": "array"
+                },
+                "assumptions": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
                 }
               },
               "required": [
                 "artifact_kind",
-                "missing_details"
+                "missing_details",
+                "evidence",
+                "assumptions"
               ],
               "type": "object"
             }
@@ -165,11 +199,28 @@
                 "summary": {
                   "min_length": 1,
                   "type": "string"
+                },
+                "evidence": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "min_items": 1,
+                  "type": "array"
+                },
+                "assumptions": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
                 }
               },
               "required": [
                 "artifact_kind",
-                "summary"
+                "summary",
+                "evidence",
+                "assumptions"
               ],
               "type": "object"
             }
@@ -191,11 +242,28 @@
                   },
                   "min_items": 1,
                   "type": "array"
+                },
+                "evidence": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "min_items": 1,
+                  "type": "array"
+                },
+                "assumptions": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
                 }
               },
               "required": [
                 "artifact_kind",
-                "gaps"
+                "gaps",
+                "evidence",
+                "assumptions"
               ],
               "type": "object"
             }
@@ -213,11 +281,28 @@
                 "reason": {
                   "min_length": 1,
                   "type": "string"
+                },
+                "evidence": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "min_items": 1,
+                  "type": "array"
+                },
+                "assumptions": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
                 }
               },
               "required": [
                 "artifact_kind",
-                "reason"
+                "reason",
+                "evidence",
+                "assumptions"
               ],
               "type": "object"
             }
@@ -251,6 +336,21 @@
                 "result": {
                   "min_length": 1,
                   "type": "string"
+                },
+                "evidence": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "min_items": 1,
+                  "type": "array"
+                },
+                "assumptions": {
+                  "items": {
+                    "min_length": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
                 }
               },
               "required": [
@@ -258,7 +358,9 @@
                 "result",
                 "blocker_cause",
                 "attempted_repair",
-                "next_route"
+                "next_route",
+                "evidence",
+                "assumptions"
               ],
               "type": "object"
             }
@@ -1664,7 +1766,8 @@
                 "source_kind": "selected_artifacts",
                 "source_ref": "direct_predecessors",
                 "max_files": 64,
-                "max_bytes": 1048576
+                "max_bytes": 1048576,
+                "empty_policy": "omit_if_absent"
               },
               {
                 "source_kind": "selected_attempts",
@@ -28094,7 +28197,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:90468be2e721c775e05828e6f80037b4b45cc32811d16405a5f9ddc8c50984a1",
+  "manifest_digest": "sha256:353d51c2eba5c8381864e886e7df70e56aaadb31029aeaf642ac1790817bb1db",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",

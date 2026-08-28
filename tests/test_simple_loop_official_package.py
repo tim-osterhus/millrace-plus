@@ -544,6 +544,16 @@ def test_simple_loop_context_bindings_are_scoped_and_typed() -> None:
     assert ("selected_artifacts", "direct_predecessors") in required_pairs[
         "simple_loop.troubleshooter"
     ]
+    troubleshooter_predecessors = next(
+        item
+        for item in by_stage["simple_loop.troubleshooter"]["required_sources"]
+        if (
+            item["source_kind"],
+            item["source_ref"],
+        )
+        == ("selected_artifacts", "direct_predecessors")
+    )
+    assert troubleshooter_predecessors["empty_policy"] == "omit_if_absent"
     assert (
         "selected_attempts",
         "since_last_accepted_transition",
@@ -582,7 +592,6 @@ def test_simple_loop_context_bindings_are_scoped_and_typed() -> None:
         action["artifact_schema_id"] == "simple_loop.troubleshooting_report"
         for action in troubleshooter_actions.values()
     )
-
     writeback_schema = _record(
         source,
         "artifact_schemas",
@@ -602,6 +611,40 @@ def test_simple_loop_context_bindings_are_scoped_and_typed() -> None:
         "simple_loop.context_update_report"
     )
 
+
+@pytest.mark.parametrize(
+    "schema_id",
+    (
+        "simple_loop.work_packet",
+        "simple_loop.detail_request",
+        "simple_loop.incident_report",
+        "simple_loop.work_result",
+        "simple_loop.gap_packet",
+        "simple_loop.troubleshooting_report",
+    ),
+)
+def test_simple_loop_evidence_contract_is_selected_schema_authority(
+    schema_id: str,
+) -> None:
+    schema = cast(
+        dict[str, Any],
+        _record(_source(), "artifact_schemas", schema_id)["schema"],
+    )
+    properties = cast(dict[str, Any], schema["properties"])
+
+    assert {"evidence", "assumptions"}.issubset(
+        cast(list[str], schema["required"])
+    )
+    item_schema = {"min_length": 1, "type": "string"}
+    assert properties["evidence"] == {
+        "items": item_schema,
+        "min_items": 1,
+        "type": "array",
+    }
+    assert properties["assumptions"] == {
+        "items": item_schema,
+        "type": "array",
+    }
 
 def test_simple_loop_context_catalog_is_selected_by_one_named_stage() -> None:
     source = _source()

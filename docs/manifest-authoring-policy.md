@@ -399,8 +399,8 @@ which workflow behavior should be official.
       "package_path": "assets/workflows/vendor_selection/skills/rubric_evaluator-core.md"
     }
   ],
-  "manifest_digest": "sha256:90468be2e721c775e05828e6f80037b4b45cc32811d16405a5f9ddc8c50984a1",
-  "package_digest": "sha256:29bc8afeb4b1a4b921a80b7a7c63d5d568d9c08ae56a5d5e3dd034216f24962e",
+  "manifest_digest": "sha256:353d51c2eba5c8381864e886e7df70e56aaadb31029aeaf642ac1790817bb1db",
+  "package_digest": "sha256:16e628cef1841ed5c396fa6e9ecb63d048ea77c3b6c8270b5735c68e5ca00bdc",
   "policy": "frozen-manifest",
   "selected_package_pin": {
     "package_format_version": "1",
@@ -413,7 +413,7 @@ which workflow behavior should be official.
     "execution.lad_integrator@0.1": "sha256:5f0e8093b007b2e026034cdda8222804bba0deeaec90441fe97c54097c6d2a28",
     "lad.full@0.1": "sha256:60e075360d232d99b2e57cafbbe5afaf0a10be1fb8546429718e1ee943db3b77",
     "planning.lad@0.1": "sha256:5d5b2420bedf88f4baf3acea78de444356cb5fe9d6921f2c953db76643baa78c",
-    "simple_loop@0.1": "sha256:d979a3d86100ef1dd2c4ef6659e05474de03f2a54e54e86edc48c8598229178f",
+    "simple_loop@0.1": "sha256:6ca969f00c0f09acc19df205ef5849408385239c8bd5ce18721988cd5b21b183",
     "vendor_selection@0.1": "sha256:41430d1a6c96149209f2983d66c68fbd0ae7d030b3ae01061ec8c2971c3c9e27"
   }
 }
