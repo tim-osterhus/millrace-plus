@@ -20,6 +20,7 @@ runner, provider, plugin, or installation hook.
 | `planning.lad` | LAD Planning followed by Execution |
 | `lad.full` | Full LAD Planning, Learning, and Execution |
 | `vendor_selection` | A four-plane research and comparison loop that stops for an operator decision |
+| `execution.lad_codex_semantic_worktree` | A governed semantic-worktree execution workflow using the public v0.22.3 context contract |
 
 Every workflow is ordinary package data. Names such as Management, Planning,
 Execution, Learning, and Review do not have special meaning inside the

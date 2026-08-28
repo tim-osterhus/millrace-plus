@@ -24,8 +24,8 @@ Unreleased schema-17 plans are historical evidence, not compatible plans.
 | License | Apache-2.0 |
 | Runtime dependency | None |
 
-The package contains these workflow entries at version `0.1`; the governed
-semantic-worktree entry is version `0.2`:
+The package contains seven workflow entries. Six are version `0.1`; the
+governed semantic-worktree entry is version `0.2`:
 
 - `simple_loop`
 - `execution.lad`

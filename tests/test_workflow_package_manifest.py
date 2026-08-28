@@ -20,7 +20,6 @@ WORKFLOW_SELECTORS = {
     ("simple_loop", "0.1"),
     ("execution.lad", "0.1"),
     ("execution.lad_integrator", "0.1"),
-    ("execution.lad_codex_control", "0.1"),
     ("execution.lad_codex_semantic_worktree", "0.2"),
     ("planning.lad", "0.1"),
     ("lad.full", "0.1"),
@@ -475,6 +474,8 @@ def test_public_workflow_package_declares_expected_workflows_only() -> None:
     }
 
     assert selectors == WORKFLOW_SELECTORS
+    assert len(selectors) == 7
+    assert not any("control" in workflow_id for workflow_id, _version in selectors)
     assert manifest["dependencies"] == []
 
 
@@ -522,23 +523,23 @@ def test_public_archive_bytes_are_deterministic_and_data_only() -> None:
         assert member.mode == 0o644
 
 
-def test_codex_workflows_close_exactly_over_the_declared_package_bytes() -> None:
+def test_semantic_workflow_closes_over_declared_package_bytes() -> None:
     manifest = _load_manifest()
     assets = {str(asset["asset_id"]): asset for asset in _assets(manifest)}
     workflows = {
         str(workflow["workflow_id"]): workflow
         for workflow in _workflows(manifest)
     }
-    treatment_prefix = "execution.lad_codex_semantic_worktree"
-    treatment_paths = {
+    semantic_prefix = "execution.lad_codex_semantic_worktree"
+    semantic_paths = {
         str(asset["package_path"])
         for asset in _assets(manifest)
-        if str(asset["asset_id"]).startswith(f"{treatment_prefix}.")
+        if str(asset["asset_id"]).startswith(f"{semantic_prefix}.")
     }
 
     router = assets["execution.lad_codex_semantic_worktree.context_router"]
     router_bytes = (PACKAGE_ROOT / str(router["package_path"])).read_bytes()
-    treatment_required_ids = {
+    semantic_required_ids = {
         str(required["asset_id"])
         for required in workflows["execution.lad_codex_semantic_worktree"][
             "required_assets"
@@ -554,9 +555,9 @@ def test_codex_workflows_close_exactly_over_the_declared_package_bytes() -> None
         "sha256:00053a2572581acd9441ebc8c1199accee49073afe87190a60bf847fec25d129"
     )
     assert router["content_digest"] == _asset_digest(router_bytes)
-    assert router["asset_id"] in treatment_required_ids
+    assert router["asset_id"] in semantic_required_ids
 
-    assert treatment_paths == {
+    assert semantic_paths == {
         "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md",
         "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_builder.md",
         "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_checker.md",
@@ -565,35 +566,24 @@ def test_codex_workflows_close_exactly_over_the_declared_package_bytes() -> None
         "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_updater.md",
         "assets/workflows/execution.lad_codex_semantic_worktree/skills/updater-core.md",
     }
-    for workflow_id in (
-        "execution.lad_codex_control",
-        "execution.lad_codex_semantic_worktree",
-    ):
-        required_assets = workflows[workflow_id]["required_assets"]
-        for required in required_assets:
-            asset_id = str(required["asset_id"])
-            assert asset_id in assets
-            assert required["content_digest"] == assets[asset_id]["content_digest"]
-    control_assets = {
-        str(asset["asset_id"])
-        for asset in workflows["execution.lad_codex_control"]["required_assets"]
-    }
-    treatment_assets = {
+    required_assets = workflows["execution.lad_codex_semantic_worktree"][
+        "required_assets"
+    ]
+    for required in required_assets:
+        asset_id = str(required["asset_id"])
+        assert asset_id in assets
+        assert required["content_digest"] == assets[asset_id]["content_digest"]
+    semantic_assets = {
         str(asset["asset_id"])
         for asset in workflows["execution.lad_codex_semantic_worktree"][
             "required_assets"
         ]
     }
-    assert not control_assets & {
-        asset_id
-        for asset_id in assets
-        if asset_id.startswith(f"{treatment_prefix}.")
-    }
     assert {
         asset_id
         for asset_id in assets
-        if asset_id.startswith(f"{treatment_prefix}.")
-    } <= treatment_assets
+        if asset_id.startswith(f"{semantic_prefix}.")
+    } <= semantic_assets
 
 
 def test_governed_semantic_lad_uses_runtime_schema_18_and_0223_pin() -> None:

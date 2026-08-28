@@ -24,6 +24,7 @@ PUBLIC_TESTS = (
 NON_PUBLIC_REGRESSION_TESTS = {
     "tests/test_lad_execution_official_package.py",
     "tests/test_lad_planning_official_package.py",
+    "tests/test_simple_loop_governed_context_lifecycle.py",
     "tests/test_workflow_package_manifest.py",
 }
 PUBLIC_DOCS = (

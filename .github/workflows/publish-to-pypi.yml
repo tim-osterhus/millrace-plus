@@ -9,9 +9,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      MILLRACE_REF: 00303d9ec3410f3803f793cd7e722c24c84f7b1e
+      MILLRACE_REF: 4855c871cd29fd1806879c619791bf4e0fdf03ee
       MILLRACE_VERSION: 0.22.3
-      MILLFORGE_REF: d660194f5641f51b5010d58852fde268865ff24f
       MILLFORGE_VERSION: 0.1.0
     permissions:
       contents: read
@@ -27,7 +26,7 @@ jobs:
         run: |
           validation_root="$RUNNER_TEMP/millrace-plus-validation"
           artifact_root="$validation_root/artifacts"
-          mkdir -p "$artifact_root/millrace" "$artifact_root/millforge"
+          mkdir -p "$artifact_root/millrace"
 
           git init --quiet "$validation_root/millrace"
           git -C "$validation_root/millrace" remote add origin \
@@ -38,38 +37,28 @@ jobs:
           test "$(git -C "$validation_root/millrace" rev-parse HEAD)" = \
             "$MILLRACE_REF"
 
-          git init --quiet "$validation_root/millforge"
-          git -C "$validation_root/millforge" remote add origin \
-            https://github.com/tim-osterhus/millforge.git
-          git -C "$validation_root/millforge" fetch --quiet --depth 1 \
-            origin "$MILLFORGE_REF"
-          git -C "$validation_root/millforge" checkout --quiet --detach FETCH_HEAD
-          test "$(git -C "$validation_root/millforge" rev-parse HEAD)" = \
-            "$MILLFORGE_REF"
-
           uv build --wheel --out-dir "$artifact_root/millrace" \
             "$validation_root/millrace"
-          uv build --wheel --out-dir "$artifact_root/millforge" \
-            "$validation_root/millforge"
 
           mapfile -t millrace_wheels < <(
             find "$artifact_root/millrace" -maxdepth 1 -type f \
               -name "millrace_ai-${MILLRACE_VERSION}-*.whl" -print
-          )
-          mapfile -t millforge_wheels < <(
-            find "$artifact_root/millforge" -maxdepth 1 -type f \
-              -name "millforge-${MILLFORGE_VERSION}-*.whl" -print
           )
           if [[ "${#millrace_wheels[@]}" -ne 1 ]]; then
             printf 'expected exactly one Millrace %s wheel, found %s\n' \
               "$MILLRACE_VERSION" "${#millrace_wheels[@]}" >&2
             exit 1
           fi
-          if [[ "${#millforge_wheels[@]}" -ne 1 ]]; then
-            printf 'expected exactly one Millforge %s wheel, found %s\n' \
-              "$MILLFORGE_VERSION" "${#millforge_wheels[@]}" >&2
-            exit 1
-          fi
+
+          env \
+            PYTHONPATH="$validation_root/millrace/src:$validation_root/millrace" \
+            PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+            PYTHONDONTWRITEBYTECODE=1 \
+            uv run --no-project --python 3.11 \
+              --with pytest==9.1.1 \
+              --with hatchling==1.31.0 \
+              --with millforge=="$MILLFORGE_VERSION" \
+              pytest -q
 
           env -u PYTHONPATH \
             PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
@@ -78,8 +67,11 @@ jobs:
               --with pytest==9.1.1 \
               --with hatchling==1.31.0 \
               --with "${millrace_wheels[0]}" \
-              --with "${millforge_wheels[0]}" \
-              pytest -q
+              --with millforge=="$MILLFORGE_VERSION" \
+              pytest -q \
+                --ignore=tests/test_lad_execution_official_package.py \
+                --ignore=tests/test_lad_planning_official_package.py \
+                --ignore=tests/test_simple_loop_governed_context_lifecycle.py
       - name: Lint
         run: uv run --no-project --python 3.11 --with ruff==0.15.21 ruff check src tests
       - name: Check clean source tree
@@ -103,8 +95,8 @@ jobs:
             exit 1
           fi
           sha256sum --check --strict <<'SHA256'
-          ee47d4885c2320cdc7ed0285843534a7ec19f583134221753d5169574d7aa401  dist/millrace_plus-0.22.3-py3-none-any.whl
-          4ec1437eb29fbfdb105e3e54c4fa6607af5287f3615c9d218cc798774e2c4f78  dist/millrace_plus-0.22.3.tar.gz
+          0f1658b23a5a01f7c30bccea0c04e4b931628b81a0c3df247b7002f3b969cc5c  dist/millrace_plus-0.22.3-py3-none-any.whl
+          c6ef341ae5f67d89a6d40a94b82d9a92ae7f5cf0246169fdd1c4fd0750a48e30  dist/millrace_plus-0.22.3.tar.gz
           SHA256
       - name: Check source unchanged
         run: git diff --exit-code
@@ -144,8 +136,8 @@ jobs:
             exit 1
           fi
           sha256sum --check --strict <<'SHA256'
-          ee47d4885c2320cdc7ed0285843534a7ec19f583134221753d5169574d7aa401  dist/millrace_plus-0.22.3-py3-none-any.whl
-          4ec1437eb29fbfdb105e3e54c4fa6607af5287f3615c9d218cc798774e2c4f78  dist/millrace_plus-0.22.3.tar.gz
+          0f1658b23a5a01f7c30bccea0c04e4b931628b81a0c3df247b7002f3b969cc5c  dist/millrace_plus-0.22.3-py3-none-any.whl
+          c6ef341ae5f67d89a6d40a94b82d9a92ae7f5cf0246169fdd1c4fd0750a48e30  dist/millrace_plus-0.22.3.tar.gz
           SHA256
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
         with:

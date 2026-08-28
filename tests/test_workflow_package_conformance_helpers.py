@@ -17,7 +17,6 @@ def test_package_fixture_checks_every_declared_asset_and_workflow_pin() -> None:
         "simple_loop",
         "execution.lad",
         "execution.lad_integrator",
-        "execution.lad_codex_control",
         "execution.lad_codex_semantic_worktree",
         "planning.lad",
         "lad.full",

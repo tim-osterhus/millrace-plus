@@ -30,7 +30,6 @@ WORKFLOW_IDS = (
     "vendor_selection",
 )
 CODEX_WORKFLOW_IDS = (
-    "execution.lad_codex_control",
     "execution.lad_codex_semantic_worktree",
 )
 CODEX_COMPONENT_ID = "millrace-codex-wrapper"

@@ -280,12 +280,12 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "simple_loop.reviewer_core_skill",
-      "content_digest": "sha256:998a09034bf5e063f1e6c8a57bcbd9123c14c9bdea45ad5539f325cc0c7f078d",
+      "content_digest": "sha256:09effc86ab19403519cd07c1e1e8a13b4ac868fb9637bc529112bad3eeeaf52c",
       "package_path": "assets/workflows/simple_loop/skills/reviewer-core.md"
     },
     {
       "asset_id": "simple_loop.reviewer_prompt",
-      "content_digest": "sha256:c39670a62f9b0311e40e2eb3f065059b01325e28f6e40b4684212997d965d2b2",
+      "content_digest": "sha256:e0a0a3e6438e37bbafdb183ac6944048323522ec24fe85c137c88b464b53f853",
       "package_path": "assets/workflows/simple_loop/entrypoints/reviewer.md"
     },
     {
@@ -399,8 +399,8 @@ which workflow behavior should be official.
       "package_path": "assets/workflows/vendor_selection/skills/rubric_evaluator-core.md"
     }
   ],
-  "manifest_digest": "sha256:cef079a6601cf1f9dffd764957dcdbfddd94f60b3f314711086b29c06039507a",
-  "package_digest": "sha256:7958992ba51e598ff2a3c3abbf633ba1aa618e2becc416a2eabef35c4cd6494e",
+  "manifest_digest": "sha256:90468be2e721c775e05828e6f80037b4b45cc32811d16405a5f9ddc8c50984a1",
+  "package_digest": "sha256:29bc8afeb4b1a4b921a80b7a7c63d5d568d9c08ae56a5d5e3dd034216f24962e",
   "policy": "frozen-manifest",
   "selected_package_pin": {
     "package_format_version": "1",
@@ -409,12 +409,11 @@ which workflow behavior should be official.
   },
   "selected_workflow_fingerprints": {
     "execution.lad@0.1": "sha256:195fbe1c5a982366b214373e65d8a20b0393605af4dbc1aff361a0413a589fdd",
-    "execution.lad_codex_control@0.1": "sha256:3b88a81c2c6a29ffca95ae1a9052e6e44df48c8c64a1c894b36aa85da3c2ac46",
     "execution.lad_codex_semantic_worktree@0.2": "sha256:a8869898be7957d317fcd2b3441b656bbc7dbeb007fa7974c0c1745f8114f975",
     "execution.lad_integrator@0.1": "sha256:5f0e8093b007b2e026034cdda8222804bba0deeaec90441fe97c54097c6d2a28",
     "lad.full@0.1": "sha256:60e075360d232d99b2e57cafbbe5afaf0a10be1fb8546429718e1ee943db3b77",
     "planning.lad@0.1": "sha256:5d5b2420bedf88f4baf3acea78de444356cb5fe9d6921f2c953db76643baa78c",
-    "simple_loop@0.1": "sha256:6712ff418127e9464096ee69ae80e0d1c8b7f1d6d17b2226f9fd9fe8b40c22da",
+    "simple_loop@0.1": "sha256:d979a3d86100ef1dd2c4ef6659e05474de03f2a54e54e86edc48c8598229178f",
     "vendor_selection@0.1": "sha256:41430d1a6c96149209f2983d66c68fbd0ae7d030b3ae01061ec8c2971c3c9e27"
   }
 }

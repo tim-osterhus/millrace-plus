@@ -62,18 +62,13 @@ PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.22.3"
 WORKFLOW_IDS = ("execution.lad", "execution.lad_integrator")
 QA_SCOPE_IDS = (*WORKFLOW_IDS, "planning.lad", "lad.full")
-CODEX_CONTROL_WORKFLOW_ID = "execution.lad_codex_control"
-CODEX_TREATMENT_WORKFLOW_ID = "execution.lad_codex_semantic_worktree"
-CODEX_WORKFLOW_IDS = (
-    CODEX_CONTROL_WORKFLOW_ID,
-    CODEX_TREATMENT_WORKFLOW_ID,
-)
-_CODEX_TREATMENT_ASSET_PREFIX = (
+SEMANTIC_WORKFLOW_ID = "execution.lad_codex_semantic_worktree"
+_SEMANTIC_ASSET_PREFIX = (
     "execution.lad_codex_semantic_worktree"
 )
-_CODEX_ROUTER_ASSET_ID = f"{_CODEX_TREATMENT_ASSET_PREFIX}.context_router"
+_CODEX_ROUTER_ASSET_ID = f"{_SEMANTIC_ASSET_PREFIX}.context_router"
 _CODEX_ENTRYPOINT_ASSET_IDS = {
-    stage: f"{_CODEX_TREATMENT_ASSET_PREFIX}.entrypoints.{stage}"
+    stage: f"{_SEMANTIC_ASSET_PREFIX}.entrypoints.{stage}"
     for stage in (
         "lad_builder",
         "lad_checker",
@@ -83,11 +78,11 @@ _CODEX_ENTRYPOINT_ASSET_IDS = {
     )
 }
 _CODEX_UPDATER_SKILL_ASSET_ID = (
-    f"{_CODEX_TREATMENT_ASSET_PREFIX}.skills.updater_core"
+    f"{_SEMANTIC_ASSET_PREFIX}.skills.updater_core"
 )
 _CODEX_CONTEXT_SCHEMA_ID = "execution.artifacts.context_update_report"
 _CODEX_CONTEXT_BINDING_IDS = {
-    stage: f"{CODEX_TREATMENT_WORKFLOW_ID}.{stage}_context"
+    stage: f"{SEMANTIC_WORKFLOW_ID}.{stage}_context"
     for stage in (
         "lad_builder",
         "lad_checker",
@@ -97,7 +92,7 @@ _CODEX_CONTEXT_BINDING_IDS = {
         "lad_updater",
     )
 }
-_CODEX_TREATMENT_ACTION_TARGET_STAGES = {
+_SEMANTIC_ACTION_TARGET_STAGES = {
     "execution.route_builder_complete": "lad_checker",
     "execution.route_checker_pass": "lad_updater",
     "execution.route_checker_fix_needed": "lad_fixer",
@@ -251,160 +246,6 @@ def _codex_descriptor_digest(runner: Record) -> str:
 
 def _runner_records(source: dict[str, object]) -> tuple[Record, ...]:
     return tuple(_records(source, "runner_bindings"))
-
-
-def _codex_asset_normalization() -> dict[str, str]:
-    return {
-        **{
-            asset_id: f"execution.entrypoints.{stage}"
-            for stage, asset_id in _CODEX_ENTRYPOINT_ASSET_IDS.items()
-        },
-        _CODEX_UPDATER_SKILL_ASSET_ID: "execution.skills.updater_core",
-    }
-
-
-def _normalize_lad_authority(source: dict[str, object]) -> dict[str, object]:
-    """Normalize only the workflow-local IDs permitted by the parity contract."""
-
-    source_workflow_id = str(cast(Record, source["workflow"])["id"])
-    is_treatment = source_workflow_id == CODEX_TREATMENT_WORKFLOW_ID
-    normalized = deepcopy(source)
-    normalized.pop("assets", None)
-    workflow = cast(Record, normalized["workflow"])
-    workflow["id"] = "execution.lad"
-    workflow["name"] = "LAD Execution"
-
-    graph = _records(normalized, "graphs")[0]
-    graph["id"] = "execution.lad.graph"
-    graph["node_ids"] = tuple(
-        node_id.replace(
-            f"{CODEX_CONTROL_WORKFLOW_ID}.", "execution.lad."
-        ).replace(
-            f"{CODEX_TREATMENT_WORKFLOW_ID}.", "execution.lad."
-        )
-        for node_id in cast(list[str], graph["node_ids"])
-    )
-
-    def normalize_runner_id(value: object) -> object:
-        if not isinstance(value, str):
-            return value
-        return value.replace(".codex_runner", ".runner").replace(
-            ".millforge_runner", ".runner"
-        )
-
-    def normalize_graph_node(value: object) -> object:
-        if not isinstance(value, str):
-            return value
-        return value.replace(
-            f"{CODEX_CONTROL_WORKFLOW_ID}.", "execution.lad."
-        ).replace(
-            f"{CODEX_TREATMENT_WORKFLOW_ID}.", "execution.lad."
-        )
-
-    asset_mapping = _codex_asset_normalization()
-    for runner in _records(normalized, "runner_bindings"):
-        runner["id"] = normalize_runner_id(runner["id"])
-        runner.pop("adapter_kind", None)
-        runner.pop("component_pin", None)
-    for stage in _records(normalized, "stage_kinds"):
-        stage["runner_binding_id"] = normalize_runner_id(
-            stage["runner_binding_id"]
-        )
-        stage["asset_ids"] = tuple(
-            asset_mapping.get(str(asset_id), asset_id)
-            for asset_id in cast(list[object], stage["asset_ids"])
-        )
-    for route in _records(normalized, "external_enqueue_routes"):
-        route["id"] = normalize_graph_node(route["id"])
-        route["graph_node_id"] = normalize_graph_node(route["graph_node_id"])
-        route["runner_binding_id"] = normalize_runner_id(
-            route["runner_binding_id"]
-        )
-    for action in _records(normalized, "terminal_actions"):
-        action_id = str(action["id"])
-        if "target_graph_node_id" in action:
-            action["target_graph_node_id"] = normalize_graph_node(
-                action["target_graph_node_id"]
-            )
-        if "runner_binding_id" in action:
-            action["runner_binding_id"] = normalize_runner_id(
-                action["runner_binding_id"]
-            )
-        selector = action.get("dynamic_target_selector")
-        if isinstance(selector, Mapping):
-            targets = selector.get("targets")
-            if isinstance(targets, Mapping):
-                for target in targets.values():
-                    if not isinstance(target, Mapping):
-                        continue
-                    if "target_graph_node_id" in target:
-                        target["target_graph_node_id"] = normalize_graph_node(
-                            target["target_graph_node_id"]
-                        )
-                    if "runner_binding_id" in target:
-                        target["runner_binding_id"] = normalize_runner_id(
-                            target["runner_binding_id"]
-                        )
-        if action_id in _CODEX_TREATMENT_ACTION_TARGET_STAGES:
-            action["asset_ids"] = tuple(
-                asset_mapping.get(str(asset_id), asset_id)
-                for asset_id in cast(list[object], action["asset_ids"])
-            )
-            selector = action.get("dynamic_target_selector")
-            if action_id == "execution.return_troubleshooter_complete" and isinstance(
-                selector, Mapping
-            ):
-                targets = selector.get("targets")
-                if isinstance(targets, Mapping):
-                    for target in targets.values():
-                        if isinstance(target, Mapping) and "asset_ids" in target:
-                            target["asset_ids"] = tuple(
-                                asset_mapping.get(str(asset_id), asset_id)
-                                for asset_id in cast(
-                                    list[object], target["asset_ids"]
-                                )
-                            )
-        if (
-            is_treatment
-            and
-            action_id == "execution.close_updater_complete"
-            and action.get("artifact_schema_id") == _CODEX_CONTEXT_SCHEMA_ID
-        ):
-            action["artifact_schema_id"] = "execution.artifacts.report"
-    for option in _records(normalized, "intervention_options"):
-        if "target_graph_node_id" in option:
-            option["target_graph_node_id"] = normalize_graph_node(
-                option["target_graph_node_id"]
-            )
-        if "target_runner_binding_id" in option:
-            option["target_runner_binding_id"] = normalize_runner_id(
-                option["target_runner_binding_id"]
-            )
-    for stage in _records(normalized, "stage_kinds"):
-        schema_ids = cast(list[object], stage["artifact_schema_ids"])
-        if is_treatment and str(stage["id"]) == "lad_updater":
-            schema_ids = [
-                "execution.artifacts.report"
-                if schema_id == _CODEX_CONTEXT_SCHEMA_ID
-                else schema_id
-                for schema_id in schema_ids
-            ]
-            schema_ids = list(dict.fromkeys(schema_ids))
-        stage["artifact_schema_ids"] = tuple(
-            schema_ids
-        )
-    normalized["artifact_schemas"] = [
-        schema
-        for schema in _records(normalized, "artifact_schemas")
-        if not (
-            is_treatment
-            and
-            schema["id"] == _CODEX_CONTEXT_SCHEMA_ID
-            and schema.get("schema") == _context_update_report_schema()
-        )
-    ]
-    normalized.pop("context_bindings", None)
-    return normalized
 
 
 def _context_update_report_schema() -> dict[str, object]:
@@ -1366,7 +1207,7 @@ def test_execution_lad_authority_and_assets_are_package_owned() -> None:
         - {
             asset_id
             for asset_id in execution_assets
-            if asset_id.startswith(f"{_CODEX_TREATMENT_ASSET_PREFIX}.")
+            if asset_id.startswith(f"{_SEMANTIC_ASSET_PREFIX}.")
         }
     ) == 16
     for workflow_id in WORKFLOW_IDS:
@@ -1396,45 +1237,26 @@ def test_existing_execution_lad_authority_and_asset_pins_are_byte_frozen() -> No
     )
 
 
-def test_public_codex_workflow_selectors_are_present_and_distinct() -> None:
+def test_public_semantic_workflow_selector_is_present() -> None:
     manifest = _manifest()
     selectors = {
         (str(workflow["workflow_id"]), str(workflow["workflow_version"]))
         for workflow in cast(list[Record], manifest["workflows"])
     }
 
-    assert {
-        (CODEX_CONTROL_WORKFLOW_ID, "0.1"),
-        (CODEX_TREATMENT_WORKFLOW_ID, "0.2"),
-    } <= selectors
-    workflows = conformance.workflows_by_id(manifest)
-    assert workflows[CODEX_CONTROL_WORKFLOW_ID]["display"]["name"] != (
-        workflows[CODEX_TREATMENT_WORKFLOW_ID]["display"]["name"]
-    )
+    assert (SEMANTIC_WORKFLOW_ID, "0.2") in selectors
 
 
-def test_codex_runner_components_and_mappings_are_exact_and_identical() -> None:
+def test_semantic_codex_runner_components_and_mappings_are_exact() -> None:
     reference = _source()
-    control = _codex_source(CODEX_CONTROL_WORKFLOW_ID)
-    treatment = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    semantic = _codex_source(SEMANTIC_WORKFLOW_ID)
     reference_runners = {
         str(runner["stage_kind_ids"][0]): runner
         for runner in _runner_records(reference)
     }
-    control_runners = _runner_records(control)
-    treatment_runners = _runner_records(treatment)
-
-    assert tuple(
-        runner
-        for runner in control_runners
-        if runner["stage_kind_ids"] != ["lad_troubleshooter"]
-    ) == tuple(
-        runner
-        for runner in treatment_runners
-        if runner["stage_kind_ids"] != ["lad_troubleshooter"]
-    )
+    semantic_runners = _runner_records(semantic)
     assert {
-        str(runner["id"]) for runner in control_runners
+        str(runner["id"]) for runner in semantic_runners
     } == {
         f"{stage}.codex_runner"
         for stage in (
@@ -1447,7 +1269,7 @@ def test_codex_runner_components_and_mappings_are_exact_and_identical() -> None:
             "lad_consultant",
         )
     }
-    for runner in control_runners:
+    for runner in semantic_runners:
         stage = str(cast(list[object], runner["stage_kind_ids"])[0])
         reference_runner = reference_runners[stage]
         component = cast(Record, runner["component_pin"])
@@ -1457,9 +1279,10 @@ def test_codex_runner_components_and_mappings_are_exact_and_identical() -> None:
         assert runner["required_capability_ids"] == (
             reference_runner["required_capability_ids"]
         )
-        assert runner["terminal_result_mappings"] == (
-            reference_runner["terminal_result_mappings"]
-        )
+        if stage != "lad_troubleshooter":
+            assert runner["terminal_result_mappings"] == (
+                reference_runner["terminal_result_mappings"]
+            )
         assert component["component_kind"] == "runner"
         assert component["component_id"] == "millrace-codex-wrapper"
         assert component["component_version"] == "4"
@@ -1471,35 +1294,30 @@ def test_codex_runner_components_and_mappings_are_exact_and_identical() -> None:
         assert component["required_capability_ids"] == (
             reference_component["required_capability_ids"]
         )
-        assert component["legal_terminal_result_ids"] == (
-            reference_component["legal_terminal_result_ids"]
-        )
+        if stage == "lad_troubleshooter":
+            assert component["legal_terminal_result_ids"] == [
+                mapping["runner_result_id"]
+                for mapping in cast(list[Record], runner["terminal_result_mappings"])
+            ]
+        else:
+            assert component["legal_terminal_result_ids"] == (
+                reference_component["legal_terminal_result_ids"]
+            )
         assert component["descriptor_sha256"] == _codex_descriptor_digest(runner)
 
 
-def test_codex_control_and_treatment_match_reference_after_normalization() -> None:
-    reference = _normalize_lad_authority(_source())
-    control = _normalize_lad_authority(_codex_source(CODEX_CONTROL_WORKFLOW_ID))
-    treatment = _normalize_lad_authority(
-        _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
-    )
-
-    assert control == reference
-    assert treatment != reference
-
-
-def test_treatment_terminal_actions_select_assets_for_their_target_stage() -> None:
-    treatment = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+def test_semantic_terminal_actions_select_assets_for_their_target_stage() -> None:
+    semantic = _codex_source(SEMANTIC_WORKFLOW_ID)
     stage_assets = {
         str(stage["id"]): tuple(cast(list[object], stage["asset_ids"]))
-        for stage in _records(treatment, "stage_kinds")
+        for stage in _records(semantic, "stage_kinds")
     }
     actions = {
         str(action["id"]): action
-        for action in _records(treatment, "terminal_actions")
+        for action in _records(semantic, "terminal_actions")
     }
 
-    for action_id, target_stage in _CODEX_TREATMENT_ACTION_TARGET_STAGES.items():
+    for action_id, target_stage in _SEMANTIC_ACTION_TARGET_STAGES.items():
         assert tuple(cast(list[object], actions[action_id]["asset_ids"])) == (
             stage_assets[target_stage]
         )
@@ -1512,70 +1330,8 @@ def test_treatment_terminal_actions_select_assets_for_their_target_stage() -> No
         assert "dynamic_target_selector" not in actions[action_id]
 
 
-@pytest.mark.parametrize(
-    "mutation",
-    (
-        "unrelated_stage_schema",
-        "unrelated_terminal_schema",
-        "unauthorized_asset",
-        "other_authority",
-    ),
-)
-def test_lad_parity_normalization_rejects_hostile_treatment_mutations(
-    mutation: str,
-) -> None:
-    control = _codex_source(CODEX_CONTROL_WORKFLOW_ID)
-    treatment = deepcopy(_codex_source(CODEX_TREATMENT_WORKFLOW_ID))
-
-    if mutation == "unrelated_stage_schema":
-        _record(treatment, "stage_kinds", "lad_checker")["artifact_schema_ids"] = (
-            _CODEX_CONTEXT_SCHEMA_ID,
-        )
-    elif mutation == "unrelated_terminal_schema":
-        _record(
-            treatment, "terminal_actions", "execution.route_builder_complete"
-        )["artifact_schema_id"] = _CODEX_CONTEXT_SCHEMA_ID
-    elif mutation == "unauthorized_asset":
-        action = _record(
-            treatment, "terminal_actions", "execution.route_builder_complete"
-        )
-        action["asset_ids"] = (
-            *cast(list[object], action["asset_ids"]),
-            f"{_CODEX_TREATMENT_ASSET_PREFIX}.entrypoints.unauthorized",
-        )
-    else:
-        _record(treatment, "terminal_actions", "execution.route_builder_complete")[
-            "emitted_queue_family_id"
-        ] = "task"
-
-    assert _normalize_lad_authority(treatment) != _normalize_lad_authority(control)
-
-
-@pytest.mark.parametrize("mutation", ("stage", "terminal_action"))
-def test_lad_parity_normalization_only_substitutes_treatment_context_schema(
-    mutation: str,
-) -> None:
-    reference = _source()
-    control = deepcopy(_codex_source(CODEX_CONTROL_WORKFLOW_ID))
-    if mutation == "stage":
-        stage = _record(control, "stage_kinds", "lad_updater")
-        schema_ids = list(cast(list[object], stage["artifact_schema_ids"]))
-        schema_ids[schema_ids.index("execution.artifacts.report")] = (
-            _CODEX_CONTEXT_SCHEMA_ID
-        )
-        stage["artifact_schema_ids"] = schema_ids
-    else:
-        _record(
-            control, "terminal_actions", "execution.close_updater_complete"
-        )["artifact_schema_id"] = _CODEX_CONTEXT_SCHEMA_ID
-
-    assert _normalize_lad_authority(control) != _normalize_lad_authority(reference)
-
-
-def test_semantic_worktree_context_bindings_are_exact_and_control_is_unbound() -> None:
-    control = _codex_source(CODEX_CONTROL_WORKFLOW_ID)
-    treatment = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
-    assert _source_context_bindings(control) == []
+def test_semantic_worktree_context_bindings_are_exact() -> None:
+    semantic = _codex_source(SEMANTIC_WORKFLOW_ID)
 
     roots = (
         "millrace-agents/shared/conventions",
@@ -1704,7 +1460,7 @@ def test_semantic_worktree_context_bindings_are_exact_and_control_is_unbound() -
 
     actual = {
         str(binding["stage_kind_id"]): binding
-        for binding in _source_context_bindings(treatment)
+        for binding in _source_context_bindings(semantic)
     }
     assert set(actual) == set(expected)
     assert set(actual) == set(_CODEX_CONTEXT_BINDING_IDS)
@@ -1718,7 +1474,6 @@ def test_context_bindings_are_absent_from_reference_and_unrelated_workflows() ->
     manifest = _manifest()
     workflows = conformance.workflows_by_id(manifest)
     workflow_ids = (
-        CODEX_CONTROL_WORKFLOW_ID,
         "execution.lad",
         "execution.lad_integrator",
         "planning.lad",
@@ -1732,7 +1487,7 @@ def test_context_bindings_are_absent_from_reference_and_unrelated_workflows() ->
         assert selected.get("context_bindings", []) == []
 
 
-def test_treatment_assets_and_context_update_schema_are_content_contracts() -> None:
+def test_semantic_assets_and_context_update_schema_are_content_contracts() -> None:
     manifest = _manifest()
     assets = conformance.assets_by_id(manifest)
     expected_paths = {
@@ -1751,16 +1506,16 @@ def test_treatment_assets_and_context_update_schema_are_content_contracts() -> N
         ),
     }
     assert set(expected_paths) <= set(assets)
-    treatment = conformance.workflows_by_id(manifest)[CODEX_TREATMENT_WORKFLOW_ID]
+    semantic = conformance.workflows_by_id(manifest)[SEMANTIC_WORKFLOW_ID]
     required_ids = {
         str(asset["asset_id"])
-        for asset in cast(list[Record], treatment["required_assets"])
+        for asset in cast(list[Record], semantic["required_assets"])
     }
     assert set(expected_paths) <= required_ids
-    treatment_source = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    semantic_source = _codex_source(SEMANTIC_WORKFLOW_ID)
     assert _CODEX_ROUTER_ASSET_ID not in {
         str(asset_id)
-        for stage in _records(treatment_source, "stage_kinds")
+        for stage in _records(semantic_source, "stage_kinds")
         for asset_id in cast(list[object], stage["asset_ids"])
     }
     for asset_id, package_path in expected_paths.items():
@@ -1861,7 +1616,7 @@ def test_treatment_assets_and_context_update_schema_are_content_contracts() -> N
     assert all(isinstance(json.loads(example), dict) for example in json_examples)
 
     schema = _record(
-        treatment_source, "artifact_schemas", _CODEX_CONTEXT_SCHEMA_ID
+        semantic_source, "artifact_schemas", _CODEX_CONTEXT_SCHEMA_ID
     )
     assert schema["schema"] == _context_update_report_schema()
     valid = {"changes": [], "proposals": []}
@@ -1885,16 +1640,16 @@ def test_treatment_assets_and_context_update_schema_are_content_contracts() -> N
     ).accepted
 
 
-def test_treatment_updater_examples_are_schema_and_digest_semantic() -> None:
+def test_semantic_updater_examples_are_schema_and_digest_exact() -> None:
     manifest = _manifest()
-    treatment_source = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    semantic_source = _codex_source(SEMANTIC_WORKFLOW_ID)
     updater_core = conformance.asset_texts(
         PACKAGE_ROOT,
         manifest,
         {_CODEX_UPDATER_SKILL_ASSET_ID},
     )[_CODEX_UPDATER_SKILL_ASSET_ID]
     schema = _record(
-        treatment_source, "artifact_schemas", _CODEX_CONTEXT_SCHEMA_ID
+        semantic_source, "artifact_schemas", _CODEX_CONTEXT_SCHEMA_ID
     )["schema"]
 
     valid = _json_example(updater_core, "## Valid Example")
@@ -1932,54 +1687,44 @@ def test_treatment_updater_examples_are_schema_and_digest_semantic() -> None:
         assert not validate_schema(schema, invalid).accepted
 
 
-@pytest.mark.parametrize("workflow_id", CODEX_WORKFLOW_IDS)
-def test_codex_workflows_compile_declared_selected_authority(
-    workflow_id: str,
-) -> None:
-    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, workflow_id)
+def test_semantic_workflow_compiles_declared_selected_authority() -> None:
+    plan = conformance.compile_packaged_workflow(PACKAGE_ROOT, SEMANTIC_WORKFLOW_ID)
 
-    assert str(plan.workflow.workflow_id) == workflow_id
+    assert str(plan.workflow.workflow_id) == SEMANTIC_WORKFLOW_ID
     bindings = {
         str(binding.stage_kind_id): binding for binding in plan.context_bindings
     }
-    if workflow_id == CODEX_CONTROL_WORKFLOW_ID:
-        assert bindings == {}
-    else:
-        assert set(bindings) == set(_CODEX_CONTEXT_BINDING_IDS)
-        updater = bindings["lad_updater"]
-        assert str(updater.router_asset_id) == _CODEX_ROUTER_ASSET_ID
-        assert str(updater.writeback_terminal_action_id) == (
-            "execution.close_updater_complete"
-        )
-        assert str(updater.writeback_artifact_schema_id) == _CODEX_CONTEXT_SCHEMA_ID
+    assert set(bindings) == set(_CODEX_CONTEXT_BINDING_IDS)
+    updater = bindings["lad_updater"]
+    assert str(updater.router_asset_id) == _CODEX_ROUTER_ASSET_ID
+    assert str(updater.writeback_terminal_action_id) == (
+        "execution.close_updater_complete"
+    )
+    assert str(updater.writeback_artifact_schema_id) == _CODEX_CONTEXT_SCHEMA_ID
 
 
-@pytest.mark.parametrize("workflow_id", CODEX_WORKFLOW_IDS)
-def test_codex_workflows_select_and_verify_through_installed_public_api(
+def test_semantic_workflow_selects_through_installed_public_api(
     tmp_path: Path,
-    workflow_id: str,
 ) -> None:
     manifest = _manifest()
     plan = conformance.select_and_verify_package(
-        tmp_path / workflow_id,
+        tmp_path / SEMANTIC_WORKFLOW_ID,
         PACKAGE_ROOT,
         package_id=PACKAGE_ID,
         package_version=PACKAGE_VERSION,
-        workflow_id=workflow_id,
-        workflow_version=(
-            "0.2" if workflow_id == CODEX_TREATMENT_WORKFLOW_ID else "0.1"
-        ),
+        workflow_id=SEMANTIC_WORKFLOW_ID,
+        workflow_version="0.2",
     )
 
     conformance.assert_selected_package_pin(
         plan,
         package_id=PACKAGE_ID,
         package_version=PACKAGE_VERSION,
-        workflow_id=workflow_id,
-        workflow_version=(
-            "0.2" if workflow_id == CODEX_TREATMENT_WORKFLOW_ID else "0.1"
+        workflow_id=SEMANTIC_WORKFLOW_ID,
+        workflow_version="0.2",
+        selected_asset_pins=conformance.selected_asset_pins(
+            manifest, SEMANTIC_WORKFLOW_ID
         ),
-        selected_asset_pins=conformance.selected_asset_pins(manifest, workflow_id),
     )
 
 
@@ -4195,7 +3940,7 @@ def _assert_closed_bounded_schema(node: Record) -> None:
 
 
 def test_governed_lad_result_schemas_are_closed_and_bounded() -> None:
-    source = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    source = _codex_source(SEMANTIC_WORKFLOW_ID)
     schemas = {
         str(schema["id"]): cast(Record, schema["schema"])
         for schema in _records(source, "artifact_schemas")
@@ -4311,7 +4056,7 @@ def test_governed_lad_result_schemas_are_closed_and_bounded() -> None:
 
 def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
 ) -> None:
-    source = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    source = _codex_source(SEMANTIC_WORKFLOW_ID)
     bindings = _source_context_bindings(source)
     assert tuple(str(binding["stage_kind_id"]) for binding in bindings) == (
         _GOVERNED_CONTEXT_STAGES
@@ -4458,7 +4203,7 @@ def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
 
 
 def test_troubleshooter_reentry_uses_typed_conditions_and_exact_graph_targets() -> None:
-    source = _codex_source(CODEX_TREATMENT_WORKFLOW_ID)
+    source = _codex_source(SEMANTIC_WORKFLOW_ID)
     expected_routes = {
         "execution.return_troubleshooter_complete": (
             "narrow_repair",

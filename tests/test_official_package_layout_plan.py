@@ -32,6 +32,7 @@ def test_readme_documents_public_official_workflow_package() -> None:
         "`planning.lad`",
         "`lad.full`",
         "`vendor_selection`",
+        "`execution.lad_codex_semantic_worktree`",
         "package data is non-executable",
         "`millrace==0.22.3` convenience meta-distribution",
     ):
@@ -49,6 +50,7 @@ def test_release_notes_document_current_package_contents() -> None:
         "`planning.lad`",
         "`lad.full`",
         "`vendor_selection`",
+        "`execution.lad_codex_semantic_worktree`",
         "| Runtime dependency | None |",
     ):
         assert required in release_notes
@@ -56,6 +58,21 @@ def test_release_notes_document_current_package_contents() -> None:
     assert "PLUS-0002D keeps" not in release_notes
     assert "PLUS-0002E extends" not in release_notes
     assert "PLUS-0002F extends" not in release_notes
+
+
+def test_public_docs_describe_seven_ordinary_workflows_without_campaign_arms() -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text()
+    workflows = (PROJECT_ROOT / "docs" / "workflows.md").read_text()
+    release = (PROJECT_ROOT / "docs" / "release.md").read_text()
+    public_docs = "\n".join((readme, workflows, release))
+
+    assert "contains seven selectable workflow configurations" in workflows
+    assert "seven workflow entries" in release
+    assert "`execution.lad_codex_semantic_worktree`" in readme
+    assert "execution.lad_codex_control" not in public_docs
+    assert "Control/Treatment" not in public_docs
+    assert "Control arm" not in public_docs
+    assert "Treatment arm" not in public_docs
 
 
 def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:

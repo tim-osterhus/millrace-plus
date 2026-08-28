@@ -19,10 +19,11 @@ Readable assets:
 - `simple_loop.reviewer_core_skill`.
 - Selected workflow context and artifact schemas named in dispatch.
 - Declared `simple_loop.reviewer_context` files, including
-  `selected_artifacts/direct_predecessors`.
+  current-lineage artifacts and the selected `docs` workspace root.
 
 Writable artifacts:
-- Review evidence for accepted work.
+- `simple_loop.context_update_report` for accepted work. Use empty `changes`
+  and `proposals` plus a concrete `no_op_reason` when no selected write is needed.
 - `simple_loop.gap_packet` when specific gaps remain.
 - `simple_loop.incident_report` when review evidence supports incident reporting.
 
@@ -35,7 +36,8 @@ Process:
 1. Compare the source `body`, work packet, work result, and actual target.
 2. Treat a literal mismatch between the source prompt and packet as a gap.
 3. Record concrete evidence for acceptance, gaps, or incident findings.
-4. Return a structured artifact with one legal marker.
+4. Return a structured artifact with one legal marker. An `ACCEPTED` result
+   must classify every selected write in the governed context update report.
 
 Legal terminal markers rendered by runtime:
 - `ACCEPTED` when the result satisfies the completion definition.

@@ -1,6 +1,6 @@
 # Workflow Guide
 
-Millrace Plus contains six selectable workflow configurations. Each one is a
+Millrace Plus contains seven selectable workflow configurations. Each one is a
 complete decision graph with its own queues, stages, outcomes, recovery rules,
 and selected prompt and skill assets.
 
@@ -93,6 +93,7 @@ than approving a purchase autonomously.
 | Turn specs or incidents into completed work | `planning.lad` |
 | Include evidence-driven learning | `lad.full` |
 | Study a non-LAD four-plane graph | `vendor_selection` |
+| Run governed semantic-worktree execution | `execution.lad_codex_semantic_worktree` |
 
 ## `execution.lad_codex_semantic_worktree`
 

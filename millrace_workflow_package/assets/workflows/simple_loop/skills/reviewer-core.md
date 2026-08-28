@@ -8,16 +8,16 @@ description: Use when executing the Reviewer stage for the selected simple_loop 
 ## Artifact Schema
 
 Produce one response envelope matching the terminal marker. `GAPS_FOUND` and
-`INCIDENT_REQUIRED` produce selected artifacts. `ACCEPTED` returns review
-acceptance evidence without claiming a selected artifact schema.
+`INCIDENT_REQUIRED` produce selected artifacts. `ACCEPTED` produces the
+governed context update report selected by the workflow authority.
 
-Review acceptance evidence
+`simple_loop.context_update_report`
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
-| `summary` | yes | string | Review conclusion. |
-| `evidence` | yes | array | Completion checks performed. |
-| `assumptions` | yes | array | Assumptions or risks. |
+| `changes` | yes | array | Direct writes under selected write roots. |
+| `proposals` | yes | array | Protected-write proposals; empty for this workflow. |
+| `no_op_reason` | no | string | Why no selected write was required. |
 
 `simple_loop.gap_packet`
 

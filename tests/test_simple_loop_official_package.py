@@ -57,6 +57,58 @@ def _record(source: dict[str, object], section: str, record_id: str) -> Record:
     return next(item for item in _records(source, section) if item["id"] == record_id)
 
 
+def _context_update_report_schema() -> dict[str, object]:
+    string_schema = {"type": "string"}
+    evidence_refs = {"type": "array", "items": string_schema}
+    return {
+        "type": "object",
+        "required": ["changes", "proposals"],
+        "properties": {
+            "changes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "path",
+                        "change_kind",
+                        "evidence_refs",
+                        "classification",
+                    ],
+                    "properties": {
+                        "path": string_schema,
+                        "change_kind": {"enum": ["create", "modify", "delete"]},
+                        "before_sha256": string_schema,
+                        "after_sha256": string_schema,
+                        "evidence_refs": evidence_refs,
+                        "classification": {"const": "direct_write"},
+                    },
+                },
+            },
+            "proposals": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "path",
+                        "proposed_content",
+                        "proposed_content_sha256",
+                        "evidence_refs",
+                        "classification",
+                    ],
+                    "properties": {
+                        "path": string_schema,
+                        "proposed_content": string_schema,
+                        "proposed_content_sha256": string_schema,
+                        "evidence_refs": evidence_refs,
+                        "classification": {"const": "protected_proposal"},
+                    },
+                },
+            },
+            "no_op_reason": string_schema,
+        },
+    }
+
+
 def test_simple_loop_manifest_is_complete_package_authority() -> None:
     manifest = _manifest()
     workflow = conformance.workflows_by_id(manifest)[WORKFLOW_ID]
@@ -450,11 +502,34 @@ def test_simple_loop_context_bindings_are_scoped_and_typed() -> None:
         binding["router_asset_id"] == "simple_loop.context_router"
         for binding in bindings
     )
-    for binding in bindings:
-        assert binding["mutation_policy"] == "forbid_selected_roots"
+    assert {
+        stage_id: binding["mutation_policy"] for stage_id, binding in by_stage.items()
+    } == {
+        "simple_loop.worker": "forbid_selected_roots",
+        "simple_loop.reviewer": "reconcile_selected_writes",
+        "simple_loop.troubleshooter": "forbid_selected_roots",
+    }
+    assert all(
+        binding["materialization_retention"]
+        == "until_session_durable_terminal"
+        for binding in bindings
+    )
+    for stage_id in ("simple_loop.worker", "simple_loop.troubleshooter"):
+        binding = by_stage[stage_id]
         assert binding["write_rules"] == []
         assert binding["writeback_terminal_action_id"] is None
         assert binding["writeback_artifact_schema_id"] is None
+
+    reviewer_binding = by_stage["simple_loop.reviewer"]
+    assert reviewer_binding["write_rules"] == [
+        {"relative_root": "docs/reviews", "disposition": "direct_write"}
+    ]
+    assert reviewer_binding["writeback_terminal_action_id"] == (
+        "simple_loop.reviewer.accepted"
+    )
+    assert reviewer_binding["writeback_artifact_schema_id"] == (
+        "simple_loop.context_update_report"
+    )
 
     required_pairs = {
         stage_id: {
@@ -463,10 +538,9 @@ def test_simple_loop_context_bindings_are_scoped_and_typed() -> None:
         }
         for stage_id in by_stage
     }
-    for stage_id in ("simple_loop.worker", "simple_loop.reviewer"):
-        assert ("selected_artifacts", "direct_predecessors") in required_pairs[
-            stage_id
-        ]
+    assert ("selected_artifacts", "direct_predecessors") in required_pairs[
+        "simple_loop.worker"
+    ]
     assert ("selected_artifacts", "direct_predecessors") in required_pairs[
         "simple_loop.troubleshooter"
     ]
@@ -474,6 +548,21 @@ def test_simple_loop_context_bindings_are_scoped_and_typed() -> None:
         "selected_attempts",
         "since_last_accepted_transition",
     ) in required_pairs["simple_loop.troubleshooter"]
+    assert (
+        "selected_artifacts",
+        "current_lineage",
+    ) in required_pairs["simple_loop.reviewer"]
+    assert (
+        "selected_attempts",
+        "current_lineage",
+    ) in {
+        (item["source_kind"], item["source_ref"])
+        for item in by_stage["simple_loop.troubleshooter"]["discoverable_sources"]
+    }
+    assert (
+        "workspace_relative_root",
+        "docs",
+    ) in required_pairs["simple_loop.reviewer"]
 
     troubleshooter_stage = _record(source, "stage_kinds", "simple_loop.troubleshooter")
     assert troubleshooter_stage["artifact_schema_ids"] == [
@@ -492,6 +581,25 @@ def test_simple_loop_context_bindings_are_scoped_and_typed() -> None:
     assert all(
         action["artifact_schema_id"] == "simple_loop.troubleshooting_report"
         for action in troubleshooter_actions.values()
+    )
+
+    writeback_schema = _record(
+        source,
+        "artifact_schemas",
+        "simple_loop.context_update_report",
+    )
+    assert writeback_schema["schema"] == _context_update_report_schema()
+    reviewer_stage = _record(source, "stage_kinds", "simple_loop.reviewer")
+    assert "simple_loop.context_update_report" in reviewer_stage[
+        "artifact_schema_ids"
+    ]
+    reviewer_accepted = _record(
+        source,
+        "terminal_actions",
+        "simple_loop.reviewer.accepted",
+    )
+    assert reviewer_accepted["artifact_schema_id"] == (
+        "simple_loop.context_update_report"
     )
 
 
@@ -530,7 +638,10 @@ def test_context_selector_names_are_canonical() -> None:
                     "context_bindings", []
                 ),
             )
-            for source in cast(list[dict[str, object]], binding["required_sources"])
+            for source in (
+                *cast(list[dict[str, object]], binding["required_sources"]),
+                *cast(list[dict[str, object]], binding["discoverable_sources"]),
+            )
         )
     }
 
