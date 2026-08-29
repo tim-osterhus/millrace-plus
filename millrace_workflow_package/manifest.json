@@ -27231,15 +27231,15 @@
                 "source_ref": "current",
                 "max_files": 1,
                 "max_bytes": 1048576
-              },
+              }
+            ],
+            "discoverable_sources": [
               {
                 "source_kind": "selected_artifacts",
                 "source_ref": "direct_predecessors",
                 "max_files": 64,
                 "max_bytes": 1048576
-              }
-            ],
-            "discoverable_sources": [
+              },
               {
                 "source_kind": "selected_attempts",
                 "source_ref": "since_last_accepted_transition",
@@ -28180,7 +28180,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:85a6efe8047fd6ce91474e43637e963ceb62b01ae9bbffc01518a6f1ba077119",
+  "manifest_digest": "sha256:4c7e93477c1773b76af90342184693f0bd6b9680323c6fc204aa3e5286adabea",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",

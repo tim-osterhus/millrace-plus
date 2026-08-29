@@ -106,7 +106,7 @@ v0.22.3 context contract. Its version is `0.2`.
 | Checker | Reviews the direct Builder predecessor and selects only relevant named evidence on demand |
 | Fixer | Uses the active finding and accepted baseline; recovery-cycle history is discoverable when present |
 | Doublechecker | Revalidates the original baseline and latest Fixer evidence; recovery-cycle history is discoverable when present |
-| Troubleshooter | Produces a typed repair plan with an explicit legal re-entry or unrecoverable reason; attempt history is discoverable when present |
+| Troubleshooter | Produces a typed repair plan with an explicit legal re-entry or unrecoverable reason; predecessor artifacts and attempt history are discoverable when present |
 | Updater | Reconciles complete selected semantic-root snapshots through the declared writeback contract; attempt history is discoverable when present |
 
 Catalog entries are bounded metadata. Stages do not read every catalog entry,

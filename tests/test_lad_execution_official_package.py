@@ -4083,7 +4083,6 @@ def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
         },
         "lad_troubleshooter": {
             ("dispatch_material", "current"),
-            ("selected_artifacts", "direct_predecessors"),
         },
         "lad_updater": {
             ("dispatch_material", "current"),
@@ -4133,6 +4132,7 @@ def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
             ),
         },
         "lad_troubleshooter": {
+            ("selected_artifacts", "direct_predecessors"),
             ("selected_attempts", "since_last_accepted_transition"),
             *(
                 ("workspace_relative_root", root)
@@ -4232,6 +4232,37 @@ def test_semantic_troubleshooter_direct_blocked_route_does_not_require_attempt(
     attempt_source = ("selected_attempts", "since_last_accepted_transition")
     assert attempt_source not in required
     assert attempt_source in discoverable
+
+
+def test_semantic_runtime_recovery_routes_do_not_require_predecessor_artifact(
+) -> None:
+    source = _codex_source(SEMANTIC_WORKFLOW_ID)
+    bindings = {
+        str(binding["stage_kind_id"]): binding
+        for binding in _source_context_bindings(source)
+    }
+    artifactless_recovery_targets = {
+        str(action["target_stage_kind_id"])
+        for action in _records(source, "terminal_actions")
+        if action["kind"] == "recovery_route"
+        and action.get("artifact_schema_id") is None
+        and action.get("target_stage_kind_id") in bindings
+    }
+    assert artifactless_recovery_targets == {"lad_troubleshooter"}
+
+    artifact_source = ("selected_artifacts", "direct_predecessors")
+    for stage in artifactless_recovery_targets:
+        binding = bindings[stage]
+        required = {
+            (item["source_kind"], item["source_ref"])
+            for item in cast(list[Record], binding["required_sources"])
+        }
+        discoverable = {
+            (item["source_kind"], item["source_ref"])
+            for item in cast(list[Record], binding["discoverable_sources"])
+        }
+        assert artifact_source not in required
+        assert artifact_source in discoverable
 
 
 def test_semantic_normal_routes_never_require_optional_attempt_history() -> None:
