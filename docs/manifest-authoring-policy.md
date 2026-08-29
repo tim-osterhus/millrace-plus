@@ -399,8 +399,8 @@ which workflow behavior should be official.
       "package_path": "assets/workflows/vendor_selection/skills/rubric_evaluator-core.md"
     }
   ],
-  "manifest_digest": "sha256:8ee1b854f81d3579fed7ef662ce84d4cee15ebab52eede1d68f9e975516d7e19",
-  "package_digest": "sha256:78c8d6c52b9b3a34b8bef6219967c48024714ccbda0790c36e5a06ae03e03732",
+  "manifest_digest": "sha256:85a6efe8047fd6ce91474e43637e963ceb62b01ae9bbffc01518a6f1ba077119",
+  "package_digest": "sha256:9f641403d3f959a5760d224b57a3d8b17cae8e71a2ecab3615e0adac7320e820",
   "policy": "frozen-manifest",
   "selected_package_pin": {
     "package_format_version": "1",
@@ -409,7 +409,7 @@ which workflow behavior should be official.
   },
   "selected_workflow_fingerprints": {
     "execution.lad@0.1": "sha256:195fbe1c5a982366b214373e65d8a20b0393605af4dbc1aff361a0413a589fdd",
-    "execution.lad_codex_semantic_worktree@0.2": "sha256:1ad72a4e3534d869e2ed353f6d0cf602a9e30e5de03e3131df00ff9041e4a798",
+    "execution.lad_codex_semantic_worktree@0.2": "sha256:34982ad91f301fc6670bc2c92fcae941b73b273f4af1a92b6438b8df4ecf350e",
     "execution.lad_integrator@0.1": "sha256:5f0e8093b007b2e026034cdda8222804bba0deeaec90441fe97c54097c6d2a28",
     "lad.full@0.1": "sha256:60e075360d232d99b2e57cafbbe5afaf0a10be1fb8546429718e1ee943db3b77",
     "planning.lad@0.1": "sha256:5d5b2420bedf88f4baf3acea78de444356cb5fe9d6921f2c953db76643baa78c",

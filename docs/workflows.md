@@ -104,15 +104,19 @@ v0.22.3 context contract. Its version is `0.2`.
 | --- | --- |
 | Builder | Reads required task and predecessor evidence first; selects named catalog entries on demand when relevant |
 | Checker | Reviews the direct Builder predecessor and selects only relevant named evidence on demand |
-| Fixer | Uses the active finding, accepted baseline, and recovery-cycle delta before any named catalog selection |
-| Doublechecker | Revalidates the original baseline and latest Fixer evidence with criteria-linked selections only |
-| Troubleshooter | Produces a typed repair plan with an explicit legal re-entry or an unrecoverable reason |
-| Updater | Reconciles complete selected semantic-root snapshots through the declared writeback contract |
+| Fixer | Uses the active finding and accepted baseline; recovery-cycle history is discoverable when present |
+| Doublechecker | Revalidates the original baseline and latest Fixer evidence; recovery-cycle history is discoverable when present |
+| Troubleshooter | Produces a typed repair plan with an explicit legal re-entry or unrecoverable reason; attempt history is discoverable when present |
+| Updater | Reconciles complete selected semantic-root snapshots through the declared writeback contract; attempt history is discoverable when present |
 
 Catalog entries are bounded metadata. Stages do not read every catalog entry,
 and required material is always consumed first. The workflow graph owns
 re-entry, blockage, and writeback outcomes; prompt text supplies evidence and
 cannot create routes.
+
+Attempt history is never a stage-start prerequisite because ordinary graph
+routes may legally reach Fixer, Doublechecker, Troubleshooter, or Updater
+before any runtime recovery-attempt record exists.
 
 Builder, Fixer, and Troubleshooter leave mutable project documentation in the
 project working tree rather than hydrating it into their immutable context

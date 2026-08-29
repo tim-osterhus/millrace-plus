@@ -27149,15 +27149,15 @@
                 "source_ref": "direct_predecessors",
                 "max_files": 64,
                 "max_bytes": 1048576
-              },
+              }
+            ],
+            "discoverable_sources": [
               {
                 "source_kind": "selected_attempts",
                 "source_ref": "since_last_accepted_transition",
                 "max_files": 64,
                 "max_bytes": 1048576
-              }
-            ],
-            "discoverable_sources": [
+              },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/conventions",
@@ -27193,15 +27193,15 @@
                 "source_ref": "direct_predecessors",
                 "max_files": 64,
                 "max_bytes": 1048576
-              },
+              }
+            ],
+            "discoverable_sources": [
               {
                 "source_kind": "selected_attempts",
                 "source_ref": "since_last_accepted_transition",
                 "max_files": 64,
                 "max_bytes": 1048576
-              }
-            ],
-            "discoverable_sources": [
+              },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/references",
@@ -27237,15 +27237,15 @@
                 "source_ref": "direct_predecessors",
                 "max_files": 64,
                 "max_bytes": 1048576
-              },
+              }
+            ],
+            "discoverable_sources": [
               {
                 "source_kind": "selected_attempts",
                 "source_ref": "since_last_accepted_transition",
                 "max_files": 64,
                 "max_bytes": 1048576
-              }
-            ],
-            "discoverable_sources": [
+              },
               {
                 "source_kind": "workspace_relative_root",
                 "source_ref": "millrace-agents/shared/conventions",
@@ -27284,12 +27284,6 @@
               },
               {
                 "source_kind": "selected_artifacts",
-                "source_ref": "current_lineage",
-                "max_files": 64,
-                "max_bytes": 1048576
-              },
-              {
-                "source_kind": "selected_attempts",
                 "source_ref": "current_lineage",
                 "max_files": 64,
                 "max_bytes": 1048576
@@ -27349,7 +27343,14 @@
                 "max_bytes": 4194304
               }
             ],
-            "discoverable_sources": [],
+            "discoverable_sources": [
+              {
+                "source_kind": "selected_attempts",
+                "source_ref": "current_lineage",
+                "max_files": 64,
+                "max_bytes": 1048576
+              }
+            ],
             "write_rules": [
               {
                 "relative_root": "README.md",
@@ -28179,7 +28180,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:8ee1b854f81d3579fed7ef662ce84d4cee15ebab52eede1d68f9e975516d7e19",
+  "manifest_digest": "sha256:85a6efe8047fd6ce91474e43637e963ceb62b01ae9bbffc01518a6f1ba077119",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "lad_learning selected_authority retains effect/provider refs as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "entrypoint-authoring skill and references used for full LAD Learning asset rewrite review",

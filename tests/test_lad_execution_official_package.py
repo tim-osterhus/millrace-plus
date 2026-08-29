@@ -4077,21 +4077,17 @@ def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
         "lad_fixer": {
             ("dispatch_material", "current"),
             ("selected_artifacts", "direct_predecessors"),
-            ("selected_attempts", "since_last_accepted_transition"),
         },
         "lad_doublechecker": {
             ("selected_artifacts", "direct_predecessors"),
-            ("selected_attempts", "since_last_accepted_transition"),
         },
         "lad_troubleshooter": {
             ("dispatch_material", "current"),
             ("selected_artifacts", "direct_predecessors"),
-            ("selected_attempts", "since_last_accepted_transition"),
         },
         "lad_updater": {
             ("dispatch_material", "current"),
             ("selected_artifacts", "current_lineage"),
-            ("selected_attempts", "current_lineage"),
             ("workspace_relative_root", "millrace-agents/MILLRACE.md"),
             ("workspace_relative_root", "millrace-agents/shared/CONTEXT.md"),
             *(
@@ -4119,25 +4115,35 @@ def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
             )
         },
         "lad_fixer": {
-            ("workspace_relative_root", root)
-            for root in (
-                "millrace-agents/shared/conventions",
-                "millrace-agents/shared/decisions",
-                "millrace-agents/shared/references",
-            )
+            ("selected_attempts", "since_last_accepted_transition"),
+            *(
+                ("workspace_relative_root", root)
+                for root in (
+                    "millrace-agents/shared/conventions",
+                    "millrace-agents/shared/decisions",
+                    "millrace-agents/shared/references",
+                )
+            ),
         },
         "lad_doublechecker": {
-            ("workspace_relative_root", root)
-            for root in ("millrace-agents/shared/references", "docs")
+            ("selected_attempts", "since_last_accepted_transition"),
+            *(
+                ("workspace_relative_root", root)
+                for root in ("millrace-agents/shared/references", "docs")
+            ),
         },
         "lad_troubleshooter": {
-            ("workspace_relative_root", root)
-            for root in (
-                "millrace-agents/shared/conventions",
-                "millrace-agents/shared/decisions",
-                "millrace-agents/shared/references",
-            )
+            ("selected_attempts", "since_last_accepted_transition"),
+            *(
+                ("workspace_relative_root", root)
+                for root in (
+                    "millrace-agents/shared/conventions",
+                    "millrace-agents/shared/decisions",
+                    "millrace-agents/shared/references",
+                )
+            ),
         },
+        "lad_updater": {("selected_attempts", "current_lineage")},
     }
     for binding in bindings:
         stage = str(binding["stage_kind_id"])
@@ -4200,6 +4206,74 @@ def test_semantic_lad_context_bindings_use_exact_stage_table_and_finite_limits(
             )
     assert updater["writeback_artifact_schema_id"] == _CODEX_CONTEXT_SCHEMA_ID
     assert updater["writeback_terminal_action_id"] == "execution.close_updater_complete"
+
+
+def test_semantic_troubleshooter_direct_blocked_route_does_not_require_attempt(
+) -> None:
+    source = _codex_source(SEMANTIC_WORKFLOW_ID)
+    blocked_route = _record(
+        source, "terminal_actions", "execution.route_checker_blocked"
+    )
+    assert blocked_route["target_stage_kind_id"] == "lad_troubleshooter"
+
+    binding = next(
+        item
+        for item in _source_context_bindings(source)
+        if item["stage_kind_id"] == "lad_troubleshooter"
+    )
+    required = {
+        (item["source_kind"], item["source_ref"])
+        for item in cast(list[Record], binding["required_sources"])
+    }
+    discoverable = {
+        (item["source_kind"], item["source_ref"])
+        for item in cast(list[Record], binding["discoverable_sources"])
+    }
+    attempt_source = ("selected_attempts", "since_last_accepted_transition")
+    assert attempt_source not in required
+    assert attempt_source in discoverable
+
+
+def test_semantic_normal_routes_never_require_optional_attempt_history() -> None:
+    source = _codex_source(SEMANTIC_WORKFLOW_ID)
+    normal_route_targets = {
+        str(action["target_stage_kind_id"])
+        for action in _records(source, "terminal_actions")
+        if action["kind"] == "route" and action.get("target_stage_kind_id")
+    }
+    bindings = {
+        str(binding["stage_kind_id"]): binding
+        for binding in _source_context_bindings(source)
+    }
+    stages_with_attempt_context = {
+        stage
+        for stage, binding in bindings.items()
+        if any(
+            item["source_kind"] == "selected_attempts"
+            for item in (
+                *cast(list[Record], binding["required_sources"]),
+                *cast(list[Record], binding["discoverable_sources"]),
+            )
+        )
+    }
+    assert stages_with_attempt_context == {
+        "lad_fixer",
+        "lad_doublechecker",
+        "lad_troubleshooter",
+        "lad_updater",
+    }
+
+    for stage in stages_with_attempt_context & normal_route_targets:
+        required_kinds = {
+            item["source_kind"]
+            for item in cast(list[Record], bindings[stage]["required_sources"])
+        }
+        discoverable_kinds = {
+            item["source_kind"]
+            for item in cast(list[Record], bindings[stage]["discoverable_sources"])
+        }
+        assert "selected_attempts" not in required_kinds
+        assert "selected_attempts" in discoverable_kinds
 
 
 def test_mutating_stages_do_not_select_project_docs_as_immutable_context() -> None:
