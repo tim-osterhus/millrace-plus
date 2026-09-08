@@ -8,9 +8,13 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
-from millrace.compiler import compile_workflow
-
-from support import package_conformance as conformance
+from millrace.operator import (
+    PackageMutationCommand,
+    PackageWorkflowVerifyCommand,
+    execute_package_mutation_command,
+    execute_package_verify_command,
+)
+from millrace.substrate import ContentAddressedByteStore, SQLiteRuntimeStore
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
@@ -20,7 +24,6 @@ WORKFLOW_SELECTORS = {
     ("simple_loop", "0.1"),
     ("execution.lad", "0.1"),
     ("execution.lad_integrator", "0.1"),
-    ("execution.lad_codex_semantic_worktree", "0.2"),
     ("planning.lad", "0.1"),
     ("lad.full", "0.1"),
     ("vendor_selection", "0.1"),
@@ -354,7 +357,7 @@ def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
         str(asset["asset_id"]): str(asset["content_digest"])
         for asset in _assets(manifest)
     }
-    assert len(asset_digests) == 70
+    assert len(asset_digests) == 63
     assert {asset["asset_kind"] for asset in _assets(manifest)} == {
         "entrypoint_prompt",
         "stage_skill",
@@ -474,7 +477,7 @@ def test_public_workflow_package_declares_expected_workflows_only() -> None:
     }
 
     assert selectors == WORKFLOW_SELECTORS
-    assert len(selectors) == 7
+    assert len(selectors) == 6
     assert not any("control" in workflow_id for workflow_id, _version in selectors)
     assert manifest["dependencies"] == []
 
@@ -523,86 +526,78 @@ def test_public_archive_bytes_are_deterministic_and_data_only() -> None:
         assert member.mode == 0o644
 
 
-def test_semantic_workflow_closes_over_declared_package_bytes() -> None:
+
+_DEFERRED_WORKFLOW_ID = "execution.lad_codex_semantic_worktree"
+_EXPECTED_PUBLIC_WORKFLOW_SELECTORS = {
+    ("simple_loop", "0.1"),
+    ("execution.lad", "0.1"),
+    ("execution.lad_integrator", "0.1"),
+    ("planning.lad", "0.1"),
+    ("lad.full", "0.1"),
+    ("vendor_selection", "0.1"),
+}
+
+
+def test_mvp_manifest_excludes_deferred_semantic_worktree() -> None:
     manifest = _load_manifest()
-    assets = {str(asset["asset_id"]): asset for asset in _assets(manifest)}
-    workflows = {
-        str(workflow["workflow_id"]): workflow
+    selectors = {
+        (str(workflow["workflow_id"]), str(workflow["workflow_version"]))
         for workflow in _workflows(manifest)
     }
-    semantic_prefix = "execution.lad_codex_semantic_worktree"
-    semantic_paths = {
-        str(asset["package_path"])
+    assert selectors == _EXPECTED_PUBLIC_WORKFLOW_SELECTORS
+    assert _DEFERRED_WORKFLOW_ID not in json.dumps(manifest, sort_keys=True)
+    assert not any(
+        str(asset["asset_id"]).startswith(f"{_DEFERRED_WORKFLOW_ID}.")
         for asset in _assets(manifest)
-        if str(asset["asset_id"]).startswith(f"{semantic_prefix}.")
-    }
-
-    router = assets["execution.lad_codex_semantic_worktree.context_router"]
-    router_bytes = (PACKAGE_ROOT / str(router["package_path"])).read_bytes()
-    semantic_required_ids = {
-        str(required["asset_id"])
-        for required in workflows["execution.lad_codex_semantic_worktree"][
-            "required_assets"
-        ]
-    }
-    assert router["asset_kind"] == "template"
-    assert router["package_path"] == (
-        "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md"
     )
-    assert router["byte_length"] == 1617
-    assert router["byte_length"] == len(router_bytes)
-    assert router["content_digest"] == (
-        "sha256:00053a2572581acd9441ebc8c1199accee49073afe87190a60bf847fec25d129"
-    )
-    assert router["content_digest"] == _asset_digest(router_bytes)
-    assert router["asset_id"] in semantic_required_ids
-
-    assert semantic_paths == {
-        "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md",
-        "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_builder.md",
-        "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_checker.md",
-        "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_fixer.md",
-        "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_doublechecker.md",
-        "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_updater.md",
-        "assets/workflows/execution.lad_codex_semantic_worktree/skills/updater-core.md",
-    }
-    required_assets = workflows["execution.lad_codex_semantic_worktree"][
-        "required_assets"
-    ]
-    for required in required_assets:
-        asset_id = str(required["asset_id"])
-        assert asset_id in assets
-        assert required["content_digest"] == assets[asset_id]["content_digest"]
-    semantic_assets = {
-        str(asset["asset_id"])
-        for asset in workflows["execution.lad_codex_semantic_worktree"][
-            "required_assets"
-        ]
-    }
-    assert {
-        asset_id
-        for asset_id in assets
-        if asset_id.startswith(f"{semantic_prefix}.")
-    } <= semantic_assets
-
-
-def test_governed_semantic_lad_uses_runtime_schema_18_and_0223_pin() -> None:
-    manifest = _load_manifest()
-    package = manifest["package"]
-    assert package["package_version"] == PACKAGE_VERSION
-    assert package["base_millrace_compatibility"] == ">=0.22.3,<0.23"
-    assert manifest["compatibility"]["base_millrace"] == ">=0.22.3,<0.23"
-
-    workflow = next(
-        item
-        for item in _workflows(manifest)
-        if item["workflow_id"] == "execution.lad_codex_semantic_worktree"
-    )
-    assert workflow["workflow_version"] == "0.2"
-    result = compile_workflow(
-        conformance.packaged_workflow_source(
-            PACKAGE_ROOT, "execution.lad_codex_semantic_worktree"
+    assert not any(
+        str(asset["package_path"]).startswith(
+            "assets/workflows/execution.lad_codex_semantic_worktree/"
         )
+        for asset in _assets(manifest)
     )
-    assert result.plan is not None, result.diagnostics
-    assert result.plan.schema_version == 18
+
+
+def test_deferred_semantic_worktree_cannot_be_verified_or_selected(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteRuntimeStore.initialize(tmp_path / "runtime.sqlite3")
+    cas_store = ContentAddressedByteStore(tmp_path / "cas")
+    imported = execute_package_mutation_command(
+        store,
+        cas_store,
+        PackageMutationCommand(
+            command_id="import",
+            operation_id="package.import_path",
+            actor_id="operator:test",
+            package_root=PACKAGE_ROOT,
+        ),
+    )
+    enabled = execute_package_mutation_command(
+        store,
+        cas_store,
+        PackageMutationCommand(
+            command_id="enable",
+            operation_id="package.enable",
+            actor_id="operator:test",
+            package_id="millrace.plus.official",
+            package_version=PACKAGE_VERSION,
+        ),
+    )
+    assert imported.outcome == "succeeded"
+    assert enabled.outcome == "succeeded"
+
+    verified = execute_package_verify_command(
+        store,
+        cas_store,
+        PackageWorkflowVerifyCommand(
+            command_id="verify-deferred",
+            actor_id="operator:test",
+            package_id="millrace.plus.official",
+            package_version=PACKAGE_VERSION,
+            workflow_id=_DEFERRED_WORKFLOW_ID,
+            workflow_version="0.2",
+        ),
+    )
+    assert verified.outcome == "failed"
+    assert not verified.plan_ready

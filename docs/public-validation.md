@@ -1,33 +1,28 @@
 # Validation
 
-Millrace Plus is a data package. Its full validation uses locally built wheels
-from the exact Millrace and Millforge checkouts under review. Those wheels are
-test inputs only; `millrace-plus` remains dependency-free at runtime.
+Millrace Plus is a data package. Its full validation accepts explicit wheel
+files for the exact Millrace Core and Millforge builds under review. Those
+wheels are test inputs only; `millrace-plus` remains dependency-free at
+runtime. This guide does not require a sibling checkout or a private workspace
+layout.
 
 ## Standalone Checks
 
-From the workspace root, build one wheel from each exact checkout into a fresh
-temporary directory:
+From a standalone Plus checkout, provide absolute paths to the reviewed wheel
+files. Use a Core wheel whose source commit and SHA-256 are recorded by the
+release owner, and a compatible Millforge wheel:
 
 ```bash
-BOUNDARY_ARTIFACT_ROOT="$(mktemp -d)"
+export MILLRACE_AI_WHEEL="/absolute/path/to/millrace_ai-0.22.3-py3-none-any.whl"
+export MILLFORGE_WHEEL="/absolute/path/to/millforge-0.1.0-py3-none-any.whl"
 
-uv build --wheel --out-dir "$BOUNDARY_ARTIFACT_ROOT/millrace" \
-  dev/source/millrace
-
-uv build --wheel --out-dir "$BOUNDARY_ARTIFACT_ROOT/millforge" \
-  dev/harness/millforge
-
-MILLRACE_AI_WHEEL="$(find "$BOUNDARY_ARTIFACT_ROOT/millrace" \
-  -maxdepth 1 -type f -name '*.whl' -print)"
-MILLFORGE_WHEEL="$(find "$BOUNDARY_ARTIFACT_ROOT/millforge" \
-  -maxdepth 1 -type f -name '*.whl' -print)"
 test -f "$MILLRACE_AI_WHEEL"
 test -f "$MILLFORGE_WHEEL"
 ```
 
-Then run the complete suite from `dev/assets/millrace-plus/` against those
-installed artifacts, with no source checkout on the import path:
+Run the complete suite from the Plus checkout against those installed wheel
+inputs. Do not substitute a Core source checkout or inject one with
+`PYTHONPATH`:
 
 ```bash
 env -u PYTHONPATH \
@@ -43,12 +38,16 @@ env -u PYTHONPATH \
     --with "$MILLFORGE_WHEEL" \
     pytest -q
 
+BOUNDARY_ARTIFACT_ROOT="$(mktemp -d)"
 PYTHONDONTWRITEBYTECODE=1 \
-  uv build --out-dir "$BOUNDARY_ARTIFACT_ROOT/millrace-plus" --force-pep517
+  uv build --out-dir "$BOUNDARY_ARTIFACT_ROOT" --force-pep517
 
 uv run --no-project --with ruff ruff check src tests
 git diff --check
 ```
+
+The explicit wheel arguments keep this check reproducible across public
+checkouts. A local candidate build is not publication evidence.
 
 These checks cover:
 

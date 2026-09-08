@@ -1,6 +1,6 @@
 # Workflow Guide
 
-Millrace Plus contains seven selectable workflow configurations. Each one is a
+Millrace Plus contains six selectable workflow configurations. Each one is a
 complete decision graph with its own queues, stages, outcomes, recovery rules,
 and selected prompt and skill assets.
 
@@ -93,36 +93,15 @@ than approving a purchase autonomously.
 | Turn specs or incidents into completed work | `planning.lad` |
 | Include evidence-driven learning | `lad.full` |
 | Study a non-LAD four-plane graph | `vendor_selection` |
-| Run governed semantic-worktree execution | `execution.lad_codex_semantic_worktree` |
 
-## `execution.lad_codex_semantic_worktree`
+## Deferred experimental workflow
 
-This governed semantic-worktree workflow is the Plus consumer of the public
-v0.22.3 context contract. Its version is `0.2`.
-
-| Stage | Context behavior |
-| --- | --- |
-| Builder | Reads required task and predecessor evidence first; selects named catalog entries on demand when relevant |
-| Checker | Reviews the direct Builder predecessor and selects only relevant named evidence on demand |
-| Fixer | Uses the active finding and accepted baseline; recovery-cycle history is discoverable when present |
-| Doublechecker | Revalidates the original baseline and latest Fixer evidence; recovery-cycle history is discoverable when present |
-| Troubleshooter | Produces a typed repair plan with an explicit legal re-entry or unrecoverable reason; predecessor artifacts and attempt history are discoverable when present |
-| Updater | Reconciles complete selected semantic-root snapshots through the declared writeback contract; attempt history is discoverable when present |
-
-Catalog entries are bounded metadata. Stages do not read every catalog entry,
-and required material is always consumed first. The workflow graph owns
-re-entry, blockage, and writeback outcomes; prompt text supplies evidence and
-cannot create routes.
-
-Attempt history is never a stage-start prerequisite because ordinary graph
-routes may legally reach Fixer, Doublechecker, Troubleshooter, or Updater
-before any runtime recovery-attempt record exists.
-
-Builder, Fixer, and Troubleshooter leave mutable project documentation in the
-project working tree rather than hydrating it into their immutable context
-checkouts. Checker and Doublechecker may select documentation for read-only
-review, while Updater changes selected documentation only through its explicit
-writeback contract.
+The experimental `execution.lad_codex_semantic_worktree` workflow is deferred
+from this MVP release. It is not selectable and its exclusive assets are not
+shipped in the manifest, wheel, or source archive. The campaign prerequisite
+defect leaves its results inconclusive; this cut makes no semantic-workspace
+efficacy or incompatibility claim. Generic context mechanisms remain runtime
+capabilities where selected by an independently justified workflow.
 
 For a workflow with different stages or routing, use
 [Authoring workflows](authoring.md) instead of forcing the problem into one of

@@ -12,12 +12,11 @@ PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 
 def test_package_fixture_checks_every_declared_asset_and_workflow_pin() -> None:
     manifest = conformance.assert_packaged_asset_closure(PACKAGE_ROOT)
-    assert len(conformance.assets_by_id(manifest)) == 70
+    assert len(conformance.assets_by_id(manifest)) == 63
     assert set(conformance.workflows_by_id(manifest)) == {
         "simple_loop",
         "execution.lad",
         "execution.lad_integrator",
-        "execution.lad_codex_semantic_worktree",
         "planning.lad",
         "lad.full",
         "vendor_selection",

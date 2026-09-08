@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,35 +27,6 @@ WORKFLOW_IDS = (
     "lad.full",
     "vendor_selection",
 )
-CODEX_WORKFLOW_IDS = (
-    "execution.lad_codex_semantic_worktree",
-)
-CODEX_COMPONENT_ID = "millrace-codex-wrapper"
-
-
-def _canonical_payload_bytes(value: object) -> bytes:
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-
-
-def _codex_descriptor_digest(runner: dict[str, object]) -> str:
-    component = cast(dict[str, object], runner["component_pin"])
-    stage_kind_id = cast(list[object], runner["stage_kind_ids"])[0]
-    descriptor = {
-        "record_kind": "millrace.codex.wrapper_component_descriptor",
-        "wrapper_schema_version": 4,
-        "provider_distribution": "@openai/codex",
-        "provider_version": "0.147.0",
-        "stage_kind_id": stage_kind_id,
-        "required_capability_ids": component["required_capability_ids"],
-        "legal_terminal_result_ids": component["legal_terminal_result_ids"],
-    }
-    return hashlib.sha256(_canonical_payload_bytes(descriptor)).hexdigest()
-
 
 def _manifest() -> dict[str, Any]:
     return conformance.assert_packaged_asset_closure(PACKAGE_ROOT)
@@ -105,11 +74,7 @@ def test_manifest_runner_pins_match_installed_millforge_descriptor() -> None:
         ]
 
     expected_component_ids_by_workflow = {
-        **{workflow_id: {descriptor.runner_id} for workflow_id in WORKFLOW_IDS},
-        **{
-            workflow_id: {CODEX_COMPONENT_ID}
-            for workflow_id in CODEX_WORKFLOW_IDS
-        },
+        workflow_id: {descriptor.runner_id} for workflow_id in WORKFLOW_IDS
     }
     assert set(pins_by_workflow) == set(expected_component_ids_by_workflow)
     assert {
@@ -123,11 +88,10 @@ def test_manifest_runner_pins_match_installed_millforge_descriptor() -> None:
         str(pin["component_id"])
         for pins in pins_by_workflow.values()
         for pin in pins
-    } == {descriptor.runner_id, CODEX_COMPONENT_ID}
+    } == {descriptor.runner_id}
 
     expected_runner_families = {
-        **{workflow_id: "millforge_runner" for workflow_id in WORKFLOW_IDS},
-        **{workflow_id: "codex_runner" for workflow_id in CODEX_WORKFLOW_IDS},
+        workflow_id: "millforge_runner" for workflow_id in WORKFLOW_IDS
     }
     assert {
         workflow_id: {
@@ -157,17 +121,6 @@ def test_manifest_runner_pins_match_installed_millforge_descriptor() -> None:
     assert {str(pin["provider_version"]) for pin in pins} == {
         descriptor.package_version
     }
-
-    for workflow_id in CODEX_WORKFLOW_IDS:
-        for binding in bindings_by_workflow[workflow_id]:
-            pin = cast(dict[str, object], binding["component_pin"])
-            assert pin["component_kind"] == "runner"
-            assert pin["component_id"] == CODEX_COMPONENT_ID
-            assert pin["component_version"] == "4"
-            assert pin["provider_distribution"] == "@openai/codex"
-            assert pin["provider_version"] == "0.147.0"
-            assert pin["descriptor_media_type"] == "application/json"
-            assert pin["descriptor_sha256"] == _codex_descriptor_digest(binding)
 
 
 @pytest.mark.parametrize("workflow_id", WORKFLOW_IDS)

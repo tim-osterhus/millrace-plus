@@ -8,7 +8,9 @@ workflow definitions, entrypoint prompts, stage skills, and examples that make
 the runtime useful out of the box. It contains data only: no daemon, CLI,
 runner, provider, plugin, or installation hook.
 
-> **Release line:** This source and package are on the v0.22.3 release line.
+> **Release status:** `millrace-plus` 0.22.3 is an unreleased member candidate.
+> The published `millrace` convenience bundle remains `0.22.2`; no `0.22.3`
+> bundle is published.
 
 ## Included Workflows
 
@@ -20,11 +22,15 @@ runner, provider, plugin, or installation hook.
 | `planning.lad` | LAD Planning followed by Execution |
 | `lad.full` | Full LAD Planning, Learning, and Execution |
 | `vendor_selection` | A four-plane research and comparison loop that stops for an operator decision |
-| `execution.lad_codex_semantic_worktree` | A governed semantic-worktree execution workflow using the public v0.22.3 context contract |
 
 Every workflow is ordinary package data. Names such as Management, Planning,
 Execution, Learning, and Review do not have special meaning inside the
 Millrace kernel.
+
+The experimental `execution.lad_codex_semantic_worktree` workflow is deferred
+from this MVP release. It is not selectable or distributed; the preserved
+campaign evidence does not establish semantic-workspace efficacy or
+incompatibility.
 
 Read [Workflow guide](docs/workflows.md) for the intended use and shape of
 each configuration.
@@ -58,11 +64,14 @@ The installed resource root is `millrace_workflow_package`; package data is
 non-executable. A direct installation contains package metadata and data only
 and does not transitively install `millrace-ai` or another member distribution.
 
-The `millrace==0.22.3` convenience meta-distribution selects and installs this
-exact tested combination: `millrace-ai==0.22.3`, `millrace-plus==0.22.3`, and
-`millforge==0.1.0`. Member distributions version independently. Each
-`millrace` meta-distribution release pins one tested combination and may reuse
-an unchanged compatible member.
+The published `millrace` convenience bundle remains `millrace==0.22.2`.
+It does not install this unreleased member candidate, and no `0.22.3` bundle
+is published. Evaluate the `millrace-plus` 0.22.3 candidate with the explicit
+Core and Millforge wheel paths documented in [Validation](docs/public-validation.md).
+Member distributions version independently. Each `millrace`
+meta-distribution release pins one tested combination and may reuse an
+unchanged compatible member. A future `millrace` bundle must publish and pin
+its own tested combination.
 
 ## Authoring Model
 

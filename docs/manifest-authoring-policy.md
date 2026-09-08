@@ -28,6 +28,10 @@ pins from the current package bytes. A selected package pin, selected workflow
 fingerprint, asset digest, or package asset path change without matching
 evidence fails the policy test.
 
+`non_authoritative_metadata` is public descriptive context only. It must not
+contain internal packet IDs or pending live-qualification labels, and it cannot
+substitute for selected authority or release evidence.
+
 `manifest.json` uses canonical authoring format: UTF-8 JSON, two-space
 indentation, the documented root key order, and a single trailing newline.
 Object-key sorting is used only for digest canonicalization; the committed file
@@ -47,6 +51,22 @@ which workflow behavior should be official.
 <!-- manifest-freeze-evidence:BEGIN -->
 ```json
 {
+  "policy": "frozen-manifest",
+  "manifest_digest": "sha256:3926d75ca25d29a4ffcc37dba8cb0fd6e94fd4a7695cc47e1b523aa1ecbbecdb",
+  "package_digest": "sha256:ac4efae9ff170f47def4e432ed9d0dc5a215606c83503185d157dd078462f43d",
+  "selected_package_pin": {
+    "package_id": "millrace.plus.official",
+    "package_version": "0.22.3",
+    "package_format_version": "1"
+  },
+  "selected_workflow_fingerprints": {
+    "execution.lad@0.1": "sha256:195fbe1c5a982366b214373e65d8a20b0393605af4dbc1aff361a0413a589fdd",
+    "execution.lad_integrator@0.1": "sha256:5f0e8093b007b2e026034cdda8222804bba0deeaec90441fe97c54097c6d2a28",
+    "lad.full@0.1": "sha256:f4c46c56219063d3496a16ffdeae5194aa792cbc2e97dcaf407b4f128df5ad53",
+    "planning.lad@0.1": "sha256:b8da5932fabb08f02d996d716c9f91ebac245334da2b4f6568993b609090826e",
+    "simple_loop@0.1": "sha256:6ca969f00c0f09acc19df205ef5849408385239c8bd5ce18721988cd5b21b183",
+    "vendor_selection@0.1": "sha256:41430d1a6c96149209f2983d66c68fbd0ae7d030b3ae01061ec8c2971c3c9e27"
+  },
   "asset_pins": [
     {
       "asset_id": "execution.entrypoints.lad_builder",
@@ -87,41 +107,6 @@ which workflow behavior should be official.
       "asset_id": "execution.entrypoints.lad_updater",
       "content_digest": "sha256:f72aa2b7fe13d6eb78be2aa62184dc67d644e0a7834f0b1fefb6d232ab3f6544",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_updater.md"
-    },
-    {
-      "asset_id": "execution.lad_codex_semantic_worktree.context_router",
-      "content_digest": "sha256:00053a2572581acd9441ebc8c1199accee49073afe87190a60bf847fec25d129",
-      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/context/router.md"
-    },
-    {
-      "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_builder",
-      "content_digest": "sha256:839385509979a7fad68fd5069289bf95589670f1d9b273e2f774f42527b222b5",
-      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_builder.md"
-    },
-    {
-      "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_checker",
-      "content_digest": "sha256:32a10558a77fe49613b53eb0779bd64dc5d14e6d8cdd6230dd70897aedfaec0b",
-      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_checker.md"
-    },
-    {
-      "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_doublechecker",
-      "content_digest": "sha256:e99a49e9e5cbe59273ca01b052662e3d945a7c52dd6f7ff07be22b63cbb1904b",
-      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_doublechecker.md"
-    },
-    {
-      "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_fixer",
-      "content_digest": "sha256:1f4547179ea2de9eac48231c547689d96c8995bbccf221ded60b7c1d4bea7bbb",
-      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_fixer.md"
-    },
-    {
-      "asset_id": "execution.lad_codex_semantic_worktree.entrypoints.lad_updater",
-      "content_digest": "sha256:27d0e0f522d417c197f3538df47ad4ce9737c190eedc9e903acf45c1400b47ef",
-      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/entrypoints/lad_updater.md"
-    },
-    {
-      "asset_id": "execution.lad_codex_semantic_worktree.skills.updater_core",
-      "content_digest": "sha256:4f5426983fd665ec5a0daeef4756fd559cd27594911dd69ec157b8b1a8b5eee1",
-      "package_path": "assets/workflows/execution.lad_codex_semantic_worktree/skills/updater-core.md"
     },
     {
       "asset_id": "execution.skills.builder_core",
@@ -220,7 +205,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "planning.entrypoints.lad_mechanic",
-      "content_digest": "sha256:56710567fc68f3c53320fa54cc8095a304913d98eb80a34a8e4031949736ca11",
+      "content_digest": "sha256:163b18d2ec8db02319e1fbfd6eb3568fb1e6217c53832e9a6681c5341db155fc",
       "package_path": "assets/workflows/planning.lad/entrypoints/lad_mechanic.md"
     },
     {
@@ -398,24 +383,7 @@ which workflow behavior should be official.
       "content_digest": "sha256:8f736c7d764e3d31d87e43d9310a4b28116cfec40d1bfe1ec8eec7da36e1b669",
       "package_path": "assets/workflows/vendor_selection/skills/rubric_evaluator-core.md"
     }
-  ],
-  "manifest_digest": "sha256:4c7e93477c1773b76af90342184693f0bd6b9680323c6fc204aa3e5286adabea",
-  "package_digest": "sha256:b55ba031889e731b1adbc648fc75919c9ade32a7673d9009ff3029377f7ec422",
-  "policy": "frozen-manifest",
-  "selected_package_pin": {
-    "package_format_version": "1",
-    "package_id": "millrace.plus.official",
-    "package_version": "0.22.3"
-  },
-  "selected_workflow_fingerprints": {
-    "execution.lad@0.1": "sha256:195fbe1c5a982366b214373e65d8a20b0393605af4dbc1aff361a0413a589fdd",
-    "execution.lad_codex_semantic_worktree@0.2": "sha256:29ca6e894876f4d37d229149ad95450fa81c47b0d7e817c28d9d3ad304a1c539",
-    "execution.lad_integrator@0.1": "sha256:5f0e8093b007b2e026034cdda8222804bba0deeaec90441fe97c54097c6d2a28",
-    "lad.full@0.1": "sha256:60e075360d232d99b2e57cafbbe5afaf0a10be1fb8546429718e1ee943db3b77",
-    "planning.lad@0.1": "sha256:5d5b2420bedf88f4baf3acea78de444356cb5fe9d6921f2c953db76643baa78c",
-    "simple_loop@0.1": "sha256:6ca969f00c0f09acc19df205ef5849408385239c8bd5ce18721988cd5b21b183",
-    "vendor_selection@0.1": "sha256:41430d1a6c96149209f2983d66c68fbd0ae7d030b3ae01061ec8c2971c3c9e27"
-  }
+  ]
 }
 ```
 <!-- manifest-freeze-evidence:END -->

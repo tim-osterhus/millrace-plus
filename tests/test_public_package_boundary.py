@@ -36,12 +36,8 @@ PUBLIC_DOCS = (
     "docs/public-validation.md",
 )
 RELEASE_IDENTITY = "0.22.3"
-META_RELEASE_PIN = "`millrace==0.22.3`"
-BUNDLE_MEMBER_PINS = (
-    "`millrace-ai==0.22.3`",
-    "`millrace-plus==0.22.3`",
-    "`millforge==0.1.0`",
-)
+PUBLISHED_BUNDLE_PIN = "`millrace==0.22.2`"
+UNRELEASED_MEMBER_CANDIDATE = "`millrace-plus` 0.22.3"
 VERSIONING_RULES = (
     "Member distributions version independently.",
     "Each `millrace` meta-distribution release pins one tested combination",
@@ -98,7 +94,8 @@ def test_current_docs_preserve_public_package_and_evidence_boundaries() -> None:
     for required in (
         "official collection of ready-to-run Millrace workflows",
         "`millrace.plus.official`",
-        "source and package are on the v0.22.3 release line",
+        "`millrace-plus` 0.22.3 is an unreleased member candidate",
+        "published `millrace` convenience bundle remains `0.22.2`",
         "installed resource root is `millrace_workflow_package`",
         "package data is non-executable",
         "A direct installation contains package metadata and data only",
@@ -166,16 +163,18 @@ def test_public_release_text_has_no_staging_or_prepublication_claims() -> None:
             )
 
 
-def test_public_release_text_names_exact_initial_bundle_members() -> None:
+def test_public_release_text_distinguishes_published_bundle_from_candidate() -> None:
     for public_release_doc in ("README.md", "docs/release.md"):
         release_text = _project_text(public_release_doc)
         normalized_release_text = _normalized_text(release_text)
 
-        assert META_RELEASE_PIN in release_text
-        for member_pin in BUNDLE_MEMBER_PINS:
-            assert member_pin in release_text
+        assert PUBLISHED_BUNDLE_PIN in release_text
+        assert "no `0.22.3` bundle is published" in normalized_release_text
+        assert "millrace==0.22.3" not in normalized_release_text
         for versioning_rule in VERSIONING_RULES:
             assert _normalized_text(versioning_rule) in normalized_release_text
+
+    assert UNRELEASED_MEMBER_CANDIDATE in _project_text("README.md")
 
 
 def test_dependency_policy_is_dependency_free_and_documented() -> None:
@@ -300,11 +299,11 @@ def test_built_artifacts_have_durable_v022_public_text(
 
         for metadata_text in (wheel_metadata, sdist_metadata_text):
             assert f"Version: {RELEASE_IDENTITY}\n" in metadata_text
-            assert META_RELEASE_PIN in metadata_text
-            for member_pin in BUNDLE_MEMBER_PINS:
-                assert member_pin in metadata_text
+            assert PUBLISHED_BUNDLE_PIN in metadata_text
 
             normalized_metadata = _normalized_text(metadata_text)
+            assert "no `0.22.3` bundle is published" in normalized_metadata
+            assert "millrace==0.22.3" not in normalized_metadata
             for versioning_rule in VERSIONING_RULES:
                 assert _normalized_text(versioning_rule) in normalized_metadata
             for stale_phrase in STALE_PUBLIC_RELEASE_PHRASES:

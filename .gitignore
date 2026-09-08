@@ -1,1 +1,18 @@
 .DS_Store
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage*
+.venv/
+
+# Local build outputs
+/build/
+/dist/
+*.egg-info/
+
+# Incidental editable-project lock; keep locally, do not stage
+/uv.lock

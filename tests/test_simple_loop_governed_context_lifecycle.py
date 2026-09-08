@@ -30,9 +30,12 @@ from millrace.contracts.transition import (
 )
 from millrace.kernel import apply, decide, empty_runtime_state
 from millrace.substrate import ContentAddressedByteStore, SQLiteRuntimeStore
-from millrace.testing import deterministic_context, materialize_fake_runner_session_cas
 
 from support import package_conformance as conformance
+from support.public_runtime_fakes import (
+    deterministic_context,
+    materialize_fake_runner_session_cas,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
@@ -317,11 +320,8 @@ def test_packaged_simple_loop_refuses_forbidden_recovery_root_mutation(
     )
 
     assert first.code == "observation_accepted"
-    assert second.code in {
-        "completion_refused",
-        "observation_refused",
-        "session_reconciliation_required",
-    }
+    assert second.code == "adapter_failure"
+    assert second.adapter_error_kind == "context_mutation_refused"
     assert after.runner_observations == before_worker.runner_observations
     before_refusals = {record.record_id for record in before_worker.refusals}
     assert any(
@@ -329,12 +329,61 @@ def test_packaged_simple_loop_refuses_forbidden_recovery_root_mutation(
         and record.reason == "context_mutation_refused"
         for record in after.refusals
     )
-    assert worker_request.session_id not in after.runner_session_completions
+    completion = after.runner_session_completions[worker_request.session_id]
+    assert completion.terminal_state == "failed"
+    assert completion.adapter_error_kind == "context_mutation_refused"
     attribution = _attribution_projection(
         runtime,
         after.runner_sessions[worker_request.session_id],
     )
-    assert attribution == {"status": "missing"}
+    assert attribution["status"] == "available"
+    assert attribution["final"] is True
+    metrics = attribution["metrics"]
+    assert metrics["manifest_bytes"] == {
+        "value": 1581,
+        "source": "runtime.context_manifest",
+        "availability": "observed",
+    }
+    assert metrics["catalog_bytes"] == {
+        "value": 16,
+        "source": "runtime.context_manifest",
+        "availability": "derived",
+    }
+    assert metrics["catalog_file_count"] == {
+        "value": 1,
+        "source": "runtime.context_manifest",
+        "availability": "derived",
+    }
+    assert metrics["hydrated_bytes"] == {
+        "value": 0,
+        "source": "runtime.hydration_receipts",
+        "availability": "derived",
+    }
+    assert metrics["hydrated_file_count"] == {
+        "value": 0,
+        "source": "runtime.hydration_receipts",
+        "availability": "derived",
+    }
+    assert metrics["distinct_content_digest_count"] == {
+        "value": 0,
+        "source": "runtime.hydration_receipts",
+        "availability": "derived",
+    }
+    assert metrics["wrapper_input_bytes"] == {
+        "value": 23,
+        "source": "adapter.direct",
+        "availability": "observed",
+    }
+    assert metrics["retained_result_bytes"] == {
+        "value": 31,
+        "source": "adapter.direct",
+        "availability": "observed",
+    }
+    assert metrics["runner_wall_milliseconds"] == {
+        "value": 47,
+        "source": "adapter.direct",
+        "availability": "observed",
+    }
     runtime.close()
 
 

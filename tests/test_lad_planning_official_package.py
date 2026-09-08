@@ -39,19 +39,24 @@ from millrace.contracts.transition import (
 )
 from millrace.kernel import apply, decide, empty_runtime_state
 from millrace.kernel.decision import _completion_request_payload
-from millrace.testing import (
+
+from support import package_conformance as conformance
+from support.public_runtime_fakes import (
     decide_with_fake_runner_completion,
     deterministic_context,
     fake_runner_observation_payload,
 )
-
-from support import package_conformance as conformance
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.22.3"
 WORKFLOW_ID = "planning.lad"
+_MECHANIC_ASSET_ID = "planning.entrypoints.lad_mechanic"
+_EXPECTED_MECHANIC_ASSET_BYTE_LENGTH = 7447
+_EXPECTED_MECHANIC_ASSET_DIGEST = (
+    "sha256:163b18d2ec8db02319e1fbfd6eb3568fb1e6217c53832e9a6681c5341db155fc"
+)
 RECON_WORKFLOW_IDS = ("planning.lad", "lad.full")
 ARBITER_WORKFLOW_IDS = ("planning.lad", "lad.full")
 Record = dict[str, object]
@@ -1837,6 +1842,53 @@ def test_planning_lad_selects_through_installed_public_api(tmp_path: Path) -> No
         workflow_version="0.1",
         selected_asset_pins=conformance.selected_asset_pins(manifest, WORKFLOW_ID),
     )
+
+
+def test_planning_lad_mechanic_public_diagnostic_asset_is_pinned_and_consumed(
+    tmp_path: Path,
+) -> None:
+    manifest = _manifest()
+    assets = conformance.assets_by_id(manifest)
+    asset = assets[_MECHANIC_ASSET_ID]
+    asset_bytes = (PACKAGE_ROOT / str(asset["package_path"])).read_bytes()
+    workflow = conformance.workflows_by_id(manifest)[WORKFLOW_ID]
+    required = next(
+        item
+        for item in cast(list[Record], workflow["required_assets"])
+        if item["asset_id"] == _MECHANIC_ASSET_ID
+    )
+
+    assert asset["package_path"] == (
+        "assets/workflows/planning.lad/entrypoints/lad_mechanic.md"
+    )
+    assert asset["byte_length"] == _EXPECTED_MECHANIC_ASSET_BYTE_LENGTH
+    assert asset["content_digest"] == _EXPECTED_MECHANIC_ASSET_DIGEST
+    assert asset["content_digest"] == conformance.asset_digest(asset_bytes)
+    assert asset["byte_length"] == len(asset_bytes)
+    assert required["content_digest"] == _EXPECTED_MECHANIC_ASSET_DIGEST
+
+    plan = conformance.select_and_verify_package(
+        tmp_path,
+        PACKAGE_ROOT,
+        package_id=PACKAGE_ID,
+        package_version=PACKAGE_VERSION,
+        workflow_id=WORKFLOW_ID,
+        workflow_version="0.1",
+    )
+    stage = next(stage for stage in plan.stage_kinds if str(stage.id) == "lad_mechanic")
+    assert tuple(str(asset_id) for asset_id in stage.asset_ids) == (
+        _MECHANIC_ASSET_ID,
+        "planning.skills.mechanic_core",
+    )
+    selected_pins = {
+        str(pin.asset_id): str(pin.content_digest)
+        for pin in plan.workflow_package_pin.selected_asset_pins
+    }
+    assert selected_pins[_MECHANIC_ASSET_ID] == _EXPECTED_MECHANIC_ASSET_DIGEST
+    compiled_asset = next(
+        asset for asset in plan.assets if str(asset.id) == _MECHANIC_ASSET_ID
+    )
+    assert compiled_asset.body == asset_bytes.decode("utf-8")
 
 
 def test_planning_lad_assets_keep_task_card_handoff_contract() -> None:

@@ -9,7 +9,9 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      MILLRACE_REF: 2f8ca25c7d82e1ea2ca5a3c19020ae475852b197
+      # Parent-supplied final Core source and wheel pins.
+      MILLRACE_REF: 463c35bb5241c046d6d75a8598328bb9601295cb
+      MILLRACE_AI_WHEEL_SHA256: 99c6d23bb898bdb47c410a078212d61d16205e1f9c9bfd64e24fcf6f32394e82
       MILLRACE_VERSION: 0.22.3
       MILLFORGE_VERSION: 0.1.0
     permissions:
@@ -21,12 +23,21 @@ jobs:
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
         with:
           version: 0.9.30
-      - name: Test
+      - name: Test complete installed-wheel suite
         shell: bash
         run: |
           validation_root="$RUNNER_TEMP/millrace-plus-validation"
           artifact_root="$validation_root/artifacts"
           mkdir -p "$artifact_root/millrace"
+
+          if [[ ! "$MILLRACE_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "MILLRACE_REF must be replaced with the final immutable Core commit SHA" >&2
+            exit 1
+          fi
+          if [[ ! "$MILLRACE_AI_WHEEL_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "MILLRACE_AI_WHEEL_SHA256 must be replaced with the final Core wheel SHA-256" >&2
+            exit 1
+          fi
 
           git init --quiet "$validation_root/millrace"
           git -C "$validation_root/millrace" remote add origin \
@@ -37,8 +48,9 @@ jobs:
           test "$(git -C "$validation_root/millrace" rev-parse HEAD)" = \
             "$MILLRACE_REF"
 
-          uv build --wheel --out-dir "$artifact_root/millrace" \
-            "$validation_root/millrace"
+          SOURCE_DATE_EPOCH=1580601600 PYTHONDONTWRITEBYTECODE=1 \
+            uv build --wheel --force-pep517 --out-dir "$artifact_root/millrace" \
+              "$validation_root/millrace"
 
           mapfile -t millrace_wheels < <(
             find "$artifact_root/millrace" -maxdepth 1 -type f \
@@ -49,16 +61,8 @@ jobs:
               "$MILLRACE_VERSION" "${#millrace_wheels[@]}" >&2
             exit 1
           fi
-
-          env \
-            PYTHONPATH="$validation_root/millrace/src:$validation_root/millrace" \
-            PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
-            PYTHONDONTWRITEBYTECODE=1 \
-            uv run --no-project --python 3.11 \
-              --with pytest==9.1.1 \
-              --with hatchling==1.31.0 \
-              --with millforge=="$MILLFORGE_VERSION" \
-              pytest -q
+          printf '%s  %s\n' "$MILLRACE_AI_WHEEL_SHA256" \
+            "${millrace_wheels[0]}" | sha256sum --check --strict
 
           env -u PYTHONPATH \
             PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
@@ -68,10 +72,8 @@ jobs:
               --with hatchling==1.31.0 \
               --with "${millrace_wheels[0]}" \
               --with millforge=="$MILLFORGE_VERSION" \
-              pytest -q \
-                --ignore=tests/test_lad_execution_official_package.py \
-                --ignore=tests/test_lad_planning_official_package.py \
-                --ignore=tests/test_simple_loop_governed_context_lifecycle.py
+              pytest -q
+
       - name: Lint
         run: uv run --no-project --python 3.11 --with ruff==0.15.21 ruff check src tests
       - name: Check clean source tree
@@ -95,8 +97,8 @@ jobs:
             exit 1
           fi
           sha256sum --check --strict <<'SHA256'
-          81fdf9d3dd83278ee8d797c7fa41ab41ba0a6e00f898bd183a7468d36c6796b6  dist/millrace_plus-0.22.3-py3-none-any.whl
-          28365bd1d889c472ff3d547233cbc0c1718686023c8f9231de1d0934ddc5a275  dist/millrace_plus-0.22.3.tar.gz
+          fd141a9b4dced85ea5b733f6d8ff1f86b6b91bd233d8c211cd6f47a6b3b88fb5  dist/millrace_plus-0.22.3-py3-none-any.whl
+          15a6f8e81a16a4677dda7375c938c588f3a01d403ae6bc8aaeeab00fd49c92c5  dist/millrace_plus-0.22.3.tar.gz
           SHA256
       - name: Check source unchanged
         run: git diff --exit-code
@@ -136,8 +138,8 @@ jobs:
             exit 1
           fi
           sha256sum --check --strict <<'SHA256'
-          81fdf9d3dd83278ee8d797c7fa41ab41ba0a6e00f898bd183a7468d36c6796b6  dist/millrace_plus-0.22.3-py3-none-any.whl
-          28365bd1d889c472ff3d547233cbc0c1718686023c8f9231de1d0934ddc5a275  dist/millrace_plus-0.22.3.tar.gz
+          fd141a9b4dced85ea5b733f6d8ff1f86b6b91bd233d8c211cd6f47a6b3b88fb5  dist/millrace_plus-0.22.3-py3-none-any.whl
+          15a6f8e81a16a4677dda7375c938c588f3a01d403ae6bc8aaeeab00fd49c92c5  dist/millrace_plus-0.22.3.tar.gz
           SHA256
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
         with:

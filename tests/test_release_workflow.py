@@ -199,39 +199,42 @@ def test_release_workflow_validates_exact_built_distributions_before_publish() -
     assert workflow.count("uses: pypa/gh-action-pypi-publish@") == 1
 
 
-def test_release_workflow_runs_source_and_exact_wheel_conformance_boundaries() -> None:
+def test_release_workflow_runs_complete_installed_wheel_suite() -> None:
     workflow = _workflow()
     validate_job = _block(workflow, "  validate:")
     test_step = validate_job[
         validate_job.index("- name: Test") : validate_job.index("- name: Lint")
     ]
 
-    assert "MILLRACE_REF: 2f8ca25c7d82e1ea2ca5a3c19020ae475852b197" in (
+    assert "MILLRACE_REF: 463c35bb5241c046d6d75a8598328bb9601295cb" in (
         validate_job
     )
+    assert (
+        "MILLRACE_AI_WHEEL_SHA256: "
+        "99c6d23bb898bdb47c410a078212d61d16205e1f9c9bfd64e24fcf6f32394e82"
+    ) in validate_job
     assert "MILLRACE_VERSION: 0.22.3" in validate_job
     assert "MILLFORGE_VERSION: 0.1.0" in validate_job
     assert "MILLFORGE_REF:" not in validate_job
+    assert "PYTHONPATH=\"$validation_root" not in test_step
+    assert "env -u PYTHONPATH" in test_step
+    assert test_step.count("pytest -q") == 1
+    assert test_step.count("--with millforge==\"$MILLFORGE_VERSION\"") == 1
+    assert '--with "${millrace_wheels[0]}"' in test_step
+    assert "SOURCE_DATE_EPOCH=1580601600 PYTHONDONTWRITEBYTECODE=1" in (
+        test_step
+    )
     assert (
-        'PYTHONPATH="$validation_root/millrace/src:$validation_root/millrace"'
+        'uv build --wheel --force-pep517 --out-dir "$artifact_root/millrace"'
         in test_step
     )
-    assert test_step.count("pytest -q") == 2
-    assert test_step.count("--with millforge==\"$MILLFORGE_VERSION\"") == 2
-
-    source_suite = test_step[: test_step.index("env -u PYTHONPATH")]
-    assert "${millrace_wheels[0]}" not in source_suite
-    assert "pytest -q" in source_suite
-    assert "--ignore=" not in source_suite
-
-    wheel_suite = test_step[test_step.index("env -u PYTHONPATH") :]
-    assert '--with "${millrace_wheels[0]}"' in wheel_suite
-    assert tuple(re.findall(r"--ignore=([^\s]+)", wheel_suite)) == (
-        "tests/test_lad_execution_official_package.py",
-        "tests/test_lad_planning_official_package.py",
-        "tests/test_simple_loop_governed_context_lifecycle.py",
+    assert "--ignore=" not in test_step
+    assert '[[ ! "$MILLRACE_REF" =~ ^[0-9a-f]{40}$ ]]' in test_step
+    assert (
+        '[[ ! "$MILLRACE_AI_WHEEL_SHA256" =~ ^[0-9a-f]{64}$ ]]' in test_step
     )
-    assert wheel_suite.count("--ignore=") == 3
+    assert "printf '%s  %s\\n' \"$MILLRACE_AI_WHEEL_SHA256\" \\" in test_step
+    assert '"${millrace_wheels[0]}" | sha256sum --check --strict' in test_step
 
 
 def test_release_workflow_uses_oidc_and_immutable_actions_only() -> None:

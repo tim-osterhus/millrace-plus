@@ -24,7 +24,7 @@ def test_readme_documents_public_official_workflow_package() -> None:
     for required in (
         "`millrace_workflow_package/`",
         "`millrace.plus.official`",
-        "source and package are on the v0.22.3 release line",
+        "`millrace-plus` 0.22.3 is an unreleased member candidate",
         "installed resource root is `millrace_workflow_package`",
         "`simple_loop`",
         "`execution.lad`",
@@ -32,9 +32,8 @@ def test_readme_documents_public_official_workflow_package() -> None:
         "`planning.lad`",
         "`lad.full`",
         "`vendor_selection`",
-        "`execution.lad_codex_semantic_worktree`",
         "package data is non-executable",
-        "`millrace==0.22.3` convenience meta-distribution",
+        "published `millrace` convenience bundle remains `0.22.2`",
     ):
         assert required in readme
     assert "PLUS-" not in readme
@@ -50,7 +49,6 @@ def test_release_notes_document_current_package_contents() -> None:
         "`planning.lad`",
         "`lad.full`",
         "`vendor_selection`",
-        "`execution.lad_codex_semantic_worktree`",
         "| Runtime dependency | None |",
     ):
         assert required in release_notes
@@ -60,19 +58,22 @@ def test_release_notes_document_current_package_contents() -> None:
     assert "PLUS-0002F extends" not in release_notes
 
 
-def test_public_docs_describe_seven_ordinary_workflows_without_campaign_arms() -> None:
+def test_public_docs_describe_six_ordinary_workflows_without_campaign_arms() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text()
     workflows = (PROJECT_ROOT / "docs" / "workflows.md").read_text()
     release = (PROJECT_ROOT / "docs" / "release.md").read_text()
     public_docs = "\n".join((readme, workflows, release))
 
-    assert "contains seven selectable workflow configurations" in workflows
-    assert "seven workflow entries" in release
+    assert "contains six selectable workflow configurations" in workflows
+    assert "six workflow entries" in release
     assert "`execution.lad_codex_semantic_worktree`" in readme
+    assert "not selectable" in public_docs
+    assert "inconclusive" in public_docs
     assert "execution.lad_codex_control" not in public_docs
     assert "Control/Treatment" not in public_docs
     assert "Control arm" not in public_docs
     assert "Treatment arm" not in public_docs
+    assert "millrace==0.22.3" not in public_docs
 
 
 def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
@@ -89,11 +90,14 @@ def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
         cast(dict[str, object], workflow)["visibility"] == "public"
         for workflow in workflows
     )
-    assert metadata["plus_packet"] == "PLUS-0003J"
+    assert "plus_packet" not in metadata
     assert metadata["status"] == (
-        "official_package_with_vendor_policy_screener_boundary_"
-        "pending_fresh_live_e2e_0005"
+        "unreleased_package_candidate_live_qualification_not_claimed"
     )
+    metadata_text = json.dumps(metadata, sort_keys=True)
+    assert "PLUS-" not in metadata_text
+    assert "pending_fresh_live_e2e" not in metadata_text
+    assert "live qualification is not claimed" in metadata_text
 
 
 def test_official_manifest_uses_v022_release_identity() -> None:

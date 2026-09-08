@@ -151,7 +151,7 @@ def test_official_package_data_declares_selected_vendor_selection_assets() -> No
     assert len(tuple(vendor_asset_root.rglob("*.md"))) == 18
 
 
-def test_governed_lad_release_targets_runtime_0223() -> None:
+def test_plus_release_cut_targets_runtime_0223_and_defers_experiment() -> None:
     manifest = json.loads(
         (PROJECT_ROOT / "millrace_workflow_package" / "manifest.json").read_text()
     )
@@ -159,10 +159,7 @@ def test_governed_lad_release_targets_runtime_0223() -> None:
     assert package["package_version"] == RELEASE_IDENTITY
     assert package["base_millrace_compatibility"] == ">=0.22.3,<0.23"
     assert manifest["compatibility"]["base_millrace"] == ">=0.22.3,<0.23"
-
-    semantic = next(
-        workflow
-        for workflow in manifest["workflows"]
-        if workflow["workflow_id"] == "execution.lad_codex_semantic_worktree"
+    assert "execution.lad_codex_semantic_worktree" not in json.dumps(
+        manifest,
+        sort_keys=True,
     )
-    assert semantic["workflow_version"] == "0.2"
