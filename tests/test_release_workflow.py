@@ -14,7 +14,7 @@ ACTION_PINS = {
     "astral-sh/setup-uv": "37802adc94f370d6bfd71619e3f0bf239e1f3b78",
     "actions/upload-artifact": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "actions/download-artifact": "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
-    "pypa/gh-action-pypi-publish": "cef221092ed1bacb1cc03d23a2d87d1d172e277b",
+    "pypa/gh-action-pypi-publish": "dc37677b2e1c63e2034f94d8a5b11f265b73ba33",
 }
 
 
@@ -206,7 +206,7 @@ def test_release_workflow_runs_complete_installed_wheel_suite() -> None:
         validate_job.index("- name: Test") : validate_job.index("- name: Lint")
     ]
 
-    assert "MILLRACE_REF: 33f7a52b9bbcbbb8cbc82014f5072c73106e8a18" in validate_job
+    assert "MILLRACE_REF: 3c72717235b8f3558d39186d27796e22df4ef95c" in validate_job
     assert (
         "MILLRACE_AI_WHEEL_SHA256: "
         "2c6704ff94f70743f3d7214fbf9f6eabc8d19f72c8486dc0bfe576ed63b7b357"

@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Bind the reviewed Core wheel to its immutable release source.
-      MILLRACE_REF: 33f7a52b9bbcbbb8cbc82014f5072c73106e8a18
+      MILLRACE_REF: 3c72717235b8f3558d39186d27796e22df4ef95c
       MILLRACE_AI_WHEEL_SHA256: 2c6704ff94f70743f3d7214fbf9f6eabc8d19f72c8486dc0bfe576ed63b7b357
       MILLRACE_VERSION: 0.22.3
       MILLFORGE_VERSION: 0.1.1
@@ -141,6 +141,6 @@ jobs:
           8a36188ded6445be1657e4cd327a34a88b7bf9ac2fe2a4942e0eda67b7ef6f7c  dist/millrace_plus-0.22.3-py3-none-any.whl
           e177b24dfab479eab3861b1767d30a9c55290014c66028d05c541a09a247822d  dist/millrace_plus-0.22.3.tar.gz
           SHA256
-      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
         with:
           packages-dir: dist/
