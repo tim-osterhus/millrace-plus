@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Bind the reviewed Core wheel to its immutable release source.
-      MILLRACE_REF: e19aada8a49f9e0e422667d43eb51653ce405f6d
+      MILLRACE_REF: b699ffe3e7dd8a39dc5ce0ca149d469149609257
       MILLRACE_AI_WHEEL_SHA256: 5e87f92f2330af30395f35860d319db7e5574367da7995a3613276d0a08f163d
       MILLRACE_VERSION: 0.22.3
       MILLFORGE_VERSION: 0.1.1
@@ -98,7 +98,7 @@ jobs:
           fi
           sha256sum --check --strict <<'SHA256'
           8a36188ded6445be1657e4cd327a34a88b7bf9ac2fe2a4942e0eda67b7ef6f7c  dist/millrace_plus-0.22.3-py3-none-any.whl
-          caf4ed3f586d5ff3d8d525d3bfd5292dc0f28db79418c01ee59c60ca6955c72d  dist/millrace_plus-0.22.3.tar.gz
+          bb7de1f610885bd6c258ca9c1f8f88d219bc64bd41e6341b15cabd524b26db14  dist/millrace_plus-0.22.3.tar.gz
           SHA256
       - name: Check source unchanged
         run: git diff --exit-code
@@ -139,7 +139,7 @@ jobs:
           fi
           sha256sum --check --strict <<'SHA256'
           8a36188ded6445be1657e4cd327a34a88b7bf9ac2fe2a4942e0eda67b7ef6f7c  dist/millrace_plus-0.22.3-py3-none-any.whl
-          caf4ed3f586d5ff3d8d525d3bfd5292dc0f28db79418c01ee59c60ca6955c72d  dist/millrace_plus-0.22.3.tar.gz
+          bb7de1f610885bd6c258ca9c1f8f88d219bc64bd41e6341b15cabd524b26db14  dist/millrace_plus-0.22.3.tar.gz
           SHA256
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
         with:
