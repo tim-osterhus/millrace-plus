@@ -95,6 +95,25 @@ Runner execution:
 millrace run daemon [--idle-sleep SECONDS] [--max-ticks N] [--activation-id ID] [--adapter-kind KIND] [--adapter-config-json PATH] [--monitor none|basic]
 ```
 
+Core control and bounded-read surfaces:
+
+```text
+millrace daemon inspect [--wait-for readiness|exit|cleanup]
+millrace daemon stop --request-json JSON
+millrace daemon history
+millrace operations show --request-json JSON
+millrace operations resolve --request-json JSON --seal-if-absent
+millrace operations history
+millrace runs pause --request-json JSON
+millrace runs resume --request-json JSON
+millrace runs recover --request-json JSON
+millrace runs follow RUN_ID --after-sequence N
+```
+
+Control requests use exact canonical JSON and the same operation key for
+reconciliation. Bounded reads use `--json --bounded`; they report finite,
+fenced projections. No control transaction spans provider or native waiting.
+
 ## Implemented Local-Operator Surfaces
 
 - Workspace store/CAS initialization and read-only check.
@@ -108,6 +127,8 @@ millrace run daemon [--idle-sleep SECONDS] [--max-ticks N] [--activation-id ID] 
 - Wait list/resume/close/revise through operator wait intake.
 - Lineage intervention list/resume/close/revise through operator intake.
 - Dispatch claim and read-only dispatch envelope display.
+- Exact durable operation show/resolve and run pause/resume/recover requests.
+- Daemon inspect/stop/history and bounded operation/run projections.
 - Local daemon execution through bounded runner units.
 
 ## Authoring And Verification Surfaces
@@ -131,8 +152,9 @@ otherwise:
 - root `millrace tick`;
 - public `millrace observe`;
 - `millrace dispatch invoke`;
-- `millrace run daemon status` or `millrace run daemon stop`;
 - a dedicated `approvals` command group;
+- native lifecycle controls on unsupported platforms; those platforms retain
+  foreground daemon execution without a native-control classification;
 - remote management, Millrace OS control, or multi-tenant control;
 - package marketplace upload, download, or remote install;
 - broad plugin/MCP runtime or package-distributed native runner code;

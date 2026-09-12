@@ -56,11 +56,11 @@ FROZEN_SKILL_DIGESTS = dict(
         ),
         (
             "millrace-instruction-manual/references/cli-operations.md",
-            "9c49d4a0190ca23c12046d9de168ccbe5e019b74f25148559d01d7a69763e01b",
+            "c79ae3d463c25846a483fa51e1076cf33323e43c01176698f1598101bdeb37d6",
         ),
         (
             "millrace-instruction-manual/references/current-capabilities.md",
-            "def5db0bb4ee5d4d8ee4aea2192faabddefedfc478f9181b70ae2324e0a716cd",
+            "53323cc425bdc0a9c9e489f2646ff1112995ce63b4c38d03875531c7b79868fc",
         ),
         (
             "millrace-instruction-manual/references/install-and-deploy.md",

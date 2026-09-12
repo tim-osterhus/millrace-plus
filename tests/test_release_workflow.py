@@ -206,15 +206,13 @@ def test_release_workflow_runs_complete_installed_wheel_suite() -> None:
         validate_job.index("- name: Test") : validate_job.index("- name: Lint")
     ]
 
-    assert "MILLRACE_REF: 463c35bb5241c046d6d75a8598328bb9601295cb" in (
-        validate_job
-    )
+    assert "MILLRACE_REF: 43ab17136c5fed5e70a4c78b1e0401cca47df726" in validate_job
     assert (
         "MILLRACE_AI_WHEEL_SHA256: "
-        "99c6d23bb898bdb47c410a078212d61d16205e1f9c9bfd64e24fcf6f32394e82"
+        "2c6704ff94f70743f3d7214fbf9f6eabc8d19f72c8486dc0bfe576ed63b7b357"
     ) in validate_job
     assert "MILLRACE_VERSION: 0.22.3" in validate_job
-    assert "MILLFORGE_VERSION: 0.1.0" in validate_job
+    assert "MILLFORGE_VERSION: 0.1.1" in validate_job
     assert "MILLFORGE_REF:" not in validate_job
     assert "PYTHONPATH=\"$validation_root" not in test_step
     assert "env -u PYTHONPATH" in test_step

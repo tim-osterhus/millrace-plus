@@ -8,9 +8,10 @@ workflow definitions, entrypoint prompts, stage skills, and examples that make
 the runtime useful out of the box. It contains data only: no daemon, CLI,
 runner, provider, plugin, or installation hook.
 
-> **Release status:** `millrace-plus` 0.22.3 is an unreleased member candidate.
-> The published `millrace` convenience bundle remains `0.22.2`; no `0.22.3`
-> bundle is published.
+> **Release line:** `millrace-plus` 0.22.3 accompanies Core 0.22.3
+> (fresh store schema 11 and compiled-plan schema 18) with Millforge 0.1.1.
+> Install the complete bundle with `pip install millrace==0.22.3` on Python 3.12+.
+> OS/provider qualification and the complete ecosystem MVP remain separate.
 
 ## Included Workflows
 
@@ -64,10 +65,9 @@ The installed resource root is `millrace_workflow_package`; package data is
 non-executable. A direct installation contains package metadata and data only
 and does not transitively install `millrace-ai` or another member distribution.
 
-The published `millrace` convenience bundle remains `millrace==0.22.2`.
-It does not install this unreleased member candidate, and no `0.22.3` bundle
-is published. Evaluate the `millrace-plus` 0.22.3 candidate with the explicit
-Core and Millforge wheel paths documented in [Validation](docs/public-validation.md).
+The `millrace==0.22.3` convenience bundle installs Core and Plus 0.22.3 with
+Millforge 0.1.1. Maintainers can validate exact member wheels using
+[Validation](docs/public-validation.md).
 Member distributions version independently. Each `millrace`
 meta-distribution release pins one tested combination and may reuse an
 unchanged compatible member. A future `millrace` bundle must publish and pin

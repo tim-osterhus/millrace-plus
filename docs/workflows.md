@@ -13,6 +13,23 @@ runtime concepts.
 package. It is useful for learning Millrace and for bounded tasks that still
 benefit from explicit review.
 
+Before running it, prepare project notes inside the initialized workspace:
+
+```bash
+mkdir -p "$WORKSPACE/docs/reviews"
+# For a fresh workspace, seed one project note if it does not exist.
+if [ ! -e "$WORKSPACE/docs/project.md" ]; then
+  printf '%s\n' '# Project notes' 'Record the task and its acceptance criteria here.' \
+    > "$WORKSPACE/docs/project.md"
+fi
+```
+
+Fill in the project note with the task and acceptance criteria. The review
+stage requires a nonempty `docs` root and owns review-note writes under
+`docs/reviews`; Worker must leave this root unchanged. Missing and empty roots
+refuse reviewer preparation. Workspace initialization does not create these
+workflow-specific notes.
+
 | Plane | Stage | Responsibility |
 | --- | --- | --- |
 | Management | Manager | Turns an incoming prompt into a work packet with a definition of done |

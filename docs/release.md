@@ -1,20 +1,19 @@
 # Release Line
 
-This checkout records the `0.22.3` unreleased `millrace-plus` member candidate.
-The published `millrace` convenience bundle remains `millrace==0.22.2`; no
-`0.22.3` bundle is published.
+The `millrace-plus` 0.22.3 release accompanies Core 0.22.3 and Millforge 0.1.1
+in the exact `millrace==0.22.3` bundle.
 
-## 0.22.3 candidate scope
+## 0.22.3 scope
 
-The candidate targets runtime compatibility `>=0.22.3,<0.23` and contains six
-ordinary workflow entries. It is not a published package release. The
+The package targets runtime compatibility `>=0.22.3,<0.23` and contains six
+ordinary workflow entries. The
 experimental `execution.lad_codex_semantic_worktree` workflow is deferred: it
 is not selectable and its exclusive assets are absent from the manifest, wheel,
 and source archive. The preserved campaign evidence is inconclusive and does
 not establish semantic-workspace efficacy or incompatibility.
 
 Generic governed-context mechanisms remain a runtime capability for workflows
-that independently select them; this Plus candidate does not claim a semantic
+that independently select them; this Plus release does not claim a semantic
 LAD workflow release. Unreleased schema-17 plans are historical evidence, not
 compatible plans.
 
@@ -24,7 +23,7 @@ compatible plans.
 | --- | --- |
 | Distribution | `millrace-plus` |
 | Source version | `0.22.3` |
-| Release status | Unreleased member candidate |
+| Release line | 0.22.3 |
 | Workflow package ID | `millrace.plus.official` |
 | Installed resource root | `millrace_workflow_package` |
 | Python | 3.11 or newer |
@@ -51,11 +50,10 @@ that executes Millrace. It has no CLI, daemon, runner, provider integration,
 plugin registration, marketplace client, post-install hook, or dependency on
 `millrace-ai`.
 
-The published `millrace` convenience bundle remains `millrace==0.22.2`.
-It does not install this unreleased member candidate, and no `0.22.3` bundle
-is published. Direct `millrace-plus` installation remains useful for tools
-that only need to inspect or distribute the package data; candidate
-qualification uses the explicit Core and Millforge wheel paths in
+The `millrace==0.22.3` bundle pins Core and Plus 0.22.3 with Millforge 0.1.1.
+Direct `millrace-plus` installation remains useful for tools that only need to
+inspect or distribute the package data; maintainer qualification uses the
+explicit Core and Millforge wheel paths in
 [Validation](public-validation.md).
 
 Member distributions version independently. Each `millrace`
@@ -65,19 +63,23 @@ combination before it can be used as a published installation.
 
 ## Upgrade boundary
 
-The matching Core candidate uses store schema 10. Tagged Core `v0.22.2` used
-schema 8, and the compatibility contract refuses schemas 8 and 9 without a
-migration. Existing state must be finished or retired with its matching
-runtime; initialize fresh state before using the candidate. This is an
-intentional compatibility boundary, not a seamless patch upgrade.
+The matching Core release uses store schema 11 and compiled-plan schema 18.
+Tagged Core `v0.22.2` used schema 8, and the compatibility contract refuses
+schemas 8, 9, and 10 without a migration. Existing state must be finished or
+retired with its matching runtime; initialize fresh state before using this
+release. This is an intentional compatibility boundary, not a seamless patch
+upgrade.
 
 ## Known limitations
 
-This candidate does not include campaign-only closure-cap changes. Public
+This release does not include campaign-only closure-cap changes. Public
 closure requests remain bounded at 16 KiB, and Millforge instructions remain
-bounded at 64 KiB. Run-scoped pause/resume is not supplied by this candidate.
-Final qualification also requires parent-owned immutable Core commit and wheel
-hashes plus rebuilt Plus artifact hashes in the release workflow.
+bounded at 64 KiB. Run pause/resume, daemon lifecycle controls, and bounded
+control reads belong to the Core runtime; this package declares no control graph
+or control implementation. The release workflow binds the immutable Core commit and wheel hash, checks
+the installed-wheel suite, and verifies exact Plus artifact hashes. All 89
+released OS/provider gates remain NOT_RUN; these package checks do not qualify
+OS integration or the complete MVP.
 
 ## Release Validation
 

@@ -131,8 +131,30 @@ secrets in workflow packages, prompt assets, skill files, or evidence reports.
 Adapter config is local operator config, not package authority.
 
 Do not use public `millrace run once`, root `millrace tick`, manual
-`millrace observe`, or `millrace dispatch invoke`. The command tree also has
-no daemon status/stop subcommands.
+`millrace observe`, or `millrace dispatch invoke`.
+
+## Runtime Controls And Bounded Reads
+
+Core control requests use exact canonical request JSON:
+
+```text
+millrace --workspace PATH daemon inspect [--wait-for readiness|exit|cleanup]
+millrace --workspace PATH daemon stop --request-json JSON
+millrace --workspace PATH daemon history
+millrace --workspace PATH operations show --request-json JSON
+millrace --workspace PATH operations resolve --request-json JSON --seal-if-absent
+millrace --workspace PATH operations history
+millrace --workspace PATH runs pause --request-json JSON
+millrace --workspace PATH runs resume --request-json JSON
+millrace --workspace PATH runs recover --request-json JSON
+millrace --workspace PATH runs follow RUN_ID --after-sequence N
+```
+
+Preserve the operation ID, caller, action, target, and payload when an outcome
+is uncertain. Reconcile with the same key; a new key is not a retry. Immutable
+receipts establish acceptance and append-only results record settlement and
+aftermath. Add `--json --bounded` before a read command for a finite, fenced
+projection. No control transaction spans provider or native waiting.
 
 ## Status, Waits, Interventions, And Doctor
 

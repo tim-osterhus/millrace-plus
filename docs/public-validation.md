@@ -14,7 +14,7 @@ release owner, and a compatible Millforge wheel:
 
 ```bash
 export MILLRACE_AI_WHEEL="/absolute/path/to/millrace_ai-0.22.3-py3-none-any.whl"
-export MILLFORGE_WHEEL="/absolute/path/to/millforge-0.1.0-py3-none-any.whl"
+export MILLFORGE_WHEEL="/absolute/path/to/millforge-0.1.1-py3-none-any.whl"
 
 test -f "$MILLRACE_AI_WHEEL"
 test -f "$MILLFORGE_WHEEL"

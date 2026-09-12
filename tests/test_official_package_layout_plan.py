@@ -24,7 +24,7 @@ def test_readme_documents_public_official_workflow_package() -> None:
     for required in (
         "`millrace_workflow_package/`",
         "`millrace.plus.official`",
-        "`millrace-plus` 0.22.3 is an unreleased member candidate",
+        "`millrace-plus` 0.22.3 accompanies Core 0.22.3",
         "installed resource root is `millrace_workflow_package`",
         "`simple_loop`",
         "`execution.lad`",
@@ -33,7 +33,7 @@ def test_readme_documents_public_official_workflow_package() -> None:
         "`lad.full`",
         "`vendor_selection`",
         "package data is non-executable",
-        "published `millrace` convenience bundle remains `0.22.2`",
+        "`millrace==0.22.3` convenience bundle installs Core and Plus 0.22.3",
     ):
         assert required in readme
     assert "PLUS-" not in readme
@@ -73,7 +73,7 @@ def test_public_docs_describe_six_ordinary_workflows_without_campaign_arms() -> 
     assert "Control/Treatment" not in public_docs
     assert "Control arm" not in public_docs
     assert "Treatment arm" not in public_docs
-    assert "millrace==0.22.3" not in public_docs
+    assert "millrace==0.22.3" in public_docs
 
 
 def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
@@ -92,7 +92,7 @@ def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
     )
     assert "plus_packet" not in metadata
     assert metadata["status"] == (
-        "unreleased_package_candidate_live_qualification_not_claimed"
+        "package_release_live_qualification_not_claimed"
     )
     metadata_text = json.dumps(metadata, sort_keys=True)
     assert "PLUS-" not in metadata_text
