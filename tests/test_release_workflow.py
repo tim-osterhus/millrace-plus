@@ -206,7 +206,7 @@ def test_release_workflow_runs_complete_installed_wheel_suite() -> None:
         validate_job.index("- name: Test") : validate_job.index("- name: Lint")
     ]
 
-    assert "MILLRACE_REF: 43ab17136c5fed5e70a4c78b1e0401cca47df726" in validate_job
+    assert "MILLRACE_REF: 33f7a52b9bbcbbb8cbc82014f5072c73106e8a18" in validate_job
     assert (
         "MILLRACE_AI_WHEEL_SHA256: "
         "2c6704ff94f70743f3d7214fbf9f6eabc8d19f72c8486dc0bfe576ed63b7b357"
