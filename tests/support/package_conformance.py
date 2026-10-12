@@ -20,6 +20,9 @@ from millrace.operator import (
 from millrace.substrate import ContentAddressedByteStore, SQLiteRuntimeStore
 
 _ASSET_DIGEST_DOMAIN_BYTES = b"millrace.wpkg.asset.v1\0"
+_PI_WORKFLOW_ID = "lad.full.pi"
+_PI_ASSET_PREFIX = "lad.full.pi."
+_PI_TRANSPORT_ASSET_ID = "runner.pi_rpc_terminal"
 _RUNTIME_AUTHORITY_PATTERNS = (
     re.compile(
         r"\breturn\s+`?[A-Z_]+`?\s+to\s+"
@@ -50,17 +53,27 @@ def load_manifest(package_root: Path) -> dict[str, Any]:
     )
 
 
-def workflows_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
+def workflows_by_id(
+    manifest: dict[str, Any], *, include_pi: bool = False
+) -> dict[str, dict[str, object]]:
     return {
         str(workflow["workflow_id"]): workflow
         for workflow in cast(list[dict[str, object]], manifest["workflows"])
+        if include_pi or str(workflow["workflow_id"]) != _PI_WORKFLOW_ID
     }
 
 
-def assets_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, object]]:
+def assets_by_id(
+    manifest: dict[str, Any], *, include_pi: bool = False
+) -> dict[str, dict[str, object]]:
     return {
         str(asset["asset_id"]): asset
         for asset in cast(list[dict[str, object]], manifest["assets"])
+        if include_pi
+        or (
+            str(asset["asset_id"]) != _PI_TRANSPORT_ASSET_ID
+            and not str(asset["asset_id"]).startswith(_PI_ASSET_PREFIX)
+        )
     }
 
 
@@ -68,14 +81,16 @@ def asset_digest(payload: bytes) -> str:
     return "sha256:" + sha256(_ASSET_DIGEST_DOMAIN_BYTES + payload).hexdigest()
 
 
-def assert_packaged_asset_closure(package_root: Path) -> dict[str, Any]:
+def assert_packaged_asset_closure(
+    package_root: Path, *, include_pi: bool = False
+) -> dict[str, Any]:
     manifest = load_manifest(package_root)
-    assets = assets_by_id(manifest)
+    assets = assets_by_id(manifest, include_pi=include_pi)
     for asset_id, asset in assets.items():
         payload = (package_root / str(asset["package_path"])).read_bytes()
         assert asset["content_digest"] == asset_digest(payload), asset_id
         assert asset["byte_length"] == len(payload), asset_id
-    for workflow in workflows_by_id(manifest).values():
+    for workflow in workflows_by_id(manifest, include_pi=include_pi).values():
         for required in cast(list[dict[str, object]], workflow["required_assets"]):
             asset_id = str(required["asset_id"])
             assert required["content_digest"] == assets[asset_id]["content_digest"]
@@ -83,9 +98,9 @@ def assert_packaged_asset_closure(package_root: Path) -> dict[str, Any]:
 
 
 def selected_asset_pins(
-    manifest: dict[str, Any], workflow_id: str
+    manifest: dict[str, Any], workflow_id: str, *, include_pi: bool = False
 ) -> tuple[tuple[str, str], ...]:
-    workflow = workflows_by_id(manifest)[workflow_id]
+    workflow = workflows_by_id(manifest, include_pi=include_pi)[workflow_id]
     return tuple(
         sorted(
             (
@@ -97,10 +112,12 @@ def selected_asset_pins(
     )
 
 
-def packaged_workflow_source(package_root: Path, workflow_id: str) -> dict[str, object]:
+def packaged_workflow_source(
+    package_root: Path, workflow_id: str, *, include_pi: bool = False
+) -> dict[str, object]:
     manifest = load_manifest(package_root)
-    workflow = workflows_by_id(manifest)[workflow_id]
-    assets = assets_by_id(manifest)
+    workflow = workflows_by_id(manifest, include_pi=include_pi)[workflow_id]
+    assets = assets_by_id(manifest, include_pi=include_pi)
     source = cast(
         dict[str, object],
         deepcopy(cast(dict[str, object], workflow["selected_authority"])),
@@ -119,8 +136,12 @@ def packaged_workflow_source(package_root: Path, workflow_id: str) -> dict[str, 
     return source
 
 
-def compile_packaged_workflow(package_root: Path, workflow_id: str) -> object:
-    result = compile_workflow(packaged_workflow_source(package_root, workflow_id))
+def compile_packaged_workflow(
+    package_root: Path, workflow_id: str, *, include_pi: bool = False
+) -> object:
+    result = compile_workflow(
+        packaged_workflow_source(package_root, workflow_id, include_pi=include_pi)
+    )
     errors = tuple(
         diagnostic
         for diagnostic in result.diagnostics
@@ -224,9 +245,13 @@ def assert_selected_package_pin(
 
 
 def asset_texts(
-    package_root: Path, manifest: dict[str, Any], asset_ids: set[str]
+    package_root: Path,
+    manifest: dict[str, Any],
+    asset_ids: set[str],
+    *,
+    include_pi: bool = False,
 ) -> dict[str, str]:
-    assets = assets_by_id(manifest)
+    assets = assets_by_id(manifest, include_pi=include_pi)
     return {
         asset_id: (package_root / str(assets[asset_id]["package_path"])).read_text()
         for asset_id in sorted(asset_ids)

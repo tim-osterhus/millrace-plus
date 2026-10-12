@@ -59,13 +59,13 @@ from support.public_runtime_fakes import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.22.3"
+PACKAGE_VERSION = "0.22.4"
 WORKFLOW_IDS = ("execution.lad", "execution.lad_integrator")
 QA_SCOPE_IDS = (*WORKFLOW_IDS, "planning.lad", "lad.full")
 _REFERENCE_LAD_CANONICAL_AUTHORITY_SHA256 = (
-    "6c6a881d12dd4d320d38bf08347f37354852eb42176fe9a4c58ec5467183c34b"
+    "8dac181c51e59d78084d0ad4034f78927d9823ef0c1a64ff48ae0bd01f05221d"
 )
-_REFERENCE_LAD_CANONICAL_AUTHORITY_BYTE_LENGTH = 67880
+_REFERENCE_LAD_CANONICAL_AUTHORITY_BYTE_LENGTH = 68722
 _REFERENCE_LAD_SELECTED_ASSET_PINS = (
     (
         "execution.entrypoints.lad_builder",
@@ -109,11 +109,11 @@ _REFERENCE_LAD_SELECTED_ASSET_PINS = (
     ),
     (
         "execution.entrypoints.lad_troubleshooter",
-        "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c",
+        "sha256:2aeb6e65d0bf5beddb212dbb9cfb9eee6bab89d9943fd9ca69424e2955dd6860",
     ),
     (
         "execution.skills.troubleshooter_core",
-        "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b",
+        "sha256:7cc8d9a63fb6ed147c92fa57d4dcd4baf72211ddd18bc24fccab058ee052abb0",
     ),
     (
         "execution.entrypoints.lad_consultant",
@@ -1943,6 +1943,19 @@ def _builder_qa_context_projection() -> dict[str, object]:
     }
 
 
+def _troubleshooter_complete_qa_context_projection() -> dict[str, object]:
+    return {
+        "kind": "coalesce",
+        "candidates": [
+            {
+                "kind": "source",
+                "path": ["work_item_payload", "qa_context"],
+            }
+        ],
+        "default": _builder_qa_context_projection(),
+    }
+
+
 def _checker_qa_context_projection() -> dict[str, object]:
     return {
         "kind": "object",
@@ -2061,10 +2074,15 @@ def test_all_non_normalizing_execution_routes_project_original_qa_context(
         fields = _projection_fields(action)
         if str(action["id"]) in _NORMALIZING_ROUTE_IDS:
             continue
-        assert fields["qa_context"] == {
-            "kind": "source",
-            "path": ["work_item_payload", "qa_context"],
-        }
+        if str(action["id"]) == "execution.return_troubleshooter_complete":
+            assert fields["qa_context"] == (
+                _troubleshooter_complete_qa_context_projection()
+            )
+        else:
+            assert fields["qa_context"] == {
+                "kind": "source",
+                "path": ["work_item_payload", "qa_context"],
+            }
         recorded_context = _recorded_qa_context(str(action["id"]))
         projected = _projected_payload(
             action,
@@ -3017,10 +3035,15 @@ def test_every_dynamic_execution_target_projects_original_qa_context(
         source_action = source_actions[action_id]
         compiled_action = compiled_actions[action_id]
         fields = _projection_fields(source_action)
-        assert fields["qa_context"] == {
-            "kind": "source",
-            "path": ["work_item_payload", "qa_context"],
-        }
+        if action_id == "execution.return_troubleshooter_complete":
+            assert fields["qa_context"] == (
+                _troubleshooter_complete_qa_context_projection()
+            )
+        else:
+            assert fields["qa_context"] == {
+                "kind": "source",
+                "path": ["work_item_payload", "qa_context"],
+            }
         selector = cast(Record, source_action["dynamic_target_selector"])
         targets = cast(dict[str, Record], selector["targets"])
         expected_targets = (

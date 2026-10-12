@@ -28,13 +28,35 @@ Every workflow is ordinary package data. Names such as Management, Planning,
 Execution, Learning, and Review do not have special meaning inside the
 Millrace kernel.
 
+## Unpublished v0.22.4
+
+The current private source candidate `millrace-plus` `0.22.4`
+contains the opt-in `lad.full.pi@0.1` workflow. It targets Core `>=0.22.4,<0.23`. The Pi workflow copies the
+seventeen `lad.full` entrypoint prompts and uses a component-free `pi_rpc`
+report channel. The reviewed Core capacity descriptor is retained. Retained predecessor wheel
+and sdist installs executed the five-stage Recon, Builder, Checker, Updater and
+Arbiter coding route with stock Pi tools and a scripted local provider. Builder
+repairs a real failing test; Checker independently reruns it. The selected profile
+uses maximum ordinary permissions without tool approval. Foreground accounting
+covers per-command process groups in trusted Darwin workspaces and one pinned
+Ubuntu 24.04 x86_64 installation; escaped descendants remain outside that
+guarantee. The final 0.22.4 artifacts and actual-model profile still require
+qualification before publication.
+
+The rejected `millrace_ai-0.22.4.dev3+pi.b01-py3-none-any.whl` and its
+completion-capacity failure are historical PI-B01 evidence for the previous
+candidate. They do not describe the current local candidate. The local proof does
+not qualify all seventeen stages, real-model behavior, Linux or the historical
+three-arm comparison. No publication is claimed.
+
 The experimental `execution.lad_codex_semantic_worktree` workflow is deferred
 from this MVP release. It is not selectable or distributed; the preserved
 campaign evidence does not establish semantic-workspace efficacy or
 incompatibility.
 
 Read [Workflow guide](docs/workflows.md) for the intended use and shape of
-each configuration.
+each configuration, and [Private Pi workflow](docs/pi-workflow.md) for the
+bounded report-channel contract.
 
 ## Included Agent Skills
 

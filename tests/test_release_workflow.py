@@ -81,17 +81,18 @@ def test_release_workflow_accepts_only_exact_project_version_tag() -> None:
     workflow = _workflow()
     with (ROOT / "pyproject.toml").open("rb") as source:
         version = tomllib.load(source)["project"]["version"]
-    expected_ref = f"refs/tags/v{version}"
+    published_ref = "refs/tags/v0.22.3"
 
-    assert version == "0.22.3"
-    assert _trigger_tags(workflow) == (f"v{version}",)
+    assert version == "0.22.4"
+    assert _trigger_tags(workflow) == ("v0.22.3",)
     cases = {
-        expected_ref: True,
+        published_ref: True,
+        f"refs/tags/v{version}": False,
         f"refs/tags/{version}": False,
         f"refs/tags/release-v{version}": False,
-        f"{expected_ref}-extra": False,
+        f"{published_ref}-extra": False,
         "refs/tags/v0.22.1": False,
-        f"{expected_ref}rc1": False,
+        f"{published_ref}rc1": False,
     }
     assert {ref: _accepts_ref(workflow, ref) for ref in cases} == cases
 

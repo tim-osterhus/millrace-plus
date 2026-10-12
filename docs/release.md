@@ -1,11 +1,14 @@
 # Release Line
 
-The `millrace-plus` 0.22.3 release accompanies Core 0.22.3 and Millforge 0.1.1
-in the exact `millrace==0.22.3` bundle.
+The unpublished `millrace-plus` 0.22.4 source targets Core 0.22.4 and Millforge
+0.1.1 in a matched `millrace==0.22.4` bundle. Published 0.22.3 remains the public
+installation until final qualification and publication complete.
+The published `millrace==0.22.3` bundle pins Core and Plus 0.22.3 with
+Millforge 0.1.1.
 
-## 0.22.3 scope
+## 0.22.4 scope
 
-The package targets runtime compatibility `>=0.22.3,<0.23` and contains six
+The package targets runtime compatibility `>=0.22.4,<0.23` and contains six
 ordinary workflow entries. The
 experimental `execution.lad_codex_semantic_worktree` workflow is deferred: it
 is not selectable and its exclusive assets are absent from the manifest, wheel,
@@ -22,8 +25,8 @@ compatible plans.
 | Field | Value |
 | --- | --- |
 | Distribution | `millrace-plus` |
-| Source version | `0.22.3` |
-| Release line | 0.22.3 |
+| Source version | `0.22.4` |
+| Release line | 0.22.4, unpublished |
 | Workflow package ID | `millrace.plus.official` |
 | Installed resource root | `millrace_workflow_package` |
 | Python | 3.11 or newer |
@@ -39,9 +42,41 @@ The package contains six workflow entries, all version `0.1`:
 - `lad.full`
 - `vendor_selection`
 
+The current private source candidate `0.22.4` adds opt-in
+`lad.full.pi@0.1` with seventeen copied entrypoint assets plus one inert
+transport note. It targets Core `>=0.22.4,<0.23`. Core owns
+runtime behavior; Plus supplies data only. The reviewed Core capacity
+descriptor and accepted PI-B02 assets are retained. The retained predecessor pair passed fresh wheel/sdist qualification for a
+five-stage coding route with real stock-Pi tools and a scripted provider on
+Darwin and one pinned Ubuntu host. Final 0.22.4 artifact and actual-model
+qualification remain open; all seventeen LAD stages are not proved. The six entries above remain the
+public release set.
+
 It also contains the `millrace-instruction-manual`,
 `millrace-loop-configuration`, and `millrace-entrypoint-authoring` advisory
 skills.
+
+## Private Pi candidate
+
+The current private candidate uses package identity `0.22.4` and
+declares Core compatibility `>=0.22.4,<0.23`. `lad.full.pi@0.1` preserves
+all seventeen `lad.full` stages and their domain, artifact, evidence, routing,
+capability, completion, and stop-condition obligations. Its opt-in Pi report
+channel replaces only the exact-observation-object presentation rule for this
+variant: a final object has exactly `marker`, `artifact_payload_candidate`, and
+`observation_payload_candidate`; `runner_report` is a bounded generic string
+inside the observation candidate when narrative evidence is required. The
+artifact schema, routing fields, capability grants, and workflow authority stay
+unchanged.
+
+Historical PI-B01 compatibility evidence used the submitted Core wheel
+`millrace_ai-0.22.4.dev3+pi.b01-py3-none-any.whl`, with its hash recorded in the
+PI-A01 handoff. That wheel's compiler rejected the preserved component-free
+completion behavior because it required payload capacity on a component pin.
+This rejection applies to the historical PI-B01 wheel and candidate. Current
+PI-B02 source review passed against the accepted Core capacity source. Its
+scripted text-tool proofs and purelib extraction remain predecessor evidence;
+they do not qualify this local candidate or establish foreground coding.
 
 ## Package Boundary
 
@@ -50,7 +85,7 @@ that executes Millrace. It has no CLI, daemon, runner, provider integration,
 plugin registration, marketplace client, post-install hook, or dependency on
 `millrace-ai`.
 
-The `millrace==0.22.3` bundle pins Core and Plus 0.22.3 with Millforge 0.1.1.
+The planned `millrace==0.22.4` bundle pins Core and Plus 0.22.4 with Millforge 0.1.1.
 Direct `millrace-plus` installation remains useful for tools that only need to
 inspect or distribute the package data; maintainer qualification uses the
 explicit Core and Millforge wheel paths in

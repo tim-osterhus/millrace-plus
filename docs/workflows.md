@@ -1,8 +1,8 @@
 # Workflow Guide
 
-Millrace Plus contains six selectable workflow configurations. Each one is a
-complete decision graph with its own queues, stages, outcomes, recovery rules,
-and selected prompt and skill assets.
+Millrace Plus contains six selectable workflow configurations in the public
+release set. Each one is a complete decision graph with its own queues,
+stages, outcomes, recovery rules, and selected prompt and skill assets.
 
 Plane and stage names describe a workflow; they are not built-in Millrace
 runtime concepts.
@@ -99,6 +99,33 @@ The workflow normalizes a purchase request, applies category and budget rules,
 sources candidates, evaluates them in parallel, joins rubric and conflict
 evidence, and prepares a decision. It stops at a durable operator wait rather
 than approving a purchase autonomously.
+
+## Private `lad.full.pi`
+
+`lad.full.pi@0.1` is an opt-in private copy of `lad.full` for a bounded Pi RPC
+report channel. It retains the seventeen stages, selected artifact schemas,
+terminal markers, routing, capabilities, and completion behavior of `lad.full`.
+Each copied entrypoint preserves its role and domain evidence obligations, then
+adds the Pi strict final-text rule: exactly `marker`,
+`artifact_payload_candidate`, and `observation_payload_candidate`, with the
+narrative carried by the optional generic `runner_report` string inside the
+observation candidate when required.
+
+Six Pi bindings explicitly map a trusted runner invocation timeout to their
+selected execution recovery action under `execution.runtime_failure_recovery`:
+Builder, Checker, Fixer, Doublechecker, Updater, and Troubleshooter. The other
+Pi stages have no timeout mapping; domain markers and Pi command timeouts do
+not select this runtime route. Mapping applies only to a trusted failed session
+completion classified as a timeout after cleanup, with no cancellation request.
+
+The selected Pi bindings are `pi_rpc` with no component pin and no
+runner-produced terminal result mappings; the six trusted timeout mappings
+are separate selected authority. All five existing capability declarations
+remain explicit.
+The package includes one inert transport note and one opaque conformance
+fixture. The frozen submitted Core wheel currently reports a completion runner
+capacity error for this component-free binding, so the candidate is review
+material and has no live runtime or provider claim. See [Private Pi workflow](pi-workflow.md).
 
 ## Choosing A Workflow
 

@@ -18,7 +18,7 @@ from support import package_conformance as conformance
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.22.3"
+PACKAGE_VERSION = "0.22.4"
 WORKFLOW_IDS = (
     "simple_loop",
     "execution.lad",
@@ -65,6 +65,8 @@ def test_manifest_runner_pins_match_installed_millforge_descriptor() -> None:
     bindings_by_workflow: dict[str, list[dict[str, object]]] = {}
     pins_by_workflow: dict[str, list[dict[str, object]]] = {}
     for workflow_id, workflow in conformance.workflows_by_id(manifest).items():
+        if workflow["visibility"] != "public":
+            continue
         selected = cast(dict[str, object], workflow["selected_authority"])
         bindings = cast(list[dict[str, object]], selected["runner_bindings"])
         bindings_by_workflow[workflow_id] = bindings

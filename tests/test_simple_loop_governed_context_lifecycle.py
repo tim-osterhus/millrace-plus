@@ -199,7 +199,7 @@ def _runtime(tmp_path: Path) -> OpenRuntimeContext:
         tmp_path / "selected-package",
         PACKAGE_ROOT,
         package_id="millrace.plus.official",
-        package_version="0.22.3",
+        package_version="0.22.4",
         workflow_id="simple_loop",
         workflow_version="0.1",
     )

@@ -13,7 +13,7 @@ files. Use a Core wheel whose source commit and SHA-256 are recorded by the
 release owner, and a compatible Millforge wheel:
 
 ```bash
-export MILLRACE_AI_WHEEL="/absolute/path/to/millrace_ai-0.22.3-py3-none-any.whl"
+export MILLRACE_AI_WHEEL="/absolute/path/to/millrace_ai-0.22.4-py3-none-any.whl"
 export MILLFORGE_WHEEL="/absolute/path/to/millforge-0.1.1-py3-none-any.whl"
 
 test -f "$MILLRACE_AI_WHEEL"
@@ -43,7 +43,6 @@ PYTHONDONTWRITEBYTECODE=1 \
   uv build --out-dir "$BOUNDARY_ARTIFACT_ROOT" --force-pep517
 
 uv run --no-project --with ruff ruff check src tests
-git diff --check
 ```
 
 The explicit wheel arguments keep this check reproducible across public
@@ -63,6 +62,44 @@ These checks cover:
 The manifest evidence is maintained in
 `docs/manifest-authoring-policy.md` and verified by
 `tests/test_manifest_authoring_policy.py`.
+
+Run the complete suite, including the two Git-dependent LAD cases, before
+final release; earlier packet exclusions are not permanent exclusions from
+this command.
+
+## Private Pi candidate checks
+
+The current private source candidate `0.22.4` targets Core
+`>=0.22.4,<0.23` and is checked as data only. The package manifest must
+retain the six public workflows and the private `lad.full.pi@0.1` entry
+with seventeen selected Pi entrypoints. Each Pi
+entrypoint must retain its inherited domain and evidence obligations and carry
+the strict three-key final-text rule with an optional generic `runner_report`
+string inside the observation candidate. The selected bindings remain
+component-free `pi_rpc` with the existing capability declarations and empty
+runner-produced `terminal_result_mappings`. Six execution-stage bindings use
+nested schema version 6 to map trusted runtime timeouts to their selected
+`RUNTIME_FAILURE` recovery actions; the other eleven bindings have no runtime
+failure mapping. An agent's marker text and Pi command timeout do not trigger
+these mappings. The package version and compatibility range do not establish
+schema or runtime support by themselves; qualify against the repaired Core
+artifact by exact digest through the wheel-based full-suite command above.
+
+The reviewed Core capacity descriptor and accepted PI-B02 assets are retained.
+The predecessor has reviewed partial capacity and scripted text-tool evidence;
+its purelib extraction is not ordinary installer proof. Later retained wheel
+and sdist installations passed a five-stage scripted-provider coding route on
+Darwin and one pinned Ubuntu host. Revalidate the exact final 0.22.4 artifacts;
+those predecessor results do not establish actual-model behavior, reviewed
+provider accounting, or all seventeen LAD stages.
+
+Historical PI-B01 compatibility evidence used the submitted Core wheel
+`millrace_ai-0.22.4.dev3+pi.b01-py3-none-any.whl` and its recorded SHA-256. That
+wheel rejected the preserved component-free completion behavior because its
+compiler required runner component-pin payload capacity. The rejection is
+retained as evidence for the historical candidate and does not describe the
+accepted PI-B02 source. Predecessor artifact results do not qualify this
+local candidate.
 
 ## Inspect The Built Wheel
 

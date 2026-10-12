@@ -19,7 +19,7 @@ from millrace.substrate import ContentAddressedByteStore, SQLiteRuntimeStore
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.22.3"
+PACKAGE_VERSION = "0.22.4"
 WORKFLOW_SELECTORS = {
     ("simple_loop", "0.1"),
     ("execution.lad", "0.1"),
@@ -28,6 +28,7 @@ WORKFLOW_SELECTORS = {
     ("lad.full", "0.1"),
     ("vendor_selection", "0.1"),
 }
+PRIVATE_WORKFLOW_SELECTORS = {("lad.full.pi", "0.1")}
 
 _ROOT_AUTHORITY_FIELDS = (
     "record_kind",
@@ -357,7 +358,7 @@ def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
         str(asset["asset_id"]): str(asset["content_digest"])
         for asset in _assets(manifest)
     }
-    assert len(asset_digests) == 63
+    assert len(asset_digests) == 88
     assert {asset["asset_kind"] for asset in _assets(manifest)} == {
         "entrypoint_prompt",
         "stage_skill",
@@ -370,7 +371,13 @@ def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
         assert asset["byte_length"] == len(asset_bytes)
 
     for workflow in _workflows(manifest):
-        assert workflow["visibility"] == "public"
+        expected_visibility = (
+            "private"
+            if (workflow["workflow_id"], workflow["workflow_version"])
+            in PRIVATE_WORKFLOW_SELECTORS
+            else "public"
+        )
+        assert workflow["visibility"] == expected_visibility
         assert workflow["entrypoints"] == ["default"]
         assert "assets" not in workflow["selected_authority"]
         for required_asset in workflow["required_assets"]:
@@ -469,15 +476,15 @@ def test_selected_arbiter_authority_is_exact_in_both_workflow_manifests(
     )
 
 
-def test_public_workflow_package_declares_expected_workflows_only() -> None:
+def test_workflow_package_declares_public_workflows_and_private_candidate() -> None:
     manifest = _load_manifest()
     selectors = {
         (str(workflow["workflow_id"]), str(workflow["workflow_version"]))
         for workflow in _workflows(manifest)
     }
 
-    assert selectors == WORKFLOW_SELECTORS
-    assert len(selectors) == 6
+    assert selectors == WORKFLOW_SELECTORS | PRIVATE_WORKFLOW_SELECTORS
+    assert len(selectors) == 7
     assert not any("control" in workflow_id for workflow_id, _version in selectors)
     assert manifest["dependencies"] == []
 
@@ -544,7 +551,7 @@ def test_mvp_manifest_excludes_deferred_semantic_worktree() -> None:
         (str(workflow["workflow_id"]), str(workflow["workflow_version"]))
         for workflow in _workflows(manifest)
     }
-    assert selectors == _EXPECTED_PUBLIC_WORKFLOW_SELECTORS
+    assert selectors == _EXPECTED_PUBLIC_WORKFLOW_SELECTORS | PRIVATE_WORKFLOW_SELECTORS
     assert _DEFERRED_WORKFLOW_ID not in json.dumps(manifest, sort_keys=True)
     assert not any(
         str(asset["asset_id"]).startswith(f"{_DEFERRED_WORKFLOW_ID}.")

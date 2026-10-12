@@ -11,7 +11,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = PROJECT_ROOT / "src" / "millrace_plus" / "skills"
-RELEASE_IDENTITY = "0.22.3"
+RELEASE_IDENTITY = "0.22.4"
 PACKAGE_DOCS = (
     "docs/authoring.md",
     "docs/manifest-authoring-policy.md",
@@ -151,14 +151,14 @@ def test_official_package_data_declares_selected_vendor_selection_assets() -> No
     assert len(tuple(vendor_asset_root.rglob("*.md"))) == 18
 
 
-def test_plus_release_cut_targets_runtime_0223_and_defers_experiment() -> None:
+def test_plus_candidate_targets_reviewed_core_minimum_and_defers_experiment() -> None:
     manifest = json.loads(
         (PROJECT_ROOT / "millrace_workflow_package" / "manifest.json").read_text()
     )
     package = manifest["package"]
     assert package["package_version"] == RELEASE_IDENTITY
-    assert package["base_millrace_compatibility"] == ">=0.22.3,<0.23"
-    assert manifest["compatibility"]["base_millrace"] == ">=0.22.3,<0.23"
+    assert package["base_millrace_compatibility"] == ">=0.22.4,<0.23"
+    assert manifest["compatibility"]["base_millrace"] == ">=0.22.4,<0.23"
     assert "execution.lad_codex_semantic_worktree" not in json.dumps(
         manifest,
         sort_keys=True,

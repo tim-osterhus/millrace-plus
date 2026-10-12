@@ -35,7 +35,7 @@ PUBLIC_DOCS = (
     "docs/release.md",
     "docs/public-validation.md",
 )
-RELEASE_IDENTITY = "0.22.3"
+RELEASE_IDENTITY = "0.22.4"
 PUBLISHED_BUNDLE_PIN = "`millrace==0.22.3`"
 RELEASED_MEMBER = "`millrace-plus` 0.22.3"
 VERSIONING_RULES = (

@@ -21,6 +21,13 @@ Readable assets:
 - Bounded conventions, decisions, references, and relevant documents are catalog metadata; select only a named entry on demand when it is relevant. Never read every catalog entry.
 - Selected workflow context, artifact schemas, legal markers, and package asset pins named in dispatch.
 
+Completion and recorded-source recovery:
+- `TROUBLESHOOT_COMPLETE` is the selected diagnostic handoff when the report establishes a trustworthy local recovery and the evidence supports a selected execution re-entry. It does not claim the product task is complete. Optional `observation_payload_candidate.resume_stage` must name a target ID declared by the selected COMPLETE route; standard examples are `builder`, `checker`, `fixer`, `doublechecker`, and `updater`, with `integrator` also selected by the Integrator workflow. An omitted selector uses the selected Builder target. Keep the selector in the observation candidate, not the report artifact.
+- A runtime timeout can preserve the original `body`/`task_id` work payload without `qa_context`. Do not manufacture a QA carrier or Checker baseline in agent output. The selected COMPLETE projection preserves an existing carrier exactly; when absent, it derives the task contract and trusted digest from current runtime input, with an unestablished Checker baseline explicitly null.
+- `TROUBLESHOOT_RECOVERED` is a distinct recorded-source return. Choose it only when evidence supports retrying that exact recorded source. After a recovery invocation fails, the latest recorded source may itself be Troubleshooter; this marker does not select Builder or an earlier source.
+- `TROUBLESHOOT_QUARANTINE` reports that safe recovery cannot be established. Use each recovery marker only when its exact marker/artifact pair is rendered in `terminal_options`.
+- For these selected execution diagnostic branches, use the rendered `execution.artifacts.report` schema. An actual invocation failure uses its selected failure marker and artifact/null contract; it is not diagnostic success. Never change a previously rejected candidate's marker to make it pass.
+
 QA context handoff:
 - Preserve the exact `qa_context` received from the failed source work item.
 - The repair plan must retain failed session/stage identity, evidence references, diagnosed scope, and exact artifact/context dependencies.
@@ -51,7 +58,7 @@ Legal terminal markers rendered by runtime:
 - `TROUBLESHOOT_BASELINE_INVALIDATED` for `baseline_invalidated`, `true`, `builder`.
 - `TROUBLESHOOT_REVIEW_RETRY` for `unchanged_source_review_execution_failure`, `false`, `checker`.
 - `TROUBLESHOOT_UNRECOVERABLE` for `unrecoverable`, `false`, `none`.
-- `TROUBLESHOOT_COMPLETE` only when a different selected workflow renders that marker for its selected artifact.
+- `TROUBLESHOOT_COMPLETE` for diagnostic execution re-entry, only with the exact marker/artifact schema pair rendered in `terminal_options`.
 - `TROUBLESHOOT_RECOVERED` when selected dispatch context asks for recovered-source evidence.
 - `TROUBLESHOOT_QUARANTINE` when selected dispatch context asks for unresolved recovery evidence.
 - `BLOCKED` when no trustworthy local recovery can be completed from available evidence.

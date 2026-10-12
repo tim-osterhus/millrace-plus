@@ -13,6 +13,7 @@ DIST_NAME = "millrace-plus"
 IMPORT_PACKAGE = "millrace_plus"
 RESOURCE_ROOT = "millrace_workflow_package"
 SKILL_ROOT = PROJECT_ROOT / "src" / "millrace_plus" / "skills"
+PACKAGE_VERSION = "0.22.4"
 
 
 def _member_paths() -> tuple[str, ...]:
@@ -97,7 +98,7 @@ def test_built_wheel_contains_official_package_data_and_no_runtime_package(
         }
 
     assert "Name: millrace-plus\n" in metadata
-    assert "Version: 0.22.3\n" in metadata
+    assert f"Version: {PACKAGE_VERSION}\n" in metadata
     assert "Requires-Dist:" not in metadata
     for member_path in _member_paths():
         assert f"{RESOURCE_ROOT}/{member_path}" in names
@@ -155,5 +156,5 @@ def test_installed_wheel_metadata_is_direct_install_data_only(
     metadata = _installed_distribution(target).metadata
 
     assert metadata["Name"] == DIST_NAME
-    assert metadata["Version"] == "0.22.3"
+    assert metadata["Version"] == PACKAGE_VERSION
     assert "Requires-Dist" not in metadata

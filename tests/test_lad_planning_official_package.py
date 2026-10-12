@@ -50,7 +50,7 @@ from support.public_runtime_fakes import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 PACKAGE_ID = "millrace.plus.official"
-PACKAGE_VERSION = "0.22.3"
+PACKAGE_VERSION = "0.22.4"
 WORKFLOW_ID = "planning.lad"
 _MECHANIC_ASSET_ID = "planning.entrypoints.lad_mechanic"
 _EXPECTED_MECHANIC_ASSET_BYTE_LENGTH = 7447

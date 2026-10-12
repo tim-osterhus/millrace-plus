@@ -52,20 +52,21 @@ which workflow behavior should be official.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:bed497ecd0d2d9b1d0e85d395a7d29c2659bdee04a3b2fbcf7c50ad9552e8c77",
-  "package_digest": "sha256:9adfe46d91fde8934c03a1d32334077a0aa11a7b992079bcde37a3b8f9daa116",
+  "manifest_digest": "sha256:12f4ee591fb5de5cd82928ffcc954aa5da3303dcd91ac80529290528153a8420",
+  "package_digest": "sha256:e96d643790f10416909b8170075f3aa55a8b80ad7bbb3b93c65db126069f80b0",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
-    "package_version": "0.22.3",
+    "package_version": "0.22.4",
     "package_format_version": "1"
   },
   "selected_workflow_fingerprints": {
-    "execution.lad@0.1": "sha256:4a75fa8706fd3847fa0d21040bc20b6e118335512c19be63364c35cab747fee4",
-    "execution.lad_integrator@0.1": "sha256:0d09a69b1b5727f79bd9b6a2c0cbc4f3f2841cf3da3e544055a9ec71a980bd8a",
-    "lad.full@0.1": "sha256:341d5509bff2f9485bdbd99f833e77f5124a056fb35da1e89078750f2a4daabf",
-    "planning.lad@0.1": "sha256:86dd199c912891ed681eaef337992f01c0a1e3f5d342ed25995f7d960dc11286",
-    "simple_loop@0.1": "sha256:84874233d00fbdc10baac2304f8eda9aa32501e6a16905de47f2dfd5c09b3b30",
-    "vendor_selection@0.1": "sha256:a904b1c5e32c9358ba59fcc2bd9259afc3d9b13f73014b466f86dafbc8012f7c"
+    "execution.lad@0.1": "sha256:30af2a74261f6b432f4be96991f5e482f0a723311b88f0d4a68fbea485295386",
+    "execution.lad_integrator@0.1": "sha256:a22eb9e2671fada39c90d9e22b5b2836fb1be441947d700081808d44fee1aff6",
+    "lad.full@0.1": "sha256:96ab3997afdc252d2c17224fb11c39a660e9dc723ab06a631eda1f9653c11bae",
+    "lad.full.pi@0.1": "sha256:3b7ad84101296c63838406f3bd15e4e285b045cc40938829cb81a01b2f61db10",
+    "planning.lad@0.1": "sha256:235ad62353f86deeea71a8bec6e17f38c9a295f2cabfa14786e543773d7557b5",
+    "simple_loop@0.1": "sha256:a1f731b32b25d116ba715e98d8b360c03c11bbb50d72eb722c557580defda9a3",
+    "vendor_selection@0.1": "sha256:447b6ef897a6cbfa662c47eb318b5be5fff673952471e7351bcd2df788b7221d"
   },
   "asset_pins": [
     {
@@ -100,7 +101,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "execution.entrypoints.lad_troubleshooter",
-      "content_digest": "sha256:cc9c35e0a78e627e572cd2eb183275fc4c1a9c4964201cc5e267e6a2c2f86d3c",
+      "content_digest": "sha256:2aeb6e65d0bf5beddb212dbb9cfb9eee6bab89d9943fd9ca69424e2955dd6860",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_troubleshooter.md"
     },
     {
@@ -140,13 +141,133 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "execution.skills.troubleshooter_core",
-      "content_digest": "sha256:c483243abe2afa86c447c47b16ada4b8d1a160147a5e4f95afa602be2899dc1b",
+      "content_digest": "sha256:7cc8d9a63fb6ed147c92fa57d4dcd4baf72211ddd18bc24fccab058ee052abb0",
       "package_path": "assets/workflows/execution.lad/skills/troubleshooter-core.md"
     },
     {
       "asset_id": "execution.skills.updater_core",
       "content_digest": "sha256:728998443904834ab25ca2f05da420b7d8b74f738fe506523df91902fefdbee2",
       "package_path": "assets/workflows/execution.lad/skills/updater-core.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.analyst",
+      "content_digest": "sha256:1a8a72e868c9bc60ac63ee76179d39df26d389ab8f4959674fa45a7440846102",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/analyst.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.curator",
+      "content_digest": "sha256:14fbd0ddb014104db989073ac1e7f0eab805eb5d909888561305eed43aebafdb",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/curator.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_arbiter",
+      "content_digest": "sha256:2fbfc809bb54d9879d5218bc071deb3b1ad21ea2e5bed5f9aefb3f2d07cc63a7",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_arbiter.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_auditor",
+      "content_digest": "sha256:c2555bf063ea538f1aac273304a4d6a3cdfdfb70a8cd9b4774a544545315fe66",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_auditor.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_builder",
+      "content_digest": "sha256:20f0723589c90cbc7cae75e874fed02bd31c99e2597a7bc877367068a3974969",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_builder.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_checker",
+      "content_digest": "sha256:c8555c9fb90e24f13a5ead98a1b220e382459be68c28534b4c29a7a6b290f188",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_checker.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_consultant",
+      "content_digest": "sha256:68c91494358e71ca78262b4204b5268a472cf85828ff6ecfe5ec4f95cd58b5ea",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_consultant.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_doublechecker",
+      "content_digest": "sha256:c93f7c1047fc21c61d1dbfbbfb45c892e651e74000c4cddb3e47571fa384b2f8",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_doublechecker.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_fixer",
+      "content_digest": "sha256:a4405c41660f149da1d6ef251b827027ff33e4bc393d8558e1a00b958242a1de",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_fixer.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_manager",
+      "content_digest": "sha256:c3b4388323830ea2db38df4c5ed56a43fa2100101a9cea5b2678bb3761771e16",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_manager.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_mechanic",
+      "content_digest": "sha256:39a8dbaca97797da5c6bb3299244c2815e9dd8b3c200b0c27ba2927580356beb",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_mechanic.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_planner",
+      "content_digest": "sha256:03abefb9757fa2132843a2c064ea240cf81da75e292200d16df2e2e5bd427784",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_planner.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_troubleshooter",
+      "content_digest": "sha256:857cb9c4c28f44e4a0904b30dfae2c6ef846482a8bd06dbb28dccb07716ac255",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_troubleshooter.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.lad_updater",
+      "content_digest": "sha256:f430435cc7bcf8faeb90e99bfb4a26a40d321d65ce9b0b0faea3cc4b76f51052",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_updater.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.librarian",
+      "content_digest": "sha256:89feab778400f10af216bc3feda97fea3b43d2252fd152234e96816740e61e02",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/librarian.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.professor",
+      "content_digest": "sha256:e34166eaa46570425f992f2e31a731664a9a920360760156986581b2e892b878",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/professor.md"
+    },
+    {
+      "asset_id": "lad.full.pi.entrypoints.recon",
+      "content_digest": "sha256:8b3fa5e4beb800f281677b789dbe7bdee8b6d89a871693b44d3d7fdee086d276",
+      "package_path": "assets/workflows/lad.full.pi/entrypoints/recon.md"
+    },
+    {
+      "asset_id": "lad.full.pi.skills.analyst_core",
+      "content_digest": "sha256:f76cfa870e43c03b610dedd9a579c694ed5297bc84d924159a6b4d3ed41d3796",
+      "package_path": "assets/workflows/lad.full.pi/skills/analyst-core.md"
+    },
+    {
+      "asset_id": "lad.full.pi.skills.auditor_core",
+      "content_digest": "sha256:625fab7dd62f382e84034606a58e4e843a803dc1f7b89d1123154198e90fa625",
+      "package_path": "assets/workflows/lad.full.pi/skills/auditor-core.md"
+    },
+    {
+      "asset_id": "lad.full.pi.skills.curator_core",
+      "content_digest": "sha256:874903f658750c36f1df6ec4c1fbd2de2d47e2a8d0f7a17c2a349ca4084ca8e8",
+      "package_path": "assets/workflows/lad.full.pi/skills/curator-core.md"
+    },
+    {
+      "asset_id": "lad.full.pi.skills.manager_core",
+      "content_digest": "sha256:8b9d0f1b4ab5b8121941f621dc114ad760aae52ea2274f6c8801c4e248b6d871",
+      "package_path": "assets/workflows/lad.full.pi/skills/manager-core.md"
+    },
+    {
+      "asset_id": "lad.full.pi.skills.mechanic_core",
+      "content_digest": "sha256:b3250fbe8b3585aeb8b497fda44b98940e1a7060a094c556f309e067f94549ec",
+      "package_path": "assets/workflows/lad.full.pi/skills/mechanic-core.md"
+    },
+    {
+      "asset_id": "lad.full.pi.skills.planner_core",
+      "content_digest": "sha256:60bb0960397d7a467b178c7224768011d0d19deaff857be599e70aa5bfa99395",
+      "package_path": "assets/workflows/lad.full.pi/skills/planner-core.md"
+    },
+    {
+      "asset_id": "lad.full.pi.skills.professor_core",
+      "content_digest": "sha256:af904988a9680bd9e19947507061147b39555241cf12b055dc235d24db1e2905",
+      "package_path": "assets/workflows/lad.full.pi/skills/professor-core.md"
     },
     {
       "asset_id": "learning.entrypoints.analyst",
@@ -247,6 +368,11 @@ which workflow behavior should be official.
       "asset_id": "planning.skills.recon_core",
       "content_digest": "sha256:835ea6d7b124a74a3bb0d331c4f8748d2f8fe12fe8cf85bc4ea169f61d9ff682",
       "package_path": "assets/workflows/planning.lad/skills/recon-core.md"
+    },
+    {
+      "asset_id": "runner.pi_rpc_terminal",
+      "content_digest": "sha256:4eff5bca352986fc1344f869c149df13f3e7a7324ec310aebc8f96f75d21df1c",
+      "package_path": "assets/runners/pi-rpc-terminal.md"
     },
     {
       "asset_id": "simple_loop.context_router",
@@ -387,3 +513,11 @@ which workflow behavior should be official.
 }
 ```
 <!-- manifest-freeze-evidence:END -->
+
+
+## Private candidate boundary
+
+The unpublished 0.22.4 package contains the opt-in private `lad.full.pi@0.1`
+variant alongside the six public workflows. Core owns runtime behavior; Plus
+contains package data and no CLI or provider code. Package identity checks do
+not establish actual-model qualification or publication.

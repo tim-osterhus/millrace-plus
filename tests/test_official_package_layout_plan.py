@@ -8,7 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "millrace_workflow_package"
 OFFICIAL_PACKAGE_ID = "millrace.plus.official"
 TEMPORARY_SCAFFOLD_PACKAGE_ID = "millrace.plus.scaffold"
-RELEASE_IDENTITY = "0.22.3"
+RELEASE_IDENTITY = "0.22.4"
 
 
 def _shipped_manifest() -> dict[str, object]:
@@ -86,8 +86,17 @@ def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
     assert package["package_id"] != TEMPORARY_SCAFFOLD_PACKAGE_ID
     assert package["package_role"] == "workflow_package"
     assert workflows
-    assert all(
+    assert sum(
         cast(dict[str, object], workflow)["visibility"] == "public"
+        for workflow in workflows
+    ) == 6
+    assert sum(
+        cast(dict[str, object], workflow)["visibility"] == "private"
+        for workflow in workflows
+    ) == 1
+    assert any(
+        cast(dict[str, object], workflow)["workflow_id"] == "lad.full.pi"
+        and cast(dict[str, object], workflow)["workflow_version"] == "0.1"
         for workflow in workflows
     )
     assert "plus_packet" not in metadata
