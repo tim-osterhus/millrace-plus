@@ -1851,11 +1851,11 @@
         },
         {
           "asset_id": "execution.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:2aeb6e65d0bf5beddb212dbb9cfb9eee6bab89d9943fd9ca69424e2955dd6860"
+          "content_digest": "sha256:444919e2e5637486ff4e9414734a285ca70eae21e942331165a9a58a2d75fb38"
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:7cc8d9a63fb6ed147c92fa57d4dcd4baf72211ddd18bc24fccab058ee052abb0"
+          "content_digest": "sha256:4a176a8600b0d3568f0dcfd1264a90c3bac084eb2bc86ddcae39f8a44a31abeb"
         },
         {
           "asset_id": "execution.entrypoints.lad_consultant",
@@ -2783,7 +2783,8 @@
               "execution.route_fixer_complete",
               "execution.route_doublechecker_pass",
               "execution.close_updater_complete",
-              "execution.return_troubleshooter_complete"
+              "execution.return_troubleshooter_complete",
+              "execution.route_consultant_complete"
             ],
             "return_action_ids": [
               "execution.return_troubleshooter_recovered"
@@ -2798,7 +2799,8 @@
               "execution.recover_fixer_runtime_failure",
               "execution.recover_doublechecker_runtime_failure",
               "execution.recover_updater_runtime_failure",
-              "execution.recover_troubleshooter_runtime_failure"
+              "execution.recover_troubleshooter_runtime_failure",
+              "execution.recover_consultant_runtime_failure"
             ],
             "threshold_behavior": "runtime_quarantine_at_threshold"
           }
@@ -2861,6 +2863,33 @@
                 "stage_kind_id": "lad_builder",
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_builder.runtime_failed_exhausted"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_builder_runtime_failure"
               }
             ]
           },
@@ -2928,6 +2957,33 @@
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_checker.runtime_failed_exhausted"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_checker_runtime_failure"
+              }
             ]
           },
           {
@@ -2987,6 +3043,33 @@
                 "stage_kind_id": "lad_fixer",
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_fixer.runtime_failed_exhausted"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_fixer_runtime_failure"
               }
             ]
           },
@@ -3054,6 +3137,33 @@
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_doublechecker.runtime_failed_exhausted"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              }
             ]
           },
           {
@@ -3113,6 +3223,33 @@
                 "stage_kind_id": "lad_updater",
                 "runner_result_id": "UPDATE_COMPLETE",
                 "outcome_id": "execution.lad_updater.complete"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_updater_runtime_failure"
               }
             ]
           },
@@ -3186,6 +3323,33 @@
                 "runner_result_id": "TROUBLESHOOT_RECOVERED",
                 "outcome_id": "execution.lad_troubleshooter.recovered"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              }
             ]
           },
           {
@@ -3251,6 +3415,33 @@
                 "stage_kind_id": "lad_consultant",
                 "runner_result_id": "NEEDS_PLANNING",
                 "outcome_id": "execution.lad_consultant.needs_plan"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_consultant_runtime_failure"
               }
             ]
           }
@@ -3477,7 +3668,8 @@
               "execution.lad_consultant.needs_plan",
               "execution.lad_consultant.blocked",
               "execution.lad_consultant.recovered",
-              "execution.lad_consultant.quarantine"
+              "execution.lad_consultant.quarantine",
+              "execution.lad_consultant.runtime_failed"
             ],
             "id": "lad_consultant",
             "input_queue_family_ids": [
@@ -4814,6 +5006,21 @@
               "display_name": "execution.close_troubleshooter_runtime_failure_exhausted"
             },
             "stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "id": "execution.recover_consultant_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "execution.lad_consultant.runtime_failed",
+            "presentation": {
+              "display_name": "execution.recover_consultant_runtime_failure"
+            },
+            "runner_binding_id": "lad_troubleshooter.millforge_runner",
+            "stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "target_stage_kind_id": "lad_troubleshooter"
           }
         ],
         "terminal_outcomes": [
@@ -5144,6 +5351,14 @@
               "display_name": "Troubleshooter runtime failure escalation"
             },
             "stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "id": "execution.lad_consultant.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Consultant runtime failure"
+            },
+            "stage_kind_id": "lad_consultant"
           }
         ],
         "wait_states": [
@@ -5240,11 +5455,11 @@
         },
         {
           "asset_id": "execution.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:2aeb6e65d0bf5beddb212dbb9cfb9eee6bab89d9943fd9ca69424e2955dd6860"
+          "content_digest": "sha256:444919e2e5637486ff4e9414734a285ca70eae21e942331165a9a58a2d75fb38"
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:7cc8d9a63fb6ed147c92fa57d4dcd4baf72211ddd18bc24fccab058ee052abb0"
+          "content_digest": "sha256:4a176a8600b0d3568f0dcfd1264a90c3bac084eb2bc86ddcae39f8a44a31abeb"
         },
         {
           "asset_id": "execution.entrypoints.lad_consultant",
@@ -6239,11 +6454,13 @@
             "recovery_stage_kind_id": "lad_troubleshooter",
             "reset_trigger_action_ids": [
               "execution.route_builder_complete",
+              "execution.route_integrator_complete",
               "execution.route_checker_pass",
               "execution.route_fixer_complete",
               "execution.route_doublechecker_pass",
               "execution.close_updater_complete",
-              "execution.return_troubleshooter_complete"
+              "execution.return_troubleshooter_complete",
+              "execution.route_consultant_complete"
             ],
             "return_action_ids": [
               "execution.return_troubleshooter_recovered"
@@ -6259,7 +6476,8 @@
               "execution.recover_fixer_runtime_failure",
               "execution.recover_doublechecker_runtime_failure",
               "execution.recover_updater_runtime_failure",
-              "execution.recover_troubleshooter_runtime_failure"
+              "execution.recover_troubleshooter_runtime_failure",
+              "execution.recover_consultant_runtime_failure"
             ],
             "threshold_behavior": "runtime_quarantine_at_threshold"
           }
@@ -6323,6 +6541,33 @@
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_builder.runtime_failed_exhausted"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_builder_runtime_failure"
+              }
             ]
           },
           {
@@ -6382,6 +6627,33 @@
                 "stage_kind_id": "lad_integrator",
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_integrator.runtime_failed_exhausted"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_integrator",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_integrator_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_integrator",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_integrator_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_integrator",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_integrator_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_integrator",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_integrator_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_integrator",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_integrator_runtime_failure"
               }
             ]
           },
@@ -6449,6 +6721,33 @@
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_checker.runtime_failed_exhausted"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_checker_runtime_failure"
+              }
             ]
           },
           {
@@ -6508,6 +6807,33 @@
                 "stage_kind_id": "lad_fixer",
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_fixer.runtime_failed_exhausted"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_fixer_runtime_failure"
               }
             ]
           },
@@ -6575,6 +6901,33 @@
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_doublechecker.runtime_failed_exhausted"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              }
             ]
           },
           {
@@ -6634,6 +6987,33 @@
                 "stage_kind_id": "lad_updater",
                 "runner_result_id": "UPDATE_COMPLETE",
                 "outcome_id": "execution.lad_updater.complete"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_updater_runtime_failure"
               }
             ]
           },
@@ -6707,6 +7087,33 @@
                 "runner_result_id": "TROUBLESHOOT_RECOVERED",
                 "outcome_id": "execution.lad_troubleshooter.recovered"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              }
             ]
           },
           {
@@ -6772,6 +7179,33 @@
                 "stage_kind_id": "lad_consultant",
                 "runner_result_id": "NEEDS_PLANNING",
                 "outcome_id": "execution.lad_consultant.needs_plan"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_consultant_runtime_failure"
               }
             ]
           }
@@ -7036,7 +7470,8 @@
               "execution.lad_consultant.needs_plan",
               "execution.lad_consultant.blocked",
               "execution.lad_consultant.recovered",
-              "execution.lad_consultant.quarantine"
+              "execution.lad_consultant.quarantine",
+              "execution.lad_consultant.runtime_failed"
             ],
             "id": "lad_consultant",
             "input_queue_family_ids": [
@@ -8511,6 +8946,21 @@
               "display_name": "execution.close_troubleshooter_runtime_failure_exhausted"
             },
             "stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "id": "execution.recover_consultant_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "execution.lad_consultant.runtime_failed",
+            "presentation": {
+              "display_name": "execution.recover_consultant_runtime_failure"
+            },
+            "runner_binding_id": "lad_troubleshooter.millforge_runner",
+            "stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad_integrator.troubleshooter.start",
+            "target_stage_kind_id": "lad_troubleshooter"
           }
         ],
         "terminal_outcomes": [
@@ -8881,6 +9331,14 @@
               "display_name": "Troubleshooter runtime failure escalation"
             },
             "stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "id": "execution.lad_consultant.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Consultant runtime failure"
+            },
+            "stage_kind_id": "lad_consultant"
           }
         ],
         "wait_states": [
@@ -8941,15 +9399,15 @@
         },
         {
           "asset_id": "planning.entrypoints.lad_manager",
-          "content_digest": "sha256:df6282f2762296119aa2a31b8e68997c6fcc40de0bd82fb96c910bb997399aef"
+          "content_digest": "sha256:b48b106bfe124940e96ccea8b95c6c122762b80376990284f6ae2c30b228d2ca"
         },
         {
           "asset_id": "planning.skills.manager_core",
-          "content_digest": "sha256:4a2743ab0211929f686eec48a2347f5053570e79acd9221955bbf5c2c25ad811"
+          "content_digest": "sha256:5669e37c99f4afba61e3a75f1a3bc17607d81467e4909cd78f7d0c9d54796f5c"
         },
         {
           "asset_id": "planning.entrypoints.lad_mechanic",
-          "content_digest": "sha256:163b18d2ec8db02319e1fbfd6eb3568fb1e6217c53832e9a6681c5341db155fc"
+          "content_digest": "sha256:79aeff093cfd5047e6cb213e9eca9600d5654dba8a8c6e3a256e2ed533b93224"
         },
         {
           "asset_id": "planning.skills.mechanic_core",
@@ -9013,11 +9471,11 @@
         },
         {
           "asset_id": "execution.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:2aeb6e65d0bf5beddb212dbb9cfb9eee6bab89d9943fd9ca69424e2955dd6860"
+          "content_digest": "sha256:444919e2e5637486ff4e9414734a285ca70eae21e942331165a9a58a2d75fb38"
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:7cc8d9a63fb6ed147c92fa57d4dcd4baf72211ddd18bc24fccab058ee052abb0"
+          "content_digest": "sha256:4a176a8600b0d3568f0dcfd1264a90c3bac084eb2bc86ddcae39f8a44a31abeb"
         },
         {
           "asset_id": "execution.entrypoints.lad_consultant",
@@ -9211,6 +9669,13 @@
                         "min_length": 1,
                         "type": "string"
                       },
+                      "depends_on_task_card_ids": {
+                        "items": {
+                          "min_length": 1,
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
                       "task_card_id": {
                         "min_length": 1,
                         "type": "string"
@@ -9223,7 +9688,8 @@
                     "required": [
                       "task_card_id",
                       "title",
-                      "body"
+                      "body",
+                      "depends_on_task_card_ids"
                     ],
                     "type": "object"
                   },
@@ -10294,8 +10760,12 @@
         "fanout_declarations": [
           {
             "dependency_policy": "depends_on_source_work_item",
+            "dependency_success_action_ids": [
+              "execution.close_updater_complete"
+            ],
             "duplicate_policy": "refuse",
             "id": "planning.manager.task_cards_to_execution",
+            "item_dependency_key": "depends_on_task_card_ids",
             "item_id_key": "task_card_id",
             "item_source_path": [
               "cards"
@@ -10854,7 +11324,8 @@
               "execution.route_fixer_complete",
               "execution.route_doublechecker_pass",
               "execution.close_updater_complete",
-              "execution.return_troubleshooter_complete"
+              "execution.return_troubleshooter_complete",
+              "execution.route_consultant_complete"
             ],
             "return_action_ids": [
               "execution.return_troubleshooter_recovered"
@@ -10869,7 +11340,48 @@
               "execution.recover_fixer_runtime_failure",
               "execution.recover_doublechecker_runtime_failure",
               "execution.recover_updater_runtime_failure",
-              "execution.recover_troubleshooter_runtime_failure"
+              "execution.recover_troubleshooter_runtime_failure",
+              "execution.recover_consultant_runtime_failure"
+            ],
+            "threshold_behavior": "runtime_quarantine_at_threshold"
+          },
+          {
+            "attempt_scope": "lineage",
+            "cooldown_starts_at_attempt": 2,
+            "cooldown_wait_state_id": "planning.runtime_failure_recovery.cooldown",
+            "default_cooldown_seconds": 900,
+            "id": "planning.runtime_failure_recovery",
+            "immediate_recovery_limit": 1,
+            "quarantine_action_ids": [
+              "planning.quarantine_mechanic_blocked"
+            ],
+            "quarantine_threshold_attempt": 3,
+            "recorded_source_selector": "latest_recovery_attempt_for_lineage",
+            "recovery_stage_kind_id": "lad_mechanic",
+            "reset_trigger_action_ids": [
+              "planning.recon_enqueue_task",
+              "planning.recon_enqueue_spec",
+              "planning.recon_noop",
+              "planning.route_planner_complete",
+              "planning.close_manager_complete",
+              "planning.route_mechanic_complete",
+              "planning.route_auditor_complete",
+              "planning.close_arbiter_complete"
+            ],
+            "return_action_ids": [
+              "planning.return_mechanic_recovered"
+            ],
+            "return_allowed_phases": [
+              "active_recovery",
+              "quarantine_eligible"
+            ],
+            "source_recovery_action_ids": [
+              "planning.recover_recon_runtime_failure",
+              "planning.recover_planner_runtime_failure",
+              "planning.recover_manager_runtime_failure",
+              "planning.recover_mechanic_runtime_failure",
+              "planning.recover_auditor_runtime_failure",
+              "planning.recover_arbiter_runtime_failure"
             ],
             "threshold_behavior": "runtime_quarantine_at_threshold"
           }
@@ -10958,6 +11470,33 @@
                 "runner_result_id": "RECON_TO_PLANNING",
                 "outcome_id": "planning.recon.to_planning"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_recon_runtime_failure"
+              }
             ]
           },
           {
@@ -11006,6 +11545,33 @@
                 "runner_result_id": "PLANNER_COMPLETE",
                 "outcome_id": "planning.lad_planner.complete"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_planner_runtime_failure"
+              }
             ]
           },
           {
@@ -11053,6 +11619,33 @@
                 "stage_kind_id": "lad_manager",
                 "runner_result_id": "MANAGER_COMPLETE",
                 "outcome_id": "planning.lad_manager.complete"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_manager_runtime_failure"
               }
             ]
           },
@@ -11114,6 +11707,33 @@
                 "runner_result_id": "MECHANIC_RECOVERED",
                 "outcome_id": "planning.lad_mechanic.recovered"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              }
             ]
           },
           {
@@ -11161,6 +11781,33 @@
                 "stage_kind_id": "lad_auditor",
                 "runner_result_id": "BLOCKED",
                 "outcome_id": "planning.lad_auditor.blocked"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_auditor_runtime_failure"
               }
             ]
           },
@@ -11216,6 +11863,33 @@
                 "stage_kind_id": "lad_arbiter",
                 "runner_result_id": "REMEDIATION_NEEDED",
                 "outcome_id": "planning.lad_arbiter.remediation_needed"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_arbiter_runtime_failure"
               }
             ]
           },
@@ -11276,6 +11950,33 @@
                 "stage_kind_id": "lad_builder",
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_builder.runtime_failed_exhausted"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_builder_runtime_failure"
               }
             ]
           },
@@ -11343,6 +12044,33 @@
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_checker.runtime_failed_exhausted"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_checker_runtime_failure"
+              }
             ]
           },
           {
@@ -11402,6 +12130,33 @@
                 "stage_kind_id": "lad_fixer",
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_fixer.runtime_failed_exhausted"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_fixer_runtime_failure"
               }
             ]
           },
@@ -11469,6 +12224,33 @@
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_doublechecker.runtime_failed_exhausted"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              }
             ]
           },
           {
@@ -11528,6 +12310,33 @@
                 "stage_kind_id": "lad_updater",
                 "runner_result_id": "UPDATE_COMPLETE",
                 "outcome_id": "execution.lad_updater.complete"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_updater_runtime_failure"
               }
             ]
           },
@@ -11601,6 +12410,33 @@
                 "runner_result_id": "TROUBLESHOOT_RECOVERED",
                 "outcome_id": "execution.lad_troubleshooter.recovered"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              }
             ]
           },
           {
@@ -11667,6 +12503,33 @@
                 "runner_result_id": "NEEDS_PLANNING",
                 "outcome_id": "execution.lad_consultant.needs_plan"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              }
             ]
           }
         ],
@@ -11689,7 +12552,8 @@
               "planning.recon.to_planning",
               "planning.recon.noop",
               "planning.recon.recon_blocked",
-              "planning.recon.blocked"
+              "planning.recon.blocked",
+              "planning.recon.runtime_failed"
             ],
             "id": "recon",
             "input_queue_family_ids": [
@@ -11727,7 +12591,8 @@
             "declared_outcome_ids": [
               "planning.lad_planner.complete",
               "planning.lad_planner.blocked",
-              "planning.lad_planner.blocked_threshold_recovery"
+              "planning.lad_planner.blocked_threshold_recovery",
+              "planning.lad_planner.runtime_failed"
             ],
             "id": "lad_planner",
             "input_queue_family_ids": [
@@ -11762,7 +12627,8 @@
             "declared_outcome_ids": [
               "planning.lad_manager.complete",
               "planning.lad_manager.blocked",
-              "planning.lad_manager.blocked_threshold_recovery"
+              "planning.lad_manager.blocked_threshold_recovery",
+              "planning.lad_manager.runtime_failed"
             ],
             "id": "lad_manager",
             "input_queue_family_ids": [
@@ -11796,7 +12662,8 @@
               "planning.lad_mechanic.blocked",
               "planning.lad_mechanic.blocked_threshold_recovery",
               "planning.lad_mechanic.recovered",
-              "planning.lad_mechanic.quarantine"
+              "planning.lad_mechanic.quarantine",
+              "planning.lad_mechanic.runtime_failed"
             ],
             "id": "lad_mechanic",
             "input_queue_family_ids": [
@@ -11828,7 +12695,8 @@
             "declared_outcome_ids": [
               "planning.lad_auditor.complete",
               "planning.lad_auditor.blocked",
-              "planning.lad_auditor.blocked_threshold_recovery"
+              "planning.lad_auditor.blocked_threshold_recovery",
+              "planning.lad_auditor.runtime_failed"
             ],
             "id": "lad_auditor",
             "input_queue_family_ids": [
@@ -11860,7 +12728,8 @@
             "declared_outcome_ids": [
               "planning.lad_arbiter.complete",
               "planning.lad_arbiter.remediation_needed",
-              "planning.lad_arbiter.blocked"
+              "planning.lad_arbiter.blocked",
+              "planning.lad_arbiter.runtime_failed"
             ],
             "id": "lad_arbiter",
             "input_queue_family_ids": [
@@ -12100,7 +12969,8 @@
               "execution.lad_consultant.needs_plan",
               "execution.lad_consultant.blocked",
               "execution.lad_consultant.recovered",
-              "execution.lad_consultant.quarantine"
+              "execution.lad_consultant.quarantine",
+              "execution.lad_consultant.runtime_failed"
             ],
             "id": "lad_consultant",
             "input_queue_family_ids": [
@@ -13807,6 +14677,111 @@
               "display_name": "execution.close_troubleshooter_runtime_failure_exhausted"
             },
             "stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "id": "execution.recover_consultant_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "execution.lad_consultant.runtime_failed",
+            "presentation": {
+              "display_name": "execution.recover_consultant_runtime_failure"
+            },
+            "runner_binding_id": "lad_troubleshooter.millforge_runner",
+            "stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "target_stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_recon_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.recon.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_recon_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "recon",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_planner_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_planner.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_planner_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_planner",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_manager_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_manager.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_manager_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_manager",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_mechanic_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_mechanic.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_mechanic_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_auditor_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_auditor.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_auditor_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_auditor",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_arbiter_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_arbiter.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_arbiter_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_arbiter",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
           }
         ],
         "terminal_outcomes": [
@@ -14313,6 +15288,62 @@
               "display_name": "Troubleshooter runtime failure escalation"
             },
             "stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "id": "execution.lad_consultant.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Consultant runtime failure"
+            },
+            "stage_kind_id": "lad_consultant"
+          },
+          {
+            "id": "planning.recon.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Recon runtime failure"
+            },
+            "stage_kind_id": "recon"
+          },
+          {
+            "id": "planning.lad_planner.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Planner runtime failure"
+            },
+            "stage_kind_id": "lad_planner"
+          },
+          {
+            "id": "planning.lad_manager.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Manager runtime failure"
+            },
+            "stage_kind_id": "lad_manager"
+          },
+          {
+            "id": "planning.lad_mechanic.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Mechanic runtime failure"
+            },
+            "stage_kind_id": "lad_mechanic"
+          },
+          {
+            "id": "planning.lad_auditor.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Auditor runtime failure"
+            },
+            "stage_kind_id": "lad_auditor"
+          },
+          {
+            "id": "planning.lad_arbiter.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Arbiter runtime failure"
+            },
+            "stage_kind_id": "lad_arbiter"
           }
         ],
         "wait_states": [
@@ -14342,6 +15373,13 @@
             "id": "execution.runtime_failure_recovery.cooldown",
             "kind": "timer",
             "policy_id": "execution.runtime_failure_recovery",
+            "starts_at_attempt": 2
+          },
+          {
+            "duration_seconds": 900,
+            "id": "planning.runtime_failure_recovery.cooldown",
+            "kind": "timer",
+            "policy_id": "planning.runtime_failure_recovery",
             "starts_at_attempt": 2
           }
         ],
@@ -14380,15 +15418,15 @@
         },
         {
           "asset_id": "planning.entrypoints.lad_manager",
-          "content_digest": "sha256:df6282f2762296119aa2a31b8e68997c6fcc40de0bd82fb96c910bb997399aef"
+          "content_digest": "sha256:b48b106bfe124940e96ccea8b95c6c122762b80376990284f6ae2c30b228d2ca"
         },
         {
           "asset_id": "planning.skills.manager_core",
-          "content_digest": "sha256:4a2743ab0211929f686eec48a2347f5053570e79acd9221955bbf5c2c25ad811"
+          "content_digest": "sha256:5669e37c99f4afba61e3a75f1a3bc17607d81467e4909cd78f7d0c9d54796f5c"
         },
         {
           "asset_id": "planning.entrypoints.lad_mechanic",
-          "content_digest": "sha256:163b18d2ec8db02319e1fbfd6eb3568fb1e6217c53832e9a6681c5341db155fc"
+          "content_digest": "sha256:79aeff093cfd5047e6cb213e9eca9600d5654dba8a8c6e3a256e2ed533b93224"
         },
         {
           "asset_id": "planning.skills.mechanic_core",
@@ -14452,11 +15490,11 @@
         },
         {
           "asset_id": "execution.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:2aeb6e65d0bf5beddb212dbb9cfb9eee6bab89d9943fd9ca69424e2955dd6860"
+          "content_digest": "sha256:444919e2e5637486ff4e9414734a285ca70eae21e942331165a9a58a2d75fb38"
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:7cc8d9a63fb6ed147c92fa57d4dcd4baf72211ddd18bc24fccab058ee052abb0"
+          "content_digest": "sha256:4a176a8600b0d3568f0dcfd1264a90c3bac084eb2bc86ddcae39f8a44a31abeb"
         },
         {
           "asset_id": "execution.entrypoints.lad_consultant",
@@ -14734,6 +15772,13 @@
                         "min_length": 1,
                         "type": "string"
                       },
+                      "depends_on_task_card_ids": {
+                        "items": {
+                          "min_length": 1,
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
                       "task_card_id": {
                         "min_length": 1,
                         "type": "string"
@@ -14746,7 +15791,8 @@
                     "required": [
                       "task_card_id",
                       "title",
-                      "body"
+                      "body",
+                      "depends_on_task_card_ids"
                     ],
                     "type": "object"
                   },
@@ -16353,8 +17399,12 @@
         "fanout_declarations": [
           {
             "dependency_policy": "depends_on_source_work_item",
+            "dependency_success_action_ids": [
+              "execution.close_updater_complete"
+            ],
             "duplicate_policy": "refuse",
             "id": "planning.manager.task_cards_to_execution",
+            "item_dependency_key": "depends_on_task_card_ids",
             "item_id_key": "task_card_id",
             "item_source_path": [
               "cards"
@@ -17315,7 +18365,8 @@
               "execution.route_fixer_complete",
               "execution.route_doublechecker_pass",
               "execution.close_updater_complete",
-              "execution.return_troubleshooter_complete"
+              "execution.return_troubleshooter_complete",
+              "execution.route_consultant_complete"
             ],
             "return_action_ids": [
               "execution.return_troubleshooter_recovered"
@@ -17330,7 +18381,48 @@
               "execution.recover_fixer_runtime_failure",
               "execution.recover_doublechecker_runtime_failure",
               "execution.recover_updater_runtime_failure",
-              "execution.recover_troubleshooter_runtime_failure"
+              "execution.recover_troubleshooter_runtime_failure",
+              "execution.recover_consultant_runtime_failure"
+            ],
+            "threshold_behavior": "runtime_quarantine_at_threshold"
+          },
+          {
+            "attempt_scope": "lineage",
+            "cooldown_starts_at_attempt": 2,
+            "cooldown_wait_state_id": "planning.runtime_failure_recovery.cooldown",
+            "default_cooldown_seconds": 900,
+            "id": "planning.runtime_failure_recovery",
+            "immediate_recovery_limit": 1,
+            "quarantine_action_ids": [
+              "planning.quarantine_mechanic_blocked"
+            ],
+            "quarantine_threshold_attempt": 3,
+            "recorded_source_selector": "latest_recovery_attempt_for_lineage",
+            "recovery_stage_kind_id": "lad_mechanic",
+            "reset_trigger_action_ids": [
+              "planning.recon_enqueue_task",
+              "planning.recon_enqueue_spec",
+              "planning.recon_noop",
+              "planning.route_planner_complete",
+              "planning.close_manager_complete",
+              "planning.route_mechanic_complete",
+              "planning.route_auditor_complete",
+              "planning.close_arbiter_complete"
+            ],
+            "return_action_ids": [
+              "planning.return_mechanic_recovered"
+            ],
+            "return_allowed_phases": [
+              "active_recovery",
+              "quarantine_eligible"
+            ],
+            "source_recovery_action_ids": [
+              "planning.recover_recon_runtime_failure",
+              "planning.recover_planner_runtime_failure",
+              "planning.recover_manager_runtime_failure",
+              "planning.recover_mechanic_runtime_failure",
+              "planning.recover_auditor_runtime_failure",
+              "planning.recover_arbiter_runtime_failure"
             ],
             "threshold_behavior": "runtime_quarantine_at_threshold"
           }
@@ -17419,6 +18511,33 @@
                 "runner_result_id": "RECON_TO_PLANNING",
                 "outcome_id": "planning.recon.to_planning"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_recon_runtime_failure"
+              }
             ]
           },
           {
@@ -17467,6 +18586,33 @@
                 "runner_result_id": "PLANNER_COMPLETE",
                 "outcome_id": "planning.lad_planner.complete"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_planner_runtime_failure"
+              }
             ]
           },
           {
@@ -17514,6 +18660,33 @@
                 "stage_kind_id": "lad_manager",
                 "runner_result_id": "MANAGER_COMPLETE",
                 "outcome_id": "planning.lad_manager.complete"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_manager_runtime_failure"
               }
             ]
           },
@@ -17575,6 +18748,33 @@
                 "runner_result_id": "MECHANIC_RECOVERED",
                 "outcome_id": "planning.lad_mechanic.recovered"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              }
             ]
           },
           {
@@ -17622,6 +18822,33 @@
                 "stage_kind_id": "lad_auditor",
                 "runner_result_id": "BLOCKED",
                 "outcome_id": "planning.lad_auditor.blocked"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_auditor_runtime_failure"
               }
             ]
           },
@@ -17677,6 +18904,33 @@
                 "stage_kind_id": "lad_arbiter",
                 "runner_result_id": "REMEDIATION_NEEDED",
                 "outcome_id": "planning.lad_arbiter.remediation_needed"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_arbiter_runtime_failure"
               }
             ]
           },
@@ -17737,6 +18991,33 @@
                 "stage_kind_id": "lad_builder",
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_builder.runtime_failed_exhausted"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_builder_runtime_failure"
               }
             ]
           },
@@ -17804,6 +19085,33 @@
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_checker.runtime_failed_exhausted"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_checker_runtime_failure"
+              }
             ]
           },
           {
@@ -17863,6 +19171,33 @@
                 "stage_kind_id": "lad_fixer",
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_fixer.runtime_failed_exhausted"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_fixer_runtime_failure"
               }
             ]
           },
@@ -17930,6 +19265,33 @@
                 "runner_result_id": "RUNTIME_FAILURE_ESCALATE",
                 "outcome_id": "execution.lad_doublechecker.runtime_failed_exhausted"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              }
             ]
           },
           {
@@ -17989,6 +19351,33 @@
                 "stage_kind_id": "lad_updater",
                 "runner_result_id": "UPDATE_COMPLETE",
                 "outcome_id": "execution.lad_updater.complete"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_updater_runtime_failure"
               }
             ]
           },
@@ -18062,6 +19451,33 @@
                 "runner_result_id": "TROUBLESHOOT_RECOVERED",
                 "outcome_id": "execution.lad_troubleshooter.recovered"
               }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              }
             ]
           },
           {
@@ -18127,6 +19543,33 @@
                 "stage_kind_id": "lad_consultant",
                 "runner_result_id": "NEEDS_PLANNING",
                 "outcome_id": "execution.lad_consultant.needs_plan"
+              }
+            ],
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_consultant_runtime_failure"
               }
             ]
           },
@@ -18366,7 +19809,8 @@
               "planning.recon.to_planning",
               "planning.recon.noop",
               "planning.recon.recon_blocked",
-              "planning.recon.blocked"
+              "planning.recon.blocked",
+              "planning.recon.runtime_failed"
             ],
             "id": "recon",
             "input_queue_family_ids": [
@@ -18404,7 +19848,8 @@
             "declared_outcome_ids": [
               "planning.lad_planner.complete",
               "planning.lad_planner.blocked",
-              "planning.lad_planner.blocked_threshold_recovery"
+              "planning.lad_planner.blocked_threshold_recovery",
+              "planning.lad_planner.runtime_failed"
             ],
             "id": "lad_planner",
             "input_queue_family_ids": [
@@ -18439,7 +19884,8 @@
             "declared_outcome_ids": [
               "planning.lad_manager.complete",
               "planning.lad_manager.blocked",
-              "planning.lad_manager.blocked_threshold_recovery"
+              "planning.lad_manager.blocked_threshold_recovery",
+              "planning.lad_manager.runtime_failed"
             ],
             "id": "lad_manager",
             "input_queue_family_ids": [
@@ -18473,7 +19919,8 @@
               "planning.lad_mechanic.blocked",
               "planning.lad_mechanic.blocked_threshold_recovery",
               "planning.lad_mechanic.recovered",
-              "planning.lad_mechanic.quarantine"
+              "planning.lad_mechanic.quarantine",
+              "planning.lad_mechanic.runtime_failed"
             ],
             "id": "lad_mechanic",
             "input_queue_family_ids": [
@@ -18505,7 +19952,8 @@
             "declared_outcome_ids": [
               "planning.lad_auditor.complete",
               "planning.lad_auditor.blocked",
-              "planning.lad_auditor.blocked_threshold_recovery"
+              "planning.lad_auditor.blocked_threshold_recovery",
+              "planning.lad_auditor.runtime_failed"
             ],
             "id": "lad_auditor",
             "input_queue_family_ids": [
@@ -18537,7 +19985,8 @@
             "declared_outcome_ids": [
               "planning.lad_arbiter.complete",
               "planning.lad_arbiter.remediation_needed",
-              "planning.lad_arbiter.blocked"
+              "planning.lad_arbiter.blocked",
+              "planning.lad_arbiter.runtime_failed"
             ],
             "id": "lad_arbiter",
             "input_queue_family_ids": [
@@ -18777,7 +20226,8 @@
               "execution.lad_consultant.needs_plan",
               "execution.lad_consultant.blocked",
               "execution.lad_consultant.recovered",
-              "execution.lad_consultant.quarantine"
+              "execution.lad_consultant.quarantine",
+              "execution.lad_consultant.runtime_failed"
             ],
             "id": "lad_consultant",
             "input_queue_family_ids": [
@@ -20771,6 +22221,111 @@
               "display_name": "learning.close_librarian_blocked"
             },
             "stage_kind_id": "librarian"
+          },
+          {
+            "asset_ids": [
+              "execution.entrypoints.lad_troubleshooter"
+            ],
+            "id": "execution.recover_consultant_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "execution.lad_consultant.runtime_failed",
+            "presentation": {
+              "display_name": "execution.recover_consultant_runtime_failure"
+            },
+            "runner_binding_id": "lad_troubleshooter.millforge_runner",
+            "stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "target_stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_recon_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.recon.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_recon_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "recon",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_planner_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_planner.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_planner_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_planner",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_manager_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_manager.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_manager_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_manager",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_mechanic_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_mechanic.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_mechanic_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_auditor_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_auditor.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_auditor_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_auditor",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "planning.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_arbiter_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_arbiter.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_arbiter_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_arbiter",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
           }
         ],
         "terminal_outcomes": [
@@ -21373,6 +22928,62 @@
               "display_name": "BLOCKED"
             },
             "stage_kind_id": "librarian"
+          },
+          {
+            "id": "execution.lad_consultant.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Consultant runtime failure"
+            },
+            "stage_kind_id": "lad_consultant"
+          },
+          {
+            "id": "planning.recon.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Recon runtime failure"
+            },
+            "stage_kind_id": "recon"
+          },
+          {
+            "id": "planning.lad_planner.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Planner runtime failure"
+            },
+            "stage_kind_id": "lad_planner"
+          },
+          {
+            "id": "planning.lad_manager.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Manager runtime failure"
+            },
+            "stage_kind_id": "lad_manager"
+          },
+          {
+            "id": "planning.lad_mechanic.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Mechanic runtime failure"
+            },
+            "stage_kind_id": "lad_mechanic"
+          },
+          {
+            "id": "planning.lad_auditor.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Auditor runtime failure"
+            },
+            "stage_kind_id": "lad_auditor"
+          },
+          {
+            "id": "planning.lad_arbiter.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Arbiter runtime failure"
+            },
+            "stage_kind_id": "lad_arbiter"
           }
         ],
         "wait_states": [
@@ -21402,6 +23013,13 @@
             "id": "execution.runtime_failure_recovery.cooldown",
             "kind": "timer",
             "policy_id": "execution.runtime_failure_recovery",
+            "starts_at_attempt": 2
+          },
+          {
+            "duration_seconds": 900,
+            "id": "planning.runtime_failure_recovery.cooldown",
+            "kind": "timer",
+            "policy_id": "planning.runtime_failure_recovery",
             "starts_at_attempt": 2
           }
         ],
@@ -23528,6 +25146,1297 @@
       ],
       "required_assets": [
         {
+          "asset_id": "demo.entrypoint",
+          "content_digest": "sha256:852f76b8cbac16c5ef1e9584d064c3ab4a4a5b8e521a42c54badb7cb84aceef4"
+        },
+        {
+          "asset_id": "demo.stages",
+          "content_digest": "sha256:6bd801d959ba9dd107fcafa0f2a4f3658774a5ff401f948fbbc8e0602f55c80a"
+        }
+      ],
+      "selected_authority": {
+        "lineage_policy": "root_from_external_enqueue",
+        "workflow": {
+          "id": "demo",
+          "version": "0.1",
+          "name": "Zero-key demo",
+          "compatibility_profile": null,
+          "required_extensions": []
+        },
+        "graphs": [
+          {
+            "id": "demo.graph",
+            "node_ids": [
+              "demo.intake",
+              "demo.producer_a",
+              "demo.producer_b",
+              "demo.verify_first",
+              "demo.repair",
+              "demo.verify_pass",
+              "demo.wait",
+              "demo.revise",
+              "demo.close"
+            ],
+            "presentation": {
+              "display_name": "Demo decision tree"
+            }
+          }
+        ],
+        "partitions": [
+          {
+            "id": "demo",
+            "kind": "plane",
+            "presentation": {
+              "display_name": "Synthetic demo"
+            }
+          }
+        ],
+        "queue_families": [
+          {
+            "id": "intake",
+            "external_enqueue": true,
+            "presentation": {
+              "display_name": "intake"
+            }
+          },
+          {
+            "id": "producer_a",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "producer_a"
+            }
+          },
+          {
+            "id": "producer_b",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "producer_b"
+            }
+          },
+          {
+            "id": "verify_first",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "verify_first"
+            }
+          },
+          {
+            "id": "repair",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "repair"
+            }
+          },
+          {
+            "id": "verify_pass",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "verify_pass"
+            }
+          },
+          {
+            "id": "wait",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "wait"
+            }
+          },
+          {
+            "id": "revise",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "revise"
+            }
+          },
+          {
+            "id": "close",
+            "external_enqueue": false,
+            "presentation": {
+              "display_name": "close"
+            }
+          }
+        ],
+        "external_enqueue_routes": [
+          {
+            "id": "intake",
+            "queue_family_id": "intake",
+            "graph_node_id": "demo.intake",
+            "stage_kind_id": "intake",
+            "runner_binding_id": "demo.runner",
+            "payload_schema_id": "evidence"
+          }
+        ],
+        "generated_work_routes": [
+          {
+            "id": "producer_a",
+            "queue_family_id": "producer_a",
+            "graph_node_id": "demo.producer_a",
+            "stage_kind_id": "producer_a",
+            "runner_binding_id": "demo.runner",
+            "payload_schema_id": "evidence"
+          },
+          {
+            "id": "producer_b",
+            "queue_family_id": "producer_b",
+            "graph_node_id": "demo.producer_b",
+            "stage_kind_id": "producer_b",
+            "runner_binding_id": "demo.runner",
+            "payload_schema_id": "evidence"
+          },
+          {
+            "id": "verify_first",
+            "queue_family_id": "verify_first",
+            "graph_node_id": "demo.verify_first",
+            "stage_kind_id": "verify_first",
+            "runner_binding_id": "demo.runner",
+            "payload_schema_id": "packet"
+          },
+          {
+            "id": "repair",
+            "queue_family_id": "repair",
+            "graph_node_id": "demo.repair",
+            "stage_kind_id": "repair",
+            "runner_binding_id": "demo.runner",
+            "payload_schema_id": "evidence"
+          },
+          {
+            "id": "verify_pass",
+            "queue_family_id": "verify_pass",
+            "graph_node_id": "demo.verify_pass",
+            "stage_kind_id": "verify_pass",
+            "runner_binding_id": "demo.runner",
+            "payload_schema_id": "evidence"
+          },
+          {
+            "id": "wait",
+            "queue_family_id": "wait",
+            "graph_node_id": "demo.wait",
+            "stage_kind_id": "wait",
+            "runner_binding_id": "demo.runner",
+            "payload_schema_id": "evidence"
+          },
+          {
+            "id": "revise",
+            "queue_family_id": "revise",
+            "graph_node_id": "demo.revise",
+            "stage_kind_id": "revise",
+            "runner_binding_id": "demo.runner",
+            "payload_schema_id": "evidence"
+          },
+          {
+            "id": "close",
+            "queue_family_id": "close",
+            "graph_node_id": "demo.close",
+            "stage_kind_id": "close",
+            "runner_binding_id": "demo.runner",
+            "payload_schema_id": "evidence"
+          }
+        ],
+        "artifact_schemas": [
+          {
+            "id": "packet",
+            "schema": {
+              "type": "object",
+              "required": [
+                "synthetic",
+                "bundle_id",
+                "items"
+              ],
+              "properties": {
+                "synthetic": {
+                  "const": true
+                },
+                "bundle_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "check_state": {
+                  "enum": [
+                    "defective",
+                    "corrected",
+                    "passed",
+                    "confirmed",
+                    "revised"
+                  ]
+                },
+                "items": {
+                  "type": "array",
+                  "min_items": 1,
+                  "max_items": 1,
+                  "unique_by": "item_id",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "item_id"
+                    ],
+                    "properties": {
+                      "item_id": {
+                        "type": "string",
+                        "min_length": 1
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "packet"
+            }
+          },
+          {
+            "id": "branch_a",
+            "schema": {
+              "type": "object",
+              "required": [
+                "synthetic",
+                "bundle_id"
+              ],
+              "properties": {
+                "synthetic": {
+                  "const": true
+                },
+                "bundle_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "check_state": {
+                  "enum": [
+                    "defective",
+                    "corrected",
+                    "passed",
+                    "confirmed",
+                    "revised"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "branch_a"
+            }
+          },
+          {
+            "id": "branch_b",
+            "schema": {
+              "type": "object",
+              "required": [
+                "synthetic",
+                "bundle_id"
+              ],
+              "properties": {
+                "synthetic": {
+                  "const": true
+                },
+                "bundle_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "check_state": {
+                  "enum": [
+                    "defective",
+                    "corrected",
+                    "passed",
+                    "confirmed",
+                    "revised"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "branch_b"
+            }
+          },
+          {
+            "id": "evidence",
+            "schema": {
+              "type": "object",
+              "required": [
+                "synthetic",
+                "bundle_id"
+              ],
+              "properties": {
+                "synthetic": {
+                  "const": true
+                },
+                "bundle_id": {
+                  "type": "string",
+                  "min_length": 1
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "check_state": {
+                  "enum": [
+                    "defective",
+                    "corrected",
+                    "passed",
+                    "confirmed",
+                    "revised"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "display_name": "evidence"
+            }
+          },
+          {
+            "id": "writeback",
+            "presentation": {
+              "display_name": "Context update report schema"
+            },
+            "schema": {
+              "type": "object",
+              "required": [
+                "changes",
+                "proposals"
+              ],
+              "properties": {
+                "changes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "path",
+                      "change_kind",
+                      "evidence_refs",
+                      "classification"
+                    ],
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "change_kind": {
+                        "enum": [
+                          "create",
+                          "modify",
+                          "delete"
+                        ]
+                      },
+                      "before_sha256": {
+                        "type": "string"
+                      },
+                      "after_sha256": {
+                        "type": "string"
+                      },
+                      "evidence_refs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "classification": {
+                        "const": "direct_write"
+                      }
+                    }
+                  }
+                },
+                "proposals": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "path",
+                      "proposed_content",
+                      "proposed_content_sha256",
+                      "evidence_refs",
+                      "classification"
+                    ],
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "proposed_content": {
+                        "type": "string"
+                      },
+                      "proposed_content_sha256": {
+                        "type": "string"
+                      },
+                      "evidence_refs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "classification": {
+                        "const": "protected_proposal"
+                      }
+                    }
+                  }
+                },
+                "no_op_reason": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "stage_kinds": [
+          {
+            "id": "intake",
+            "partition_id": "demo",
+            "runner_binding_id": "demo.runner",
+            "input_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "output_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "artifact_schema_ids": [
+              "packet",
+              "branch_a",
+              "branch_b",
+              "evidence",
+              "writeback"
+            ],
+            "asset_ids": [
+              "demo.entrypoint",
+              "demo.stages"
+            ],
+            "declared_outcome_ids": [
+              "demo.intake.fanout"
+            ],
+            "presentation": {
+              "display_name": "intake"
+            }
+          },
+          {
+            "id": "producer_a",
+            "partition_id": "demo",
+            "runner_binding_id": "demo.runner",
+            "input_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "output_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "artifact_schema_ids": [
+              "packet",
+              "branch_a",
+              "branch_b",
+              "evidence",
+              "writeback"
+            ],
+            "asset_ids": [
+              "demo.entrypoint",
+              "demo.stages"
+            ],
+            "declared_outcome_ids": [
+              "demo.producer_a.artifact_a"
+            ],
+            "presentation": {
+              "display_name": "producer_a"
+            }
+          },
+          {
+            "id": "producer_b",
+            "partition_id": "demo",
+            "runner_binding_id": "demo.runner",
+            "input_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "output_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "artifact_schema_ids": [
+              "packet",
+              "branch_a",
+              "branch_b",
+              "evidence",
+              "writeback"
+            ],
+            "asset_ids": [
+              "demo.entrypoint",
+              "demo.stages"
+            ],
+            "declared_outcome_ids": [
+              "demo.producer_b.artifact_b"
+            ],
+            "presentation": {
+              "display_name": "producer_b"
+            }
+          },
+          {
+            "id": "verify_first",
+            "partition_id": "demo",
+            "runner_binding_id": "demo.runner",
+            "input_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "output_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "artifact_schema_ids": [
+              "packet",
+              "branch_a",
+              "branch_b",
+              "evidence",
+              "writeback"
+            ],
+            "asset_ids": [
+              "demo.entrypoint",
+              "demo.stages"
+            ],
+            "declared_outcome_ids": [
+              "demo.verify_first.expected_fail"
+            ],
+            "presentation": {
+              "display_name": "verify_first"
+            }
+          },
+          {
+            "id": "repair",
+            "partition_id": "demo",
+            "runner_binding_id": "demo.runner",
+            "input_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "output_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "artifact_schema_ids": [
+              "packet",
+              "branch_a",
+              "branch_b",
+              "evidence",
+              "writeback"
+            ],
+            "asset_ids": [
+              "demo.entrypoint",
+              "demo.stages"
+            ],
+            "declared_outcome_ids": [
+              "demo.repair.corrected"
+            ],
+            "presentation": {
+              "display_name": "repair"
+            }
+          },
+          {
+            "id": "verify_pass",
+            "partition_id": "demo",
+            "runner_binding_id": "demo.runner",
+            "input_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "output_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "artifact_schema_ids": [
+              "packet",
+              "branch_a",
+              "branch_b",
+              "evidence",
+              "writeback"
+            ],
+            "asset_ids": [
+              "demo.entrypoint",
+              "demo.stages"
+            ],
+            "declared_outcome_ids": [
+              "demo.verify_pass.pass"
+            ],
+            "presentation": {
+              "display_name": "verify_pass"
+            }
+          },
+          {
+            "id": "wait",
+            "partition_id": "demo",
+            "runner_binding_id": "demo.runner",
+            "input_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "output_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "artifact_schema_ids": [
+              "packet",
+              "branch_a",
+              "branch_b",
+              "evidence",
+              "writeback"
+            ],
+            "asset_ids": [
+              "demo.entrypoint",
+              "demo.stages"
+            ],
+            "declared_outcome_ids": [
+              "demo.wait.decide"
+            ],
+            "presentation": {
+              "display_name": "wait"
+            }
+          },
+          {
+            "id": "revise",
+            "partition_id": "demo",
+            "runner_binding_id": "demo.runner",
+            "input_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "output_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "artifact_schema_ids": [
+              "packet",
+              "branch_a",
+              "branch_b",
+              "evidence",
+              "writeback"
+            ],
+            "asset_ids": [
+              "demo.entrypoint",
+              "demo.stages"
+            ],
+            "declared_outcome_ids": [
+              "demo.revise.revised"
+            ],
+            "presentation": {
+              "display_name": "revise"
+            }
+          },
+          {
+            "id": "close",
+            "partition_id": "demo",
+            "runner_binding_id": "demo.runner",
+            "input_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "output_queue_family_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "artifact_schema_ids": [
+              "packet",
+              "branch_a",
+              "branch_b",
+              "evidence",
+              "writeback"
+            ],
+            "asset_ids": [
+              "demo.entrypoint",
+              "demo.stages"
+            ],
+            "declared_outcome_ids": [
+              "demo.close.closed"
+            ],
+            "presentation": {
+              "display_name": "close"
+            }
+          }
+        ],
+        "terminal_outcomes": [
+          {
+            "id": "demo.intake.fanout",
+            "stage_kind_id": "intake",
+            "marker": "FANOUT",
+            "presentation": {
+              "display_name": "FANOUT"
+            }
+          },
+          {
+            "id": "demo.producer_a.artifact_a",
+            "stage_kind_id": "producer_a",
+            "marker": "ARTIFACT_A",
+            "presentation": {
+              "display_name": "ARTIFACT_A"
+            }
+          },
+          {
+            "id": "demo.producer_b.artifact_b",
+            "stage_kind_id": "producer_b",
+            "marker": "ARTIFACT_B",
+            "presentation": {
+              "display_name": "ARTIFACT_B"
+            }
+          },
+          {
+            "id": "demo.verify_first.expected_fail",
+            "stage_kind_id": "verify_first",
+            "marker": "EXPECTED_FAIL",
+            "presentation": {
+              "display_name": "EXPECTED_FAIL"
+            }
+          },
+          {
+            "id": "demo.repair.corrected",
+            "stage_kind_id": "repair",
+            "marker": "CORRECTED",
+            "presentation": {
+              "display_name": "CORRECTED"
+            }
+          },
+          {
+            "id": "demo.verify_pass.pass",
+            "stage_kind_id": "verify_pass",
+            "marker": "PASS",
+            "presentation": {
+              "display_name": "PASS"
+            }
+          },
+          {
+            "id": "demo.wait.decide",
+            "stage_kind_id": "wait",
+            "marker": "DECIDE",
+            "presentation": {
+              "display_name": "DECIDE"
+            }
+          },
+          {
+            "id": "demo.revise.revised",
+            "stage_kind_id": "revise",
+            "marker": "REVISED",
+            "presentation": {
+              "display_name": "REVISED"
+            }
+          },
+          {
+            "id": "demo.close.closed",
+            "stage_kind_id": "close",
+            "marker": "CLOSED",
+            "presentation": {
+              "display_name": "CLOSED"
+            }
+          }
+        ],
+        "terminal_actions": [
+          {
+            "id": "demo.intake.fanout",
+            "stage_kind_id": "intake",
+            "outcome_id": "demo.intake.fanout",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "packet",
+            "presentation": {
+              "display_name": "FANOUT"
+            }
+          },
+          {
+            "id": "demo.producer_a.artifact_a",
+            "stage_kind_id": "producer_a",
+            "outcome_id": "demo.producer_a.artifact_a",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "branch_a",
+            "presentation": {
+              "display_name": "ARTIFACT_A"
+            }
+          },
+          {
+            "id": "demo.producer_b.artifact_b",
+            "stage_kind_id": "producer_b",
+            "outcome_id": "demo.producer_b.artifact_b",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "branch_b",
+            "presentation": {
+              "display_name": "ARTIFACT_B"
+            }
+          },
+          {
+            "id": "demo.verify_first.expected_fail",
+            "stage_kind_id": "verify_first",
+            "outcome_id": "demo.verify_first.expected_fail",
+            "kind": "route",
+            "artifact_schema_id": "evidence",
+            "presentation": {
+              "display_name": "EXPECTED_FAIL"
+            },
+            "target_stage_kind_id": "repair",
+            "target_graph_node_id": "demo.repair",
+            "emitted_queue_family_id": "repair",
+            "runner_binding_id": "demo.runner",
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            }
+          },
+          {
+            "id": "demo.repair.corrected",
+            "stage_kind_id": "repair",
+            "outcome_id": "demo.repair.corrected",
+            "kind": "route",
+            "artifact_schema_id": "evidence",
+            "presentation": {
+              "display_name": "CORRECTED"
+            },
+            "target_stage_kind_id": "verify_pass",
+            "target_graph_node_id": "demo.verify_pass",
+            "emitted_queue_family_id": "verify_pass",
+            "runner_binding_id": "demo.runner",
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            }
+          },
+          {
+            "id": "demo.verify_pass.pass",
+            "stage_kind_id": "verify_pass",
+            "outcome_id": "demo.verify_pass.pass",
+            "kind": "route",
+            "artifact_schema_id": "evidence",
+            "presentation": {
+              "display_name": "PASS"
+            },
+            "target_stage_kind_id": "wait",
+            "target_graph_node_id": "demo.wait",
+            "emitted_queue_family_id": "wait",
+            "runner_binding_id": "demo.runner",
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            }
+          },
+          {
+            "id": "demo.wait.decide",
+            "stage_kind_id": "wait",
+            "outcome_id": "demo.wait.decide",
+            "kind": "operator_wait",
+            "artifact_schema_id": "writeback",
+            "presentation": {
+              "display_name": "DECIDE"
+            }
+          },
+          {
+            "id": "demo.revise.revised",
+            "stage_kind_id": "revise",
+            "outcome_id": "demo.revise.revised",
+            "kind": "route",
+            "artifact_schema_id": "evidence",
+            "presentation": {
+              "display_name": "REVISED"
+            },
+            "target_stage_kind_id": "close",
+            "target_graph_node_id": "demo.close",
+            "emitted_queue_family_id": "close",
+            "runner_binding_id": "demo.runner",
+            "payload_projection": {
+              "kind": "source",
+              "path": [
+                "artifact_payload"
+              ]
+            }
+          },
+          {
+            "id": "demo.close.closed",
+            "stage_kind_id": "close",
+            "outcome_id": "demo.close.closed",
+            "kind": "complete_work_item",
+            "artifact_schema_id": "writeback",
+            "presentation": {
+              "display_name": "CLOSED"
+            }
+          }
+        ],
+        "fanout_declarations": [
+          {
+            "id": "demo.fanout.producer_a",
+            "source_action_id": "demo.intake.fanout",
+            "source_artifact_schema_id": "packet",
+            "item_source_path": [
+              "items"
+            ],
+            "item_id_key": "item_id",
+            "target_route_id": "producer_a",
+            "target_payload_schema_id": "evidence",
+            "target_payload_mapping": {
+              "synthetic": [
+                "synthetic"
+              ],
+              "bundle_id": [
+                "bundle_id"
+              ]
+            },
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "depends_on_source_work_item"
+          },
+          {
+            "id": "demo.fanout.producer_b",
+            "source_action_id": "demo.intake.fanout",
+            "source_artifact_schema_id": "packet",
+            "item_source_path": [
+              "items"
+            ],
+            "item_id_key": "item_id",
+            "target_route_id": "producer_b",
+            "target_payload_schema_id": "evidence",
+            "target_payload_mapping": {
+              "synthetic": [
+                "synthetic"
+              ],
+              "bundle_id": [
+                "bundle_id"
+              ]
+            },
+            "duplicate_policy": "refuse",
+            "root_lineage_policy": "inherit_source_lineage",
+            "dependency_policy": "depends_on_source_work_item"
+          }
+        ],
+        "join_declarations": [
+          {
+            "id": "demo.join",
+            "target_stage_kind_id": "verify_first",
+            "correlation_key": "bundle_id",
+            "required_artifact_schema_ids": [
+              "branch_a",
+              "branch_b"
+            ],
+            "missing_policy": "wait"
+          }
+        ],
+        "recovery_policies": [],
+        "wait_states": [],
+        "counters": [],
+        "intervention_options": [],
+        "operator_waits": [
+          {
+            "id": "demo.operator",
+            "source_action_ids": [
+              "demo.wait.decide"
+            ],
+            "wait_scope": "lineage",
+            "source_work_item_behavior": "leave_open",
+            "project_source_artifact": true,
+            "unrelated_lineages_continue": true,
+            "allowed_resolution_kinds": [
+              "close_recorded_source",
+              "revise_recorded_source"
+            ],
+            "payload_schema_id": "evidence",
+            "target_queue_family_id": "revise",
+            "target_stage_kind_id": "revise",
+            "target_graph_node_id": "demo.revise",
+            "target_runner_binding_id": "demo.runner",
+            "actor_kind": "local_operator",
+            "audit_metadata_requirements": [
+              "input_id",
+              "input_digest",
+              "selected_plan_fingerprint",
+              "actor_id",
+              "actor_kind",
+              "wait_id",
+              "operator_wait_id",
+              "lineage_id",
+              "closed_work_item_ids",
+              "empty_payload",
+              "target_work_item_id",
+              "target_activation_id",
+              "payload_digest",
+              "payload_reference"
+            ],
+            "correlation_key": "wait_id",
+            "idempotency": "input_receipt_and_active_wait_status",
+            "timeout_policy": "none",
+            "expiry_policy": "none",
+            "cancellation_policy": "selected_resolution_only",
+            "status_effect": "operator_wait_active"
+          }
+        ],
+        "runner_bindings": [
+          {
+            "id": "demo.runner",
+            "adapter_kind": "millrace.demo.synthetic",
+            "stage_kind_ids": [
+              "intake",
+              "producer_a",
+              "producer_b",
+              "verify_first",
+              "repair",
+              "verify_pass",
+              "wait",
+              "revise",
+              "close"
+            ],
+            "presentation": {
+              "display_name": "Synthetic only"
+            },
+            "required_capability_ids": [
+              "capability.runner.invoke"
+            ],
+            "terminal_result_mappings": [
+              {
+                "stage_kind_id": "intake",
+                "runner_result_id": "FANOUT",
+                "outcome_id": "demo.intake.fanout"
+              },
+              {
+                "stage_kind_id": "producer_a",
+                "runner_result_id": "ARTIFACT_A",
+                "outcome_id": "demo.producer_a.artifact_a"
+              },
+              {
+                "stage_kind_id": "producer_b",
+                "runner_result_id": "ARTIFACT_B",
+                "outcome_id": "demo.producer_b.artifact_b"
+              },
+              {
+                "stage_kind_id": "verify_first",
+                "runner_result_id": "EXPECTED_FAIL",
+                "outcome_id": "demo.verify_first.expected_fail"
+              },
+              {
+                "stage_kind_id": "repair",
+                "runner_result_id": "CORRECTED",
+                "outcome_id": "demo.repair.corrected"
+              },
+              {
+                "stage_kind_id": "verify_pass",
+                "runner_result_id": "PASS",
+                "outcome_id": "demo.verify_pass.pass"
+              },
+              {
+                "stage_kind_id": "wait",
+                "runner_result_id": "DECIDE",
+                "outcome_id": "demo.wait.decide"
+              },
+              {
+                "stage_kind_id": "revise",
+                "runner_result_id": "REVISED",
+                "outcome_id": "demo.revise.revised"
+              },
+              {
+                "stage_kind_id": "close",
+                "runner_result_id": "CLOSED",
+                "outcome_id": "demo.close.closed"
+              }
+            ],
+            "component_pin": {
+              "component_kind": "runner",
+              "component_id": "demo-synthetic",
+              "component_version": "1",
+              "provider_distribution": "millrace-ai",
+              "provider_version": "0.22.4",
+              "descriptor_media_type": "application/json",
+              "required_capability_ids": [
+                "capability.runner.invoke"
+              ],
+              "legal_terminal_result_ids": [
+                "FANOUT",
+                "ARTIFACT_A",
+                "ARTIFACT_B",
+                "EXPECTED_FAIL",
+                "CORRECTED",
+                "PASS",
+                "DECIDE",
+                "REVISED",
+                "CLOSED"
+              ],
+              "descriptor_sha256": "bf7a28946685360586d9a8ec8ad98d865711bb129334506279308b5718bc905a"
+            }
+          }
+        ],
+        "capabilities": [
+          {
+            "id": "capability.runner.invoke",
+            "kind": "runner.invoke",
+            "support_status": "supported",
+            "grant_status": "granted",
+            "approval_policy_id": null
+          }
+        ],
+        "context_bindings": [
+          {
+            "id": "demo.context",
+            "stage_kind_id": "wait",
+            "router_asset_id": "demo.stages",
+            "max_hydrated_files": 8,
+            "max_hydrated_bytes": 16384,
+            "materialization_retention": "until_session_durable_terminal",
+            "checkout_root": "demo-context",
+            "mutation_policy": "reconcile_selected_writes",
+            "required_sources": [
+              {
+                "source_kind": "dispatch_material",
+                "source_ref": "current",
+                "max_files": 1,
+                "max_bytes": 65536
+              },
+              {
+                "source_kind": "workspace_relative_root",
+                "source_ref": "docs",
+                "max_files": 8,
+                "max_bytes": 16384
+              }
+            ],
+            "discoverable_sources": [],
+            "write_rules": [
+              {
+                "relative_root": "docs/reviews",
+                "disposition": "direct_write"
+              }
+            ],
+            "writeback_terminal_action_id": "demo.wait.decide",
+            "writeback_artifact_schema_id": "writeback"
+          }
+        ]
+      },
+      "visibility": "private",
+      "workflow_id": "demo",
+      "workflow_version": "0.1"
+    },
+    {
+      "entrypoints": [
+        "default"
+      ],
+      "required_assets": [
+        {
           "asset_id": "execution.skills.builder_core",
           "content_digest": "sha256:d789eb8a142451cffd3476b11671ab7b636a3e704c109d204c82db3e9d5d3dac"
         },
@@ -23549,7 +26458,7 @@
         },
         {
           "asset_id": "execution.skills.troubleshooter_core",
-          "content_digest": "sha256:7cc8d9a63fb6ed147c92fa57d4dcd4baf72211ddd18bc24fccab058ee052abb0"
+          "content_digest": "sha256:4a176a8600b0d3568f0dcfd1264a90c3bac084eb2bc86ddcae39f8a44a31abeb"
         },
         {
           "asset_id": "execution.skills.updater_core",
@@ -23565,7 +26474,7 @@
         },
         {
           "asset_id": "lad.full.pi.entrypoints.lad_arbiter",
-          "content_digest": "sha256:2fbfc809bb54d9879d5218bc071deb3b1ad21ea2e5bed5f9aefb3f2d07cc63a7"
+          "content_digest": "sha256:9e6b871a83898874637dedda08372aa88504b4dbe52aae0b5a2948c212d1c5a8"
         },
         {
           "asset_id": "lad.full.pi.entrypoints.lad_auditor",
@@ -23593,11 +26502,11 @@
         },
         {
           "asset_id": "lad.full.pi.entrypoints.lad_manager",
-          "content_digest": "sha256:c3b4388323830ea2db38df4c5ed56a43fa2100101a9cea5b2678bb3761771e16"
+          "content_digest": "sha256:802d66b9c222ef9e537ebdb8831367276dedad9b9d1a22077adb4c212057026e"
         },
         {
           "asset_id": "lad.full.pi.entrypoints.lad_mechanic",
-          "content_digest": "sha256:39a8dbaca97797da5c6bb3299244c2815e9dd8b3c200b0c27ba2927580356beb"
+          "content_digest": "sha256:d4575960ed71457e0e439528df12a643a075f4c6b8993bfa60b30d9d256b00dd"
         },
         {
           "asset_id": "lad.full.pi.entrypoints.lad_planner",
@@ -23605,7 +26514,7 @@
         },
         {
           "asset_id": "lad.full.pi.entrypoints.lad_troubleshooter",
-          "content_digest": "sha256:857cb9c4c28f44e4a0904b30dfae2c6ef846482a8bd06dbb28dccb07716ac255"
+          "content_digest": "sha256:db2e33d81436d16fea04314697ccad722770ff2d5418fc4d0261375062d0f775"
         },
         {
           "asset_id": "lad.full.pi.entrypoints.lad_updater",
@@ -23637,7 +26546,7 @@
         },
         {
           "asset_id": "lad.full.pi.skills.manager_core",
-          "content_digest": "sha256:8b9d0f1b4ab5b8121941f621dc114ad760aae52ea2274f6c8801c4e248b6d871"
+          "content_digest": "sha256:46959e18379a1f469ec1b85817bbea530e67af79cc733e453317041f8ae0496a"
         },
         {
           "asset_id": "lad.full.pi.skills.mechanic_core",
@@ -23899,6 +26808,13 @@
                         "min_length": 1,
                         "type": "string"
                       },
+                      "depends_on_task_card_ids": {
+                        "items": {
+                          "min_length": 1,
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
                       "task_card_id": {
                         "min_length": 1,
                         "type": "string"
@@ -23911,7 +26827,8 @@
                     "required": [
                       "task_card_id",
                       "title",
-                      "body"
+                      "body",
+                      "depends_on_task_card_ids"
                     ],
                     "type": "object"
                   },
@@ -25238,7 +28155,14 @@
             "remediation_policy_id": "planning.closure.remediation",
             "request_kind": "closure_target",
             "request_queue_family_id": "stage_result",
-            "request_payload_byte_limit": 16384,
+            "request_payload_byte_limit": 131072,
+            "request_overflow": {
+              "policy": "materialized_evidence_pages",
+              "materialization_root": "millrace-closure-evidence",
+              "page_byte_limit": 32768,
+              "max_snapshot_bytes": 8388608,
+              "max_page_count": 1024
+            },
             "root_source_resolution": "runtime_inventory",
             "rubric_policy": "reuse_or_create",
             "runner_binding_id": "lad_arbiter.millforge_runner",
@@ -25518,8 +28442,12 @@
         "fanout_declarations": [
           {
             "dependency_policy": "depends_on_source_work_item",
+            "dependency_success_action_ids": [
+              "execution.close_updater_complete"
+            ],
             "duplicate_policy": "refuse",
             "id": "planning.manager.task_cards_to_execution",
+            "item_dependency_key": "depends_on_task_card_ids",
             "item_id_key": "task_card_id",
             "item_source_path": [
               "cards"
@@ -26480,7 +29408,8 @@
               "execution.route_fixer_complete",
               "execution.route_doublechecker_pass",
               "execution.close_updater_complete",
-              "execution.return_troubleshooter_complete"
+              "execution.return_troubleshooter_complete",
+              "execution.route_consultant_complete"
             ],
             "return_action_ids": [
               "execution.return_troubleshooter_recovered"
@@ -26495,7 +29424,48 @@
               "execution.recover_fixer_runtime_failure",
               "execution.recover_doublechecker_runtime_failure",
               "execution.recover_updater_runtime_failure",
-              "execution.recover_troubleshooter_runtime_failure"
+              "execution.recover_troubleshooter_runtime_failure",
+              "execution.recover_consultant_runtime_failure"
+            ],
+            "threshold_behavior": "runtime_quarantine_at_threshold"
+          },
+          {
+            "attempt_scope": "lineage",
+            "cooldown_starts_at_attempt": 2,
+            "cooldown_wait_state_id": "planning.runtime_failure_recovery.cooldown",
+            "default_cooldown_seconds": 900,
+            "id": "planning.runtime_failure_recovery",
+            "immediate_recovery_limit": 1,
+            "quarantine_action_ids": [
+              "planning.quarantine_mechanic_blocked"
+            ],
+            "quarantine_threshold_attempt": 3,
+            "recorded_source_selector": "latest_recovery_attempt_for_lineage",
+            "recovery_stage_kind_id": "lad_mechanic",
+            "reset_trigger_action_ids": [
+              "planning.recon_enqueue_task",
+              "planning.recon_enqueue_spec",
+              "planning.recon_noop",
+              "planning.route_planner_complete",
+              "planning.close_manager_complete",
+              "planning.route_mechanic_complete",
+              "planning.route_auditor_complete",
+              "planning.close_arbiter_complete"
+            ],
+            "return_action_ids": [
+              "planning.return_mechanic_recovered"
+            ],
+            "return_allowed_phases": [
+              "active_recovery",
+              "quarantine_eligible"
+            ],
+            "source_recovery_action_ids": [
+              "planning.recover_recon_runtime_failure",
+              "planning.recover_planner_runtime_failure",
+              "planning.recover_manager_runtime_failure",
+              "planning.recover_mechanic_runtime_failure",
+              "planning.recover_auditor_runtime_failure",
+              "planning.recover_arbiter_runtime_failure"
             ],
             "threshold_behavior": "runtime_quarantine_at_threshold"
           }
@@ -26547,7 +29517,34 @@
               "adapter_kind": "pi_rpc",
               "descriptor_sha256": "dd7ef029fed5aeebbbb08081934e881e8ed9baecbcf87ba1d03a39d1ffe75d36",
               "max_work_item_payload_bytes": 1048576
-            }
+            },
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_recon_runtime_failure"
+              },
+              {
+                "stage_kind_id": "recon",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_recon_runtime_failure"
+              }
+            ]
           },
           {
             "id": "lad_planner.millforge_runner",
@@ -26576,7 +29573,34 @@
               "adapter_kind": "pi_rpc",
               "descriptor_sha256": "dd7ef029fed5aeebbbb08081934e881e8ed9baecbcf87ba1d03a39d1ffe75d36",
               "max_work_item_payload_bytes": 1048576
-            }
+            },
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_planner_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_planner",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_planner_runtime_failure"
+              }
+            ]
           },
           {
             "id": "lad_manager.millforge_runner",
@@ -26605,7 +29629,34 @@
               "adapter_kind": "pi_rpc",
               "descriptor_sha256": "dd7ef029fed5aeebbbb08081934e881e8ed9baecbcf87ba1d03a39d1ffe75d36",
               "max_work_item_payload_bytes": 1048576
-            }
+            },
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_manager_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_manager",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_manager_runtime_failure"
+              }
+            ]
           },
           {
             "id": "lad_mechanic.millforge_runner",
@@ -26634,7 +29685,34 @@
               "adapter_kind": "pi_rpc",
               "descriptor_sha256": "dd7ef029fed5aeebbbb08081934e881e8ed9baecbcf87ba1d03a39d1ffe75d36",
               "max_work_item_payload_bytes": 1048576
-            }
+            },
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_mechanic",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_mechanic_runtime_failure"
+              }
+            ]
           },
           {
             "id": "lad_auditor.millforge_runner",
@@ -26663,7 +29741,34 @@
               "adapter_kind": "pi_rpc",
               "descriptor_sha256": "dd7ef029fed5aeebbbb08081934e881e8ed9baecbcf87ba1d03a39d1ffe75d36",
               "max_work_item_payload_bytes": 1048576
-            }
+            },
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_auditor",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_auditor_runtime_failure"
+              }
+            ]
           },
           {
             "id": "lad_arbiter.millforge_runner",
@@ -26692,7 +29797,34 @@
               "adapter_kind": "pi_rpc",
               "descriptor_sha256": "dd7ef029fed5aeebbbb08081934e881e8ed9baecbcf87ba1d03a39d1ffe75d36",
               "max_work_item_payload_bytes": 1048576
-            }
+            },
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "invocation_failed",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "output_too_large",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "result_parse_failed",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "result_rejected",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_arbiter",
+                "failure_kind": "timeout",
+                "action_id": "planning.recover_arbiter_runtime_failure"
+              }
+            ]
           },
           {
             "id": "lad_builder.millforge_runner",
@@ -26714,6 +29846,26 @@
             "component_pin": null,
             "terminal_result_mappings": [],
             "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_builder",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_builder_runtime_failure"
+              },
               {
                 "stage_kind_id": "lad_builder",
                 "failure_kind": "timeout",
@@ -26752,6 +29904,26 @@
             "runtime_failure_mappings": [
               {
                 "stage_kind_id": "lad_checker",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_checker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_checker",
                 "failure_kind": "timeout",
                 "action_id": "execution.recover_checker_runtime_failure"
               }
@@ -26786,6 +29958,26 @@
             "component_pin": null,
             "terminal_result_mappings": [],
             "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_fixer",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_fixer_runtime_failure"
+              },
               {
                 "stage_kind_id": "lad_fixer",
                 "failure_kind": "timeout",
@@ -26824,6 +30016,26 @@
             "runtime_failure_mappings": [
               {
                 "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_doublechecker_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_doublechecker",
                 "failure_kind": "timeout",
                 "action_id": "execution.recover_doublechecker_runtime_failure"
               }
@@ -26860,6 +30072,26 @@
             "runtime_failure_mappings": [
               {
                 "stage_kind_id": "lad_updater",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_updater_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_updater",
                 "failure_kind": "timeout",
                 "action_id": "execution.recover_updater_runtime_failure"
               }
@@ -26894,6 +30126,26 @@
             "component_pin": null,
             "terminal_result_mappings": [],
             "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_troubleshooter",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_troubleshooter_runtime_failure"
+              },
               {
                 "stage_kind_id": "lad_troubleshooter",
                 "failure_kind": "timeout",
@@ -26937,7 +30189,34 @@
               "adapter_kind": "pi_rpc",
               "descriptor_sha256": "dd7ef029fed5aeebbbb08081934e881e8ed9baecbcf87ba1d03a39d1ffe75d36",
               "max_work_item_payload_bytes": 1048576
-            }
+            },
+            "runtime_failure_mappings": [
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "invocation_failed",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "output_too_large",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "result_parse_failed",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "result_rejected",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              },
+              {
+                "stage_kind_id": "lad_consultant",
+                "failure_kind": "timeout",
+                "action_id": "execution.recover_consultant_runtime_failure"
+              }
+            ]
           },
           {
             "id": "analyst.millforge_runner",
@@ -27075,7 +30354,8 @@
               "planning.recon.to_planning",
               "planning.recon.noop",
               "planning.recon.recon_blocked",
-              "planning.recon.blocked"
+              "planning.recon.blocked",
+              "planning.recon.runtime_failed"
             ],
             "id": "recon",
             "input_queue_family_ids": [
@@ -27113,7 +30393,8 @@
             "declared_outcome_ids": [
               "planning.lad_planner.complete",
               "planning.lad_planner.blocked",
-              "planning.lad_planner.blocked_threshold_recovery"
+              "planning.lad_planner.blocked_threshold_recovery",
+              "planning.lad_planner.runtime_failed"
             ],
             "id": "lad_planner",
             "input_queue_family_ids": [
@@ -27148,7 +30429,8 @@
             "declared_outcome_ids": [
               "planning.lad_manager.complete",
               "planning.lad_manager.blocked",
-              "planning.lad_manager.blocked_threshold_recovery"
+              "planning.lad_manager.blocked_threshold_recovery",
+              "planning.lad_manager.runtime_failed"
             ],
             "id": "lad_manager",
             "input_queue_family_ids": [
@@ -27182,7 +30464,8 @@
               "planning.lad_mechanic.blocked",
               "planning.lad_mechanic.blocked_threshold_recovery",
               "planning.lad_mechanic.recovered",
-              "planning.lad_mechanic.quarantine"
+              "planning.lad_mechanic.quarantine",
+              "planning.lad_mechanic.runtime_failed"
             ],
             "id": "lad_mechanic",
             "input_queue_family_ids": [
@@ -27214,7 +30497,8 @@
             "declared_outcome_ids": [
               "planning.lad_auditor.complete",
               "planning.lad_auditor.blocked",
-              "planning.lad_auditor.blocked_threshold_recovery"
+              "planning.lad_auditor.blocked_threshold_recovery",
+              "planning.lad_auditor.runtime_failed"
             ],
             "id": "lad_auditor",
             "input_queue_family_ids": [
@@ -27246,7 +30530,8 @@
             "declared_outcome_ids": [
               "planning.lad_arbiter.complete",
               "planning.lad_arbiter.remediation_needed",
-              "planning.lad_arbiter.blocked"
+              "planning.lad_arbiter.blocked",
+              "planning.lad_arbiter.runtime_failed"
             ],
             "id": "lad_arbiter",
             "input_queue_family_ids": [
@@ -27486,7 +30771,8 @@
               "execution.lad_consultant.needs_plan",
               "execution.lad_consultant.blocked",
               "execution.lad_consultant.recovered",
-              "execution.lad_consultant.quarantine"
+              "execution.lad_consultant.quarantine",
+              "execution.lad_consultant.runtime_failed"
             ],
             "id": "lad_consultant",
             "input_queue_family_ids": [
@@ -29480,6 +32766,111 @@
               "display_name": "learning.close_librarian_blocked"
             },
             "stage_kind_id": "librarian"
+          },
+          {
+            "asset_ids": [
+              "lad.full.pi.entrypoints.lad_troubleshooter"
+            ],
+            "id": "execution.recover_consultant_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "execution.lad_consultant.runtime_failed",
+            "presentation": {
+              "display_name": "execution.recover_consultant_runtime_failure"
+            },
+            "runner_binding_id": "lad_troubleshooter.millforge_runner",
+            "stage_kind_id": "lad_consultant",
+            "target_graph_node_id": "execution.lad.troubleshooter.start",
+            "target_stage_kind_id": "lad_troubleshooter"
+          },
+          {
+            "asset_ids": [
+              "lad.full.pi.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_recon_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.recon.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_recon_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "recon",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "lad.full.pi.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_planner_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_planner.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_planner_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_planner",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "lad.full.pi.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_manager_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_manager.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_manager_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_manager",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "lad.full.pi.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_mechanic_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_mechanic.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_mechanic_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_mechanic",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "lad.full.pi.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_auditor_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_auditor.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_auditor_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_auditor",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
+          },
+          {
+            "asset_ids": [
+              "lad.full.pi.entrypoints.lad_mechanic"
+            ],
+            "id": "planning.recover_arbiter_runtime_failure",
+            "kind": "recovery_route",
+            "outcome_id": "planning.lad_arbiter.runtime_failed",
+            "presentation": {
+              "display_name": "planning.recover_arbiter_runtime_failure"
+            },
+            "runner_binding_id": "lad_mechanic.millforge_runner",
+            "stage_kind_id": "lad_arbiter",
+            "target_graph_node_id": "planning.lad.mechanic.start",
+            "target_stage_kind_id": "lad_mechanic"
           }
         ],
         "terminal_outcomes": [
@@ -30082,6 +33473,62 @@
               "display_name": "BLOCKED"
             },
             "stage_kind_id": "librarian"
+          },
+          {
+            "id": "execution.lad_consultant.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Consultant runtime failure"
+            },
+            "stage_kind_id": "lad_consultant"
+          },
+          {
+            "id": "planning.recon.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Recon runtime failure"
+            },
+            "stage_kind_id": "recon"
+          },
+          {
+            "id": "planning.lad_planner.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Planner runtime failure"
+            },
+            "stage_kind_id": "lad_planner"
+          },
+          {
+            "id": "planning.lad_manager.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Manager runtime failure"
+            },
+            "stage_kind_id": "lad_manager"
+          },
+          {
+            "id": "planning.lad_mechanic.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Mechanic runtime failure"
+            },
+            "stage_kind_id": "lad_mechanic"
+          },
+          {
+            "id": "planning.lad_auditor.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Auditor runtime failure"
+            },
+            "stage_kind_id": "lad_auditor"
+          },
+          {
+            "id": "planning.lad_arbiter.runtime_failed",
+            "marker": "RUNTIME_FAILURE",
+            "presentation": {
+              "display_name": "Arbiter runtime failure"
+            },
+            "stage_kind_id": "lad_arbiter"
           }
         ],
         "wait_states": [
@@ -30112,6 +33559,13 @@
             "kind": "timer",
             "policy_id": "execution.runtime_failure_recovery",
             "starts_at_attempt": 2
+          },
+          {
+            "duration_seconds": 900,
+            "id": "planning.runtime_failure_recovery.cooldown",
+            "kind": "timer",
+            "policy_id": "planning.runtime_failure_recovery",
+            "starts_at_attempt": 2
           }
         ],
         "workflow": {
@@ -30132,6 +33586,28 @@
     }
   ],
   "assets": [
+    {
+      "asset_id": "demo.entrypoint",
+      "asset_kind": "entrypoint_prompt",
+      "byte_length": 54,
+      "content_digest": "sha256:852f76b8cbac16c5ef1e9584d064c3ab4a4a5b8e521a42c54badb7cb84aceef4",
+      "encoding": "utf-8",
+      "media_type": "text/markdown; charset=utf-8",
+      "package_path": "assets/workflows/demo/entrypoints/demo.md",
+      "selected_authority_participation": "yes",
+      "selection": "required"
+    },
+    {
+      "asset_id": "demo.stages",
+      "asset_kind": "template",
+      "byte_length": 66,
+      "content_digest": "sha256:6bd801d959ba9dd107fcafa0f2a4f3658774a5ff401f948fbbc8e0602f55c80a",
+      "encoding": "utf-8",
+      "media_type": "text/markdown; charset=utf-8",
+      "package_path": "assets/workflows/demo/context/router.md",
+      "selected_authority_participation": "yes",
+      "selection": "required"
+    },
     {
       "asset_id": "execution.entrypoints.lad_builder",
       "asset_kind": "entrypoint_prompt",
@@ -30201,8 +33677,8 @@
     {
       "asset_id": "execution.entrypoints.lad_troubleshooter",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 6260,
-      "content_digest": "sha256:2aeb6e65d0bf5beddb212dbb9cfb9eee6bab89d9943fd9ca69424e2955dd6860",
+      "byte_length": 8030,
+      "content_digest": "sha256:444919e2e5637486ff4e9414734a285ca70eae21e942331165a9a58a2d75fb38",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_troubleshooter.md",
@@ -30289,8 +33765,8 @@
     {
       "asset_id": "execution.skills.troubleshooter_core",
       "asset_kind": "stage_skill",
-      "byte_length": 7487,
-      "content_digest": "sha256:7cc8d9a63fb6ed147c92fa57d4dcd4baf72211ddd18bc24fccab058ee052abb0",
+      "byte_length": 7847,
+      "content_digest": "sha256:4a176a8600b0d3568f0dcfd1264a90c3bac084eb2bc86ddcae39f8a44a31abeb",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/execution.lad/skills/troubleshooter-core.md",
@@ -30333,8 +33809,8 @@
     {
       "asset_id": "lad.full.pi.entrypoints.lad_arbiter",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 6578,
-      "content_digest": "sha256:2fbfc809bb54d9879d5218bc071deb3b1ad21ea2e5bed5f9aefb3f2d07cc63a7",
+      "byte_length": 8538,
+      "content_digest": "sha256:9e6b871a83898874637dedda08372aa88504b4dbe52aae0b5a2948c212d1c5a8",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_arbiter.md",
@@ -30410,8 +33886,8 @@
     {
       "asset_id": "lad.full.pi.entrypoints.lad_manager",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 4967,
-      "content_digest": "sha256:c3b4388323830ea2db38df4c5ed56a43fa2100101a9cea5b2678bb3761771e16",
+      "byte_length": 5282,
+      "content_digest": "sha256:802d66b9c222ef9e537ebdb8831367276dedad9b9d1a22077adb4c212057026e",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_manager.md",
@@ -30421,8 +33897,8 @@
     {
       "asset_id": "lad.full.pi.entrypoints.lad_mechanic",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 8921,
-      "content_digest": "sha256:39a8dbaca97797da5c6bb3299244c2815e9dd8b3c200b0c27ba2927580356beb",
+      "byte_length": 10543,
+      "content_digest": "sha256:d4575960ed71457e0e439528df12a643a075f4c6b8993bfa60b30d9d256b00dd",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_mechanic.md",
@@ -30443,8 +33919,8 @@
     {
       "asset_id": "lad.full.pi.entrypoints.lad_troubleshooter",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 7731,
-      "content_digest": "sha256:857cb9c4c28f44e4a0904b30dfae2c6ef846482a8bd06dbb28dccb07716ac255",
+      "byte_length": 9501,
+      "content_digest": "sha256:db2e33d81436d16fea04314697ccad722770ff2d5418fc4d0261375062d0f775",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_troubleshooter.md",
@@ -30531,8 +34007,8 @@
     {
       "asset_id": "lad.full.pi.skills.manager_core",
       "asset_kind": "stage_skill",
-      "byte_length": 6640,
-      "content_digest": "sha256:8b9d0f1b4ab5b8121941f621dc114ad760aae52ea2274f6c8801c4e248b6d871",
+      "byte_length": 7274,
+      "content_digest": "sha256:46959e18379a1f469ec1b85817bbea530e67af79cc733e453317041f8ae0496a",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/lad.full.pi/skills/manager-core.md",
@@ -30685,8 +34161,8 @@
     {
       "asset_id": "planning.entrypoints.lad_manager",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 3493,
-      "content_digest": "sha256:df6282f2762296119aa2a31b8e68997c6fcc40de0bd82fb96c910bb997399aef",
+      "byte_length": 3808,
+      "content_digest": "sha256:b48b106bfe124940e96ccea8b95c6c122762b80376990284f6ae2c30b228d2ca",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/planning.lad/entrypoints/lad_manager.md",
@@ -30696,8 +34172,8 @@
     {
       "asset_id": "planning.entrypoints.lad_mechanic",
       "asset_kind": "entrypoint_prompt",
-      "byte_length": 7447,
-      "content_digest": "sha256:163b18d2ec8db02319e1fbfd6eb3568fb1e6217c53832e9a6681c5341db155fc",
+      "byte_length": 8575,
+      "content_digest": "sha256:79aeff093cfd5047e6cb213e9eca9600d5654dba8a8c6e3a256e2ed533b93224",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/planning.lad/entrypoints/lad_mechanic.md",
@@ -30751,8 +34227,8 @@
     {
       "asset_id": "planning.skills.manager_core",
       "asset_kind": "stage_skill",
-      "byte_length": 5544,
-      "content_digest": "sha256:4a2743ab0211929f686eec48a2347f5053570e79acd9221955bbf5c2c25ad811",
+      "byte_length": 6178,
+      "content_digest": "sha256:5669e37c99f4afba61e3a75f1a3bc17607d81467e4909cd78f7d0c9d54796f5c",
       "encoding": "utf-8",
       "media_type": "text/markdown; charset=utf-8",
       "package_path": "assets/workflows/planning.lad/skills/manager-core.md",
@@ -31110,7 +34586,7 @@
     "algorithm": "millrace-json-v1",
     "hash": "sha256"
   },
-  "manifest_digest": "sha256:12f4ee591fb5de5cd82928ffcc954aa5da3303dcd91ac80529290528153a8420",
+  "manifest_digest": "sha256:25d38e770fbfee34a5b10b36797c96093ff674432745cb0269020213d1fbf927",
   "non_authoritative_metadata": {
     "effect_provider_refs_disposition": "Selected authorities retain effect/provider references as data; package assets contain no provider refs, credentials, provider code, plugin/MCP code, or native runner code",
     "ops_skill_evidence": "Advisory skills and reference text are package documentation; no executable runtime or provider code is included",

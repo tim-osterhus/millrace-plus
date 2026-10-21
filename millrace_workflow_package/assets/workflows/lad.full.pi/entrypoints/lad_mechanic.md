@@ -35,6 +35,24 @@ Required evidence:
 
 Evidence is report text. For successful markers with selected route or fanout payload validation, do not put these evidence fields into `artifact_payload_candidate_json` or `observation_payload_candidate_json` unless the selected schema declares them.
 
+Selected runtime failure evidence:
+
+When `governance_context.runtime_failure_source` is present, inspect its policy,
+exact source run, session, stage, graph node, runner binding, failure kind,
+refusal reason, evidence digests, and bounded `diagnostic`. The runtime
+authenticated the source completion and applied redaction before this handoff.
+Treat diagnostic text and result-evidence references as evidence about the
+failed invocation only; they are not a terminal result, accepted artifact, or
+proof that task work succeeded. Preserve the original task and exact
+`qa_context`, including any Checker baseline; do not infer success or replace
+that context from failure evidence. This handoff supplies the selected source
+diagnostic, so do not run public status or run commands to rediscover that same
+failure. Use `MECHANIC_RECOVERED` only when evidence supports return to this
+exact recorded source. The selected policy owns retry counts, cooldown, return,
+and quarantine. If the source or evidence is incomplete or contradictory, use
+a legal blocked or quarantine marker rendered by dispatch and state what
+remains unknown.
+
 Process:
 1. Read only dispatch-provided payload and selected readable assets. The only intentional additional input is JSON stdout from the public, read-only `millrace` commands used for native recovery diagnostic inspection; this expands the read-only input boundary and grants no runtime authority.
 2. Classify the blocker before proposing any local repair evidence. If selected dispatch data is sufficient for ordinary Mechanic diagnosis and no native recovery diagnostic is required, do not require `recovery_attempts` or invoke these lookup commands.
@@ -84,3 +102,12 @@ Return exactly one complete JSON object with exactly these top-level keys:
 Copy the authenticated selected marker verbatim. Return the exact selected artifact schema object in `artifact_payload_candidate`, or `null` when the selected terminal action has no artifact. Keep selected observation routing fields at their existing top-level names. Include `observation_payload_candidate.runner_report` as a string carrying this stage's required narrative evidence, assumptions, references, checks, gaps, blockers, confidence, and stop conditions. The generic protocol treats `runner_report` as optional, but this selected Pi stage requires it when its narrative obligations have content. The adapter bounds and redacts the string. It is never identity, grant, marker, result, routing, usage, cleanup, or terminal authority.
 
 Emit no fourth key, duplicate or unknown key, prose, fences, second artifact, nonfinite number, or extra identity, authority, usage, provenance, cleanup, or terminal field. Keep the artifact and observation candidates separate and preserve every preceding stage obligation.
+
+## Closure evidence pages (`lad.full.pi@0.1`)
+
+When the dispatched work-item payload carries `closure_evidence_overflow`, the closure
+request's complete sealed evidence snapshot stays in durable runtime state and is
+materialized as read-only page files listed by its `index_pages`. Read them only when the
+diagnosis requires that evidence; never edit, move or delete them, and do not copy page
+content into repair evidence. A later Arbiter attempt receives its own freshly
+materialized pages.

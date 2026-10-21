@@ -31,7 +31,8 @@ Millrace kernel.
 ## Unpublished v0.22.4
 
 The current private source candidate `millrace-plus` `0.22.4`
-contains the opt-in `lad.full.pi@0.1` workflow. It targets Core `>=0.22.4,<0.23`. The Pi workflow copies the
+retains the private `demo@0.1` data-only entry and the opt-in `lad.full.pi@0.1`
+workflow. It targets Core `>=0.22.4,<0.23`. The Pi workflow copies the
 seventeen `lad.full` entrypoint prompts and uses a component-free `pi_rpc`
 report channel. The reviewed Core capacity descriptor is retained. Retained predecessor wheel
 and sdist installs executed the five-stage Recon, Builder, Checker, Updater and

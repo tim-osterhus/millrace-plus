@@ -38,10 +38,15 @@ the selector in the report artifact.
 Diagnostic completion does not establish completion of the original task.
 
 `TROUBLESHOOT_RECOVERED` is a separate return to the latest recorded recovery
-source. That source can be a failed Troubleshooter. Use it only when evidence
-supports retrying that exact source; it is not an alias for COMPLETE or an
-instruction to select an earlier Builder. `TROUBLESHOOT_QUARANTINE` reports
-unresolved recovery. Copy each marker's rendered artifact schema exactly.
+source. That source can be a failed Troubleshooter. Use it only when
+`terminal_options` renders its exact marker/artifact pair for this current
+recovery attempt and evidence supports retrying that exact source; it is not an
+alias for COMPLETE or an instruction to select an earlier Builder. Ordinary
+Troubleshooter ingress does not authorize it. `TROUBLESHOOT_QUARANTINE` reports
+unresolved recovery and is available only when its exact marker/artifact pair
+is rendered in `terminal_options` for the current attempt. When either formal
+choice is absent, use only ordinary markers rendered for this invocation. Copy
+each selected marker's artifact schema exactly.
 For these selected execution branches the artifact is
 `execution.artifacts.report`, with required string fields `artifact_kind` and
 `summary`. Some selected workflows also permit optional `learning_requests`;

@@ -24,9 +24,27 @@ Readable assets:
 Completion and recorded-source recovery:
 - `TROUBLESHOOT_COMPLETE` is the selected diagnostic handoff when the report establishes a trustworthy local recovery and the evidence supports a selected execution re-entry. It does not claim the product task is complete. Optional `observation_payload_candidate.resume_stage` must name a target ID declared by the selected COMPLETE route; standard examples are `builder`, `checker`, `fixer`, `doublechecker`, and `updater`, with `integrator` also selected by the Integrator workflow. An omitted selector uses the selected Builder target. Keep the selector in the observation candidate, not the report artifact.
 - A runtime timeout can preserve the original `body`/`task_id` work payload without `qa_context`. Do not manufacture a QA carrier or Checker baseline in agent output. The selected COMPLETE projection preserves an existing carrier exactly; when absent, it derives the task contract and trusted digest from current runtime input, with an unestablished Checker baseline explicitly null.
-- `TROUBLESHOOT_RECOVERED` is a distinct recorded-source return. Choose it only when evidence supports retrying that exact recorded source. After a recovery invocation fails, the latest recorded source may itself be Troubleshooter; this marker does not select Builder or an earlier source.
-- `TROUBLESHOOT_QUARANTINE` reports that safe recovery cannot be established. Use each recovery marker only when its exact marker/artifact pair is rendered in `terminal_options`.
+- `TROUBLESHOOT_RECOVERED` is a distinct recorded-source return. Use it only when `terminal_options` renders its exact marker/artifact pair for this current recovery attempt, and evidence supports retrying the exact latest recorded source. After a recovery invocation fails, that source may itself be Troubleshooter; this marker does not select Builder or an earlier source. Ordinary Troubleshooter ingress does not authorize this marker.
+- `TROUBLESHOOT_QUARANTINE` reports that safe recovery cannot be established. Use it only when `terminal_options` renders its exact marker/artifact pair for this current recovery attempt. If either formal recovery marker is absent, choose only among the ordinary markers actually rendered for this invocation.
 - For these selected execution diagnostic branches, use the rendered `execution.artifacts.report` schema. An actual invocation failure uses its selected failure marker and artifact/null contract; it is not diagnostic success. Never change a previously rejected candidate's marker to make it pass.
+
+Selected runtime failure evidence:
+
+When `governance_context.runtime_failure_source` is present, inspect its policy,
+exact source run, session, stage, graph node, runner binding, failure kind,
+refusal reason, evidence digests, and bounded `diagnostic`. The runtime
+authenticated the source completion and applied redaction before this handoff.
+Treat diagnostic text and result-evidence references as evidence about the
+failed invocation only; they are not a terminal result, accepted artifact, or
+proof that task work succeeded. Do not infer success, create an artifact, change
+task identity, or replace `qa_context` or the Checker baseline from failure
+evidence. Use `TROUBLESHOOT_RECOVERED` only when its exact marker/artifact pair
+is rendered in `terminal_options` for this current recovery attempt and the
+evidence supports returning to this exact recorded source. The selected policy owns retry counts, cooldown, return, and quarantine. If
+source identity or evidence is incomplete or contradictory, use a rendered
+ordinary `BLOCKED` path when available. Use `TROUBLESHOOT_QUARANTINE` only when
+its exact marker/artifact pair is rendered in `terminal_options` for this
+current recovery attempt, and state what remains unknown.
 
 QA context handoff:
 - Preserve the exact `qa_context` received from the failed source work item.
@@ -59,8 +77,8 @@ Legal terminal markers rendered by runtime:
 - `TROUBLESHOOT_REVIEW_RETRY` for `unchanged_source_review_execution_failure`, `false`, `checker`.
 - `TROUBLESHOOT_UNRECOVERABLE` for `unrecoverable`, `false`, `none`.
 - `TROUBLESHOOT_COMPLETE` for diagnostic execution re-entry, only with the exact marker/artifact schema pair rendered in `terminal_options`.
-- `TROUBLESHOOT_RECOVERED` when selected dispatch context asks for recovered-source evidence.
-- `TROUBLESHOOT_QUARANTINE` when selected dispatch context asks for unresolved recovery evidence.
+- `TROUBLESHOOT_RECOVERED` only when its exact marker/artifact pair is rendered in `terminal_options` for the current recovery attempt and evidence supports retrying that exact recorded source.
+- `TROUBLESHOOT_QUARANTINE` only when its exact marker/artifact pair is rendered in `terminal_options` for the current recovery attempt and safe recovery remains unresolved. If these choices are absent, use an ordinary marker rendered for the invocation.
 - `BLOCKED` when no trustworthy local recovery can be completed from available evidence.
 - `RUNTIME_FAILURE` when runner evidence shows an execution failure report is needed.
 - `RUNTIME_FAILURE_ESCALATE` when runner evidence shows repeated runtime failure evidence is exhausted.

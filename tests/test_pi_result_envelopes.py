@@ -74,6 +74,9 @@ def _selected_schema_by_marker(
         if outcome["stage_kind_id"] == stage_id
         and outcome["marker"]
         and outcome["id"] in actions
+        # Runtime failures are emitted by the runtime. Other recovery routes, such as
+        # BLOCKED, remain valid Pi result markers.
+        and outcome["marker"] != "RUNTIME_FAILURE"
     }
 
 

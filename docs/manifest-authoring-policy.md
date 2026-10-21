@@ -52,23 +52,34 @@ which workflow behavior should be official.
 ```json
 {
   "policy": "frozen-manifest",
-  "manifest_digest": "sha256:12f4ee591fb5de5cd82928ffcc954aa5da3303dcd91ac80529290528153a8420",
-  "package_digest": "sha256:e96d643790f10416909b8170075f3aa55a8b80ad7bbb3b93c65db126069f80b0",
+  "manifest_digest": "sha256:25d38e770fbfee34a5b10b36797c96093ff674432745cb0269020213d1fbf927",
+  "package_digest": "sha256:4b06db8e08df906a1e4a56250fbbfb520acc2719885865d7c1e298da24dca274",
   "selected_package_pin": {
     "package_id": "millrace.plus.official",
     "package_version": "0.22.4",
     "package_format_version": "1"
   },
   "selected_workflow_fingerprints": {
-    "execution.lad@0.1": "sha256:30af2a74261f6b432f4be96991f5e482f0a723311b88f0d4a68fbea485295386",
-    "execution.lad_integrator@0.1": "sha256:a22eb9e2671fada39c90d9e22b5b2836fb1be441947d700081808d44fee1aff6",
-    "lad.full@0.1": "sha256:96ab3997afdc252d2c17224fb11c39a660e9dc723ab06a631eda1f9653c11bae",
-    "lad.full.pi@0.1": "sha256:3b7ad84101296c63838406f3bd15e4e285b045cc40938829cb81a01b2f61db10",
-    "planning.lad@0.1": "sha256:235ad62353f86deeea71a8bec6e17f38c9a295f2cabfa14786e543773d7557b5",
+    "demo@0.1": "sha256:512320da87e0842c0cce538c54dd1f666b9fefb39f335525e4cd09cf197b6182",
+    "execution.lad@0.1": "sha256:51df084ff2bbd0a373fddbbc13f542e2c4ac49ef20824e121954ceae01a3bbd5",
+    "execution.lad_integrator@0.1": "sha256:df091f62b45a6bde4e76582cb5bd5b1d49cbb18c116bbf604ac1c098679eec0b",
+    "lad.full@0.1": "sha256:4322b782b753ac70879e0508ff453ac00dce0b6e8cc8cc2ace5da7bdc4167f47",
+    "lad.full.pi@0.1": "sha256:5a526b5c24a9260ebdb99c96ed0e306491aa547829ad0908a7c6b04a860b389a",
+    "planning.lad@0.1": "sha256:d39c5d96bc1dcca754141b7ebc36938e2ae32d36989035cbe2d8ca37cb6014bf",
     "simple_loop@0.1": "sha256:a1f731b32b25d116ba715e98d8b360c03c11bbb50d72eb722c557580defda9a3",
     "vendor_selection@0.1": "sha256:447b6ef897a6cbfa662c47eb318b5be5fff673952471e7351bcd2df788b7221d"
   },
   "asset_pins": [
+    {
+      "asset_id": "demo.entrypoint",
+      "content_digest": "sha256:852f76b8cbac16c5ef1e9584d064c3ab4a4a5b8e521a42c54badb7cb84aceef4",
+      "package_path": "assets/workflows/demo/entrypoints/demo.md"
+    },
+    {
+      "asset_id": "demo.stages",
+      "content_digest": "sha256:6bd801d959ba9dd107fcafa0f2a4f3658774a5ff401f948fbbc8e0602f55c80a",
+      "package_path": "assets/workflows/demo/context/router.md"
+    },
     {
       "asset_id": "execution.entrypoints.lad_builder",
       "content_digest": "sha256:2ae327cd582353e2510de7dff31ee55eb70f4ffcdfa2d2303db6bd2201b92a8c",
@@ -101,7 +112,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "execution.entrypoints.lad_troubleshooter",
-      "content_digest": "sha256:2aeb6e65d0bf5beddb212dbb9cfb9eee6bab89d9943fd9ca69424e2955dd6860",
+      "content_digest": "sha256:444919e2e5637486ff4e9414734a285ca70eae21e942331165a9a58a2d75fb38",
       "package_path": "assets/workflows/execution.lad/entrypoints/lad_troubleshooter.md"
     },
     {
@@ -141,7 +152,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "execution.skills.troubleshooter_core",
-      "content_digest": "sha256:7cc8d9a63fb6ed147c92fa57d4dcd4baf72211ddd18bc24fccab058ee052abb0",
+      "content_digest": "sha256:4a176a8600b0d3568f0dcfd1264a90c3bac084eb2bc86ddcae39f8a44a31abeb",
       "package_path": "assets/workflows/execution.lad/skills/troubleshooter-core.md"
     },
     {
@@ -161,7 +172,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "lad.full.pi.entrypoints.lad_arbiter",
-      "content_digest": "sha256:2fbfc809bb54d9879d5218bc071deb3b1ad21ea2e5bed5f9aefb3f2d07cc63a7",
+      "content_digest": "sha256:9e6b871a83898874637dedda08372aa88504b4dbe52aae0b5a2948c212d1c5a8",
       "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_arbiter.md"
     },
     {
@@ -196,12 +207,12 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "lad.full.pi.entrypoints.lad_manager",
-      "content_digest": "sha256:c3b4388323830ea2db38df4c5ed56a43fa2100101a9cea5b2678bb3761771e16",
+      "content_digest": "sha256:802d66b9c222ef9e537ebdb8831367276dedad9b9d1a22077adb4c212057026e",
       "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_manager.md"
     },
     {
       "asset_id": "lad.full.pi.entrypoints.lad_mechanic",
-      "content_digest": "sha256:39a8dbaca97797da5c6bb3299244c2815e9dd8b3c200b0c27ba2927580356beb",
+      "content_digest": "sha256:d4575960ed71457e0e439528df12a643a075f4c6b8993bfa60b30d9d256b00dd",
       "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_mechanic.md"
     },
     {
@@ -211,7 +222,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "lad.full.pi.entrypoints.lad_troubleshooter",
-      "content_digest": "sha256:857cb9c4c28f44e4a0904b30dfae2c6ef846482a8bd06dbb28dccb07716ac255",
+      "content_digest": "sha256:db2e33d81436d16fea04314697ccad722770ff2d5418fc4d0261375062d0f775",
       "package_path": "assets/workflows/lad.full.pi/entrypoints/lad_troubleshooter.md"
     },
     {
@@ -251,7 +262,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "lad.full.pi.skills.manager_core",
-      "content_digest": "sha256:8b9d0f1b4ab5b8121941f621dc114ad760aae52ea2274f6c8801c4e248b6d871",
+      "content_digest": "sha256:46959e18379a1f469ec1b85817bbea530e67af79cc733e453317041f8ae0496a",
       "package_path": "assets/workflows/lad.full.pi/skills/manager-core.md"
     },
     {
@@ -321,12 +332,12 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "planning.entrypoints.lad_manager",
-      "content_digest": "sha256:df6282f2762296119aa2a31b8e68997c6fcc40de0bd82fb96c910bb997399aef",
+      "content_digest": "sha256:b48b106bfe124940e96ccea8b95c6c122762b80376990284f6ae2c30b228d2ca",
       "package_path": "assets/workflows/planning.lad/entrypoints/lad_manager.md"
     },
     {
       "asset_id": "planning.entrypoints.lad_mechanic",
-      "content_digest": "sha256:163b18d2ec8db02319e1fbfd6eb3568fb1e6217c53832e9a6681c5341db155fc",
+      "content_digest": "sha256:79aeff093cfd5047e6cb213e9eca9600d5654dba8a8c6e3a256e2ed533b93224",
       "package_path": "assets/workflows/planning.lad/entrypoints/lad_mechanic.md"
     },
     {
@@ -351,7 +362,7 @@ which workflow behavior should be official.
     },
     {
       "asset_id": "planning.skills.manager_core",
-      "content_digest": "sha256:4a2743ab0211929f686eec48a2347f5053570e79acd9221955bbf5c2c25ad811",
+      "content_digest": "sha256:5669e37c99f4afba61e3a75f1a3bc17607d81467e4909cd78f7d0c9d54796f5c",
       "package_path": "assets/workflows/planning.lad/skills/manager-core.md"
     },
     {
@@ -517,7 +528,9 @@ which workflow behavior should be official.
 
 ## Private candidate boundary
 
-The unpublished 0.22.4 package contains the opt-in private `lad.full.pi@0.1`
-variant alongside the six public workflows. Core owns runtime behavior; Plus
-contains package data and no CLI or provider code. Package identity checks do
-not establish actual-model qualification or publication.
+The unpublished 0.22.4 package retains private `demo@0.1` data and the opt-in
+`lad.full.pi@0.1` variant alongside the six public workflows. The demo selects
+an exact matching Core 0.22.4 provider identity and a private synthetic policy;
+Core owns the command and execution. Plus contains no CLI or provider code.
+Package and demo identity checks do not establish actual-model qualification
+or publication.

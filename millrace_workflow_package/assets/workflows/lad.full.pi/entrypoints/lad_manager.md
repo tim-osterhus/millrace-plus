@@ -37,12 +37,13 @@ Process:
 2. Treat `source_request` as the authoritative requirements and
    `planning_result` as analysis. Choose the smallest meaningful task-card set
    supported by both.
-3. For `MANAGER_COMPLETE`, produce exact selected `planning.artifacts.task_cards` JSON: `artifact_kind` must be `task_cards`, and each card may contain only `task_card_id`, `title`, and `body`.
-4. Put owner stage, dependency, acceptance, verification, and evidence details inside each card `body` or runner report text, not as undeclared task-card JSON fields.
-5. Copy every exact literal, path, completion definition, and constraint needed
+3. For `MANAGER_COMPLETE`, produce exact selected `planning.artifacts.task_cards` JSON: `artifact_kind` must be `task_cards`, and each card may contain only `task_card_id`, `title`, `body`, and `depends_on_task_card_ids`.
+4. In every card, set `depends_on_task_card_ids` to the exact IDs of prerequisite cards in this same Manager artifact. Use the empty array `[]` for an independent card. Do not use prose, numbering, or ID ordering as a substitute for this field; avoid duplicate, self, unknown, or cyclic references.
+5. Put owner stage, acceptance, verification, and evidence details inside each card `body` or runner report text, not as undeclared task-card JSON fields.
+6. Copy every exact literal, path, completion definition, and constraint needed
    by the owner stage into the card `body`. Never replace required source data
    with phrases such as "as requested" or a source identifier.
-6. Preserve assumptions, missing inputs, and exact evidence references.
+7. Preserve assumptions, missing inputs, and exact evidence references.
 
 Legal terminal markers rendered by runtime:
 - `MANAGER_COMPLETE` when the selected task-card or stage-result artifact is complete and evidence-backed.

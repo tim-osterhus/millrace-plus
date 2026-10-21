@@ -42,9 +42,9 @@ The package contains six workflow entries, all version `0.1`:
 - `lad.full`
 - `vendor_selection`
 
-The current private source candidate `0.22.4` adds opt-in
-`lad.full.pi@0.1` with seventeen copied entrypoint assets plus one inert
-transport note. It targets Core `>=0.22.4,<0.23`. Core owns
+The current private source candidate `0.22.4` retains `demo@0.1`
+and adds opt-in `lad.full.pi@0.1` with seventeen copied entrypoint assets plus
+one inert transport note. It targets Core `>=0.22.4,<0.23`. Core owns
 runtime behavior; Plus supplies data only. The reviewed Core capacity
 descriptor and accepted PI-B02 assets are retained. The retained predecessor pair passed fresh wheel/sdist qualification for a
 five-stage coding route with real stock-Pi tools and a scripted provider on

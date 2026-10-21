@@ -53,9 +53,9 @@ PACKAGE_ID = "millrace.plus.official"
 PACKAGE_VERSION = "0.22.4"
 WORKFLOW_ID = "planning.lad"
 _MECHANIC_ASSET_ID = "planning.entrypoints.lad_mechanic"
-_EXPECTED_MECHANIC_ASSET_BYTE_LENGTH = 7447
+_EXPECTED_MECHANIC_ASSET_BYTE_LENGTH = 8575
 _EXPECTED_MECHANIC_ASSET_DIGEST = (
-    "sha256:163b18d2ec8db02319e1fbfd6eb3568fb1e6217c53832e9a6681c5341db155fc"
+    "sha256:79aeff093cfd5047e6cb213e9eca9600d5654dba8a8c6e3a256e2ed533b93224"
 )
 RECON_WORKFLOW_IDS = ("planning.lad", "lad.full")
 ARBITER_WORKFLOW_IDS = ("planning.lad", "lad.full")
@@ -387,6 +387,7 @@ def _arbiter_root_state(
                     "task_card_id": "arbiter-proof-card",
                     "title": "Arbiter proof",
                     "body": "The root contract is ready for closure evaluation.",
+                    "depends_on_task_card_ids": [],
                 }
             ],
         },
@@ -653,6 +654,7 @@ def _settle_arbiter_returned_auditor(
                     "task_card_id": f"{tag}-card",
                     "title": "Recovered evidence",
                     "body": "The returned evidence is settled.",
+                    "depends_on_task_card_ids": [],
                 }
             ],
         },
@@ -1235,6 +1237,7 @@ def test_selected_arbiter_evaluations_reuse_rubric_and_bound_post_anchor_evidenc
                         "task_card_id": "arbiter-returned-card",
                         "title": "Recovered evidence",
                         "body": "The returned evidence is settled.",
+                        "depends_on_task_card_ids": [],
                     }
                 ],
             }
@@ -1707,7 +1710,7 @@ def test_official_recon_workflows_preserve_independent_terminal_authority(
         if str(action.stage_kind_id) == "recon"
     }
 
-    assert set(outcomes) == set(expected)
+    assert set(outcomes) == set(expected) | {"RUNTIME_FAILURE"}
     for marker, expected_authority in expected.items():
         outcome = outcomes[marker]
         action = actions[str(outcome.id)]
@@ -1732,6 +1735,14 @@ def test_official_recon_workflows_preserve_independent_terminal_authority(
             else str(action.artifact_schema_id),
         )
         assert observed_authority == expected_authority
+    runtime_outcome = outcomes["RUNTIME_FAILURE"]
+    runtime_action = actions[str(runtime_outcome.id)]
+    assert str(runtime_outcome.id) == "planning.recon.runtime_failed"
+    assert runtime_action.action_kind == "recovery_route"
+    assert runtime_action.artifact_schema_id is None
+    assert str(runtime_action.target_stage_kind_id) == "lad_mechanic"
+    assert str(runtime_action.runner_binding_id) == "lad_mechanic.millforge_runner"
+    assert runtime_action.target_graph_node_id == "planning.lad.mechanic.start"
 
 
 def _recon_provider_bundle(plan: object, tmp_path: Path) -> dict[str, Any]:
@@ -2557,6 +2568,7 @@ def test_arbiter_selected_authority_is_one_strict_verdict_contract(
     actions_by_marker = {
         str(outcome.marker): actions[str(outcome.id)]
         for outcome in outcomes.values()
+        if actions[str(outcome.id)].action_kind != "recovery_route"
     }
     assert set(actions_by_marker) == {
         "ARBITER_COMPLETE",
@@ -2571,6 +2583,14 @@ def test_arbiter_selected_authority_is_one_strict_verdict_contract(
         "REMEDIATION_NEEDED": "planning.artifacts.verdict",
         "BLOCKED": "planning.artifacts.verdict",
     }
+    runtime_outcome = next(
+        outcome for outcome in outcomes.values() if outcome.marker == "RUNTIME_FAILURE"
+    )
+    runtime_action = actions[str(runtime_outcome.id)]
+    assert runtime_action.action_kind == "recovery_route"
+    assert runtime_action.artifact_schema_id is None
+    assert str(runtime_action.target_stage_kind_id) == "lad_mechanic"
+    assert str(runtime_action.runner_binding_id) == "lad_mechanic.millforge_runner"
     assert (
         tuple(str(schema_id) for schema_id in behavior.evidence_artifact_schema_ids)
         == EXPECTED_CLOSURE_EVIDENCE_SCHEMA_IDS[workflow_id]

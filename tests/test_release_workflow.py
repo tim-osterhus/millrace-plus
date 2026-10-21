@@ -7,8 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "publish-to-pypi.yml"
-WHEEL = "millrace_plus-0.22.3-py3-none-any.whl"
-SDIST = "millrace_plus-0.22.3.tar.gz"
+WHEEL = "millrace_plus-0.22.4-py3-none-any.whl"
+SDIST = "millrace_plus-0.22.4.tar.gz"
 ACTION_PINS = {
     "actions/checkout": "df4cb1c069e1874edd31b4311f1884172cec0e10",
     "astral-sh/setup-uv": "37802adc94f370d6bfd71619e3f0bf239e1f3b78",
@@ -81,18 +81,16 @@ def test_release_workflow_accepts_only_exact_project_version_tag() -> None:
     workflow = _workflow()
     with (ROOT / "pyproject.toml").open("rb") as source:
         version = tomllib.load(source)["project"]["version"]
-    published_ref = "refs/tags/v0.22.3"
-
     assert version == "0.22.4"
-    assert _trigger_tags(workflow) == ("v0.22.3",)
+    assert _trigger_tags(workflow) == ("v0.22.4",)
     cases = {
-        published_ref: True,
-        f"refs/tags/v{version}": False,
+        f"refs/tags/v{version}": True,
+        "refs/tags/v0.22.3": False,
         f"refs/tags/{version}": False,
         f"refs/tags/release-v{version}": False,
-        f"{published_ref}-extra": False,
+        "refs/tags/v0.22.4-extra": False,
         "refs/tags/v0.22.1": False,
-        f"{published_ref}rc1": False,
+        f"refs/tags/v{version}rc1": False,
     }
     assert {ref: _accepts_ref(workflow, ref) for ref in cases} == cases
 
@@ -207,12 +205,14 @@ def test_release_workflow_runs_complete_installed_wheel_suite() -> None:
         validate_job.index("- name: Test") : validate_job.index("- name: Lint")
     ]
 
-    assert "MILLRACE_REF: b699ffe3e7dd8a39dc5ce0ca149d469149609257" in validate_job
+    assert re.search(r"MILLRACE_REF: [0-9a-f]{40}\n", validate_job), (
+        "final immutable Core release commit is not sealed"
+    )
     assert (
         "MILLRACE_AI_WHEEL_SHA256: "
-        "5e87f92f2330af30395f35860d319db7e5574367da7995a3613276d0a08f163d"
+        "828ca3b41f4f5dcc11c495001443a86b1e4438ee7256e154f0edf435305cb9fd"
     ) in validate_job
-    assert "MILLRACE_VERSION: 0.22.3" in validate_job
+    assert "MILLRACE_VERSION: 0.22.4" in validate_job
     assert "MILLFORGE_VERSION: 0.1.1" in validate_job
     assert "MILLFORGE_REF:" not in validate_job
     assert "PYTHONPATH=\"$validation_root" not in test_step

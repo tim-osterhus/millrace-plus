@@ -58,7 +58,7 @@ from test_pi_workflow import (
 )
 
 _EXPECTED_FULL_PI_FINGERPRINT = (
-    "sha256:2dbacd9857ab2d93220185f4adbaeb488d3bc6a85b00bb8ebec78d4d7e6dff7d"
+    "sha256:19d832e5187ca56919602498116d95a373e5ba980057c26a4d30501f1cb94154"
 )
 _TASK_PAYLOAD = {
     "task_id": "c05-timeout-recurrence",
@@ -107,6 +107,9 @@ def _operation(name: str) -> RunnerCancellationOperationResult:
 
 def _timeout_adapter(
     monkeypatch: Any,
+    *,
+    failure_kind: str = "timeout",
+    captured_requests: list[AdapterInvocationRequest] | None = None,
 ) -> tuple[AdapterLocalConfig, PiRpcAdapter, list[str]]:
     monkeypatch.setenv("PI_RPC_API_KEY", "local-test-placeholder")
     monkeypatch.setattr(PiRpcConfig, "verify", lambda _self: {})
@@ -126,12 +129,16 @@ def _timeout_adapter(
         admitted = self._admitted.pop(id(request), None)
         assert admitted is not None and admitted[0] is request
         stage_calls.append(request.dispatch_envelope.stage_kind_id)
+        if captured_requests is not None:
+            captured_requests.append(request)
         outcome = self.error(
             request,
-            "timeout",
+            failure_kind,
             diagnostics={
                 "failure_phase": "invocation",
-                "failure_reason": "deadline",
+                "failure_reason": (
+                    "deadline" if failure_kind == "timeout" else "parse_error"
+                ),
             },
         )
         echo = DispatchEcho.from_dispatch_envelope(
@@ -241,6 +248,9 @@ def _failure_records(
     *,
     expected_stage: str,
     fingerprint: str,
+    expected_failure_kind: str = "timeout",
+    expected_work_item_id: str = "work-c05-task",
+    expect_empty_state: bool = True,
 ) -> tuple[RuntimeState, object, object]:
     state = runtime.store.load_runtime_state(runtime.cas_store)
     run_id = cast(str, result.run_id)
@@ -250,11 +260,11 @@ def _failure_records(
     completion = state.runner_session_completions[session_id]
     assert str(run.stage_kind_id) == expected_stage
     assert str(run.run_ref.plan_ref.authority_fingerprint) == fingerprint
-    assert run.work_item_id == "work-c05-task"
+    assert run.work_item_id == expected_work_item_id
     assert run.run_ref.claim_id and run.run_ref.fencing_token
     assert session.state == completion.terminal_state == "failed"
     assert session.cleanup_disposition == completion.cleanup_disposition == "complete"
-    assert completion.adapter_error_kind == "timeout"
+    assert completion.adapter_error_kind == expected_failure_kind
     assert completion.runner_result_evidence_digest is None
     assert runtime_failure_eligible(state, completion)
     payload = runtime.cas_store.get_bytes(completion.diagnostic_digest)
@@ -263,11 +273,20 @@ def _failure_records(
     assert diagnostic.run_id == run_id
     assert diagnostic.stage_kind_id == expected_stage
     assert diagnostic.plan_fingerprint == fingerprint
-    assert diagnostic.diagnostic["error_kind"] == "timeout"
+    assert diagnostic.diagnostic["error_kind"] == expected_failure_kind
     assert runtime_failure_diagnostic_matches(state, completion, payload)
     assert runtime_failure_applied(state, run_id)
-    assert state.runner_observations == {}
-    assert state.artifacts == {}
+    if expect_empty_state:
+        assert state.runner_observations == {}
+        assert state.artifacts == {}
+    else:
+        assert not any(
+            observation.run_id == run_id
+            for observation in state.runner_observations.values()
+        )
+        assert not any(
+            artifact.source_run_id == run_id for artifact in state.artifacts.values()
+        )
     return state, run, completion
 
 

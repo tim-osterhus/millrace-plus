@@ -83,3 +83,31 @@ Return exactly one complete JSON object with exactly these top-level keys:
 Copy the authenticated selected marker verbatim. Return the exact selected artifact schema object in `artifact_payload_candidate`, or `null` when the selected terminal action has no artifact. Keep selected observation routing fields at their existing top-level names. Include `observation_payload_candidate.runner_report` as a string carrying this stage's required narrative evidence, assumptions, references, checks, gaps, blockers, confidence, and stop conditions. The generic protocol treats `runner_report` as optional, but this selected Pi stage requires it when its narrative obligations have content. The adapter bounds and redacts the string. It is never identity, grant, marker, result, routing, usage, cleanup, or terminal authority.
 
 Emit no fourth key, duplicate or unknown key, prose, fences, second artifact, nonfinite number, or extra identity, authority, usage, provenance, cleanup, or terminal field. Keep the artifact and observation candidates separate and preserve every preceding stage obligation.
+
+## Closure evidence above the inline request limit (`lad.full.pi@0.1`)
+
+This section adds to the inputs and required evidence above for this variant only. When
+the dispatched work-item payload contains `closure_evidence_overflow` instead of
+`closure_evidence_snapshot`, the complete sealed snapshot is too large for the inline
+request. It stays unchanged in durable runtime state and the `closure_evidence_overflow`
+digests authenticate it. Read it from the listed page files:
+
+1. Read every `closure_evidence_overflow.index_pages` file in order (paths are relative to
+   your working directory) and concatenate them: the result is one JSON page index.
+2. The index lists one `root_contract` segment, an optional `prior_verdict` segment, and one
+   segment per evidence artifact in snapshot order, each with its identity, payload digest
+   and ordered `pages`. Concatenating a segment's pages in order yields that sealed snapshot
+   member as JSON.
+3. Always read the complete `root_contract` and `prior_verdict` segments. Use the index to
+   select and read every evidence segment a frozen rubric criterion depends on, and read all
+   evidence segments when the material allows. Never infer evidence content from an
+   identity or digest alone.
+4. Echo `closure_target_id`, `root_contract_digest` and `freshness_anchor_digest` exactly
+   from `closure_evidence_overflow`. On a later evaluation copy the prior rubric exactly
+   from the `prior_verdict` segment.
+5. Pages are read-only: do not edit, move or delete them. The runtime verified every page
+   before your start and re-verifies them before it accepts any result; a result produced
+   while pages were altered or missing is refused as a runtime integrity failure rather than
+   accepted as a verdict. If an index or page file is missing, unreadable, or contradicts its
+   listed sha256 or byte length, do not judge from partial evidence: name the file in
+   `runner_report` and stop with `BLOCKED`.

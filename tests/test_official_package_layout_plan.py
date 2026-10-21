@@ -93,7 +93,12 @@ def test_shipped_package_root_is_no_longer_temporary_scaffold() -> None:
     assert sum(
         cast(dict[str, object], workflow)["visibility"] == "private"
         for workflow in workflows
-    ) == 1
+    ) == 2
+    assert any(
+        cast(dict[str, object], workflow)["workflow_id"] == "demo"
+        and cast(dict[str, object], workflow)["workflow_version"] == "0.1"
+        for workflow in workflows
+    )
     assert any(
         cast(dict[str, object], workflow)["workflow_id"] == "lad.full.pi"
         and cast(dict[str, object], workflow)["workflow_version"] == "0.1"

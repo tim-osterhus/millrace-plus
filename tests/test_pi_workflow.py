@@ -50,14 +50,38 @@ PI_SKILL_REMAP = {
     "learning.skills.professor_core": "lad.full.pi.skills.professor_core",
     "learning.skills.curator_core": "lad.full.pi.skills.curator_core",
 }
-PI_RUNTIME_TIMEOUT_ACTIONS = {
+PI_RUNTIME_FAILURE_ACTIONS = {
+    "recon": "planning.recover_recon_runtime_failure",
+    "lad_planner": "planning.recover_planner_runtime_failure",
+    "lad_manager": "planning.recover_manager_runtime_failure",
+    "lad_mechanic": "planning.recover_mechanic_runtime_failure",
+    "lad_auditor": "planning.recover_auditor_runtime_failure",
+    "lad_arbiter": "planning.recover_arbiter_runtime_failure",
     "lad_builder": "execution.recover_builder_runtime_failure",
     "lad_checker": "execution.recover_checker_runtime_failure",
     "lad_fixer": "execution.recover_fixer_runtime_failure",
     "lad_doublechecker": "execution.recover_doublechecker_runtime_failure",
     "lad_updater": "execution.recover_updater_runtime_failure",
     "lad_troubleshooter": "execution.recover_troubleshooter_runtime_failure",
+    "lad_consultant": "execution.recover_consultant_runtime_failure",
 }
+PI_RUNTIME_FAILURE_KINDS = (
+    "invocation_failed",
+    "output_too_large",
+    "result_parse_failed",
+    "result_rejected",
+    "timeout",
+)
+PI_SCHEMA_V6_STAGES = frozenset(
+    {
+        "lad_builder",
+        "lad_checker",
+        "lad_fixer",
+        "lad_doublechecker",
+        "lad_updater",
+        "lad_troubleshooter",
+    }
+)
 
 
 def _manifest() -> dict[str, Any]:
@@ -165,7 +189,7 @@ def _assert_pi_compiled_binding_types(bindings: Sequence[Any]) -> None:
         assert len(stage_ids) == 1
         expected_type = (
             RunnerBindingWithRuntimeFailuresAndPayloadCapacityDeclaration
-            if stage_ids[0] in PI_RUNTIME_TIMEOUT_ACTIONS
+            if stage_ids[0] in PI_RUNTIME_FAILURE_ACTIONS
             else RunnerBindingWithPayloadCapacityDeclaration
         )
         assert type(binding) is expected_type
@@ -199,21 +223,22 @@ def test_pi_workflow_is_private_and_component_free() -> None:
     assert REQUIRED_PI_CAPABILITIES <= set(declarations)
     for binding in selected["runner_bindings"]:
         stage_id = binding["stage_kind_ids"][0]
-        has_runtime_timeout_mapping = stage_id in PI_RUNTIME_TIMEOUT_ACTIONS
+        has_runtime_failure_mapping = stage_id in PI_RUNTIME_FAILURE_ACTIONS
         assert binding["adapter_kind"] == "pi_rpc"
         assert binding["component_pin"] is None
         assert binding["terminal_result_mappings"] == []
         assert binding["schema_version"] == (
-            6 if has_runtime_timeout_mapping else 4
+            6 if stage_id in PI_SCHEMA_V6_STAGES else 4
         )
         assert binding["payload_capacity_pin"] == _capacity_pin()
-        if has_runtime_timeout_mapping:
+        if has_runtime_failure_mapping:
             assert binding["runtime_failure_mappings"] == [
                 {
                     "stage_kind_id": stage_id,
-                    "failure_kind": "timeout",
-                    "action_id": PI_RUNTIME_TIMEOUT_ACTIONS[stage_id],
+                    "failure_kind": failure_kind,
+                    "action_id": PI_RUNTIME_FAILURE_ACTIONS[stage_id],
                 }
+                for failure_kind in PI_RUNTIME_FAILURE_KINDS
             ]
         else:
             assert "runtime_failure_mappings" not in binding
@@ -232,7 +257,7 @@ def test_pi_workflow_declares_followup_stage_timeouts() -> None:
         assert binding["invocation_timeout_seconds"] == expected
 
 
-def test_pi_runtime_timeout_mappings_select_only_owned_recovery_routes() -> None:
+def test_pi_runtime_failure_mappings_select_only_owned_recovery_routes() -> None:
     manifest = _manifest()
     selected = _workflow(manifest, PI_WORKFLOW_ID)["selected_authority"]
     bindings = {
@@ -243,14 +268,15 @@ def test_pi_runtime_timeout_mappings_select_only_owned_recovery_routes() -> None
     outcomes = {outcome["id"]: outcome for outcome in selected["terminal_outcomes"]}
     policies = selected["recovery_policies"]
 
-    for stage_id, action_id in PI_RUNTIME_TIMEOUT_ACTIONS.items():
+    for stage_id, action_id in PI_RUNTIME_FAILURE_ACTIONS.items():
         binding = bindings[stage_id]
         assert binding["runtime_failure_mappings"] == [
             {
                 "stage_kind_id": stage_id,
-                "failure_kind": "timeout",
+                "failure_kind": failure_kind,
                 "action_id": action_id,
             }
+            for failure_kind in PI_RUNTIME_FAILURE_KINDS
         ]
         action = actions[action_id]
         assert action["kind"] == "recovery_route"
@@ -264,7 +290,12 @@ def test_pi_runtime_timeout_mappings_select_only_owned_recovery_routes() -> None
             if action_id in policy["source_recovery_action_ids"]
         ]
         assert len(owners) == 1
-        assert owners[0]["id"] == "execution.runtime_failure_recovery"
+        expected_policy_id = (
+            "planning.runtime_failure_recovery"
+            if PI_RUNTIME_FAILURE_ACTIONS[stage_id].startswith("planning.")
+            else "execution.runtime_failure_recovery"
+        )
+        assert owners[0]["id"] == expected_policy_id
         assert owners[0]["recovery_stage_kind_id"] == action["target_stage_kind_id"]
         target_stage = next(
             item
@@ -274,19 +305,11 @@ def test_pi_runtime_timeout_mappings_select_only_owned_recovery_routes() -> None
         assert target_stage["runner_binding_id"] == action["runner_binding_id"]
 
     for stage_id, binding in bindings.items():
-        if stage_id in PI_RUNTIME_TIMEOUT_ACTIONS:
+        if stage_id in PI_RUNTIME_FAILURE_ACTIONS:
             continue
         assert "runtime_failure_mappings" not in binding
 
-    for workflow in manifest["workflows"]:
-        if workflow["workflow_id"] == PI_WORKFLOW_ID:
-            continue
-        assert all(
-            "runtime_failure_mappings" not in binding
-            for binding in workflow["selected_authority"]["runner_bindings"]
-        )
-
-    mapped_action_ids = set(PI_RUNTIME_TIMEOUT_ACTIONS.values())
+    mapped_action_ids = set(PI_RUNTIME_FAILURE_ACTIONS.values())
     for outcome in selected["terminal_outcomes"]:
         if outcome["marker"] != "RUNTIME_FAILURE_ESCALATE":
             continue
@@ -383,6 +406,28 @@ def test_pi_authority_matches_lad_full_except_explicit_pi_deltas() -> None:
         binding_id = binding["id"]
         binding.clear()
         binding.update(copy.deepcopy(old_bindings[binding_id]))
+    # Explicit intended Pi delta: the only completion-behavior differences from
+    # lad.full are the 131072-byte inline request limit and the request_overflow
+    # declaration. Assert both exactly, then neutralize them to the lad.full values
+    # so the final equality still covers every other field, including the 96-item
+    # evidence limit.
+    old_behaviors = old_selected["completion_behaviors"]
+    pi_behaviors = pi_selected["completion_behaviors"]
+    assert len(pi_behaviors) == len(old_behaviors)
+    for pi_behavior, old_behavior in zip(pi_behaviors, old_behaviors, strict=True):
+        assert pi_behavior["request_payload_byte_limit"] == 131072
+        assert pi_behavior["request_overflow"] == {
+            "policy": "materialized_evidence_pages",
+            "materialization_root": "millrace-closure-evidence",
+            "page_byte_limit": 32768,
+            "max_snapshot_bytes": 8388608,
+            "max_page_count": 1024,
+        }
+        assert pi_behavior["evidence_item_limit"] == 96
+        pi_behavior["request_payload_byte_limit"] = old_behavior[
+            "request_payload_byte_limit"
+        ]
+        del pi_behavior["request_overflow"]
     assert pi_selected == old_selected
 
 
@@ -400,7 +445,7 @@ def test_pi_workflow_compiles_exports_and_is_admission_ready_with_reviewed_core(
     assert result.plan is not None
     assert authority_fingerprint(result.plan).startswith("sha256:")
     assert len(result.plan.completion_behaviors) == 1
-    assert result.plan.completion_behaviors[0].request_payload_byte_limit == 16384
+    assert result.plan.completion_behaviors[0].request_payload_byte_limit == 131072
     _assert_pi_compiled_binding_types(result.plan.runner_bindings)
     assert all(
         payload_capacity_pin_record(binding.payload_capacity_pin) == _capacity_pin()

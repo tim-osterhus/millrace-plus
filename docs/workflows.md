@@ -100,6 +100,15 @@ sources candidates, evaluates them in parallel, joins rubric and conflict
 evidence, and prepares a decision. It stops at a durable operator wait rather
 than approving a purchase autonomously.
 
+## Private `demo`
+
+The source candidate also contains `demo@0.1`, a private data-only decision
+tree copied from the accepted intermediate proof. It retains fanout and join,
+the expected-failure and repair path, an operator wait, and one bounded
+revision before closure. Its two markdown assets describe the entrypoint and
+context contract. Compile checks use a narrowly selected synthetic runner
+policy; no public command or provider execution is included.
+
 ## Private `lad.full.pi`
 
 `lad.full.pi@0.1` is an opt-in private copy of `lad.full` for a bounded Pi RPC
@@ -111,21 +120,81 @@ adds the Pi strict final-text rule: exactly `marker`,
 narrative carried by the optional generic `runner_report` string inside the
 observation candidate when required.
 
-Six Pi bindings explicitly map a trusted runner invocation timeout to their
-selected execution recovery action under `execution.runtime_failure_recovery`:
-Builder, Checker, Fixer, Doublechecker, Updater, and Troubleshooter. The other
-Pi stages have no timeout mapping; domain markers and Pi command timeouts do
-not select this runtime route. Mapping applies only to a trusted failed session
-completion classified as a timeout after cleanup, with no cancellation request.
+The Pi configuration maps five authenticated runtime failure kinds:
+`timeout`, `invocation_failed`, `result_parse_failed`, `output_too_large`, and
+`result_rejected`. Seven execution roles (Builder, Checker, Fixer,
+Doublechecker, Updater, Troubleshooter, and Consultant) route to
+Troubleshooter under the execution recovery policy. Six planning roles (Recon,
+Planner, Manager, Mechanic, Auditor, and Arbiter) route to Mechanic under the
+planning recovery policy. The four learning roles have no default mapping.
 
-The selected Pi bindings are `pi_rpc` with no component pin and no
-runner-produced terminal result mappings; the six trusted timeout mappings
-are separate selected authority. All five existing capability declarations
-remain explicit.
+These mappings cover five Plus workflows. `execution.lad` routes seven
+execution roles to Troubleshooter. `execution.lad_integrator` routes eight
+roles, including Integrator, to Troubleshooter. `planning.lad`, `lad.full`,
+and `lad.full.pi` route six planning roles to Mechanic and seven execution
+roles, including Consultant, to Troubleshooter.
+
+Only authenticated `ApplyRunnerRuntimeFailure` selects a mapped mechanical
+recovery. It requires a settled authenticated failure: a failed adapter
+completion or a completed candidate with an exact persisted semantic refusal.
+For `result_rejected`, Millrace preserves the original candidate with its
+`COMPLETED/SUCCESS` transport state. A separate persisted semantic refusal
+supplies the typed failure.
+
+Supported authenticated refusals may use the `result_rejected` mapping. Raw
+candidate text cannot create a failure kind or its evidence. Pi command-level
+timeouts cannot create typed failure evidence.
+
+The component-free Pi path parses the exact three-key JSON envelope. The kernel then
+applies the selected plan's declared outcome and action. Pi does not validate
+`marker` against an authored enum.
+
+An authored marker may name `RUNTIME_FAILURE` only when the selected graph
+declares that outcome and an action for it. The kernel follows the declared
+action under the finite policy. This authored marker does not become a typed mechanical failure. The
+`RUNTIME_FAILURE` label alone does not make a marker runtime-owned. Unknown or
+invalid candidates remain refused. Component-bound Millforge separately
+validates provider result mappings.
+
+A proven pre-external `invocation_failed` may map when recorded start intent
+confirms there is no external owner and cleanup is `not_required`. Unclassified
+or indeterminate start exceptions remain fatal. A stage invocation deadline
+maps to `timeout` only after Millrace authenticates the settled completion and
+confirms cleanup. Explicit user or global cancellation does not select the
+typed mapping.
+
+The recovery prompt receives a bounded, redacted diagnostic and recorded
+source references through `governance_context.runtime_failure_source`. It
+uses this handoff as evidence only. The handoff grants no authority or external
+ownership. A semantic refusal or invalid candidate remains rejected. Recovery
+cannot retroactively accept the candidate. Any later candidate must pass
+normal selected validation.
+
+Runtime-failure policies allow one immediate attempt. They start a 15-minute
+cooldown at attempt 2 and quarantine at attempt 3. Recovery returns to the
+recorded source. The runtime refuses recovery if it cannot authenticate source
+evidence, or if the selected policy or action is missing, inconsistent, or
+unsafe.
+
+All seventeen selected Pi bindings use `pi_rpc`. They keep
+`component_pin: null` and empty runner-produced terminal result mappings. All
+select the same Core-owned payload-capacity pin. Six bindings use nested schema
+version 6. Eleven use version 4.
+
+Thirteen execution and planning roles carry typed mappings for the five failure
+kinds. The four learning roles have no default mapping. All five capability
+declarations remain explicit.
+
 The package includes one inert transport note and one opaque conformance
 fixture. The frozen submitted Core wheel currently reports a completion runner
 capacity error for this component-free binding, so the candidate is review
 material and has no live runtime or provider claim. See [Private Pi workflow](pi-workflow.md).
+
+Its closure completion accepts an inline request body up to 131072 bytes. Larger
+evidence uses `materialized_evidence_pages` overflow within the same 96-item
+evidence window. The Millforge-bound `planning.lad` and `lad.full` variants keep
+their 16384-byte limit. The overflow semantics and refusal boundaries are in
+[Private Pi workflow](pi-workflow.md).
 
 ## Choosing A Workflow
 

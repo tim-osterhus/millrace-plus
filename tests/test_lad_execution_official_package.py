@@ -63,9 +63,9 @@ PACKAGE_VERSION = "0.22.4"
 WORKFLOW_IDS = ("execution.lad", "execution.lad_integrator")
 QA_SCOPE_IDS = (*WORKFLOW_IDS, "planning.lad", "lad.full")
 _REFERENCE_LAD_CANONICAL_AUTHORITY_SHA256 = (
-    "8dac181c51e59d78084d0ad4034f78927d9823ef0c1a64ff48ae0bd01f05221d"
+    "0b668a02b9e85c1df9922d9f50072f27a383853e55564a4ad44d92c25c342970"
 )
-_REFERENCE_LAD_CANONICAL_AUTHORITY_BYTE_LENGTH = 68722
+_REFERENCE_LAD_CANONICAL_AUTHORITY_BYTE_LENGTH = 74054
 _REFERENCE_LAD_SELECTED_ASSET_PINS = (
     (
         "execution.entrypoints.lad_builder",
@@ -109,11 +109,11 @@ _REFERENCE_LAD_SELECTED_ASSET_PINS = (
     ),
     (
         "execution.entrypoints.lad_troubleshooter",
-        "sha256:2aeb6e65d0bf5beddb212dbb9cfb9eee6bab89d9943fd9ca69424e2955dd6860",
+        "sha256:444919e2e5637486ff4e9414734a285ca70eae21e942331165a9a58a2d75fb38",
     ),
     (
         "execution.skills.troubleshooter_core",
-        "sha256:7cc8d9a63fb6ed147c92fa57d4dcd4baf72211ddd18bc24fccab058ee052abb0",
+        "sha256:4a176a8600b0d3568f0dcfd1264a90c3bac084eb2bc86ddcae39f8a44a31abeb",
     ),
     (
         "execution.entrypoints.lad_consultant",
@@ -151,6 +151,7 @@ _COMMON_RECOVERY_ROUTE_IDS = frozenset(
         "execution.recover_updater_runtime_failure",
         "execution.escalate_troubleshooter_blocked_exhausted",
         "execution.recover_troubleshooter_runtime_failure",
+        "execution.recover_consultant_runtime_failure",
     }
 )
 _COMMON_RETURN_ACTION_IDS = frozenset(
@@ -1381,6 +1382,7 @@ def test_execution_lad_recovery_wait_and_intervention_authority_is_exact() -> No
             "doublechecker",
             "updater",
             "troubleshooter",
+            "consultant",
         )
     )
     assert {str(wait.id) for wait in plan.wait_states} == {

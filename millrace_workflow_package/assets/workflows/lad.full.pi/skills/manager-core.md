@@ -23,8 +23,9 @@ Each `cards` item:
 | `task_card_id` | yes | string; min_length 1 | Stable task-card identifier. |
 | `title` | yes | string; min_length 1 | Short task title. |
 | `body` | yes | string; min_length 1 | Complete task instruction and verification detail. |
+| `depends_on_task_card_ids` | yes | array of non-empty strings; empty is allowed | Exact `task_card_id` values for prerequisite cards in this same artifact. An empty array means this card is independent. |
 
-No additional artifact keys are allowed beyond the dispatch-selected `planning.artifacts.task_cards` schema. Put owner stages, dependencies, acceptance criteria, verification notes, assumptions, and evidence in each card `body` or runner report text; do not add undeclared JSON fields for them.
+No additional artifact keys are allowed beyond the dispatch-selected `planning.artifacts.task_cards` schema. Put dependency edges in `depends_on_task_card_ids`; keep owner stages, acceptance criteria, verification notes, assumptions, and evidence in each card `body` or runner report text. Every dependency must name another exact card ID from the same Manager artifact. Avoid duplicate, self, unknown, or cyclic references.
 
 The selected route provides `planning_result` and `source_request`.
 `source_request` is authoritative for requested behavior and exact constraints;
@@ -53,7 +54,8 @@ Keep narrative evidence out of the artifact unless the selected schema declares 
       {
         "task_card_id": "create-deterministic-result",
         "title": "Create deterministic result file",
-        "body": "Create result.txt in the assigned workspace containing exactly: preserved literal. Verify the file exists, its full content is exactly preserved literal., and no paths outside the assigned workspace are used."
+        "body": "Create result.txt in the assigned workspace containing exactly: preserved literal. Verify the file exists, its full content is exactly preserved literal., and no paths outside the assigned workspace are used.",
+        "depends_on_task_card_ids": []
       }
     ]
   },
@@ -63,7 +65,8 @@ Keep narrative evidence out of the artifact unless the selected schema declares 
       {
         "task_card_id": "create-deterministic-result",
         "title": "Create deterministic result file",
-        "body": "Create result.txt in the assigned workspace containing exactly: preserved literal. Verify the file exists, its full content is exactly preserved literal., and no paths outside the assigned workspace are used."
+        "body": "Create result.txt in the assigned workspace containing exactly: preserved literal. Verify the file exists, its full content is exactly preserved literal., and no paths outside the assigned workspace are used.",
+        "depends_on_task_card_ids": []
       }
     ],
     "runner_report": "Manager evidence supports the selected MANAGER_COMPLETE result."
@@ -148,6 +151,8 @@ Type mismatch:
 - The successful artifact body and observation payload candidate are schema-identical when the wrapper asks for an observation payload candidate.
 - Observation payload candidates contain no source IDs, selected action IDs, outcome IDs, route targets, route metadata, evidence arrays, assumptions arrays, owner-stage fields, dependency arrays, or downstream context unless selected schema declares them.
 - Evidence supports the task-card content and marker choice.
+- Every card declares its exact same-artifact prerequisites in `depends_on_task_card_ids`; use an empty array for an independent card.
+- The dependency lists contain no duplicate, self, unknown, or cyclic references.
 - Every source literal, path, completion definition, and constraint needed by
   the owner stage is present verbatim in the task-card body.
 - Terminal marker is legal for `lad_manager` in the selected workflow.

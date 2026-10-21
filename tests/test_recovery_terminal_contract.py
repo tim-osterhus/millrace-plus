@@ -26,6 +26,7 @@ from millrace.adapters.runner_contract import (
 from millrace.compiler import authority_fingerprint
 from millrace.contracts import QueueFamilyId
 from millrace.contracts.compiled_plan import SelectedCompiledPlan
+from millrace.contracts.runtime_failures import runtime_failure_applied
 from millrace.contracts.transition import (
     AdmitPlan,
     ClaimWork,
@@ -34,9 +35,9 @@ from millrace.contracts.transition import (
     RunnerResultObserved,
     SelectDefaultPlan,
     TimerDue,
+    artifact_payload_digest,
 )
 from millrace.kernel import apply, decide, empty_runtime_state
-from millrace.kernel.projection import artifact_payload_digest
 
 from support.public_runtime_fakes import (
     deterministic_context,
@@ -45,6 +46,7 @@ from support.public_runtime_fakes import (
 from test_pi_runtime_failure_recovery import (
     _TASK_PAYLOAD,
     _accepted,
+    _failure_records,
     _reopen,
     _runtime,
     _timeout_adapter,
@@ -109,6 +111,7 @@ def _success_adapter(
     marker: str = "TROUBLESHOOT_COMPLETE",
     artifact_payload: Mapping[str, object] | None = _REPORT,
     observation_payload: Mapping[str, object] | None = None,
+    captured_requests: list[AdapterInvocationRequest] | None = None,
 ) -> tuple[AdapterLocalConfig, list[str]]:
     monkeypatch.setenv("PI_RPC_API_KEY", "local-test-placeholder")
     monkeypatch.setattr(PiRpcConfig, "verify", lambda _self: {})
@@ -128,6 +131,8 @@ def _success_adapter(
         admitted = self._admitted.pop(id(request), None)
         assert admitted is not None and admitted[0] is request
         stage_calls.append(request.dispatch_envelope.stage_kind_id)
+        if captured_requests is not None:
+            captured_requests.append(request)
         echo = DispatchEcho.from_dispatch_envelope(
             request.dispatch_envelope,
             correlation_id=request.correlation_id,
@@ -663,8 +668,7 @@ def test_selected_pi_complete_preserves_authenticated_existing_qa_context(
             local_config=runtime_failure_config,
         )
         assert (
-            runtime_failure.code == "observation_accepted"
-            and runtime_failure.accepted
+            runtime_failure.code == "observation_accepted" and runtime_failure.accepted
         )
         runtime = _reopen(runtime)
         after_failure = runtime.store.load_runtime_state(runtime.cas_store)
@@ -716,5 +720,205 @@ def test_selected_pi_complete_preserves_authenticated_existing_qa_context(
         ].payload
         assert returned_payload["qa_context"] == source_qa_context
         assert returned_payload["troubleshooter_evidence"] == _REPORT
+    finally:
+        runtime.close()
+
+
+def test_selected_pi_parse_failure_returns_to_recorded_source_with_checker_baseline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state, _plan, fingerprint = _selected_initial_state(
+        tmp_path,
+        dict(_TASK_PAYLOAD),
+    )
+    runtime = _runtime(tmp_path, state)
+    try:
+        builder_config, builder_stages = _success_adapter(
+            monkeypatch,
+            marker="BUILDER_COMPLETE",
+            artifact_payload={
+                "artifact_kind": "execution.artifacts.stage_result",
+                "summary": "The implementation is ready for review.",
+            },
+            observation_payload=None,
+        )
+        builder_complete = run_bounded_execution_unit(
+            runtime,
+            activation_id="activation-c19-builder",
+            local_config=builder_config,
+        )
+        assert (
+            builder_complete.code == "observation_accepted"
+            and builder_complete.accepted
+        )
+        assert builder_stages == ["lad_builder"]
+        after_builder = runtime.store.load_runtime_state(runtime.cas_store)
+        builder_route = next(
+            route
+            for route in after_builder.activation_routes
+            if route.source_run_id == builder_complete.run_id
+        )
+        checker_activation = after_builder.activations[
+            builder_route.target_activation_id
+        ]
+        initial_payload = after_builder.work_items[
+            checker_activation.work_item_id
+        ].payload
+        initial_qa_context = initial_payload["qa_context"]
+        assert initial_qa_context["task_contract"] == _TASK_PAYLOAD
+
+        checker_artifact = {
+            "artifact_kind": "execution.artifacts.checker_result",
+            "summary": "The declared task criteria passed review.",
+            "task_contract_digest": initial_qa_context["task_contract_digest"],
+            "criteria": [
+                {
+                    "criterion_id": "task-contract",
+                    "requirement": "Satisfy the supplied task contract.",
+                    "evidence_rule": "Review the completed implementation.",
+                }
+            ],
+            "findings": [],
+            "observations": [
+                {
+                    "observation_id": "criteria-reviewed",
+                    "summary": "The declared task criteria were checked.",
+                }
+            ],
+            "checks": [
+                {
+                    "check_id": "review-check",
+                    "command_or_method": "Selected Checker review.",
+                    "result": "passed",
+                }
+            ],
+        }
+        checker_config, checker_stages = _success_adapter(
+            monkeypatch,
+            marker="CHECKER_PASS",
+            artifact_payload=checker_artifact,
+            observation_payload=None,
+        )
+        checker_pass = run_bounded_execution_unit(
+            runtime,
+            activation_id=checker_activation.activation_id,
+            local_config=checker_config,
+        )
+        assert checker_pass.code == "observation_accepted" and checker_pass.accepted
+        assert checker_stages == ["lad_checker"]
+        after_checker = runtime.store.load_runtime_state(runtime.cas_store)
+        checker_route = next(
+            route
+            for route in after_checker.activation_routes
+            if route.source_run_id == checker_pass.run_id
+        )
+        source_activation = after_checker.activations[
+            checker_route.target_activation_id
+        ]
+        assert str(source_activation.stage_kind_id) == "lad_updater"
+        checker_work_item_id = source_activation.work_item_id
+        source_payload = after_checker.work_items[checker_work_item_id].payload
+        checker_qa_context = source_payload["qa_context"]
+        assert artifact_payload_digest(checker_qa_context["checker_baseline"]) == (
+            artifact_payload_digest(checker_artifact)
+        )
+        assert checker_qa_context["checker_baseline_digest"] == artifact_payload_digest(
+            checker_artifact
+        )
+
+        failure_config, _failure_adapter, failed_stages = _timeout_adapter(
+            monkeypatch,
+            failure_kind="result_parse_failed",
+        )
+        source_failure = run_bounded_execution_unit(
+            runtime,
+            activation_id=source_activation.activation_id,
+            local_config=failure_config,
+        )
+        assert source_failure.code == "runtime_failure_recovery_applied"
+        assert source_failure.accepted is True
+        assert failed_stages == ["lad_updater"]
+        after_failure, failed_run, completion = _failure_records(
+            runtime,
+            source_failure,
+            expected_stage="lad_updater",
+            fingerprint=fingerprint,
+            expected_failure_kind="result_parse_failed",
+            expected_work_item_id=checker_work_item_id,
+            expect_empty_state=False,
+        )
+        assert after_failure.work_items[checker_work_item_id].payload == source_payload
+        assert not any(
+            observation.run_id == failed_run.run_ref.run_id
+            for observation in after_failure.runner_observations.values()
+        )
+        failure_route = next(
+            route
+            for route in after_failure.activation_routes
+            if route.created_by_input_id == completion.application_input_id
+        )
+        troubleshooter = after_failure.activations[failure_route.target_activation_id]
+        assert str(troubleshooter.stage_kind_id) == "lad_troubleshooter"
+        assert troubleshooter.work_item_id == checker_work_item_id
+
+        runtime = _reopen(runtime)
+        recovery_requests: list[AdapterInvocationRequest] = []
+        recovered_config, recovered_stages = _success_adapter(
+            monkeypatch,
+            marker="TROUBLESHOOT_RECOVERED",
+            artifact_payload=_REPORT,
+            observation_payload=None,
+            captured_requests=recovery_requests,
+        )
+        recovered = run_bounded_execution_unit(
+            runtime,
+            activation_id=troubleshooter.activation_id,
+            local_config=recovered_config,
+        )
+        assert recovered.code == "observation_accepted" and recovered.accepted
+        assert recovered_stages == ["lad_troubleshooter"]
+        source = recovery_requests[0].dispatch_envelope.governance_context[
+            "runtime_failure_source"
+        ]
+        assert source["failure_kind"] == "result_parse_failed"
+        assert source["source_run_id"] == failed_run.run_ref.run_id
+        assert source["source_session_id"] == completion.session_id
+        assert source["source_stage_kind_id"] == "lad_updater"
+        assert source["diagnostic"]["error_kind"] == "result_parse_failed"
+        assert source["diagnostic_digest"] == completion.diagnostic_digest
+        after_return = runtime.store.load_runtime_state(runtime.cas_store)
+        recovered_observation = next(
+            observation
+            for observation in after_return.runner_observations.values()
+            if observation.run_id == recovered.run_id
+        )
+        return_route = next(
+            route
+            for route in after_return.activation_routes
+            if route.created_by_input_id == recovered_observation.created_by_input_id
+        )
+        assert (
+            str(return_route.action_id) == "execution.return_troubleshooter_recovered"
+        )
+        returned_checker = after_return.activations[return_route.target_activation_id]
+        assert str(returned_checker.stage_kind_id) == "lad_updater"
+        assert returned_checker.graph_node_id == source_activation.graph_node_id
+        assert returned_checker.work_item_id == checker_work_item_id
+        returned_payload = after_return.work_items[
+            returned_checker.work_item_id
+        ].payload
+        assert returned_payload["qa_context"] == checker_qa_context
+        assert artifact_payload_digest(
+            returned_payload["qa_context"]["checker_baseline"]
+        ) == artifact_payload_digest(checker_artifact)
+        assert (
+            returned_payload["qa_context"]["checker_baseline_digest"]
+            == (checker_qa_context["checker_baseline_digest"])
+        )
+        assert (
+            after_return.runner_session_completions[completion.session_id] == completion
+        )
+        assert runtime_failure_applied(after_return, failed_run.run_ref.run_id)
     finally:
         runtime.close()

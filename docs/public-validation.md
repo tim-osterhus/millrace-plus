@@ -63,27 +63,74 @@ The manifest evidence is maintained in
 `docs/manifest-authoring-policy.md` and verified by
 `tests/test_manifest_authoring_policy.py`.
 
-Run the complete suite, including the two Git-dependent LAD cases, before
-final release; earlier packet exclusions are not permanent exclusions from
-this command.
+The unpublished 0.22.4 candidate also validates private `demo@0.1` with the
+matched Core wheel and a narrowly selected synthetic runner policy. Run the
+complete suite, including the two Git-dependent LAD cases, before final release;
+earlier packet exclusions are not permanent exclusions from this command.
 
 ## Private Pi candidate checks
 
 The current private source candidate `0.22.4` targets Core
 `>=0.22.4,<0.23` and is checked as data only. The package manifest must
-retain the six public workflows and the private `lad.full.pi@0.1` entry
-with seventeen selected Pi entrypoints. Each Pi
+retain the six public workflows, the private demo, and the private
+`lad.full.pi@0.1` entry with seventeen selected Pi entrypoints. Each Pi
 entrypoint must retain its inherited domain and evidence obligations and carry
 the strict three-key final-text rule with an optional generic `runner_report`
 string inside the observation candidate. The selected bindings remain
 component-free `pi_rpc` with the existing capability declarations and empty
-runner-produced `terminal_result_mappings`. Six execution-stage bindings use
-nested schema version 6 to map trusted runtime timeouts to their selected
-`RUNTIME_FAILURE` recovery actions; the other eleven bindings have no runtime
-failure mapping. An agent's marker text and Pi command timeout do not trigger
-these mappings. The package version and compatibility range do not establish
-schema or runtime support by themselves; qualify against the repaired Core
-artifact by exact digest through the wheel-based full-suite command above.
+runner-produced `terminal_result_mappings`. Six of the seventeen bindings
+use nested schema version 6. The other eleven use version 4. Thirteen roles
+map five authenticated failure kinds. Seven execution roles route to
+Troubleshooter, and six planning roles route to Mechanic. The four learning
+roles have no default mapping. The five kinds are `timeout`,
+`invocation_failed`, `result_parse_failed`, `output_too_large`, and
+`result_rejected`.
+
+Only authenticated `ApplyRunnerRuntimeFailure` selects a mapped mechanical
+recovery. It requires a settled authenticated failure: a failed adapter
+completion or a completed candidate with an exact persisted semantic refusal.
+For `result_rejected`, Millrace preserves the original candidate with its
+`COMPLETED/SUCCESS` transport state. A separate persisted semantic refusal
+supplies the typed failure.
+
+Supported authenticated refusals may use the `result_rejected` mapping. Raw
+candidate text cannot create a failure kind or its evidence. Pi command-level
+timeouts cannot create typed failure evidence.
+
+The component-free Pi path parses the exact three-key JSON envelope. The kernel then
+applies the selected plan's declared outcome and action. Pi does not validate
+`marker` against an authored enum.
+
+An authored marker may name `RUNTIME_FAILURE` only when the selected graph
+declares that outcome and an action for it. The kernel follows the declared
+action under the finite policy. This authored marker does not become a typed mechanical failure. The
+`RUNTIME_FAILURE` label alone does not make a marker runtime-owned. Unknown or
+invalid candidates remain refused. Component-bound Millforge separately
+validates provider result mappings.
+
+A proven pre-external `invocation_failed` may map when recorded start intent
+confirms there is no external owner and cleanup is `not_required`. Unclassified
+or indeterminate start exceptions remain fatal. A stage invocation deadline
+maps to `timeout` only after Millrace authenticates the settled completion and
+confirms cleanup. Explicit user or global cancellation does not select the
+typed mapping.
+
+The recovery prompt receives a bounded, redacted diagnostic and recorded
+source references through `governance_context.runtime_failure_source`. It
+uses this handoff as evidence only. The handoff grants no authority or external
+ownership. A semantic refusal or invalid candidate remains rejected. Recovery
+cannot retroactively accept the candidate. Any later candidate must pass
+normal selected validation.
+
+Runtime-failure policies allow one immediate attempt. They start a 15-minute
+cooldown at attempt 2 and quarantine at attempt 3. Recovery returns to the
+recorded source. The runtime refuses recovery if it cannot authenticate source
+evidence, or if the selected policy or action is missing, inconsistent, or
+unsafe.
+
+The package version and compatibility range do not establish schema or runtime
+support by themselves; qualify against the repaired Core artifact by exact
+digest through the wheel-based full-suite command above.
 
 The reviewed Core capacity descriptor and accepted PI-B02 assets are retained.
 The predecessor has reviewed partial capacity and scripted text-tool evidence;

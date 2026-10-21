@@ -28,7 +28,7 @@ WORKFLOW_SELECTORS = {
     ("lad.full", "0.1"),
     ("vendor_selection", "0.1"),
 }
-PRIVATE_WORKFLOW_SELECTORS = {("lad.full.pi", "0.1")}
+PRIVATE_WORKFLOW_SELECTORS = {("demo", "0.1"), ("lad.full.pi", "0.1")}
 
 _ROOT_AUTHORITY_FIELDS = (
     "record_kind",
@@ -358,7 +358,7 @@ def test_official_manifest_and_declared_assets_match_shipped_bytes() -> None:
         str(asset["asset_id"]): str(asset["content_digest"])
         for asset in _assets(manifest)
     }
-    assert len(asset_digests) == 88
+    assert len(asset_digests) == 90
     assert {asset["asset_kind"] for asset in _assets(manifest)} == {
         "entrypoint_prompt",
         "stage_skill",
@@ -463,13 +463,21 @@ def test_selected_arbiter_authority_is_exact_in_both_workflow_manifests(
     assert behavior["request_payload_byte_limit"] == 16384
     assert runner["component_pin"]["max_work_item_payload_bytes"] == 16384
     assert {
-        outcomes[action["outcome_id"]]["marker"]: action["artifact_schema_id"]
+        outcomes[action["outcome_id"]]["marker"]: action.get("artifact_schema_id")
         for action in actions.values()
     } == {
         "ARBITER_COMPLETE": "planning.artifacts.verdict",
         "REMEDIATION_NEEDED": "planning.artifacts.verdict",
         "BLOCKED": "planning.artifacts.verdict",
+        "RUNTIME_FAILURE": None,
     }
+    runtime_action = next(
+        action
+        for action in actions.values()
+        if outcomes[action["outcome_id"]]["marker"] == "RUNTIME_FAILURE"
+    )
+    assert runtime_action["kind"] == "recovery_route"
+    assert runtime_action.get("artifact_schema_id") is None
     assert "marathon-qa-audit" not in json.dumps(
         workflow["selected_authority"],
         sort_keys=True,
@@ -484,7 +492,7 @@ def test_workflow_package_declares_public_workflows_and_private_candidate() -> N
     }
 
     assert selectors == WORKFLOW_SELECTORS | PRIVATE_WORKFLOW_SELECTORS
-    assert len(selectors) == 7
+    assert len(selectors) == 8
     assert not any("control" in workflow_id for workflow_id, _version in selectors)
     assert manifest["dependencies"] == []
 
