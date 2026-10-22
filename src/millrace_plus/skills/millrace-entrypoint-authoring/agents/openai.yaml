@@ -1,4 +1,4 @@
 interface:
-  display_name: "Millrace Entrypoint Authoring"
-  short_description: "Write stage prompts and core handoff skills"
-  default_prompt: "Use $millrace-entrypoint-authoring to write a Millrace stage entrypoint and core handoff skill."
+  display_name: "Author Millrace step instructions"
+  short_description: "Write prompts for graph nodes with explicit outcomes and evidence."
+  default_prompt: "Use $millrace-entrypoint-authoring for graph-v3 workflows, json-v1 results and public controls. Treat this guidance as advisory. The graph owns routing."

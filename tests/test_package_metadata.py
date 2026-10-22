@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ast
 import json
 import os
+import re
 import subprocess
 import sys
 import tarfile
@@ -11,10 +13,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = PROJECT_ROOT / "src" / "millrace_plus" / "skills"
-RELEASE_IDENTITY = "0.22.4"
+RELEASE_IDENTITY = "0.23.0"
 PACKAGE_DOCS = (
     "docs/authoring.md",
-    "docs/manifest-authoring-policy.md",
     "docs/public-validation.md",
     "docs/release.md",
     "docs/workflows.md",
@@ -57,15 +58,24 @@ def test_pyproject_declares_narrow_distribution_metadata() -> None:
     assert pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == [
         "src/millrace_plus"
     ]
-    assert pyproject["tool"]["hatch"]["build"]["targets"]["wheel"][
-        "force-include"
-    ] == {"millrace_workflow_package": "millrace_workflow_package"}
-    assert "docs/*.md" in pyproject["tool"]["hatch"]["build"]["targets"][
-        "sdist"
-    ]["include"]
+    assert (
+        "force-include" not in pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]
+    )
+    assert (
+        "docs/*.md"
+        in pyproject["tool"]["hatch"]["build"]["targets"]["sdist"]["include"]
+    )
 
     project_metadata = pyproject["project"]
-    assert "scripts" not in project_metadata
+    # v0.23 successor: assert "scripts" not in project_metadata
+    #   -> exact console script table
+    assert project_metadata["scripts"] == {
+        "millrace-plus": "millrace_plus.router.cli:cli",
+    }
+    # v0.23 successor: no optional-dependencies table -> exact router extra
+    assert project_metadata["optional-dependencies"] == {
+        "router": ["millrace-ai>=0.23.0,<0.24.0"],
+    }
     assert "gui-scripts" not in project_metadata
     assert "entry-points" not in project_metadata
     assert "entry-points" not in pyproject.get("project", {})
@@ -91,6 +101,8 @@ def test_sdist_includes_package_docs_and_skills(tmp_path: Path) -> None:
             "--out-dir",
             str(tmp_path),
             "--clear",
+            # v0.23 successor: uv build argv without --offline -> with --offline
+            "--offline",
         ],
         cwd=PROJECT_ROOT,
         check=True,
@@ -112,6 +124,7 @@ def test_sdist_includes_package_docs_and_skills(tmp_path: Path) -> None:
                 assert member is not None
                 skill_payloads[relative_path] = member.read()
 
+    assert any(name.endswith("/.github/workflows/public-ci.yml") for name in names)
     for doc_path in PACKAGE_DOCS:
         assert any(name.endswith(f"/{doc_path}") for name in names)
     for skill_path in SKILL_ROOT.rglob("*"):
@@ -126,8 +139,42 @@ def test_source_tree_does_not_shadow_runtime_or_import_private_runtime_code() ->
     source_files = list((PROJECT_ROOT / "src").rglob("*.py"))
     source_text = "\n".join(path.read_text() for path in source_files)
 
-    assert "import millrace" not in source_text
-    assert "from millrace." not in source_text
+    # v0.23 successor: assert "import millrace" / "from millrace." not in source_text
+    #   -> AST allowlist: no millrace imports outside router; inside router only
+    #      millrace.router.{execution,control,cli}, no private "from ... import _"
+    router_root = PROJECT_ROOT / "src" / "millrace_plus" / "router"
+    allowed_router_core = {
+        "millrace.router.execution",
+        "millrace.router.control",
+        "millrace.router.cli",
+    }
+    for path in source_files:
+        text = path.read_text()
+        imported: list[str] = []
+        for node in ast.walk(ast.parse(text, filename=str(path))):
+            if isinstance(node, ast.Import):
+                imported.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                if node.module == "millrace.router":
+                    imported.extend(
+                        f"millrace.router.{alias.name}" for alias in node.names
+                    )
+                else:
+                    imported.append(node.module)
+        core_imports = {name for name in imported if name.split(".")[0] == "millrace"}
+        if router_root in path.parents:
+            assert core_imports <= allowed_router_core, path
+            for forbidden_text in (
+                "millrace.router.store",
+                "millrace.router.records",
+                "sqlite3",
+            ):
+                assert forbidden_text not in text, (path, forbidden_text)
+            assert not re.search(
+                r"from millrace\.router(?:\.[\w.]+)?\s+import\s+_", text
+            ), path
+        else:
+            assert not core_imports, path
     for forbidden in (
         "millrace.kernel",
         "millrace.substrate._",
@@ -139,27 +186,40 @@ def test_source_tree_does_not_shadow_runtime_or_import_private_runtime_code() ->
 
 
 def test_official_package_data_declares_selected_vendor_selection_assets() -> None:
-    manifest_path = PROJECT_ROOT / "millrace_workflow_package" / "manifest.json"
-    package_data_text = ""
-    package_root = PROJECT_ROOT / "millrace_workflow_package"
-    for path in (manifest_path, *package_root.rglob("*.md")):
-        package_data_text += path.read_text()
-
-    assert "vendor_selection" in package_data_text
-    vendor_asset_root = package_root / "assets" / "workflows" / "vendor_selection"
-    assert vendor_asset_root.is_dir()
-    assert len(tuple(vendor_asset_root.rglob("*.md"))) == 18
+    """P5 successor: ordinary new templates replace legacy vendor inventory."""
+    root = PROJECT_ROOT / "src/millrace_plus/workflows"
+    assert sorted(p.name for p in root.iterdir() if p.is_dir()) == [
+        "document-review",
+        "software-change",
+    ]
+    for folder in root.iterdir():
+        if not folder.is_dir():
+            continue
+        graph = json.loads((folder / "workflow.json").read_text())
+        assert graph["format"] == "millrace-router/v3"
+        assert set(graph["planes"]) == {"main"}
+        assert graph["planes"]["main"]["workspace"] == "."
+        assert graph["limits"] == {"max_invocations": 16, "max_elapsed_seconds": 86400}
+        assert graph["defaults"]["timeout_seconds"] == 1800
+        for asset in graph["control_files"]:
+            assert (folder / asset).is_file(), asset
+        assert all("skill" not in name for name in graph["control_files"])
 
 
 def test_plus_candidate_targets_reviewed_core_minimum_and_defers_experiment() -> None:
-    manifest = json.loads(
-        (PROJECT_ROOT / "millrace_workflow_package" / "manifest.json").read_text()
+    """Candidate equality is insufficient; the execution contract remains required."""
+    pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
+    assert pyproject["project"]["optional-dependencies"] == {
+        "router": ["millrace-ai>=0.23.0,<0.24.0"]
+    }
+    assert (
+        "millrace-router-execution/v2"
+        in (PROJECT_ROOT / "src/millrace_plus/router/__init__.py").read_text()
     )
-    package = manifest["package"]
-    assert package["package_version"] == RELEASE_IDENTITY
-    assert package["base_millrace_compatibility"] == ">=0.22.4,<0.23"
-    assert manifest["compatibility"]["base_millrace"] == ">=0.22.4,<0.23"
-    assert "execution.lad_codex_semantic_worktree" not in json.dumps(
-        manifest,
-        sort_keys=True,
-    )
+    for folder in (PROJECT_ROOT / "src/millrace_plus/workflows").iterdir():
+        if folder.is_dir():
+            profile = json.loads((folder / "profiles/claude.json").read_text())
+            assert profile == {
+                "format": "millrace-claude-print-profile/v1",
+                "claude_version": "2.1.296",
+            }

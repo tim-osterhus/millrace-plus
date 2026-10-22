@@ -1,7 +1,8 @@
+"""P5 successors to the historical package-surface tests (stable test IDs)."""
+
 from __future__ import annotations
 
 import ast
-import importlib
 import json
 import os
 import re
@@ -15,179 +16,82 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_TESTS = (
     "tests/test_package_metadata.py",
-    "tests/test_manifest_authoring_policy.py",
-    "tests/test_official_package_layout_plan.py",
-    "tests/test_workflow_package_installed_smoke.py",
     "tests/test_public_package_boundary.py",
     "tests/test_agent_skill_assets.py",
+    "tests/test_public_test_support_boundary.py",
+    "tests/router/test_catalog.py",
 )
 NON_PUBLIC_REGRESSION_TESTS = {
     "tests/test_lad_execution_official_package.py",
     "tests/test_lad_planning_official_package.py",
     "tests/test_simple_loop_governed_context_lifecycle.py",
     "tests/test_workflow_package_manifest.py",
-    "tests/test_demo_official_package.py",
 }
-PUBLIC_DOCS = (
-    "README.md",
-    "docs/workflows.md",
-    "docs/authoring.md",
-    "docs/manifest-authoring-policy.md",
-    "docs/release.md",
-    "docs/public-validation.md",
-)
-RELEASE_IDENTITY = "0.22.4"
-PUBLISHED_BUNDLE_PIN = "`millrace==0.22.3`"
-RELEASED_MEMBER = "`millrace-plus` 0.22.3"
-VERSIONING_RULES = (
-    "Member distributions version independently.",
-    "Each `millrace` meta-distribution release pins one tested combination",
-    "may reuse an unchanged compatible member.",
-)
-STALE_PUBLIC_RELEASE_PHRASES = (
-    "0.0.0",
-    "staging version",
-    "staging package version",
-    "staging metadata",
-    "not yet published",
-    "being prepared",
-    "replace staging metadata",
-    "install both tested distributions together",
-    "`millrace-ai` and `millrace-plus` together",
-    "only `millrace-ai` and `millrace-plus`",
-    "both `millrace-ai` and `millrace-plus`",
-)
+ACTIVE = ["tests/router", *PUBLIC_TESTS[:4]]
 
 
-def _project_text(path: str) -> str:
+def _text(path: str) -> str:
     return (PROJECT_ROOT / path).read_text()
 
 
-def _normalized_text(text: str) -> str:
-    return " ".join(text.lower().split())
-
-
-def _imports_runtime_module(path: Path) -> bool:
-    tree = ast.parse(path.read_text())
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name == "millrace" or alias.name.startswith("millrace."):
-                    return True
-        if isinstance(node, ast.ImportFrom):
-            module = node.module or ""
-            if module == "millrace" or module.startswith("millrace."):
-                return True
-    return False
-
-
 def test_public_validation_selection_has_no_runtime_or_legacy_path_imports() -> None:
-    for public_test in PUBLIC_TESTS:
-        test_path = PROJECT_ROOT / public_test
-        assert test_path.is_file(), public_test
-        assert not _imports_runtime_module(test_path), public_test
+    for name in PUBLIC_TESTS:
+        for node in ast.walk(ast.parse(_text(name))):
+            if isinstance(node, ast.ImportFrom):
+                assert not (node.module or "").startswith("millrace.")
+            if isinstance(node, ast.Import):
+                assert not any(
+                    a.name == "millrace" or a.name.startswith("millrace.")
+                    for a in node.names
+                )
 
 
 def test_current_docs_preserve_public_package_and_evidence_boundaries() -> None:
-    readme = " ".join(_project_text("README.md").split())
-    current_docs = "\n".join(_project_text(path) for path in PUBLIC_DOCS)
-
-    for required in (
-        "official collection of ready-to-run Millrace workflows",
-        "`millrace.plus.official`",
-        "`millrace-plus` 0.22.3 accompanies Core 0.22.3",
-        "`millrace==0.22.3` convenience bundle installs Core and Plus 0.22.3",
-        "installed resource root is `millrace_workflow_package`",
-        "package data is non-executable",
-        "A direct installation contains package metadata and data only",
-        "does not transitively install `millrace-ai`",
-        "does not copy them into Codex, Claude Code",
-        "no daemon, CLI, runner, provider",
-        "does not import `millrace_plus` modules or execute package code",
-        "See [Validation](docs/public-validation.md)",
-    ):
-        assert required in readme
-
-    assert "Source-Conformance Checks" not in current_docs
+    readme = _text("README.md")
+    assert "Millrace 0.23" in readme
+    assert "millrace_plus/workflows/" in readme
+    assert "resource/selection API is retired" in readme
+    assert "without a Plus catalog service" in readme
+    assert "historical" in _text("docs/workflows.md").lower()
 
 
 def test_public_workflow_boundary_exposes_only_the_verdict_arbiter_contract() -> None:
-    manifest = json.loads(
-        (PROJECT_ROOT / "millrace_workflow_package/manifest.json").read_text()
-    )
-    for workflow in manifest["workflows"]:
-        if workflow["workflow_id"] not in {"planning.lad", "lad.full"}:
-            continue
-        selected = workflow["selected_authority"]
-        arbiter = next(
-            stage
-            for stage in selected["stage_kinds"]
-            if stage["id"] == "lad_arbiter"
-        )
-        assert arbiter["artifact_schema_ids"] == ["planning.artifacts.verdict"]
-        assert arbiter["output_queue_family_ids"] == ["verdict"]
-        assert "planning.artifacts.rubric" not in {
-            schema["id"] for schema in selected["artifact_schemas"]
-        }
-        assert "rubric" not in {
-            queue["id"] for queue in selected["queue_families"]
-        }
-        assert "marathon-qa-audit" not in json.dumps(selected)
-
-        asset_paths = {
-            asset["asset_id"]: asset["package_path"]
-            for asset in manifest["assets"]
-        }
-        entrypoint = (
-            PROJECT_ROOT / "millrace_workflow_package" / asset_paths[
-                "planning.entrypoints.lad_arbiter"
-            ]
-        ).read_text()
-        skill = (
-            PROJECT_ROOT / "millrace_workflow_package" / asset_paths[
-                "planning.skills.arbiter_core"
-            ]
-        ).read_text()
-        arbiter_text = (entrypoint + "\n" + skill).lower()
-        assert "read-only" in arbiter_text
-        assert "runtime-owned" in arbiter_text
-        assert "new observations remain non-blocking" in arbiter_text
+    """Successor: workflow-owned outcomes replace the old domain Arbiter schema."""
+    for path in (PROJECT_ROOT / "src/millrace_plus/workflows").glob("*/workflow.json"):
+        graph = json.loads(path.read_text())
+        assert "selected_authority" not in graph
+        for node in graph["planes"]["main"]["nodes"].values():
+            assert node["result"] == "json-v1"
+            assert set(node["outcomes"]) == set(node["on"])
+            assert "on_error" in node and "on_unknown" in node
 
 
 def test_public_release_text_has_no_staging_or_prepublication_claims() -> None:
-    for public_doc in PUBLIC_DOCS:
-        normalized_text = _normalized_text(_project_text(public_doc))
-        for stale_phrase in STALE_PUBLIC_RELEASE_PHRASES:
-            assert stale_phrase not in normalized_text, (
-                public_doc,
-                stale_phrase,
-            )
+    """Successor: retain the truthful unpublished candidate boundary."""
+    for name in ("README.md", "docs/release.md"):
+        text = _text(name).lower()
+        assert "0.23.0" in text and "unpublished" not in text
+        assert "release" in text and "equal version" in text
+        assert "0.0.0" not in text
 
 
 def test_public_release_text_identifies_exact_bundle_and_independent_members() -> None:
-    for public_release_doc in ("README.md", "docs/release.md"):
-        release_text = _project_text(public_release_doc)
-        normalized_release_text = _normalized_text(release_text)
-
-        assert PUBLISHED_BUNDLE_PIN in release_text
-        assert "unreleased member candidate" not in normalized_release_text
-        assert "millrace==0.22.3" in normalized_release_text
-        for versioning_rule in VERSIONING_RULES:
-            assert _normalized_text(versioning_rule) in normalized_release_text
-
-    assert RELEASED_MEMBER in _project_text("README.md")
+    """Successor: exact source-bound component pairing replaces old bundle pins."""
+    for name in ("README.md", "docs/release.md"):
+        text = _text(name)
+        assert "millrace-ai==0.23.0" in text
+        assert "matched" in text and "publication" in text
+    assert "millrace-router-execution/v2" in _text("README.md")
 
 
 def test_dependency_policy_is_dependency_free_and_documented() -> None:
-    pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
-    readme = " ".join(_project_text("README.md").split())
-    release_notes = _project_text("docs/release.md")
-
-    assert pyproject["project"].get("dependencies", []) == []
-    assert "dependencies = []" in _project_text("pyproject.toml")
-    assert "A direct installation contains package metadata and data only" in readme
-    assert "does not transitively install `millrace-ai`" in readme
-    assert "| Runtime dependency | None |" in release_notes
+    project = tomllib.loads(_text("pyproject.toml"))["project"]
+    assert project["dependencies"] == []
+    assert project["optional-dependencies"] == {
+        "router": ["millrace-ai>=0.23.0,<0.24.0"]
+    }
+    assert "does not transitively install" in _text("README.md")
+    assert "| Runtime dependency | None |" in _text("docs/release.md")
 
 
 def test_conformance_tests_are_ungated_and_use_public_module_roots() -> None:
@@ -221,108 +125,148 @@ def test_conformance_tests_are_ungated_and_use_public_module_roots() -> None:
 
 
 def test_public_ci_runs_clean_checkout_boundary_without_sibling_paths() -> None:
-    workflow_path = PROJECT_ROOT / ".github" / "workflows" / "public-ci.yml"
-    workflow = workflow_path.read_text()
-
-    for required in (
-        "env -u PYTHONPATH",
-        "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
-        "tests/test_public_package_boundary.py",
-        "uv build --out-dir /tmp/millrace-plus-build --force-pep517",
-        "ruff check src tests",
-        "git diff --check",
-        "No millrace runtime package shipped",
-        "millrace_plus/skills/",
-    ):
-        assert required in workflow
-    for public_test in PUBLIC_TESTS:
-        assert public_test in workflow
-    assert "source/millrace-rewrite" not in workflow
-    assert "sys." + "path.insert" not in workflow
+    workflow = _text(".github/workflows/public-ci.yml")
+    for name in PUBLIC_TESTS:
+        assert name in workflow
+    assert "env -u PYTHONPATH" in workflow
+    assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in workflow
+    assert "millrace_plus/workflows/" in workflow
+    assert "not any(name.startswith('millrace_workflow_package/')" in workflow
+    assert "dev/source/" not in workflow
 
 
 def test_built_artifacts_have_durable_v022_public_text(
-    tmp_path: Path,
-    monkeypatch,
+    tmp_path: Path, monkeypatch
 ) -> None:
-    build_env = os.environ.copy()
-    build_env["PYTHONDONTWRITEBYTECODE"] = "1"
-    build_env.pop("PYTHONPATH", None)
+    """P5 payload successor: one graph-v2 tree, no v0.22 resource API."""
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     subprocess.run(
-        ["uv", "build", "--out-dir", str(tmp_path), "--clear"],
+        ["uv", "build", "--offline", "--out-dir", str(tmp_path)],
         cwd=PROJECT_ROOT,
+        env=env,
         check=True,
-        env=build_env,
+        capture_output=True,
     )
-    wheel_path = next(tmp_path.glob("*.whl"))
-    sdist_path = next(tmp_path.glob("*.tar.gz"))
-
-    with zipfile.ZipFile(wheel_path) as wheel:
-        wheel_metadata = wheel.read(
-            next(
-                name
-                for name in wheel.namelist()
-                if name.endswith(".dist-info/METADATA")
-            )
-        ).decode("utf-8")
-        wheel_manifest = json.loads(
-            wheel.read("millrace_workflow_package/manifest.json")
+    with zipfile.ZipFile(next(tmp_path.glob("*.whl"))) as wheel:
+        names = wheel.namelist()
+        assert not any(
+            n.startswith("millrace_workflow_package/") or n.startswith("millrace/")
+            for n in names
         )
-        wheel.extractall(tmp_path / "site")
-
-    with tarfile.open(sdist_path) as sdist:
-        sdist_metadata = sdist.extractfile(
-            next(
-                member
-                for member in sdist.getmembers()
-                if member.name.endswith("/PKG-INFO")
+        for template in ("document-review", "software-change"):
+            graph = json.loads(
+                wheel.read(f"millrace_plus/workflows/{template}/workflow.json")
             )
+            for asset in graph["control_files"]:
+                assert f"millrace_plus/workflows/{template}/{asset}" in names
+        metadata = wheel.read(
+            next(n for n in names if n.endswith(".dist-info/METADATA"))
+        ).decode()
+        assert "Version: 0.23.0" in metadata and "unpublished" not in metadata.lower()
+    with tarfile.open(next(tmp_path.glob("*.tar.gz"))) as archive:
+        names = archive.getnames()
+        assert not any("/millrace_workflow_package/" in n for n in names)
+        assert any(
+            n.endswith("/src/millrace_plus/workflows/document-review/workflow.json")
+            for n in names
         )
-        sdist_manifest = sdist.extractfile(
-            next(
-                member
-                for member in sdist.getmembers()
-                if member.name.endswith("/millrace_workflow_package/manifest.json")
-            )
-        )
-        assert sdist_metadata is not None
-        assert sdist_manifest is not None
-        sdist_metadata_text = sdist_metadata.read().decode("utf-8")
-        sdist_manifest_data = json.loads(sdist_manifest.read())
-
-    monkeypatch.syspath_prepend(str(tmp_path / "site"))
-    module_name = "millrace_plus"
-    had_previous_module = module_name in sys.modules
-    previous_module = sys.modules.get(module_name)
-    try:
-        sys.modules.pop(module_name, None)
-        installed_module = importlib.import_module(module_name)
-
-        for metadata_text in (wheel_metadata, sdist_metadata_text):
-            assert f"Version: {RELEASE_IDENTITY}\n" in metadata_text
-            assert PUBLISHED_BUNDLE_PIN in metadata_text
-
-            normalized_metadata = _normalized_text(metadata_text)
-            assert "unreleased member candidate" not in normalized_metadata
-            assert "millrace==0.22.3" in normalized_metadata
-            for versioning_rule in VERSIONING_RULES:
-                assert _normalized_text(versioning_rule) in normalized_metadata
-            for stale_phrase in STALE_PUBLIC_RELEASE_PHRASES:
-                assert stale_phrase not in normalized_metadata
-
-        assert wheel_manifest["package"]["package_version"] == RELEASE_IDENTITY
-        assert sdist_manifest_data["package"]["package_version"] == RELEASE_IDENTITY
-        assert installed_module.__version__ == RELEASE_IDENTITY
-        assert importlib.reload(installed_module).__version__ == RELEASE_IDENTITY
-    finally:
-        sys.modules.pop(module_name, None)
-        if had_previous_module:
-            sys.modules[module_name] = previous_module
+        assert any(n.endswith("/docs/catalog.md") for n in names)
 
 
 def test_all_conformance_modules_are_in_normal_pytest_collection() -> None:
-    pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
-    assert pyproject["tool"]["pytest"]["ini_options"]["testpaths"] == ["tests"]
-    assert pyproject["tool"]["pytest"]["ini_options"].get("markers") == [
-        "public: standalone public package tests"
-    ]
+    """Successor: current tests active, historical manifest/release gates explicit."""
+    settings = tomllib.loads(_text("pyproject.toml"))["tool"]["pytest"]["ini_options"]
+    assert settings["testpaths"] == ACTIVE
+    assert "Historical" in _text("tests/README.md") or "historical" in _text(
+        "tests/README.md"
+    )
+    assert "test_manifest_authoring_policy.py" not in settings["testpaths"]
+
+
+def test_installed_catalog_without_core_from_public_selection(tmp_path: Path) -> None:
+    """The standalone CI selection proves installed catalog use without Core."""
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    artifacts = tmp_path / "artifacts"
+    subprocess.run(
+        ["uv", "build", "--offline", "--wheel", "--out-dir", str(artifacts)],
+        cwd=PROJECT_ROOT,
+        env=env,
+        check=True,
+        capture_output=True,
+    )
+    venv = tmp_path / "standalone"
+    subprocess.run(
+        [sys.executable, "-m", "venv", "--without-pip", str(venv)],
+        env=env,
+        check=True,
+        capture_output=True,
+    )
+    python = venv / "bin/python"
+    subprocess.run(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--offline",
+            "--no-deps",
+            "--no-cache",
+            "--python",
+            str(python),
+            str(next(artifacts.glob("*.whl"))),
+        ],
+        env=env,
+        check=True,
+        capture_output=True,
+    )
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    home = tmp_path / "home"
+    home.mkdir()
+    isolated = {
+        "PATH": str(venv / "bin"),
+        "HOME": str(home),
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    assert not outside.is_relative_to(PROJECT_ROOT)
+    probe = subprocess.run(
+        [
+            str(python),
+            "-I",
+            "-c",
+            "import importlib.util; "
+            "assert importlib.util.find_spec('millrace') is None; "
+            "from millrace_plus import catalog; "
+            "from pathlib import Path; import sys; "
+            "assert Path(catalog.__file__).is_relative_to(Path(sys.prefix))",
+        ],
+        cwd=outside,
+        env=isolated,
+        check=True,
+        capture_output=True,
+    )
+    assert probe.returncode == 0
+    console = str(venv / "bin/millrace-plus")
+    listed = subprocess.run(
+        [console, "catalog", "list"],
+        cwd=outside,
+        env=isolated,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    selectors = [v["selector"] for v in json.loads(listed.stdout)["templates"]]
+    assert selectors == ["bundled:document-review", "bundled:software-change"]
+    for selector in selectors:
+        destination = outside / selector.split(":")[1]
+        subprocess.run(
+            [console, "catalog", "init", selector, str(destination)],
+            cwd=outside,
+            env=isolated,
+            check=True,
+            capture_output=True,
+        )
+        assert json.loads((destination / "workflow.json").read_text())["format"] == (
+            "millrace-router/v3"
+        )

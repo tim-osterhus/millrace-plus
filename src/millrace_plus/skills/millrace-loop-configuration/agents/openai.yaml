@@ -1,4 +1,4 @@
 interface:
-  display_name: "Millrace Loop Configuration"
-  short_description: "Design compiler-validated workflow loops"
-  default_prompt: "Use $millrace-loop-configuration to design a fully specified Millrace workflow loop."
+  display_name: "Author Millrace workflow graphs"
+  short_description: "Design graph-v3 workflows with explicit planes, outcomes, routes and seams."
+  default_prompt: "Use $millrace-loop-configuration for graph-v3 workflows, json-v1 results and public controls. Treat this guidance as advisory. The graph owns routing."

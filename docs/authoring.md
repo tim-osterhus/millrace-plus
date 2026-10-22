@@ -1,112 +1,17 @@
-# Authoring Workflows
+# Authoring editable router workflows
 
-A Millrace workflow should begin as a fully specified decision tree, not as a
-collection of prompts.
+Use Core and Plus 0.23.0 with the public execution-v2 contract.
 
-Before writing package files, identify:
+Start with an initialized folder or a user-authored `workflow.json`. Use `format: millrace-router/v3`, declared bindings, explicit planes, local nodes, outcomes, unambiguous routes and explicit unknown/error fallbacks. Meaningful branch/retry decisions belong in that graph; executors return outcomes and work artifacts.
 
-- what enters the workflow;
-- which decisions must be made;
-- which decisions require an agent and which are deterministic;
-- what each stage receives and produces;
-- every legal outcome and route;
-- retry, recovery, wait, quarantine, and intervention behavior;
-- the exact condition that closes the work.
+A plane requires `start`, `nodes` and `workspace`. The stock graphs explicitly declare `planes.main` with `workspace: "."`. To reauthor an old graph, move its top-level `start` and `nodes` under that declaration and set the v3 marker. Use fresh v7 state; no command migrates or wraps an old graph/store. Plane/workspace/seam/dependency topology and maximum concurrency remain fixed for a run.
 
-If any branch still ends in “the agent decides what happens next,” the workflow
-is not fully specified enough to compile into governed runtime behavior.
+`control_files` lists every script, prompt and native profile relative to the workflow folder. Command binding `config` is `{}`; command node `invoke.config` contains `script`/`args`. Semantic Claude nodes name a prompt. `cwd`, `inputs` and result refs are relative to the selected plane workspace. Generated inputs are checked at the consuming dispatch. The catalog checks only the format marker; use the matched router's `validate` operation for full diagnostics.
 
-## Planes And Stages
+Runtime defaults → workflow defaults → selected plane defaults → node overrides resolve under operator pins/ceilings. Invalid explicit values fail. The missing-timeout fallback is 1,800 seconds with a warning only when no effective value exists. Stock graphs supply an explicit 1,800 seconds and finite limits of 16 invocations/86,400 elapsed seconds. Paused wall time counts; edits and resume do not replenish budgets.
 
-A plane groups stages that share one domain of responsibility. A workflow may
-have one plane, several planes, or stages such as a cross-plane troubleshooter
-that do not belong to a domain plane.
+Edit ordinary JSON, prompts, scripts and profile files. There is no runner-selection DSL, required ICM index, paired core skill or universal artifact schema. Stock examples choose Claude; command/Pi/Codex rebinding requires their actual distinct configuration, listed in [Router adapters](router-adapters.md). Keep only selected bindings and their declared controls; do not invent native credentials or endpoints.
 
-Use planes to clarify ownership and concurrency, not to imitate LAD. Their
-names are workflow data. Management, Implementation, Review, Requirements,
-Sourcing, Evaluation, and Authorization are all ordinary examples.
+Add a stage and branch within a plane by adding a node, declared outcome/transition and any required controls. Locked mode is the default and hard-pauses on a control change. Explicit live mode drains active invocations, then activates one compatible revision before routing retained results in stable plane order. Completed results keep their producing launch contract and route under the eligible routing revision. Invalid changes preserve the result and pause for intervention.
 
-Each stage should have one bounded responsibility. Define:
-
-- its input queues;
-- its output queues;
-- selected runner binding;
-- artifact schemas it may produce;
-- legal terminal markers;
-- the runtime action selected for each marker;
-- selected prompt and skill assets.
-
-## Entrypoint And Core Skill
-
-Agent stages use a two-layer instruction pattern.
-
-### Entrypoint prompt
-
-The entrypoint is the stage's operating prompt. It should explain:
-
-- the role and scope of this stage;
-- the dispatch evidence it must read;
-- the work process to follow;
-- what it must not decide;
-- the legal terminal markers and when each applies;
-- when to stop instead of guessing.
-
-Millrace tells the runner to open the selected entrypoint and follow its
-instructions. Write it as a complete prompt, not as notes about a prompt.
-
-### Stage-core skill
-
-The paired core skill defines the exact handoff contract:
-
-- required artifact fields and types;
-- valid and invalid JSON examples;
-- how upstream context maps into the artifact;
-- validation and evidence requirements;
-- completion criteria.
-
-Keep structured artifact details here rather than duplicating them across the
-entrypoint prompt. The entrypoint explains the job; the core skill explains the
-format in which the job must be handed back.
-
-## Runtime Authority
-
-Prompt and skill text instruct the model. The workflow definition owns:
-
-- legal routes;
-- queue creation and closure;
-- retries and attempt limits;
-- waits and operator choices;
-- fanout and join behavior;
-- completion and quarantine behavior;
-- capabilities and runner bindings.
-
-Do not encode those rules only in prose. If the runtime must enforce a rule,
-declare it in workflow data and make the prompt explain the already-declared
-contract.
-
-QA schemas and projections must preserve a frozen task/root contract. Stage
-artifacts are evidence. Runtime owns remediation and queue aftermath. Mutable
-baselines/evidence are lineage/run authority, not package assets.
-
-## Package Assets
-
-Every selected asset needs a stable asset ID, package-relative path, byte
-length, and content digest in `millrace_workflow_package/manifest.json`.
-
-The manifest is currently maintained as committed canonical JSON. Follow
-[Manifest maintenance](manifest-authoring-policy.md) whenever assets or
-selected workflow authority change.
-
-## Validate In Layers
-
-1. Validate manifest shape and asset digests.
-2. Compile every selectable workflow and entrypoint.
-3. Exercise each legal terminal marker and route offline.
-4. Test refusal cases for invalid markers, schemas, and stale identity.
-5. Run focused actual-model flows with fixed input payloads.
-6. Review prompt or schema failures as asset defects before weakening runtime
-   validation.
-
-The included `millrace-loop-configuration` and
-`millrace-entrypoint-authoring` skills provide a question-driven design process
-and more detailed authoring checklists.
+Independent checkers read the original request and actual work; they write reports, not the request or work product. A repair is followed by an independent recheck. Planning defects route to diagnosis/pause. The goal review checks original acceptance criteria. A declared outcome chooses an edge; inspect artifacts to judge quality.

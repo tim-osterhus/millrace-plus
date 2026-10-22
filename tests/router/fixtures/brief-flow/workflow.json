@@ -1,0 +1,113 @@
+{
+  "format": "millrace-router/v3",
+  "limits": {
+    "max_invocations": 6,
+    "max_elapsed_seconds": 30
+  },
+  "bindings": {
+    "python": {
+      "adapter": "command",
+      "contract": "millrace-command/v1",
+      "executable": "python3",
+      "config": {}
+    }
+  },
+  "control_files": [
+    "scripts/draft.py",
+    "scripts/check.py"
+  ],
+  "planes": {
+    "main": {
+      "workspace": ".",
+      "start": "draft",
+      "nodes": {
+        "draft": {
+          "invoke": {
+            "binding": "python",
+            "config": {
+              "script": "scripts/draft.py",
+              "args": []
+            },
+            "cwd": ".",
+            "timeout_seconds": 5,
+            "inputs": [
+              "request.txt"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "BLOCKED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "check"
+            },
+            "BLOCKED": {
+              "pause": {
+                "reason": "request_empty",
+                "resume": "draft"
+              }
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "unknown_draft_outcome",
+              "resume": "draft"
+            }
+          },
+          "on_error": {
+            "retry": {
+              "limit": 1,
+              "exhausted": {
+                "pause": {
+                  "reason": "draft_execution_failed",
+                  "resume": "draft"
+                }
+              }
+            }
+          }
+        },
+        "check": {
+          "invoke": {
+            "binding": "python",
+            "config": {
+              "script": "scripts/check.py",
+              "args": []
+            },
+            "cwd": ".",
+            "timeout_seconds": 5,
+            "inputs": [
+              "out/brief.txt"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACCEPT",
+            "REVISE"
+          ],
+          "on": {
+            "ACCEPT": {
+              "finish": "succeeded"
+            },
+            "REVISE": {
+              "goto": "draft"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "unknown_check_outcome",
+              "resume": "check"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "check_execution_failed",
+              "resume": "check"
+            }
+          }
+        }
+      }
+    }
+  }
+}

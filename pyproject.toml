@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "millrace-plus"
-version = "0.22.4"
+version = "0.23.0"
 description = "Official workflow packages and agent skill assets for Millrace."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -19,9 +19,15 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+[project.optional-dependencies]
+# The public execution-v2 handshake additionally checks runtime compatibility.
+router = ["millrace-ai>=0.23.0,<0.24.0"]
+
+[project.scripts]
+millrace-plus = "millrace_plus.router.cli:cli"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/millrace_plus"]
-force-include = { "millrace_workflow_package" = "millrace_workflow_package" }
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -29,13 +35,18 @@ include = [
     "README.md",
     "pyproject.toml",
     "src/millrace_plus",
-    "millrace_workflow_package",
-    "tests",
+    "tests/router",
+    "tests/test_package_metadata.py",
+    "tests/test_public_package_boundary.py",
+    "tests/test_agent_skill_assets.py",
+    "tests/test_public_test_support_boundary.py",
+    "tests/README.md",
+    ".github/workflows/public-ci.yml",
     "docs/*.md",
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/router", "tests/test_package_metadata.py", "tests/test_public_package_boundary.py", "tests/test_agent_skill_assets.py", "tests/test_public_test_support_boundary.py"]
 pythonpath = ["src"]
 addopts = ["-p", "no:cacheprovider"]
 markers = [

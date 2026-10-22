@@ -1,0 +1,444 @@
+{
+  "format": "millrace-router/v3",
+  "limits": {
+    "max_invocations": 16,
+    "max_elapsed_seconds": 86400
+  },
+  "defaults": {
+    "timeout_seconds": 1800
+  },
+  "bindings": {
+    "claude": {
+      "adapter": "claude_print",
+      "contract": "millrace-claude-print/v1",
+      "executable": "claude",
+      "config": {
+        "profile": "profiles/claude.json"
+      }
+    },
+    "command": {
+      "adapter": "command",
+      "contract": "millrace-command/v1",
+      "executable": "python3",
+      "config": {}
+    }
+  },
+  "control_files": [
+    "profiles/claude.json",
+    "prompts/check.md",
+    "prompts/diagnose.md",
+    "prompts/goal-review.md",
+    "prompts/recheck.md",
+    "prompts/repair.md",
+    "prompts/work.md",
+    "scripts/check_inputs.py"
+  ],
+  "planes": {
+    "main": {
+      "workspace": ".",
+      "start": "check_inputs",
+      "nodes": {
+        "check_inputs": {
+          "invoke": {
+            "binding": "command",
+            "config": {
+              "script": "scripts/check_inputs.py",
+              "args": []
+            },
+            "cwd": ".",
+            "inputs": []
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "NEEDS_INPUT"
+          ],
+          "on": {
+            "READY": {
+              "goto": "work"
+            },
+            "NEEDS_INPUT": {
+              "pause": {
+                "reason": "request_missing_or_empty",
+                "resume": "check_inputs"
+              }
+            }
+          },
+          "on_error": {
+            "retry": {
+              "limit": 1,
+              "exhausted": {
+                "pause": {
+                  "reason": "check_inputs_execution_failed",
+                  "resume": "check_inputs"
+                }
+              }
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "unknown_check_inputs_outcome",
+              "resume": "check_inputs"
+            }
+          }
+        },
+        "work": {
+          "invoke": {
+            "binding": "claude",
+            "config": {
+              "prompt": "prompts/work.md"
+            },
+            "cwd": ".",
+            "inputs": [
+              "request.md"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "NEEDS_INPUT",
+            "BLOCKED",
+            "PLANNING_DEFECT"
+          ],
+          "on": {
+            "READY": {
+              "goto": "check"
+            },
+            "NEEDS_INPUT": {
+              "pause": {
+                "reason": "work_needs_input",
+                "resume": "work"
+              }
+            },
+            "BLOCKED": {
+              "pause": {
+                "reason": "work_blocked",
+                "resume": "work"
+              }
+            },
+            "PLANNING_DEFECT": {
+              "goto": "diagnose"
+            }
+          },
+          "on_error": {
+            "retry": {
+              "limit": 1,
+              "exhausted": {
+                "pause": {
+                  "reason": "work_execution_failed",
+                  "resume": "work"
+                }
+              }
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "unknown_work_outcome",
+              "resume": "work"
+            }
+          }
+        },
+        "check": {
+          "invoke": {
+            "binding": "claude",
+            "config": {
+              "prompt": "prompts/check.md"
+            },
+            "cwd": ".",
+            "inputs": [
+              "request.md"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACCEPT",
+            "REVISE",
+            "NEEDS_INPUT",
+            "BLOCKED",
+            "PLANNING_DEFECT"
+          ],
+          "on": {
+            "ACCEPT": {
+              "goto": "goal_review"
+            },
+            "REVISE": {
+              "goto": "repair"
+            },
+            "NEEDS_INPUT": {
+              "pause": {
+                "reason": "check_needs_input",
+                "resume": "check"
+              }
+            },
+            "BLOCKED": {
+              "pause": {
+                "reason": "check_blocked",
+                "resume": "check"
+              }
+            },
+            "PLANNING_DEFECT": {
+              "goto": "diagnose"
+            }
+          },
+          "on_error": {
+            "retry": {
+              "limit": 1,
+              "exhausted": {
+                "pause": {
+                  "reason": "check_execution_failed",
+                  "resume": "check"
+                }
+              }
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "unknown_check_outcome",
+              "resume": "check"
+            }
+          }
+        },
+        "repair": {
+          "invoke": {
+            "binding": "claude",
+            "config": {
+              "prompt": "prompts/repair.md"
+            },
+            "cwd": ".",
+            "inputs": [
+              "request.md",
+              "work/check.md"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "NEEDS_INPUT",
+            "BLOCKED",
+            "PLANNING_DEFECT"
+          ],
+          "on": {
+            "READY": {
+              "goto": "recheck"
+            },
+            "NEEDS_INPUT": {
+              "pause": {
+                "reason": "repair_needs_input",
+                "resume": "repair"
+              }
+            },
+            "BLOCKED": {
+              "pause": {
+                "reason": "repair_blocked",
+                "resume": "repair"
+              }
+            },
+            "PLANNING_DEFECT": {
+              "goto": "diagnose"
+            }
+          },
+          "on_error": {
+            "retry": {
+              "limit": 1,
+              "exhausted": {
+                "pause": {
+                  "reason": "repair_execution_failed",
+                  "resume": "repair"
+                }
+              }
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "unknown_repair_outcome",
+              "resume": "repair"
+            }
+          }
+        },
+        "recheck": {
+          "invoke": {
+            "binding": "claude",
+            "config": {
+              "prompt": "prompts/recheck.md"
+            },
+            "cwd": ".",
+            "inputs": [
+              "request.md",
+              "work/check.md"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACCEPT",
+            "REVISE",
+            "NEEDS_INPUT",
+            "BLOCKED",
+            "PLANNING_DEFECT"
+          ],
+          "on": {
+            "ACCEPT": {
+              "goto": "goal_review"
+            },
+            "REVISE": {
+              "pause": {
+                "reason": "recheck_found_unresolved_gap",
+                "resume": "recheck"
+              }
+            },
+            "NEEDS_INPUT": {
+              "pause": {
+                "reason": "recheck_needs_input",
+                "resume": "recheck"
+              }
+            },
+            "BLOCKED": {
+              "pause": {
+                "reason": "recheck_blocked",
+                "resume": "recheck"
+              }
+            },
+            "PLANNING_DEFECT": {
+              "goto": "diagnose"
+            }
+          },
+          "on_error": {
+            "retry": {
+              "limit": 1,
+              "exhausted": {
+                "pause": {
+                  "reason": "recheck_execution_failed",
+                  "resume": "recheck"
+                }
+              }
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "unknown_recheck_outcome",
+              "resume": "recheck"
+            }
+          }
+        },
+        "goal_review": {
+          "invoke": {
+            "binding": "claude",
+            "config": {
+              "prompt": "prompts/goal-review.md"
+            },
+            "cwd": ".",
+            "inputs": [
+              "request.md",
+              "work/check.md"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACCEPT",
+            "REVISE",
+            "NEEDS_INPUT",
+            "BLOCKED",
+            "PLANNING_DEFECT"
+          ],
+          "on": {
+            "ACCEPT": {
+              "finish": "succeeded"
+            },
+            "REVISE": {
+              "pause": {
+                "reason": "goal_review_found_gap",
+                "resume": "goal_review"
+              }
+            },
+            "NEEDS_INPUT": {
+              "pause": {
+                "reason": "goal_review_needs_input",
+                "resume": "goal_review"
+              }
+            },
+            "BLOCKED": {
+              "pause": {
+                "reason": "goal_review_blocked",
+                "resume": "goal_review"
+              }
+            },
+            "PLANNING_DEFECT": {
+              "goto": "diagnose"
+            }
+          },
+          "on_error": {
+            "retry": {
+              "limit": 1,
+              "exhausted": {
+                "pause": {
+                  "reason": "goal_review_execution_failed",
+                  "resume": "goal_review"
+                }
+              }
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "unknown_goal_review_outcome",
+              "resume": "goal_review"
+            }
+          }
+        },
+        "diagnose": {
+          "invoke": {
+            "binding": "claude",
+            "config": {
+              "prompt": "prompts/diagnose.md"
+            },
+            "cwd": ".",
+            "inputs": [
+              "request.md"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "DIAGNOSED",
+            "NEEDS_INPUT",
+            "BLOCKED"
+          ],
+          "on": {
+            "DIAGNOSED": {
+              "pause": {
+                "reason": "planning_defect_requires_user_decision",
+                "resume": "diagnose"
+              }
+            },
+            "NEEDS_INPUT": {
+              "pause": {
+                "reason": "diagnosis_needs_input",
+                "resume": "diagnose"
+              }
+            },
+            "BLOCKED": {
+              "pause": {
+                "reason": "diagnosis_blocked",
+                "resume": "diagnose"
+              }
+            }
+          },
+          "on_error": {
+            "retry": {
+              "limit": 1,
+              "exhausted": {
+                "pause": {
+                  "reason": "diagnose_execution_failed",
+                  "resume": "diagnose"
+                }
+              }
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "unknown_diagnose_outcome",
+              "resume": "diagnose"
+            }
+          }
+        }
+      }
+    }
+  }
+}

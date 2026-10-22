@@ -25,12 +25,11 @@ jobs:
         run: |
           env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with hatchling pytest -q \
             tests/test_package_metadata.py \
-            tests/test_manifest_authoring_policy.py \
-            tests/test_official_package_layout_plan.py \
-            tests/test_workflow_package_manifest.py \
-            tests/test_workflow_package_installed_smoke.py \
             tests/test_public_package_boundary.py \
-            tests/test_agent_skill_assets.py
+            tests/test_agent_skill_assets.py \
+            tests/test_public_test_support_boundary.py \
+            tests/router/test_catalog.py \
+            tests/router/test_catalog_settings.py
 
       - name: Build distribution
         run: |
@@ -48,7 +47,10 @@ jobs:
           assert not any(name.startswith('millrace/') for name in names)
           assert any(name.startswith('millrace_plus/') for name in names)
           assert any(name.startswith('millrace_plus/skills/') for name in names)
-          assert any(name.startswith('millrace_workflow_package/') for name in names)
+          assert not any(name.startswith('millrace_workflow_package/') for name in names)
+          assert any(name.startswith('millrace_plus/workflows/') for name in names)
+          assert 'millrace_plus/router/cli.py' in names
+          assert 'millrace_plus/router/pi.py' in names
           PY
 
       - name: Lint

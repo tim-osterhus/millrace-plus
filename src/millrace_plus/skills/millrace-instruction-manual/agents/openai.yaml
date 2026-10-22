@@ -1,4 +1,4 @@
 interface:
-  display_name: "Millrace Instruction Manual"
-  short_description: "Operate Millrace safely from the CLI"
-  default_prompt: "Use $millrace-instruction-manual to decide whether to delegate this work to Millrace and operate it safely."
+  display_name: "Operate Millrace workflows"
+  short_description: "Inspect and control graph-v3 instances through public catalog and router commands."
+  default_prompt: "Use $millrace-instruction-manual for graph-v3 workflows, json-v1 results and public controls. Treat this guidance as advisory. The graph owns routing."
