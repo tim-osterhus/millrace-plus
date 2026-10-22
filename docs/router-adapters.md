@@ -362,3 +362,59 @@ Initial real qualification uses existing subscription OAuth as a harness-only
 guard, with native model/effort inherited. Production supports native API/provider
 configuration without that guard. Every native qualification claim remains
 limited to its exact accepted source, artifacts, CLI and selected route receipts.
+
+## OpenCode finite run
+
+`opencode_run` / `millrace-opencode-run/v1` selects public OpenCode 1.19.3,
+tag commit `e3c4eb242585dcd77be1a867391b7c25fd47ce52`. Its captured profile is:
+
+```json
+{"format":"millrace-opencode-run-profile/v1","opencode_version":"1.19.3"}
+```
+
+Use binding config `{"profile":"opencode-profile.json"}` and node config
+`{"prompt":"prompts/step.md"}`, declaring both control files. Optional `model`
+(`provider/model`, preserving later slashes) and `variant` settings resolve
+runtime < profile < workflow < plane < node. Every explicit layer is validated;
+unknown settings refuse. Omitted values preserve native inheritance. The
+profile filename can differ from the project's native `opencode.json`.
+
+The adapter invokes `opencode run --format json`, adding `--model` and
+`--variant` only when selected. It sends the exact captured UTF-8 prompt bytes
+on stdin, preserving a BOM, spaces and final-newline presence. It adds no result
+instructions: the authored prompt must request its selected `json-v1` result.
+There is no positional prompt, attach/server mode, continuation, session reuse,
+interactive fallback or permission bypass. Finite native ask permissions
+auto-reject; project `opencode.json` may widen permissions. A tool permission
+denial can precede a valid final result. Later native qualification must record
+the selected project permissions, provider/model and authentication route.
+
+Core's declared invocation environment reaches the child without an ambient
+environment merge. Native config/auth remain native; the adapter neither copies
+nor attests them. The exact local version probe precedes each main launch and
+has a five-second ceiling within the invocation deadline. Static validation,
+planning and historical reload perform no live path, credential or version
+probes. A different installed version refuses.
+
+Only completed text parts belonging to one final message with step-finish
+reason `stop` supply semantic bytes. Identical repeated parts deduplicate;
+conflicting identities, ambiguous messages, later errors, missing stop/text,
+malformed/truncated output, nonzero exit and unsettled writers fail. Earlier
+tool-call messages, reasoning, tool output and stderr cannot supply the result.
+There is no invented session-completed event. Core parses the exact semantic
+bytes using the existing `json-v1` contract and owns routing.
+
+Stdout is bounded to 8 MiB, each JSONL record to 1 MiB and stderr to 1 MiB.
+Overflow starts cleanup. Evidence retains identities, counts, digests, observed
+version, terminal reason and fixed failure codes. Native error/stderr payloads
+are discarded; diagnostics contain only fixed sanitized codes. Normal root
+exit waits for drained EOF and foreground process-group closure until the
+invocation deadline. Cancel, timeout or transport failure starts TERM, then
+KILL after two seconds, with a five-second cleanup bound. Forced cleanup keeps
+`may_live` and produces no semantic completion. Public reconciliation precedes
+fresh recovery; no native session is replayed. Foreground closure does not
+attest detached processes or remote effects.
+
+Current R4 evidence is offline fake-process evidence only. No OpenCode binary
+was downloaded or executed and no native/provider route is qualified. Installed
+wheel/sdist integration and any native qualification have separate gates.

@@ -81,6 +81,8 @@ def test_production_imports_only_public_core_modules() -> None:
         "codex_configuration.py",
         "configuration.py",
         "control.py",
+        "opencode.py",
+        "opencode_configuration.py",
         "pi.py",
         "preflight.py",
         "resolver.py",
@@ -97,7 +99,11 @@ def test_production_imports_only_public_core_modules() -> None:
         )
     assert used == PUBLIC_CORE
     assert _core_imports(SOURCE / "__init__.py") == set()
-    for name in ("configuration.py", "codex_configuration.py"):
+    for name in (
+        "configuration.py",
+        "codex_configuration.py",
+        "opencode_configuration.py",
+    ):
         _assert_pure_module(SOURCE / name)
 
 

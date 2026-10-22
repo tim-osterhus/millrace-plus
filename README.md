@@ -57,6 +57,7 @@ The [command-only quickstart](https://github.com/tim-osterhus/millrace-plus/blob
 See [adapters](https://github.com/tim-osterhus/millrace-plus/blob/v0.23.0/docs/router-adapters.md), [public validation](https://github.com/tim-osterhus/millrace-plus/blob/v0.23.0/docs/public-validation.md), and [release policy](https://github.com/tim-osterhus/millrace-plus/blob/v0.23.0/docs/release.md).
 
 Stock native examples choose Claude Code. Configure the selected native runtime deliberately before execution.
+The candidate also includes the finite OpenCode 1.19.3 adapter. Its current evidence uses fake processes. See [adapter profiles](docs/router-adapters.md) for its exact contract and limits.
 The three packaged skills are advisory package data, not runtime-installed authority.
 
 Release publication follows the matched Core, Plus, OS, then bundle order.

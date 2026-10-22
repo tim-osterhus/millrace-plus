@@ -393,8 +393,18 @@ def test_matched_candidate_wheels_and_public_controls(
         metadata = archive.read(info).decode()
         entry = archive.read(info.replace("METADATA", "entry_points.txt")).decode()
     assert not any(name.startswith("millrace/") for name in names)
-    for module in ("__init__", "__main__", "cli", "configuration", "control", "pi"):
+    for module in (
+        "__init__", "__main__", "cli", "configuration", "control", "pi",
+        "codex", "codex_configuration", "claude",
+        "opencode", "opencode_configuration", "resolver",
+    ):
         assert f"millrace_plus/router/{module}.py" in names
+    for asset in (
+        "__init__.py", "paperclip_bridge.py", "paperclip_records.py",
+        "paperclip_http.py",
+        "paperclip/package.json", "paperclip/index.js", "paperclip/README.md",
+    ):
+        assert f"millrace_plus/integrations/{asset}" in names
     assert [
         line for line in metadata.splitlines() if line.startswith("Requires-Dist:")
     ] == [f"Requires-Dist: {ROUTER_REQUIREMENT}"]
@@ -524,6 +534,71 @@ def test_matched_candidate_wheels_and_public_controls(
         assert _last_json(refused.stderr)["code"] == "unsupported_adapter_contract"
     assert _tree(home) == before
 
+    # Reuse the matched installed environment for the new adapter. The peer's
+    # interpreter and all runtime imports come from that environment.
+    from opencode_support import PROFILE, events, wire
+
+    opencode_project = _pi_project(matched.cwd / "opencode", matched.python)
+    workflow = opencode_project / "workflow"
+    prompt = b"\xef\xbb\xbfReview this project.\r\nKeep exact UTF-8: \xce\xbb"
+    (workflow / "task.txt").write_bytes(prompt)
+    (workflow / "pi.json").write_bytes(PROFILE)
+    fake = workflow / "fake-opencode"
+    fake.write_text(
+        f"#!{matched.python}\n"
+        + (Path(__file__).parent / "fixtures/opencode_peer.py").read_text()
+    )
+    fake.chmod(0o700)
+    Path(str(fake) + ".json").write_text(json.dumps({
+        "wire": base64.b64encode(wire(events())).decode(),
+        "version": base64.b64encode(b"1.19.3\n").decode(),
+        "stderr": "",
+        "expected_prompt": base64.b64encode(prompt).decode(),
+        "expected_argv": ["run", "--format", "json"],
+    }))
+    graph_path = workflow / "workflow.json"
+    graph = json.loads(graph_path.read_text())
+    graph["bindings"]["native"].update({
+        "adapter": "opencode_run", "contract": "millrace-opencode-run/v1",
+        "executable": str(fake),
+    })
+    graph_path.write_text(json.dumps(graph))
+    driver.write_text(DRIVER.replace(
+        "import millrace_plus.router.pi as pi",
+        "import millrace_plus.router.opencode as pi",
+    ))
+    native = _last_json(matched.run(
+        str(matched.python), "-I", str(driver), str(opencode_project), check=True
+    ).stdout)
+    assert (native["status"], native["count"], native["adapter"]) == (
+        "succeeded", 1, "opencode_run",
+    )
+    reloaded = matched.py(
+        "from pathlib import Path\n"
+        "from millrace_plus.router import control, opencode_configuration\n"
+        "from millrace_plus.router.opencode import OpenCodeRunAdapter\n"
+        "from millrace_plus.router.resolver import resolve_adapter\n"
+        "assert isinstance(resolve_adapter('opencode_run', "
+        "'millrace-opencode-run/v1'), OpenCodeRunAdapter)\n"
+        "assert Path(opencode_configuration.__file__).is_relative_to(Path(__import__('sys').prefix))\n"  # noqa: E501 - isolated installed proof
+        f"run = control.inspect_run({native['instance']!r}, {native['run']!r}, "
+        f"state_home=Path({str(opencode_project / 'state')!r}))\n"
+        "assert run['status'] == 'succeeded' and run['quiescent']\n"
+        "assert run['completions'][0]['outcome'] == 'READY'\n"
+        "assert run['completions'][0]['effective_writer'] == 'stopped'\n"
+        "assert run['invocations'][0]['launch']['adapter_id'] == 'opencode_run'\n"
+    )
+    assert reloaded.returncode == 0
+    help_result = matched.run(
+        str(matched.root / "bin/millrace-plus"), "paperclip", "--help", check=True
+    )
+    assert "run" in help_result.stdout and "inspect" in help_result.stdout
+    matched.py(
+        "from pathlib import Path; import sys; "
+        "from millrace_plus.integrations import paperclip_bridge; "
+        "assert Path(paperclip_bridge.__file__).is_relative_to(Path(sys.prefix))"
+    )
+
 
 @pytest.mark.parametrize(
     "case,code",
@@ -552,7 +627,11 @@ def test_plus_refuses_core_without_execution_contract(
     if stubs is not None:
         wheels.append(_stub_wheel(root / "stub", case, stubs))
     env = Env(root / "env", wheels)
-    inert = env.py("import millrace_plus, sys; print('millrace' in sys.modules)")
+    inert = env.py(
+        "import millrace_plus, millrace_plus.router, sys; "
+        "from millrace_plus.integrations import paperclip_bridge; "
+        "print('millrace' in sys.modules)"
+    )
     assert inert.stdout.strip() == "False"
     for module in (
         "control",
@@ -560,6 +639,9 @@ def test_plus_refuses_core_without_execution_contract(
         "configuration",
         "codex",
         "codex_configuration",
+        "claude",
+        "opencode",
+        "opencode_configuration",
         "resolver",
     ):
         refused = env.py(
