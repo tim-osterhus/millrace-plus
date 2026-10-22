@@ -1,3 +1,7 @@
+Reusable local child calls use ordinary command nodes and independent copies.
+See [subworkflows](docs/subworkflows.md) for pinned requests, finite waiting,
+explicit cancellation and retained uncertainty after interruption.
+
 <div align="center">
   <p>
     <a href="https://pypi.org/project/millrace-plus/"><img alt="PyPI v0.23.0" src="https://img.shields.io/badge/pypi-v0.23.0-orange.svg"></a>

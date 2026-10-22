@@ -39,6 +39,46 @@ def _lines(text: str) -> list[dict[str, object]]:
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
+def test_subworkflow_installed_console_and_strict_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from subworkflow_support import setup
+
+    monkeypatch.setenv("HOME", str(tmp_path.resolve() / "user"))
+    fixture = setup(tmp_path / "helper-cli")
+    env = {
+        "PATH": str(Path(sys.executable).parent) + ":/usr/bin:/bin",
+        "HOME": os.environ["HOME"],
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    console = str(Path(sys.executable).parent / "millrace-plus")
+    result = subprocess.run(
+        [console, "subworkflow", "call", "--request", str(fixture["file"])],
+        cwd=fixture["project"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stderr
+    assert len(result.stdout.splitlines()) == 1
+    assert json.loads(result.stdout)["outcome"] == "CHILD_SUCCEEDED"
+    malformed = Path(str(fixture["file"]))
+    malformed.write_text('{"format":1,"format":2}')
+    refused = subprocess.run(
+        [console, "subworkflow", "call", "--request", str(malformed)],
+        cwd=fixture["project"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert refused.returncode == 2 and refused.stdout == ""
+    assert json.loads(refused.stderr)["code"] == "invalid_json"
+    assert "Traceback" not in refused.stderr
+
+
 def test_module_and_console_wrappers_share_core_main(
     single_flow: tuple[Path, Path, Path],
     monkeypatch: pytest.MonkeyPatch,

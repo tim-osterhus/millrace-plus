@@ -6,15 +6,19 @@ import json
 import os
 import shutil
 import stat
+import tarfile
+import zipfile
 from pathlib import Path
 
-from test_distribution import Env, _record, _sha256
+from test_distribution import PLUS_ROOT, Env, _record, _sha256
 from test_distribution import (
-    artifacts as artifacts,  # noqa: F401 - shared pytest fixture
+    artifacts as artifacts,  # noqa: F401,F811 - shared pytest fixture
 )
 
 
-def test_v023_templates_installed_and_initializable(artifacts: dict[str, Path]) -> None:
+def test_v023_templates_installed_and_initializable(
+    artifacts: dict[str, Path],  # noqa: F811 - pytest fixture injection
+) -> None:
     root = artifacts["root"]
     wheel = artifacts["plus_wheel"]
     assert _record(wheel) == _record(artifacts["plus_sdist_wheel"])
@@ -218,3 +222,35 @@ print(json.dumps(origins))
         check=True,
     )
     assert (cli_env.cwd / "project/document.md").read_text() == "accepted content\n"
+
+
+def test_every_stock_workflow_asset_is_in_wheel_and_sdist(
+    artifacts: dict[str, Path],  # noqa: F811 - pytest fixture injection
+) -> None:
+    source_root = PLUS_ROOT / "src/millrace_plus/workflows"
+    assets = [
+        path
+        for path in source_root.rglob("*")
+        if path.is_file()
+        and not path.is_symlink()
+        and "__pycache__" not in path.relative_to(source_root).parts
+    ]
+
+    with zipfile.ZipFile(artifacts["plus_wheel"]) as wheel:
+        names = set(wheel.namelist())
+        for source in assets:
+            relative = source.relative_to(source_root).as_posix()
+            packaged = f"millrace_plus/workflows/{relative}"
+            assert packaged in names, packaged
+            assert wheel.read(packaged) == source.read_bytes(), packaged
+
+    with tarfile.open(artifacts["plus_sdist"]) as sdist:
+        names = sdist.getnames()
+        for source in assets:
+            relative = source.relative_to(source_root).as_posix()
+            suffix = f"/src/millrace_plus/workflows/{relative}"
+            matches = [name for name in names if name.endswith(suffix)]
+            assert len(matches) == 1, (suffix, matches)
+            member = sdist.extractfile(matches[0])
+            assert member is not None
+            assert member.read() == source.read_bytes(), relative

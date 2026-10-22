@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import importlib.metadata
 import json
 import os
 import re
@@ -288,6 +290,63 @@ def _source_files(source: Path) -> list[tuple[Path, bool]]:
     return files
 
 
+def _fingerprint_files(source: Path, files: list[tuple[Path, bool]]) -> str:
+    records: list[dict[str, str | int]] = []
+    for relative, directory in files:
+        if directory:
+            continue
+        path = source / relative
+        try:
+            mode = path.lstat().st_mode
+            if not stat.S_ISREG(mode):
+                raise CatalogError(
+                    "unsupported_file_type",
+                    f"Only regular files may be fingerprinted: {path}",
+                )
+            content = path.read_bytes()
+        except OSError as exc:
+            raise CatalogError(
+                "io_error", f"Cannot read workflow file {path}: {exc}"
+            ) from exc
+        records.append(
+            {
+                "path": relative.as_posix(),
+                "executable_bits": mode & 0o111,
+                "sha256": hashlib.sha256(content).hexdigest(),
+            }
+        )
+    records.sort(key=lambda record: str(record["path"]))
+    encoded = json.dumps(
+        records, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def workflow_fingerprint(source: Path) -> str:
+    """Return the SHA-256 definition digest for an ordinary workflow folder.
+
+    Raises:
+        CatalogError: The source is invalid or contains a linked/special file.
+    """
+    try:
+        return _fingerprint_files(source, _source_files(source))
+    except CatalogError:
+        raise
+    except (OSError, RuntimeError, UnicodeError, ValueError) as exc:
+        raise CatalogError(
+            "io_error", f"Cannot fingerprint workflow source {source}: {exc}"
+        ) from exc
+
+
+def _plus_version() -> str:
+    try:
+        return importlib.metadata.version("millrace-plus")
+    except importlib.metadata.PackageNotFoundError:
+        from millrace_plus import __version__
+
+        return __version__
+
+
 def _copy(
     source: Path, destination: Path, *, catalog_home: Path | None, into_catalog: bool
 ) -> dict[str, str]:
@@ -330,6 +389,7 @@ def _copy(
                 f"Create the parent/catalog directory first: {destination.parent}",
             )
         files = _source_files(source)
+        source_digest = _fingerprint_files(source, files)
         destination.mkdir()
         owned = True
         for relative, directory in files:
@@ -338,7 +398,19 @@ def _copy(
                 target.mkdir()
             else:
                 shutil.copy2(source / relative, target)
+        if (
+            workflow_fingerprint(source) != source_digest
+            or workflow_fingerprint(destination) != source_digest
+        ):
+            raise CatalogError(
+                "source_changed",
+                f"Workflow source changed during copy: {source}",
+            )
         return {"source": str(canonical_source), "destination": str(canonical_dest)}
+    except CatalogError:
+        if owned:
+            shutil.rmtree(destination)
+        raise
     except FileExistsError as exc:
         if owned:
             shutil.rmtree(destination)
@@ -364,7 +436,7 @@ def copy_workflow(
 
 def init_template(
     selector: str, destination: Path, *, catalog_home: Path | None = None
-) -> dict[str, str]:
+) -> dict[str, object]:
     """Initialize a qualified template into a fresh independent workspace folder."""
     parts = selector.split(":")
     if (
@@ -377,10 +449,16 @@ def init_template(
         )
     for entry in list_templates(catalog_home=catalog_home):
         if entry["selector"] == selector:
-            return _copy(
+            result: dict[str, object] = _copy(
                 Path(entry["path"]),
                 destination,
                 catalog_home=catalog_home,
                 into_catalog=False,
             )
+            result["provenance"] = {
+                "template_id": selector,
+                "plus_version": _plus_version(),
+                "sha256": workflow_fingerprint(destination.expanduser().absolute()),
+            }
+            return result
     raise CatalogError("unknown_selector", f"Unknown template selector: {selector}")

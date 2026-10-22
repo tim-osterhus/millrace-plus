@@ -16,6 +16,7 @@ import base64
 import hashlib
 import json
 import os
+import runpy
 import subprocess
 import sys
 import zipfile
@@ -27,7 +28,16 @@ from millrace.router import execution
 PLUS_ROOT = Path(__file__).resolve().parents[2]
 CORE_ROOT = Path(execution.__file__).resolve().parents[3]
 VERSION = "0.23.0"
+PLUS_CANDIDATE_VERSION = "0.23.1"
 ROUTER_REQUIREMENT = "millrace-ai<0.24.0,>=0.23.0; extra == 'router'"
+BASELINE_PLUS_WHEEL_SHA256 = (
+    "5c2025e4f6d592bf4c927d659b4d729e17a62e49bc13f5b380de1b2d6bff480f"
+)
+BASELINE_PLUS_WHEEL = PLUS_ROOT.parents[2] / (
+    "lab/tasks/v023-canonical-cutover-plan/2026-10-21/"
+    "execution/publication/plus/bootstrap-recovery/public-artifacts/"
+    "millrace_plus-0.23.0-py3-none-any.whl"
+)
 
 
 def _sha256(path: Path) -> str:
@@ -91,22 +101,7 @@ class Env:
         )
         self.python = root / "bin" / "python"
         if wheels:
-            subprocess.run(
-                [
-                    "uv",
-                    "pip",
-                    "install",
-                    "--offline",
-                    "--no-deps",
-                    "--no-cache",
-                    "--python",
-                    str(self.python),
-                    *map(str, wheels),
-                ],
-                check=True,
-                capture_output=True,
-                env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"},
-            )
+            self.install(*wheels)
         self.home = root.parent / f"{root.name}-home"
         self.home.mkdir()
         self.cwd = root.parent / f"{root.name}-cwd"
@@ -132,6 +127,27 @@ class Env:
 
     def py(self, code: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         return self.run(str(self.python), "-I", "-c", code, check=check)
+
+    def install(self, *wheels: Path, force_reinstall: bool = False) -> None:
+        command = [
+            "uv",
+            "pip",
+            "install",
+            "--offline",
+            "--no-deps",
+            "--no-cache",
+            "--python",
+            str(self.python),
+        ]
+        if force_reinstall:
+            command.append("--force-reinstall")
+        command.extend(map(str, wheels))
+        subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"},
+        )
 
 
 @pytest.fixture(scope="module")
@@ -454,7 +470,7 @@ def test_matched_candidate_wheels_and_public_controls(
     assert provenance["contract"] == "millrace-router-execution/v2"
     assert provenance["core_url"] == artifacts["core_sdist_wheel"].as_uri()
     assert provenance["plus_url"] == plus_wheel.as_uri()
-    assert provenance["versions"] == [VERSION, VERSION]
+    assert provenance["versions"] == [VERSION, PLUS_CANDIDATE_VERSION]
 
     project = _pi_project(matched.cwd / "pi", matched.python)
     driver = matched.cwd / "driver.py"
@@ -791,3 +807,359 @@ def test_advisory_commands_and_json_result_use_current_public_controls(
                 made["instance_id"], started["run_id"], state_home=home
             )
             assert result["status"] == "succeeded", result
+
+
+def test_package_update_keeps_copies_independent(artifacts: dict[str, Path]) -> None:
+    assert BASELINE_PLUS_WHEEL.is_file()
+    assert _sha256(BASELINE_PLUS_WHEEL) == BASELINE_PLUS_WHEEL_SHA256
+    root = artifacts["root"]
+    env = Env(root / "catalog-update", [BASELINE_PLUS_WHEEL])
+    console = str(env.root / "bin/millrace-plus")
+    assert env.py(
+        "import importlib.metadata as m; "
+        "assert m.version('millrace-plus') == '0.23.0'; "
+        "import importlib.util; "
+        "assert importlib.util.find_spec('millrace') is None"
+    ).returncode == 0
+
+    catalog_home = env.cwd / "catalog"
+    catalog_home.mkdir()
+    env.run(console, "catalog", "home", "set", str(catalog_home), check=True)
+    copy_a = env.cwd / "copy-a"
+    initialized = _last_json(
+        env.run(
+            console,
+            "catalog",
+            "init",
+            "bundled:software-change",
+            str(copy_a),
+            check=True,
+        ).stdout
+    )
+    assert initialized["source"].endswith("/millrace_plus/workflows/software-change")
+    graph = json.loads((copy_a / "workflow.json").read_text())
+    prompt = graph["planes"]["main"]["nodes"]["work"]["invoke"]["config"][
+        "prompt"
+    ]
+    (copy_a / prompt).write_bytes((copy_a / prompt).read_bytes() + b"\nlocal edit\n")
+    copy_a_before = _tree(copy_a)
+
+    copy_sibling = env.cwd / "copy-sibling"
+    env.run(
+        console,
+        "catalog",
+        "init",
+        "bundled:software-change",
+        str(copy_sibling),
+        check=True,
+    )
+    copy_sibling_before = _tree(copy_sibling)
+
+    local_variant = catalog_home / "local-variant"
+    bundled_source = env.py(
+        "from millrace_plus import catalog; "
+        "print(catalog.bundled_root() / 'software-change')"
+    ).stdout.strip()
+    env.run(
+        console,
+        "catalog",
+        "copy",
+        bundled_source,
+        str(local_variant),
+        check=True,
+    )
+    (local_variant / prompt).write_bytes(
+        (local_variant / prompt).read_bytes() + b"\nlocal catalog edit\n"
+    )
+    local_before = _tree(local_variant)
+    settings = env.home / ".config/millrace-plus/catalog.json"
+    settings_before = settings.read_bytes()
+
+    env.install(artifacts["plus_wheel"], force_reinstall=True)
+    assert env.py(
+        "import importlib.metadata as m; "
+        "assert m.version('millrace-plus') == '0.23.1'; "
+        "import importlib.util; "
+        "assert importlib.util.find_spec('millrace') is None"
+    ).returncode == 0
+    assert _tree(copy_a) == copy_a_before
+    assert _tree(copy_sibling) == copy_sibling_before
+    assert _tree(local_variant) == local_before
+    assert settings.read_bytes() == settings_before
+    selectors = [
+        item["selector"]
+        for item in _last_json(env.run(console, "catalog", "list", check=True).stdout)[
+            "templates"
+        ]
+    ]
+    assert "local:local-variant" in selectors
+
+    copy_b = env.cwd / "copy-b"
+    initialized_b = _last_json(
+        env.run(
+            console,
+            "catalog",
+            "init",
+            "bundled:software-change",
+            str(copy_b),
+            check=True,
+        ).stdout
+    )
+    candidate_source = env.py(
+        "from millrace_plus import catalog; "
+        "print(catalog.bundled_root() / 'software-change')"
+    ).stdout.strip()
+    candidate_digest = env.py(
+        "from millrace_plus import catalog; "
+        "print(catalog.workflow_fingerprint("
+        "catalog.bundled_root() / 'software-change'))"
+    ).stdout.strip()
+    copy_digest = env.py(
+        "from pathlib import Path; from millrace_plus import catalog; "
+        f"print(catalog.workflow_fingerprint(Path({str(copy_b)!r})))"
+    ).stdout.strip()
+    assert initialized_b["provenance"] == {
+        "template_id": "bundled:software-change",
+        "plus_version": "0.23.1",
+        "sha256": candidate_digest,
+    }
+    assert copy_digest == candidate_digest
+    assert _tree(copy_b) == _tree(Path(candidate_source))
+    assert _tree(copy_sibling) == copy_sibling_before
+
+    # The post-upgrade copy can enter the runtime through its command-only first
+    # node. Use Plus's public control facade so the stock Claude binding is
+    # resolved, then verify the run pauses before reaching that native stage.
+    env.install(artifacts["core_wheel"])
+    # Core resolves every declared binding at create time, including the
+    # unreachable Claude stage. Bind the stock entries to this environment's
+    # Python and a test-owned inert Claude executable through public host_paths;
+    # only the command binding should run.
+    inert_claude = env.cwd / "claude-not-launched"
+    inert_claude.write_text("#!/bin/sh\nexit 97\n", encoding="ascii")
+    inert_claude.chmod(0o700)
+    project_b = env.cwd / "copy-b-project"
+    project_b.mkdir()
+    usable = env.py(
+        "import json, sys, uuid\n"
+        "from pathlib import Path\n"
+        "from millrace_plus.router import control\n"
+        f"workflow = Path({str(copy_b)!r})\n"
+        f"project = Path({str(project_b)!r})\n"
+        f"state = Path({str(env.cwd / 'copy-b-state')!r})\n"
+        f"inert_claude = Path({str(inert_claude)!r})\n"
+        "created = control.create_instance(\n"
+        "    workflow / 'workflow.json', project, state_home=state,\n"
+        "    request_id=uuid.uuid4().hex, expected_state_version=0,\n"
+        "    host_paths={'claude': str(inert_claude), 'python3': sys.executable})\n"
+        "assert created['status'] == 'applied', created\n"
+        "started = control.start_run(\n"
+        "    created['instance_id'], state_home=state,\n"
+        "    request_id=uuid.uuid4().hex, expected_state_version=1)\n"
+        "run = control.inspect_run(\n"
+        "    created['instance_id'], started['run_id'], state_home=state)\n"
+        "print(json.dumps({\n"
+        "    'status': run['status'],\n"
+        "    'pause_reason': run['pause_reason'],\n"
+        "    'count': run['count'],\n"
+        "    'plane_status': run['planes']['main']['status'],\n"
+        "    'plane_pause_reason': run['planes']['main']['pause_reason'],\n"
+        "    'outcome': run['completions'][0]['outcome'],\n"
+        "    'quiescent': run['quiescent'],\n"
+        "    'inflight': run['inflight_invocations'],\n"
+        "    'writers': [item['writer_state'] for item in run['invocations']],\n"
+        "    'effective_writers': [\n"
+        "        item['effective_writer'] for item in run['completions']],\n"
+        "}))\n"
+    )
+    assert _last_json(usable.stdout) == {
+        "status": "paused",
+        "pause_reason": "no_runnable_planes",
+        "count": 1,
+        "plane_status": "paused",
+        "plane_pause_reason": "request_missing_or_empty",
+        "outcome": "NEEDS_INPUT",
+        "quiescent": True,
+        "inflight": [],
+        "writers": ["stopped"],
+        "effective_writers": ["stopped"],
+    }
+    assert not (project_b / "request.md").exists()
+    assert not (copy_b / "request.md").exists()
+    assert _tree(copy_b) == _tree(Path(candidate_source))
+
+    sibling_validation = env.cwd / "copy-sibling-validation"
+    env.run(
+        console,
+        "catalog",
+        "copy",
+        str(copy_sibling),
+        str(sibling_validation),
+        check=True,
+    )
+    assert _tree(sibling_validation) == copy_sibling_before
+
+
+@pytest.mark.parametrize("workflow", ["document-review", "software-change"])
+def test_stock_inputs_map_exact_request_bytes_and_refuse_conflicts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    workflow: str,
+) -> None:
+    project = tmp_path / workflow
+    project.mkdir()
+    monkeypatch.chdir(project)
+    script = (
+        PLUS_ROOT
+        / "src/millrace_plus/workflows"
+        / workflow
+        / "scripts/check_inputs.py"
+    )
+    request_markdown = "Goal café\nAcceptance criteria with trailing spaces.  \n"
+    manifest = {
+        "format": "millrace-plus-subworkflow-inputs/v1",
+        "identity": {"call_key": "review-1"},
+        "inputs": {"request_markdown": request_markdown},
+    }
+    (project / "subworkflow-inputs.json").write_text(
+        json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
+    )
+
+    runpy.run_path(str(script))
+    first = _last_json(capsys.readouterr().out)
+    expected = request_markdown.encode("utf-8")
+    assert first["outcome"] == "READY"
+    assert (project / "request.md").read_bytes() == expected
+
+    runpy.run_path(str(script))
+    assert _last_json(capsys.readouterr().out)["outcome"] == "READY"
+    assert (project / "request.md").read_bytes() == expected
+
+    (project / "request.md").write_bytes(b"operator-owned request\n")
+    runpy.run_path(str(script))
+    conflict = _last_json(capsys.readouterr().out)
+    assert conflict["outcome"] == "NEEDS_INPUT"
+    assert (project / "request.md").read_bytes() == b"operator-owned request\n"
+
+    (project / "request.md").unlink()
+    outside = tmp_path / "outside.md"
+    outside.write_bytes(expected)
+    (project / "request.md").symlink_to(outside)
+    runpy.run_path(str(script))
+    linked = _last_json(capsys.readouterr().out)
+    assert linked["outcome"] == "NEEDS_INPUT"
+    assert outside.read_bytes() == expected
+
+
+@pytest.mark.parametrize("workflow", ["document-review", "software-change"])
+def test_stock_inputs_reject_blank_manifest_request(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    workflow: str,
+) -> None:
+    project = tmp_path / workflow
+    project.mkdir()
+    monkeypatch.chdir(project)
+    script = (
+        PLUS_ROOT
+        / "src/millrace_plus/workflows"
+        / workflow
+        / "scripts/check_inputs.py"
+    )
+    (project / "subworkflow-inputs.json").write_text(
+        json.dumps(
+            {
+                "format": "millrace-plus-subworkflow-inputs/v1",
+                "identity": {"call_key": "review-1"},
+                "inputs": {"request_markdown": " \n\t "},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runpy.run_path(str(script))
+
+    assert _last_json(capsys.readouterr().out)["outcome"] == "NEEDS_INPUT"
+    assert not (project / "request.md").exists()
+
+
+@pytest.mark.parametrize("workflow", ["document-review", "software-change"])
+@pytest.mark.parametrize(
+    "manifest_bytes",
+    [
+        pytest.param(
+            b'{"format":"millrace-plus-subworkflow-inputs/v1",'
+            b'"identity":{"call_key":"first"},'
+            b'"identity":{"call_key":"second"},'
+            b'"inputs":{"request_markdown":"selected request"}}',
+            id="duplicate-top-level-key",
+        ),
+        pytest.param(
+            b'{"format":"millrace-plus-subworkflow-inputs/v1",'
+            b'"identity":{"call_key":"review-1"},'
+            b'"inputs":{"request_markdown":"other",'
+            b'"request_markdown":"selected request"}}',
+            id="duplicate-nested-input-key",
+        ),
+        pytest.param(
+            b'{"format":"millrace-plus-subworkflow-inputs/v1",'
+            b'"identity":{"call_key":"review-1"},'
+            b'"inputs":{"request_markdown":"selected request",'
+            b'"extra":NaN}}',
+            id="nan",
+        ),
+        pytest.param(
+            b'{"format":"millrace-plus-subworkflow-inputs/v1",'
+            b'"identity":{"call_key":"review-1"},'
+            b'"inputs":{"request_markdown":"selected request",'
+            b'"extra":Infinity}}',
+            id="infinity",
+        ),
+        pytest.param(
+            b'{"format":"millrace-plus-subworkflow-inputs/v1",'
+            b'"identity":{"call_key":"review-1"},'
+            b'"inputs":{"request_markdown":"selected request",'
+            b'"extra":"invalid-utf8-\xff"}}',
+            id="malformed-utf8",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "existing_request",
+    [
+        pytest.param(False, id="no-request"),
+        pytest.param(True, id="existing-request"),
+    ],
+)
+def test_stock_inputs_reject_ambiguous_manifest_json_without_writing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    workflow: str,
+    manifest_bytes: bytes,
+    existing_request: bool,
+) -> None:
+    project = tmp_path / workflow
+    project.mkdir()
+    monkeypatch.chdir(project)
+    script = (
+        PLUS_ROOT
+        / "src/millrace_plus/workflows"
+        / workflow
+        / "scripts/check_inputs.py"
+    )
+    request_path = project / "request.md"
+    original = b"selected request"
+    if existing_request:
+        request_path.write_bytes(original)
+    (project / "subworkflow-inputs.json").write_bytes(manifest_bytes)
+
+    runpy.run_path(str(script))
+
+    assert _last_json(capsys.readouterr().out)["outcome"] == "NEEDS_INPUT"
+    if existing_request:
+        assert request_path.read_bytes() == original
+    else:
+        assert not request_path.exists()

@@ -16,7 +16,8 @@ from test_distribution import artifacts as artifacts
 
 @pytest.mark.parametrize("scenario", ["repair", "clean"])
 def test_installed_software_change_useful_route(
-    artifacts: dict[str, Path], scenario: str
+    artifacts: dict[str, Path],  # noqa: F811 - imported pytest fixture
+    scenario: str,
 ) -> None:
     env = Env(
         artifacts["root"] / f"software-change-{scenario}",

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -51,34 +53,167 @@ def test_local_catalog_list_init_and_independent_copy(
             catalog.init_template(selector, tmp_path / "bad", catalog_home=local)
 
 
+def test_workflow_fingerprint_matches_sorted_definition_records(
+    tmp_path: Path,
+) -> None:
+    source = _flow(tmp_path / "source")
+    nested = source / "café"
+    nested.mkdir()
+    executable = nested / "run.sh"
+    executable.write_bytes(b"#!/bin/sh\necho ok\n")
+    executable.chmod(0o751)
+    (source / "__pycache__").mkdir()
+    (source / "__pycache__/ignored.pyc").write_bytes(b"ignored")
+
+    records = [
+        {
+            "path": path.relative_to(source).as_posix(),
+            "executable_bits": path.stat().st_mode & 0o111,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+        for path in sorted(source.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.relative_to(source).parts
+    ]
+    encoded = json.dumps(
+        records, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+
+    assert catalog.workflow_fingerprint(source) == hashlib.sha256(encoded).hexdigest()
+
+
+@pytest.mark.parametrize("kind", ["symlink", "fifo"])
+def test_workflow_fingerprint_refuses_nonregular_definition_files(
+    tmp_path: Path, kind: str
+) -> None:
+    source = _flow(tmp_path / "source")
+    special = source / "special"
+    if kind == "symlink":
+        special.symlink_to(source / "step.py")
+    else:
+        os.mkfifo(special)
+
+    with pytest.raises(catalog.CatalogError):
+        catalog.workflow_fingerprint(source)
+
+
+@pytest.mark.parametrize("selector", ["bundled:same", "local:same"])
+def test_init_template_reports_descriptive_provenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, selector: str
+) -> None:
+    bundled = _flow(tmp_path / "bundled/same")
+    local = _flow(tmp_path / "catalog/same")
+    monkeypatch.setattr(catalog, "bundled_root", lambda: bundled.parent)
+    destination = tmp_path / "copy"
+
+    result = catalog.init_template(selector, destination, catalog_home=local.parent)
+
+    source = bundled if selector.startswith("bundled:") else local
+    digest = catalog.workflow_fingerprint(source)
+    assert result["source"] == str(source.resolve())
+    assert result["destination"] == str(destination.resolve())
+    try:
+        expected_plus_version = importlib.metadata.version("millrace-plus")
+    except importlib.metadata.PackageNotFoundError:
+        from millrace_plus import __version__ as expected_plus_version
+
+    assert result["provenance"] == {
+        "template_id": selector,
+        "plus_version": expected_plus_version,
+        "sha256": digest,
+    }
+    assert catalog.workflow_fingerprint(destination) == digest
+    assert not (destination / "provenance.json").exists()
+
+
+def test_init_template_refuses_source_change_during_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _flow(tmp_path / "bundled/same")
+    monkeypatch.setattr(catalog, "bundled_root", lambda: source.parent)
+    destination = tmp_path / "copy"
+    real_copy2 = catalog.shutil.copy2
+
+    def mutate_after_graph_copy(
+        src: str | os.PathLike[str], dst: str | os.PathLike[str]
+    ) -> str:
+        copied = real_copy2(src, dst)
+        if Path(src).name == "workflow.json":
+            (source / "step.py").write_text("changed during copy\n")
+        return copied
+
+    monkeypatch.setattr(catalog.shutil, "copy2", mutate_after_graph_copy)
+    with pytest.raises(catalog.CatalogError):
+        catalog.init_template(
+            "bundled:same", destination, catalog_home=tmp_path / "catalog"
+        )
+
+    assert (source / "step.py").read_text() == "changed during copy\n"
+    assert not destination.exists()
+
+
 def test_copy_path_refusals_and_cleanup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = _flow(tmp_path / "source")
+    source_files = {
+        name: (source / name).read_bytes() for name in ("workflow.json", "step.py")
+    }
     local = tmp_path / "catalog"
     local.mkdir()
+    local_sentinel = local / "operator-owned.txt"
+    local_sentinel.write_bytes(b"keep this catalog entry")
     dest = tmp_path / "dest"
-    dest.symlink_to(tmp_path / "missing")
-    with pytest.raises(catalog.CatalogError, match="exists"):
-        catalog.copy_workflow(source, dest, catalog_home=local)
-    assert dest.is_symlink()
-    dest.unlink()
-    for target in (source / "child", local, local / "nested" / "child"):
-        with pytest.raises(catalog.CatalogError):
-            catalog.copy_workflow(source, target, catalog_home=local)
+    dangling_target = tmp_path / "missing"
+    dest.symlink_to(dangling_target)
     with pytest.raises(catalog.CatalogError) as error:
-        catalog.copy_workflow(source, tmp_path / "absent" / "dest", catalog_home=local)
+        catalog.copy_workflow(source, dest, catalog_home=local)
+    assert error.value.code == "destination_exists"
+    assert dest.is_symlink() and not dangling_target.exists()
+    dest.unlink()
+
+    forbidden_paths = (
+        (source / "child", "forbidden_destination"),
+        (local, "destination_exists"),
+        (local / "nested" / "child", "forbidden_destination"),
+    )
+    for target, expected_code in forbidden_paths:
+        with pytest.raises(catalog.CatalogError) as error:
+            catalog.copy_workflow(source, target, catalog_home=local)
+        assert error.value.code == expected_code
+        assert local_sentinel.read_bytes() == b"keep this catalog entry"
+        assert {
+            name: (source / name).read_bytes() for name in source_files
+        } == source_files
+    assert not (source / "child").exists()
+    assert not (local / "nested").exists()
+
+    missing_parent = tmp_path / "absent"
+    missing_destination = missing_parent / "dest"
+    with pytest.raises(catalog.CatalogError) as error:
+        catalog.copy_workflow(source, missing_destination, catalog_home=local)
     assert error.value.code == "destination_parent_missing"
+    assert not missing_parent.exists() and not missing_destination.exists()
+    assert local_sentinel.read_bytes() == b"keep this catalog entry"
+
     linked = source / "linked"
     linked.symlink_to(source / "step.py")
-    with pytest.raises(catalog.CatalogError):
+    with pytest.raises(catalog.CatalogError) as error:
         catalog.copy_workflow(source, dest, catalog_home=local)
-    assert not dest.exists()
+    assert error.value.code == "unsupported_file_type"
+    assert not dest.exists() and (source / "linked").is_symlink()
+    assert (source / "step.py").read_bytes() == source_files["step.py"]
+    assert local_sentinel.read_bytes() == b"keep this catalog entry"
     linked.unlink()
+
     os.mkfifo(source / "pipe")
-    with pytest.raises(catalog.CatalogError):
+    with pytest.raises(catalog.CatalogError) as error:
         catalog.copy_workflow(source, dest, catalog_home=local)
+    assert error.value.code == "unsupported_file_type"
+    assert not dest.exists() and (source / "pipe").exists()
+    assert (source / "step.py").read_bytes() == source_files["step.py"]
+    assert local_sentinel.read_bytes() == b"keep this catalog entry"
     (source / "pipe").unlink()
+
     (source / "__pycache__").symlink_to(tmp_path / "absent")
     catalog.copy_workflow(source, dest, catalog_home=local)
     assert not (dest / "__pycache__").exists()
@@ -90,9 +225,14 @@ def test_copy_path_refusals_and_cleanup(
         raise OSError("owned test I/O failure")
 
     monkeypatch.setattr(catalog.shutil, "copy2", fail)
-    with pytest.raises(catalog.CatalogError):
+    with pytest.raises(catalog.CatalogError) as error:
         catalog.copy_workflow(source, dest, catalog_home=local)
+    assert error.value.code == "io_error"
     assert not dest.exists() and source.is_dir()
+    assert {
+        name: (source / name).read_bytes() for name in source_files
+    } == source_files
+    assert local_sentinel.read_bytes() == b"keep this catalog entry"
 
 
 @pytest.mark.parametrize(
@@ -131,11 +271,14 @@ def test_catalog_override_never_permits_writing_bundled_root(
     source = _flow(tmp_path / "source")
     bundled = tmp_path / "bundled"
     bundled.mkdir()
+    sentinel = bundled / "existing-template.txt"
+    sentinel.write_bytes(b"bundled asset remains unchanged")
     monkeypatch.setattr(catalog, "bundled_root", lambda: bundled)
     with pytest.raises(catalog.CatalogError) as error:
         catalog.copy_workflow(source, bundled / "new", catalog_home=bundled)
     assert error.value.code == "forbidden_destination"
     assert not (bundled / "new").exists()
+    assert sentinel.read_bytes() == b"bundled asset remains unchanged"
 
 
 def test_default_catalog_alias_and_hardlink_copy(
@@ -148,10 +291,15 @@ def test_default_catalog_alias_and_hardlink_copy(
     monkeypatch.setattr(catalog, "default_catalog", lambda: default)
     alias = tmp_path / "alias"
     alias.symlink_to(default, target_is_directory=True)
-    with pytest.raises(catalog.CatalogError):
+    source_graph = (source / "workflow.json").read_bytes()
+    source_step = (source / "step.py").read_bytes()
+    with pytest.raises(catalog.CatalogError) as error:
         catalog.check_ownership(
             alias / "source/workflow.json", tmp_path / "project", catalog_home=override
         )
+    assert error.value.code == "catalog_ownership"
+    assert (source / "workflow.json").read_bytes() == source_graph
+    assert (source / "step.py").read_bytes() == source_step
     os.link(source / "step.py", source / "hardlinked.py")
     dest = tmp_path / "copy"
     catalog.copy_workflow(source, dest, catalog_home=override)
@@ -196,16 +344,32 @@ def test_unknown_named_user_tilde_is_typed_api_and_cli_error(
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    source = _flow(tmp_path / "source")
+    monkeypatch.chdir(tmp_path)
+    real_source = _flow(tmp_path / "source")
+    source_sentinel = (real_source / "step.py").read_bytes()
+    saved_catalog = tmp_path / "saved-catalog"
+    saved_catalog.mkdir()
+    settings = home / ".config/millrace-plus/catalog.json"
+    settings.parent.mkdir(parents=True)
+    settings.write_bytes(
+        (json.dumps({"catalog_home": str(saved_catalog)}) + "\n").encode()
+    )
+    settings_before = settings.read_bytes()
+    source = real_source
     missing = Path("~millrace_user_that_does_not_exist_92f715c8/workflow")
     destination = tmp_path / "copy"
+    attempted_destination = destination
     if bad_location == "source":
         source = missing
     else:
         destination = missing
+        attempted_destination = tmp_path / missing
     with pytest.raises(catalog.CatalogError) as error:
         catalog.copy_workflow(source, destination)
     assert error.value.code == "io_error"
+    assert not attempted_destination.exists()
+    assert not (tmp_path / missing).exists()
+    assert settings.read_bytes() == settings_before
     monkeypatch.setattr(
         __import__("sys"),
         "argv",
@@ -215,4 +379,7 @@ def test_unknown_named_user_tilde_is_typed_api_and_cli_error(
         cli.cli()
     assert exit_code.value.code == 2
     assert json.loads(capsys.readouterr().err)["code"] == "io_error"
-    assert not (tmp_path / "copy").exists()
+    assert not attempted_destination.exists()
+    assert not (tmp_path / missing).exists()
+    assert settings.read_bytes() == settings_before
+    assert (real_source / "step.py").read_bytes() == source_sentinel

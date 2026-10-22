@@ -2,6 +2,12 @@
 
 Use Core and Plus 0.23.0 with the public execution-v2 contract.
 
+The 0.23.1 candidate also supports [reusable local child calls](subworkflows.md)
+over that unchanged Core contract. Declare a helper command node with cwd `.`,
+all handled `CHILD_*` outcomes and a finite outer timeout covering wait + cleanup
++ 10 seconds. New logical occurrences use new call keys; retrying an occurrence
+retains its original request and key.
+
 Start with an initialized folder or a user-authored `workflow.json`. Use `format: millrace-router/v3`, declared bindings, explicit planes, local nodes, outcomes, unambiguous routes and explicit unknown/error fallbacks. Meaningful branch/retry decisions belong in that graph; executors return outcomes and work artifacts.
 
 A plane requires `start`, `nodes` and `workspace`. The stock graphs explicitly declare `planes.main` with `workspace: "."`. To reauthor an old graph, move its top-level `start` and `nodes` under that declaration and set the v3 marker. Use fresh v7 state; no command migrates or wraps an old graph/store. Plane/workspace/seam/dependency topology and maximum concurrency remain fixed for a run.

@@ -78,9 +78,53 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
+def _subworkflow_main(argv: Sequence[str]) -> int:
+    from millrace_plus import subworkflows
+    from millrace_plus.subworkflow_records import SubworkflowError
+
+    # Load the public error type only in the selected optional helper command.
+    require_core()
+    from millrace.router.execution import RouterError
+
+    parser = _CatalogParser(prog="millrace-plus subworkflow")
+    commands = parser.add_subparsers(dest="operation", required=True)
+    commands.add_parser("call").add_argument("--request", required=True, type=Path)
+    for name in ("inspect", "cancel", "reconcile"):
+        child = commands.add_parser(name)
+        child.add_argument("--call-home", required=True, type=Path)
+        child.add_argument("--call-key", required=True)
+        if name == "cancel":
+            child.add_argument("--request-id", required=True)
+    args = parser.parse_args(argv)
+    try:
+        if args.operation == "call":
+            result = subworkflows.call(args.request)
+        elif args.operation == "inspect":
+            result = subworkflows.inspect(args.call_home, args.call_key)
+        elif args.operation == "cancel":
+            result = subworkflows.cancel(args.call_home, args.call_key, args.request_id)
+        else:
+            result = subworkflows.reconcile(args.call_home, args.call_key)
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    except (SubworkflowError, RouterError) as exc:
+        print(json.dumps({"code": exc.code, "message": str(exc)}), file=sys.stderr)
+        return 2
+    except OSError:
+        print(json.dumps({"code": "io_error", "message": "io_error"}), file=sys.stderr)
+        return 2
+
+
 def cli() -> None:
     """Dispatch catalog without Core; retain the explicit router namespace."""
     args = sys.argv[1:]
+    if args and args[0] == "subworkflow":
+        try:
+            code = _subworkflow_main(args[1:])
+        except (CoreContractError, catalog.CatalogError) as exc:
+            print(json.dumps({"code": exc.code, "message": str(exc)}), file=sys.stderr)
+            code = 2
+        raise SystemExit(code)
     if args and args[0] == "catalog":
         try:
             code = _catalog_main(args[1:])
@@ -90,7 +134,8 @@ def cli() -> None:
         raise SystemExit(code)
     if not args or args[0] != "router":
         print(
-            "usage: millrace-plus router ... | millrace-plus catalog ...",
+            "usage: millrace-plus router ... | millrace-plus catalog ... | "
+            "millrace-plus subworkflow ...",
             file=sys.stderr,
         )
         raise SystemExit(2)

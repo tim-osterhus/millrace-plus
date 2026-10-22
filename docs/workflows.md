@@ -6,6 +6,8 @@ Each graph explicitly declares `planes.main` with `workspace: "."`. Node cwd, in
 
 The normal path is input check → work → independent check → original-goal review. A check can request one repair/recheck; repeated failure pauses. A planning defect routes to a distinct diagnosis and pause. Missing input and blocked work pause explicitly. Each project supplies `request.md` with the original goal and acceptance criteria. Software work edits requested files; document work writes `document.md`. Reports are ordinary `work/*.md` files.
 
+For helper-driven calls, the stock input check also reads `subworkflow-inputs.json` with format `millrace-plus-subworkflow-inputs/v1` and a nonempty `inputs.request_markdown`. It creates `request.md` from the exact UTF-8 text bytes, without trimming or adding a newline. Re-running with identical content is safe. A conflicting existing file, malformed manifest, or blank request returns `NEEDS_INPUT` without overwriting the file. Direct launches without a manifest continue to require an existing nonempty `request.md`.
+
 Each example uses 16 invocations, a 24-hour elapsed deadline and an explicit 1,800-second invocation timeout. Values are editable graph settings. Pauses consume wall time and continuation retains used bounds. An expired run requires a fresh run rather than reset-by-resume. An uncertain `may_live` writer retains its hold: verify the writer is stopped, reconcile through supported controls, then resume within remaining bounds. Never blindly replay an uncertain writer.
 
 The existing Claude permission bypass runs in the project root. Native auto-update may fail the accepted exact-version check; changing the profile cannot bypass it. See each template README for practical inputs, outputs, controls and recovery.

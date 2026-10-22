@@ -1,5 +1,10 @@
 # Command-only router quickstart
 
+For a parent that calls independent pinned child workflows, use the
+[subworkflow command guide](subworkflows.md). Its command-only composition
+fixtures use 300 seconds wait, 15 seconds cleanup and a 325-second outer timeout;
+native callers must choose their own longer finite budget.
+
 This walkthrough authors a graph, copies it through a local catalog, and operates two independent instances through Millrace OS. Each instance has a producer plane and a checker plane connected by a declared seam. You then expand one instance, publish a paused pending revision, restart OS, and continue explicitly.
 
 Use a matched Core/Plus/OS 0.23.0 environment with `python`, `millrace-plus`, and `millrace-os` on `PATH`. The formats here are graph v3, store v7, execution v2, and request v2. Package version numbers alone do not establish compatibility. Use fresh state and a POSIX host. No browser or model credentials are needed.

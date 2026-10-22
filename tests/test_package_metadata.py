@@ -13,7 +13,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = PROJECT_ROOT / "src" / "millrace_plus" / "skills"
-RELEASE_IDENTITY = "0.23.0"
+RELEASE_IDENTITY = "0.23.1"
 PACKAGE_DOCS = (
     "docs/authoring.md",
     "docs/public-validation.md",

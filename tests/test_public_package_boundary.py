@@ -163,7 +163,7 @@ def test_built_artifacts_have_durable_v022_public_text(
         metadata = wheel.read(
             next(n for n in names if n.endswith(".dist-info/METADATA"))
         ).decode()
-        assert "Version: 0.23.0" in metadata and "unpublished" not in metadata.lower()
+        assert "Version: 0.23.1" in metadata and "unpublished" not in metadata.lower()
     with tarfile.open(next(tmp_path.glob("*.tar.gz"))) as archive:
         names = archive.getnames()
         assert not any("/millrace_workflow_package/" in n for n in names)
