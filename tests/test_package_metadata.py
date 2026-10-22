@@ -19,6 +19,9 @@ PACKAGE_DOCS = (
     "docs/public-validation.md",
     "docs/release.md",
     "docs/workflows.md",
+    "docs/catalog.md",
+    "docs/subworkflows.md",
+    "docs/paperclip.md",
 )
 
 
@@ -205,6 +208,21 @@ def test_official_package_data_declares_selected_vendor_selection_assets() -> No
             assert (folder / asset).is_file(), asset
         assert all("skill" not in name for name in graph["control_files"])
 
+
+def test_paperclip_local_esm_package_has_no_package_dependencies() -> None:
+    root = PROJECT_ROOT / "src/millrace_plus/integrations/paperclip"
+    package = json.loads((root / "package.json").read_text())
+    assert package == {
+        "name": "@millrace/paperclip-adapter",
+        "version": RELEASE_IDENTITY,
+        "type": "module",
+        "exports": {".": "./index.js"},
+        "engines": {"node": ">=24.11.0"},
+        "license": "Apache-2.0",
+    }
+    assert {path.name for path in root.iterdir()} == {
+        "package.json", "index.js", "README.md",
+    }
 
 def test_plus_candidate_targets_reviewed_core_minimum_and_defers_experiment() -> None:
     """Candidate equality is insufficient; the execution contract remains required."""

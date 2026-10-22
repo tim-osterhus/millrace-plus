@@ -24,6 +24,41 @@ from millrace_plus.router import cli
 SOURCES = os.environ.get("PYTHONPATH", "")
 
 
+def test_paperclip_cli_strict_error_and_dispatch(tmp_path, monkeypatch, capsys):
+    config, assignment = tmp_path / "config.json", tmp_path / "assignment.json"
+    config.write_text('{"format":1,"format":2}')
+    assignment.write_text("{}")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "millrace-plus",
+            "paperclip",
+            "run",
+            "--config",
+            str(config),
+            "--assignment",
+            str(assignment),
+        ],
+    )
+    with pytest.raises(SystemExit) as exit_info:
+        cli.cli()
+    assert exit_info.value.code == 5
+    output = capsys.readouterr()
+    assert output.out == "" and json.loads(output.err)["code"] == "invalid_json"
+    from millrace_plus.integrations import paperclip_bridge
+
+    monkeypatch.setattr(
+        paperclip_bridge,
+        "run",
+        lambda *_: {"status": "attention_required", "summary": "busy"},
+    )
+    with pytest.raises(SystemExit) as exit_info:
+        cli.cli()
+    assert exit_info.value.code == 4
+    assert json.loads(capsys.readouterr().out)["status"] == "attention_required"
+
+
 def _run(*args: str, pythonpath: str = SOURCES, flags: tuple[str, ...] = ()):
     env = dict(os.environ, PYTHONPATH=pythonpath, PYTHONDONTWRITEBYTECODE="1")
     return subprocess.run(

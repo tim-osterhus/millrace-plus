@@ -1,0 +1,8 @@
+{
+  "name": "@millrace/paperclip-adapter",
+  "version": "0.23.1",
+  "type": "module",
+  "exports": {".": "./index.js"},
+  "engines": {"node": ">=24.11.0"},
+  "license": "Apache-2.0"
+}

@@ -115,9 +115,45 @@ def _subworkflow_main(argv: Sequence[str]) -> int:
         return 2
 
 
+def _paperclip_main(argv: Sequence[str]) -> int:
+    from millrace_plus.integrations import paperclip_bridge
+    from millrace_plus.integrations.paperclip_records import BridgeError
+    from millrace_plus.subworkflow_records import SubworkflowError
+
+    parser = _CatalogParser(prog="millrace-plus paperclip")
+    commands = parser.add_subparsers(dest="operation", required=True)
+    for name in ("run", "inspect"):
+        child = commands.add_parser(name)
+        child.add_argument("--config", required=True, type=Path)
+        child.add_argument("--assignment", required=True, type=Path)
+    args = parser.parse_args(argv)
+    try:
+        if args.operation == "inspect":
+            result = paperclip_bridge.inspect(args.config, args.assignment)
+            code = 0
+        else:
+            result = paperclip_bridge.run(args.config, args.assignment)
+            code = paperclip_bridge.EXIT_CODES[str(result["status"])]
+        print(json.dumps(result, ensure_ascii=False))
+        return code
+    except (BridgeError, SubworkflowError, catalog.CatalogError) as exc:
+        print(json.dumps({"code": exc.code, "message": exc.code}), file=sys.stderr)
+        return 5
+    except OSError:
+        print(json.dumps({"code": "io_error", "message": "io_error"}), file=sys.stderr)
+        return 6
+
+
 def cli() -> None:
     """Dispatch catalog without Core; retain the explicit router namespace."""
     args = sys.argv[1:]
+    if args and args[0] == "paperclip":
+        try:
+            code = _paperclip_main(args[1:])
+        except catalog.CatalogError as exc:
+            print(json.dumps({"code": exc.code, "message": exc.code}), file=sys.stderr)
+            code = 5
+        raise SystemExit(code)
     if args and args[0] == "subworkflow":
         try:
             code = _subworkflow_main(args[1:])
@@ -135,7 +171,7 @@ def cli() -> None:
     if not args or args[0] != "router":
         print(
             "usage: millrace-plus router ... | millrace-plus catalog ... | "
-            "millrace-plus subworkflow ...",
+            "millrace-plus subworkflow ... | millrace-plus paperclip ...",
             file=sys.stderr,
         )
         raise SystemExit(2)

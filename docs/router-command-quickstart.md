@@ -1,5 +1,9 @@
 # Command-only router quickstart
 
+For a Paperclip issue calling an independent pinned graph through the local OS
+HTTP API, use the [Paperclip bridge guide](paperclip.md). It preserves exact
+assignment bytes and reports verified graph results to the caller.
+
 For a parent that calls independent pinned child workflows, use the
 [subworkflow command guide](subworkflows.md). Its command-only composition
 fixtures use 300 seconds wait, 15 seconds cleanup and a 325-second outer timeout;
