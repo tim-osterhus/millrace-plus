@@ -36,7 +36,9 @@ Stop after one result. Report unknown effects without replay. A blocked result r
 
 
 First derive expected behavior from the original goal, specification, and packet.
-Write a separate review-baseline artifact using only those requirements.
+Write `baseline.md` using only those requirements, with its own substantive `## Evidence` and `## Outcome` sections as required for every artifact.
+Its Evidence records requirement-side identities, expectations and checks before implementation exposure.
+Its Outcome records that the requirements baseline is frozen; the implementation verdict belongs in `review.md`.
 Record criteria, expected behavior, required checks, pinned guidance revision, and manifest identity.
 Record supplied source identity as assignment metadata, without inspecting source before freeze.
 Include only pre-existing exceptions already supplied on the requirement side.
