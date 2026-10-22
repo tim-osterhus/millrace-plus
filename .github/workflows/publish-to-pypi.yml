@@ -1,6 +1,7 @@
 name: Publish to PyPI
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - v0.23.0
@@ -18,12 +19,33 @@ env:
 
 jobs:
   validate:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/tags/v0.23.0' }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/tags/v0.23.0') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: 8bad76605b8a5735ab12eb0e0e70a7ba914be6c8
+          fetch-depth: 0
+      - name: Verify immutable release source and control-only recovery
+        run: |
+          python3 - <<'PYCODE'
+          import os, subprocess
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+          source = "8bad76605b8a5735ab12eb0e0e70a7ba914be6c8"
+          assert git("rev-parse", "HEAD") == source
+          assert git("rev-parse", "refs/tags/v0.23.0") == "3ee02ca32ae4622a551ecac2e7ad1abf00933609"
+          assert git("rev-parse", "refs/tags/v0.23.0^{}") == source
+          if os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch":
+              assert os.environ["GITHUB_REF"] == "refs/heads/main"
+              changed = git("diff", "--name-only", source, os.environ["GITHUB_SHA"]).splitlines()
+              assert changed == [".github/workflows/publish-to-pypi.yml"], changed
+          else:
+              assert os.environ["GITHUB_EVENT_NAME"] == "push"
+              assert os.environ["GITHUB_REF"] == "refs/tags/v0.23.0"
+              assert os.environ["GITHUB_SHA"] == source
+          PYCODE
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
         with:
           version: 0.13.5
@@ -47,6 +69,11 @@ jobs:
               env.write("MILLRACE_TEST_CORE_WHEEL=" + str(root / "millrace_ai-0.23.0-py3-none-any.whl") + "\n")
               env.write("MILLRACE_TEST_CORE_SDIST=" + str(root / "millrace_ai-0.23.0.tar.gz") + "\n")
           PYCODE
+      - name: Cache pinned Core backend for offline distribution proofs
+        run: >-
+          uv run --no-project --python 3.11
+          --with 'uv_build==0.11.30'
+          python -c 'import uv_build'
       - name: Test matched public Core and Plus source
         run: |
           env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --no-project --python 3.11 --with pytest==9.1.1 --with hatchling==1.31.0 --with "$MILLRACE_TEST_CORE_WHEEL" --with . pytest -q
@@ -81,7 +108,7 @@ jobs:
 
   publish:
     needs: validate
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/tags/v0.23.0' }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/tags/v0.23.0') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-latest
     environment:
       name: pypi
