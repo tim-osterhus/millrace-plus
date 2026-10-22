@@ -33,6 +33,15 @@ Every ERROR variant includes `data.failure` with exactly `{operation,attempted,e
 | Learning | `assessment.md`, optional `candidate.md` | `pending_route` exactly echoes the pinned request's saved route. Assess two actual pairs; explain missing/unclear guidance, noncompliance or unrelated failure. Prefer no change if unsupported. Candidate stays separate and inactive. PASS/FINDINGS/error acknowledgement preserves the route. |
 | Arbiter | `verdict.md` | `verdict:{criterion_id:{status,evidence}}` covers every original criterion exactly. Status is `pass`, `gap` or `unavailable`. PASS requires drained accepted plan and all criteria pass at actual source; FINDINGS reserves the one remediation episode and returns Manager. |
 
+Arbiter FINDINGS requires a real, remediable gap in an original stable criterion;
+each finding's `criterion` is an existing stable ID and the verdict must identify
+the gap truthfully. An all-pass verdict is not a remediation gap. An operating or
+process-constraint deviation outside the stable criteria that requires human
+resolution uses HUMAN_BLOCKED, `human_evidence.type` of `human_choice`, and
+`findings=[]`. Explain the obstacle, evidence checked, why source repair cannot
+resolve it, and the required human decision. Keep stable verdicts truthful and
+unchanged; do not invent IDs or relabel passing criteria as gaps to request repair.
+
 Every role/outcome and dedicated acceptance route appears in `context/routes.md` and `workflow.json`. Dedicated expected-outcome nodes prohibit result/terminal mismatch. All semantic results, including errors and human holds, pass acceptance before routing. Transport/protocol errors/unknowns use explicit prepared replacement instead.
 
 Invalid result examples: adding `"next_stage":"builder"` to the envelope adds an undeclared field and refuses; omitting `occurrence_id` refuses; using `"artifacts":"intake.md"` instead of an array refuses; returning Core PASS while `result.json` says FINDINGS refuses. Valid Core completion after writing the corresponding valid LAD envelope is `{"outcome":"PASS","summary":"Observed intake and reproduction recorded","refs":["lad-results/<occurrence_id>/result.json"]}`. Ref presence does not itself prove acceptance.

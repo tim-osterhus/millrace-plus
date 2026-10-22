@@ -201,6 +201,91 @@ def save_fixture(project: Path, state: dict) -> None:
     (project / "foreground/lad-state/session.json").write_text(json.dumps(state))
 
 
+def test_arbiter_process_deviation_requires_human_choice(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    before_role(project, "arbiter")
+    assert command(project, "prepare_role.py", "arbiter")["outcome"] == "READY"
+    command(project, "lad_peer.py", "arbiter", "clean", "HUMAN_BLOCKED")
+    state = ledger(project)
+    oid = state["active"]["foreground"]
+    occurrence = project / "foreground/lad-state/occurrences" / oid
+    file = project / "foreground/lad-results" / oid / "result.json"
+    blocked = json.loads(file.read_bytes())
+    verdict = blocked["data"]["verdict"]
+    assert verdict == {
+        "answer": {
+            "status": "pass",
+            "evidence": "Original request requires answer() == 42; "
+            "current target and accepted review agree.",
+        }
+    }
+    blocked["human_evidence"] = {
+        "type": "human_choice",
+        "obstacle": "Test-owned prior evidence reports an operating-constraint "
+        "deviation outside the stable answer criterion.",
+        "attempted": "Checked the retained report and passing stable verdict; "
+        "a source repair cannot undo the reported historical action.",
+        "required_resolution": "Operator must decide how to disposition the "
+        "reported process deviation without changing the stable criterion.",
+    }
+    assert blocked["findings"] == []
+    snapshot = (project / "foreground/lad-state/session.json").read_bytes()
+    for criterion, reason in [
+        ("operating-constraint", "finding_identity"),
+        ("answer", "remediation_gap_required"),
+    ]:
+        invalid = blocked | {
+            "outcome": "FINDINGS",
+            "human_evidence": None,
+            "findings": [
+                {
+                    "id": "OPS-01",
+                    "criterion": criterion,
+                    "path": "prior-process-report.md",
+                    "reproduction": "Read the test-owned prior deviation report.",
+                    "evidence": blocked["human_evidence"]["obstacle"],
+                }
+            ],
+        }
+        file.write_text(json.dumps(invalid))
+        refused = command(project, "accept_role.py", "arbiter", "FINDINGS")
+        assert refused["outcome"] == "REFUSED"
+        assert reason in refused["summary"]
+        assert (project / "foreground/lad-state/session.json").read_bytes() == snapshot
+
+    file.write_text(json.dumps(blocked))
+    accepted = command(project, "accept_role.py", "arbiter", "HUMAN_BLOCKED")
+    assert accepted["outcome"] == "PAUSE"
+    held = ledger(project)
+    assert held["criteria"] == state["criteria"]
+    assert held["usage"] == state["usage"]
+    assert held["usage"]["all"] == 7 and held["usage"]["arbiter"] == 1
+    assert "remediation" not in held["usage"]
+    assert held["terminal"] is None
+    assert held["pending"]["kind"] == "human"
+    assert held["pending"]["target"] == "arbiter"
+    assert held["continuation"]["node"] == "human_pause"
+    assert held["continuation"]["cleanup_required"] is True
+    assert held["accepted"][oid]["result"]["data"]["verdict"] == verdict
+    snapshot = (project / "foreground/lad-state/session.json").read_bytes()
+    assert command(project, "accept_role.py", "arbiter", "HUMAN_BLOCKED") == accepted
+    for _ in range(2):
+        assert command(project, "boundaries.py", "human_pause")["outcome"] == "HOLD"
+        assert (project / "foreground/lad-state/session.json").read_bytes() == snapshot
+    nodes = json.loads((project / "workflow.json").read_bytes())["planes"][
+        "foreground"
+    ]["nodes"]
+    assert nodes["accept_arbiter_human_blocked"]["on"]["PAUSE"] == {
+        "goto": "human_pause"
+    }
+    assert "pause" in nodes["human_pause"]["on"]["HOLD"]
+    for name in ("prompts/arbiter.md", "context/role-contracts.md"):
+        guidance = (occurrence / "guidance" / name).read_text()
+        assert "HUMAN_BLOCKED" in guidance
+        assert "human_choice" in guidance
+        assert "findings=[]" in guidance
+
+
 @pytest.mark.parametrize("manifest_kind", ["helper", "paperclip", "direct"])
 def test_all_launchers_bootstrap_and_reuse_session(
     tmp_path: Path, manifest_kind: str

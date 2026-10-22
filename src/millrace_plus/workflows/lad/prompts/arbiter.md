@@ -51,4 +51,14 @@ For gaps, propose bounded remediation tied to original criteria.
 For unavailable authority or inputs, identify the required human action.
 Recommend closure only when every original criterion passes and required work is complete.
 
+Choose FINDINGS only for a real, remediable gap in an original stable criterion.
+Every finding's `criterion` must be that criterion's existing ID, and the verdict
+must truthfully identify the gap. An all-pass stable verdict cannot justify FINDINGS.
+For an operating or process-constraint deviation outside the stable criteria that
+requires human resolution, choose HUMAN_BLOCKED with `human_evidence.type` set to
+`human_choice` and `findings=[]`. Explain the deviation, evidence checked, why a
+source repair cannot resolve it, and the required human decision. Preserve truthful
+stable verdicts, including passing ones; never invent an ID or disguise the
+deviation as a criterion repair.
+
 Do not complete the native goal or change canonical state yourself.
