@@ -1,0 +1,66 @@
+# Visible LAD routes
+
+Modified from the pinned Orchestrator and transition policy; see `PROVENANCE.md`. Each row is native outcome → dedicated acceptance guard → finite route. The graph is authoritative.
+
+- `recon:PASS` → `PLANNER`
+- `recon:FINDINGS` → `CONSULTANT`
+- `recon:ERROR` → `TROUBLESHOOTER`
+- `recon:HUMAN_BLOCKED` → `PAUSE`
+- `planner:PASS` → `MANAGER`
+- `planner:FINDINGS` → `CONSULTANT`
+- `planner:ERROR` → `TROUBLESHOOTER`
+- `planner:HUMAN_BLOCKED` → `PAUSE`
+- `manager:PASS` → `BUILDER`, `ARBITER`
+- `manager:FINDINGS` → `CONSULTANT`
+- `manager:ERROR` → `TROUBLESHOOTER`
+- `manager:HUMAN_BLOCKED` → `PAUSE`
+- `builder:PASS` → `CHECKER`
+- `builder:FINDINGS_INSPECTABLE` → `CHECKER`
+- `builder:FINDINGS_UNINSPECTABLE` → `TROUBLESHOOTER`
+- `builder:ERROR` → `TROUBLESHOOTER`
+- `builder:HUMAN_BLOCKED` → `PAUSE`
+- `checker:PASS` → `UPDATER`
+- `checker:FINDINGS_ACTIONABLE` → `FIXER`
+- `checker:FINDINGS_CONTRACT` → `CONSULTANT`
+- `checker:ERROR` → `TROUBLESHOOTER`
+- `checker:HUMAN_BLOCKED` → `PAUSE`
+- `fixer:PASS` → `DOUBLECHECKER`
+- `fixer:FINDINGS_INSPECTABLE` → `DOUBLECHECKER`
+- `fixer:FINDINGS_UNINSPECTABLE` → `TROUBLESHOOTER`
+- `fixer:ERROR` → `TROUBLESHOOTER`
+- `fixer:HUMAN_BLOCKED` → `PAUSE`
+- `doublechecker:PASS` → `UPDATER`, `ASSESS`
+- `doublechecker:FINDINGS_ACTIONABLE` → `FIXER`, `TROUBLESHOOTER`, `ASSESS`
+- `doublechecker:FINDINGS_CONTRACT` → `CONSULTANT`
+- `doublechecker:ERROR` → `TROUBLESHOOTER`
+- `doublechecker:HUMAN_BLOCKED` → `PAUSE`
+- `troubleshooter:PASS_REVIEW_REPAIRED` → `DOUBLECHECKER`
+- `troubleshooter:PASS_PREREQUISITE_REPAIRED` → `RESUME_RECON`, `RESUME_PLANNER`, `RESUME_MANAGER`, `RESUME_BUILDER`, `RESUME_CHECKER`, `RESUME_FIXER`, `RESUME_DOUBLECHECKER`, `RESUME_CONSULTANT`, `RESUME_UPDATER`, `RESUME_ARBITER`
+- `troubleshooter:FINDINGS` → `CONSULTANT`
+- `troubleshooter:ERROR` → `CONSULTANT`
+- `troubleshooter:HUMAN_BLOCKED` → `PAUSE`
+- `consultant:REPAIR_SPEC` → `PLANNER`
+- `consultant:REPAIR_PACKETS` → `MANAGER`
+- `consultant:REPAIR_EXECUTION` → `TROUBLESHOOTER`
+- `consultant:NO_SAFE_ROUTE` → `PAUSE`
+- `consultant:ERROR_REPAIRABLE` → `TROUBLESHOOTER`
+- `consultant:ERROR_REPLACEMENT` → `REPLACE_CONSULTANT`
+- `consultant:HUMAN_BLOCKED` → `PAUSE`
+- `updater:PASS` → `BUILDER`, `ARBITER`
+- `updater:REVIEW_INVALIDATED_NEW_BASELINE` → `CHECKER`
+- `updater:REVIEW_INVALIDATED_SAME_BASELINE` → `DOUBLECHECKER`
+- `updater:FINDINGS_CONTRACT` → `CONSULTANT`
+- `updater:ERROR` → `TROUBLESHOOTER`
+- `updater:HUMAN_BLOCKED` → `PAUSE`
+- `learning:PASS` → `ACK`
+- `learning:FINDINGS` → `ACK`
+- `learning:ERROR_TRANSIENT_RESOLVED` → `REPLACE_LEARNING`, `ACK`
+- `learning:ERROR` → `ACK`
+- `learning:HUMAN_BLOCKED` → `ACK`
+- `arbiter:PASS` → `CLOSE`
+- `arbiter:FINDINGS` → `MANAGER`
+- `arbiter:ERROR_REPAIRABLE` → `TROUBLESHOOTER`
+- `arbiter:ERROR_REPLACEMENT` → `REPLACE_ARBITER`
+- `arbiter:HUMAN_BLOCKED` → `PAUSE`
+
+Every native transport/protocol error or unknown goes through `prepare_<role>_replacement`. There is no Core retry on native roles. Preparation/acceptance/guard failure pauses. Normal/operator retries never replenish session debits. Native role nodes never schedule another role.

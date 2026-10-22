@@ -189,15 +189,15 @@ def test_source_tree_does_not_shadow_runtime_or_import_private_runtime_code() ->
 
 
 def test_official_package_data_declares_selected_vendor_selection_assets() -> None:
-    """P5 successor: ordinary new templates replace legacy vendor inventory."""
+    """Stock examples and LAD are ordinary graph folders, with distinct bounds."""
     root = PROJECT_ROOT / "src/millrace_plus/workflows"
     assert sorted(p.name for p in root.iterdir() if p.is_dir()) == [
         "document-review",
+        "lad",
         "software-change",
     ]
-    for folder in root.iterdir():
-        if not folder.is_dir():
-            continue
+    for name in ("document-review", "software-change"):
+        folder = root / name
         graph = json.loads((folder / "workflow.json").read_text())
         assert graph["format"] == "millrace-router/v3"
         assert set(graph["planes"]) == {"main"}
@@ -207,6 +207,46 @@ def test_official_package_data_declares_selected_vendor_selection_assets() -> No
         for asset in graph["control_files"]:
             assert (folder / asset).is_file(), asset
         assert all("skill" not in name for name in graph["control_files"])
+
+
+def test_lad_package_inventory_matches_admitted_workflow_assets() -> None:
+    root = PROJECT_ROOT / "src/millrace_plus/workflows/lad"
+    roles = {
+        "recon", "planner", "manager", "builder", "checker", "fixer",
+        "doublechecker", "troubleshooter", "consultant", "updater",
+        "learning", "arbiter",
+    }
+    expected = {
+        "workflow.json", "README.md", "PROVENANCE.md", "provenance.json",
+        "licenses/lad-factory-Apache-2.0.txt", "profiles/claude.json",
+        "foreground/README.md", "learning/README.md",
+        "context/contracts.md", "context/role-contracts.md", "context/routes.md",
+        "context/harness.md", "templates/goal.md", "templates/bootstrap.md",
+        "templates/state.md", "templates/assignment.md", "templates/packet.md",
+        "templates/result.md", "scripts/lad_state.py", "scripts/init_session.py",
+        "scripts/setup_intake.py", "scripts/prepare_role.py", "scripts/accept_role.py",
+        "scripts/boundaries.py", "scripts/learning_seam.py",
+        *(f"prompts/{role}.md" for role in roles),
+    }
+    actual = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts
+    }
+    assert len(expected) == 37
+    assert actual == expected
+    assert not any(path.is_symlink() for path in root.rglob("*"))
+    graph = json.loads((root / "workflow.json").read_text())
+    assert graph["format"] == "millrace-router/v3"
+    assert set(graph["planes"]) == {"foreground", "learning"}
+    assert graph["limits"] == {
+        "max_invocations": 609,
+        "max_elapsed_seconds": 35900,
+        "max_parallel_invocations": 2,
+    }
+    assert all((root / asset).is_file() for asset in graph["control_files"])
+    license_text = (root / "licenses/lad-factory-Apache-2.0.txt").read_text()
+    assert "Apache License" in license_text
 
 
 def test_paperclip_local_esm_package_has_no_package_dependencies() -> None:
@@ -223,6 +263,7 @@ def test_paperclip_local_esm_package_has_no_package_dependencies() -> None:
     assert {path.name for path in root.iterdir()} == {
         "package.json", "index.js", "README.md",
     }
+
 
 def test_plus_candidate_targets_reviewed_core_minimum_and_defers_experiment() -> None:
     """Candidate equality is insufficient; the execution contract remains required."""

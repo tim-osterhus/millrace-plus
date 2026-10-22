@@ -1,0 +1,4288 @@
+{
+  "format": "millrace-router/v3",
+  "limits": {
+    "max_invocations": 609,
+    "max_elapsed_seconds": 35900,
+    "max_parallel_invocations": 2
+  },
+  "defaults": {
+    "timeout_seconds": 1800
+  },
+  "bindings": {
+    "claude": {
+      "adapter": "claude_print",
+      "contract": "millrace-claude-print/v1",
+      "executable": "claude",
+      "config": {
+        "profile": "profiles/claude.json"
+      }
+    },
+    "command": {
+      "adapter": "command",
+      "contract": "millrace-command/v1",
+      "executable": "python3",
+      "config": {}
+    }
+  },
+  "control_files": [
+    "context/contracts.md",
+    "context/harness.md",
+    "context/role-contracts.md",
+    "context/routes.md",
+    "profiles/claude.json",
+    "prompts/arbiter.md",
+    "prompts/builder.md",
+    "prompts/checker.md",
+    "prompts/consultant.md",
+    "prompts/doublechecker.md",
+    "prompts/fixer.md",
+    "prompts/learning.md",
+    "prompts/manager.md",
+    "prompts/planner.md",
+    "prompts/recon.md",
+    "prompts/troubleshooter.md",
+    "prompts/updater.md",
+    "scripts/accept_role.py",
+    "scripts/boundaries.py",
+    "scripts/init_session.py",
+    "scripts/lad_state.py",
+    "scripts/learning_seam.py",
+    "scripts/prepare_role.py",
+    "scripts/setup_intake.py",
+    "templates/assignment.md",
+    "templates/bootstrap.md",
+    "templates/goal.md",
+    "templates/packet.md",
+    "templates/result.md",
+    "templates/state.md"
+  ],
+  "planes": {
+    "foreground": {
+      "workspace": "foreground",
+      "start": "init_session",
+      "nodes": {
+        "init_session": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/init_session.py",
+              "args": [
+                "--project-root",
+                ".."
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "NEW_SESSION",
+            "EXISTING_SESSION_PRISTINE",
+            "EXISTING_SESSION_WITH_WORK",
+            "RECONCILE",
+            "REFUSED"
+          ],
+          "on": {
+            "NEW_SESSION": {
+              "goto": "setup_intake"
+            },
+            "EXISTING_SESSION_PRISTINE": {
+              "goto": "setup_intake"
+            },
+            "EXISTING_SESSION_WITH_WORK": {
+              "pause": {
+                "reason": "lad_used_session_requires_exact_continuation_redirect"
+              }
+            },
+            "RECONCILE": {
+              "pause": {
+                "reason": "lad_session_reconciliation_required"
+              }
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "setup_intake": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/setup_intake.py",
+              "args": [
+                "--project-root",
+                ".."
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "INTAKE_READY_EXISTING",
+            "INTAKE_READY_GREENFIELD",
+            "INTAKE_MISSING",
+            "INTAKE_CONFLICT",
+            "REFUSED"
+          ],
+          "on": {
+            "INTAKE_READY_EXISTING": {
+              "goto": "prepare_recon"
+            },
+            "INTAKE_READY_GREENFIELD": {
+              "goto": "prepare_planner"
+            },
+            "INTAKE_MISSING": {
+              "pause": {
+                "reason": "lad_server_local_request_missing",
+                "resume": "setup_intake"
+              }
+            },
+            "INTAKE_CONFLICT": {
+              "pause": {
+                "reason": "lad_intake_conflict",
+                "resume": "setup_intake"
+              }
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "human_pause": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/boundaries.py",
+              "args": [
+                "human_pause"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HOLD",
+            "TERMINAL_FAILURE",
+            "REFUSED"
+          ],
+          "on": {
+            "HOLD": {
+              "pause": {
+                "reason": "lad_human_decision_required"
+              }
+            },
+            "TERMINAL_FAILURE": {
+              "goto": "terminal_failure"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "terminal_failure": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/boundaries.py",
+              "args": [
+                "terminal_failure"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CLOSE",
+            "REFUSED"
+          ],
+          "on": {
+            "CLOSE": {
+              "goto": "emit_learning_request"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "emit_learning_request": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "emit_request"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "REQUEST",
+            "REFUSED"
+          ],
+          "on": {
+            "REQUEST": {
+              "goto": "accept_learning_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_learning_ack": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "accept_ack"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "UPDATER",
+            "TROUBLESHOOTER",
+            "FINALIZE",
+            "REFUSED"
+          ],
+          "on": {
+            "UPDATER": {
+              "goto": "prepare_updater"
+            },
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "FINALIZE": {
+              "goto": "finalize"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "finalize": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/boundaries.py",
+              "args": [
+                "finalize"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "SUCCEEDED",
+            "FAILED",
+            "REFUSED"
+          ],
+          "on": {
+            "SUCCEEDED": {
+              "finish": "succeeded"
+            },
+            "FAILED": {
+              "finish": "failed"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_recon": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "recon"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "recon"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_recon_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "recon",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "recon"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "recon": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/recon.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "accept_recon_pass"
+            },
+            "FINDINGS": {
+              "goto": "accept_recon_findings"
+            },
+            "ERROR": {
+              "goto": "accept_recon_error"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_recon_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_recon_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_recon_replacement"
+          }
+        },
+        "accept_recon_pass": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "recon",
+                "PASS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PLANNER",
+            "REFUSED"
+          ],
+          "on": {
+            "PLANNER": {
+              "goto": "prepare_planner"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_recon_findings": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "recon",
+                "FINDINGS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CONSULTANT",
+            "REFUSED"
+          ],
+          "on": {
+            "CONSULTANT": {
+              "goto": "prepare_consultant"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_recon_error": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "recon",
+                "ERROR"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_recon_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "recon",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_planner": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "planner"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "planner"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_planner_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "planner",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "planner"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "planner": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/planner.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "accept_planner_pass"
+            },
+            "FINDINGS": {
+              "goto": "accept_planner_findings"
+            },
+            "ERROR": {
+              "goto": "accept_planner_error"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_planner_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_planner_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_planner_replacement"
+          }
+        },
+        "accept_planner_pass": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "planner",
+                "PASS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "MANAGER",
+            "REFUSED"
+          ],
+          "on": {
+            "MANAGER": {
+              "goto": "prepare_manager"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_planner_findings": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "planner",
+                "FINDINGS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CONSULTANT",
+            "REFUSED"
+          ],
+          "on": {
+            "CONSULTANT": {
+              "goto": "prepare_consultant"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_planner_error": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "planner",
+                "ERROR"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_planner_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "planner",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_manager": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "manager"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "manager"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_manager_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "manager",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "manager"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "manager": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/manager.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "accept_manager_pass"
+            },
+            "FINDINGS": {
+              "goto": "accept_manager_findings"
+            },
+            "ERROR": {
+              "goto": "accept_manager_error"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_manager_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_manager_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_manager_replacement"
+          }
+        },
+        "accept_manager_pass": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "manager",
+                "PASS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "BUILDER",
+            "ARBITER",
+            "REFUSED"
+          ],
+          "on": {
+            "BUILDER": {
+              "goto": "prepare_builder"
+            },
+            "ARBITER": {
+              "goto": "prepare_arbiter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_manager_findings": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "manager",
+                "FINDINGS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CONSULTANT",
+            "REFUSED"
+          ],
+          "on": {
+            "CONSULTANT": {
+              "goto": "prepare_consultant"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_manager_error": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "manager",
+                "ERROR"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_manager_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "manager",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_builder": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "builder"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "builder"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_builder_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "builder",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "builder"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "builder": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/builder.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "FINDINGS_INSPECTABLE",
+            "FINDINGS_UNINSPECTABLE",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "accept_builder_pass"
+            },
+            "FINDINGS_INSPECTABLE": {
+              "goto": "accept_builder_findings_inspectable"
+            },
+            "FINDINGS_UNINSPECTABLE": {
+              "goto": "accept_builder_findings_uninspectable"
+            },
+            "ERROR": {
+              "goto": "accept_builder_error"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_builder_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_builder_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_builder_replacement"
+          }
+        },
+        "accept_builder_pass": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "builder",
+                "PASS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CHECKER",
+            "REFUSED"
+          ],
+          "on": {
+            "CHECKER": {
+              "goto": "prepare_checker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_builder_findings_inspectable": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "builder",
+                "FINDINGS_INSPECTABLE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CHECKER",
+            "REFUSED"
+          ],
+          "on": {
+            "CHECKER": {
+              "goto": "prepare_checker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_builder_findings_uninspectable": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "builder",
+                "FINDINGS_UNINSPECTABLE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_builder_error": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "builder",
+                "ERROR"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_builder_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "builder",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_checker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "checker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "checker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_checker_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "checker",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "checker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "checker": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/checker.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "FINDINGS_ACTIONABLE",
+            "FINDINGS_CONTRACT",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "accept_checker_pass"
+            },
+            "FINDINGS_ACTIONABLE": {
+              "goto": "accept_checker_findings_actionable"
+            },
+            "FINDINGS_CONTRACT": {
+              "goto": "accept_checker_findings_contract"
+            },
+            "ERROR": {
+              "goto": "accept_checker_error"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_checker_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_checker_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_checker_replacement"
+          }
+        },
+        "accept_checker_pass": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "checker",
+                "PASS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "UPDATER",
+            "REFUSED"
+          ],
+          "on": {
+            "UPDATER": {
+              "goto": "prepare_updater"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_checker_findings_actionable": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "checker",
+                "FINDINGS_ACTIONABLE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "FIXER",
+            "REFUSED"
+          ],
+          "on": {
+            "FIXER": {
+              "goto": "prepare_fixer"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_checker_findings_contract": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "checker",
+                "FINDINGS_CONTRACT"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CONSULTANT",
+            "REFUSED"
+          ],
+          "on": {
+            "CONSULTANT": {
+              "goto": "prepare_consultant"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_checker_error": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "checker",
+                "ERROR"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_checker_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "checker",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_fixer": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "fixer"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "fixer"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_fixer_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "fixer",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "fixer"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "fixer": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/fixer.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "FINDINGS_INSPECTABLE",
+            "FINDINGS_UNINSPECTABLE",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "accept_fixer_pass"
+            },
+            "FINDINGS_INSPECTABLE": {
+              "goto": "accept_fixer_findings_inspectable"
+            },
+            "FINDINGS_UNINSPECTABLE": {
+              "goto": "accept_fixer_findings_uninspectable"
+            },
+            "ERROR": {
+              "goto": "accept_fixer_error"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_fixer_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_fixer_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_fixer_replacement"
+          }
+        },
+        "accept_fixer_pass": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "fixer",
+                "PASS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "DOUBLECHECKER",
+            "REFUSED"
+          ],
+          "on": {
+            "DOUBLECHECKER": {
+              "goto": "prepare_doublechecker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_fixer_findings_inspectable": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "fixer",
+                "FINDINGS_INSPECTABLE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "DOUBLECHECKER",
+            "REFUSED"
+          ],
+          "on": {
+            "DOUBLECHECKER": {
+              "goto": "prepare_doublechecker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_fixer_findings_uninspectable": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "fixer",
+                "FINDINGS_UNINSPECTABLE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_fixer_error": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "fixer",
+                "ERROR"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_fixer_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "fixer",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_doublechecker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "doublechecker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "doublechecker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_doublechecker_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "doublechecker",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "doublechecker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "doublechecker": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/doublechecker.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "FINDINGS_ACTIONABLE",
+            "FINDINGS_CONTRACT",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "accept_doublechecker_pass"
+            },
+            "FINDINGS_ACTIONABLE": {
+              "goto": "accept_doublechecker_findings_actionable"
+            },
+            "FINDINGS_CONTRACT": {
+              "goto": "accept_doublechecker_findings_contract"
+            },
+            "ERROR": {
+              "goto": "accept_doublechecker_error"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_doublechecker_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_doublechecker_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_doublechecker_replacement"
+          }
+        },
+        "accept_doublechecker_pass": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "doublechecker",
+                "PASS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "UPDATER",
+            "ASSESS",
+            "REFUSED"
+          ],
+          "on": {
+            "UPDATER": {
+              "goto": "prepare_updater"
+            },
+            "ASSESS": {
+              "goto": "emit_learning_request"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_doublechecker_findings_actionable": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "doublechecker",
+                "FINDINGS_ACTIONABLE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "FIXER",
+            "TROUBLESHOOTER",
+            "ASSESS",
+            "REFUSED"
+          ],
+          "on": {
+            "FIXER": {
+              "goto": "prepare_fixer"
+            },
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "ASSESS": {
+              "goto": "emit_learning_request"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_doublechecker_findings_contract": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "doublechecker",
+                "FINDINGS_CONTRACT"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CONSULTANT",
+            "REFUSED"
+          ],
+          "on": {
+            "CONSULTANT": {
+              "goto": "prepare_consultant"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_doublechecker_error": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "doublechecker",
+                "ERROR"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_doublechecker_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "doublechecker",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_troubleshooter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "troubleshooter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_troubleshooter_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "troubleshooter",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "troubleshooter": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_troubleshooter_pass_review_repaired"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_troubleshooter_pass_prerequisite_repaired"
+            },
+            "FINDINGS": {
+              "goto": "accept_troubleshooter_findings"
+            },
+            "ERROR": {
+              "goto": "accept_troubleshooter_error"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_troubleshooter_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_troubleshooter_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_troubleshooter_replacement"
+          }
+        },
+        "accept_troubleshooter_pass_review_repaired": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "troubleshooter",
+                "PASS_REVIEW_REPAIRED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "DOUBLECHECKER",
+            "REFUSED"
+          ],
+          "on": {
+            "DOUBLECHECKER": {
+              "goto": "prepare_doublechecker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_troubleshooter_pass_prerequisite_repaired": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "troubleshooter",
+                "PASS_PREREQUISITE_REPAIRED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RESUME_RECON",
+            "RESUME_PLANNER",
+            "RESUME_MANAGER",
+            "RESUME_BUILDER",
+            "RESUME_CHECKER",
+            "RESUME_FIXER",
+            "RESUME_DOUBLECHECKER",
+            "RESUME_CONSULTANT",
+            "RESUME_UPDATER",
+            "RESUME_ARBITER",
+            "REFUSED"
+          ],
+          "on": {
+            "RESUME_RECON": {
+              "goto": "prepare_recon_replacement"
+            },
+            "RESUME_PLANNER": {
+              "goto": "prepare_planner_replacement"
+            },
+            "RESUME_MANAGER": {
+              "goto": "prepare_manager_replacement"
+            },
+            "RESUME_BUILDER": {
+              "goto": "prepare_builder_replacement"
+            },
+            "RESUME_CHECKER": {
+              "goto": "prepare_checker_replacement"
+            },
+            "RESUME_FIXER": {
+              "goto": "prepare_fixer_replacement"
+            },
+            "RESUME_DOUBLECHECKER": {
+              "goto": "prepare_doublechecker_replacement"
+            },
+            "RESUME_CONSULTANT": {
+              "goto": "prepare_consultant_replacement"
+            },
+            "RESUME_UPDATER": {
+              "goto": "prepare_updater_replacement"
+            },
+            "RESUME_ARBITER": {
+              "goto": "prepare_arbiter_replacement"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_troubleshooter_findings": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "troubleshooter",
+                "FINDINGS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CONSULTANT",
+            "REFUSED"
+          ],
+          "on": {
+            "CONSULTANT": {
+              "goto": "prepare_consultant"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_troubleshooter_error": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "troubleshooter",
+                "ERROR"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CONSULTANT",
+            "REFUSED"
+          ],
+          "on": {
+            "CONSULTANT": {
+              "goto": "prepare_consultant"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_troubleshooter_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "troubleshooter",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_consultant": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "consultant"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "consultant"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_consultant_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "consultant",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "consultant"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "consultant": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/consultant.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "REPAIR_SPEC",
+            "REPAIR_PACKETS",
+            "REPAIR_EXECUTION",
+            "NO_SAFE_ROUTE",
+            "ERROR_REPAIRABLE",
+            "ERROR_REPLACEMENT",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "REPAIR_SPEC": {
+              "goto": "accept_consultant_repair_spec"
+            },
+            "REPAIR_PACKETS": {
+              "goto": "accept_consultant_repair_packets"
+            },
+            "REPAIR_EXECUTION": {
+              "goto": "accept_consultant_repair_execution"
+            },
+            "NO_SAFE_ROUTE": {
+              "goto": "accept_consultant_no_safe_route"
+            },
+            "ERROR_REPAIRABLE": {
+              "goto": "accept_consultant_error_repairable"
+            },
+            "ERROR_REPLACEMENT": {
+              "goto": "accept_consultant_error_replacement"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_consultant_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_consultant_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_consultant_replacement"
+          }
+        },
+        "accept_consultant_repair_spec": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "consultant",
+                "REPAIR_SPEC"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PLANNER",
+            "REFUSED"
+          ],
+          "on": {
+            "PLANNER": {
+              "goto": "prepare_planner"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_consultant_repair_packets": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "consultant",
+                "REPAIR_PACKETS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "MANAGER",
+            "REFUSED"
+          ],
+          "on": {
+            "MANAGER": {
+              "goto": "prepare_manager"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_consultant_repair_execution": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "consultant",
+                "REPAIR_EXECUTION"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_consultant_no_safe_route": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "consultant",
+                "NO_SAFE_ROUTE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_consultant_error_repairable": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "consultant",
+                "ERROR_REPAIRABLE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_consultant_error_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "consultant",
+                "ERROR_REPLACEMENT"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "REPLACE_CONSULTANT",
+            "REFUSED"
+          ],
+          "on": {
+            "REPLACE_CONSULTANT": {
+              "goto": "prepare_consultant_replacement"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_consultant_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "consultant",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_updater": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "updater"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "updater"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_updater_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "updater",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "updater"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "updater": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/updater.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "REVIEW_INVALIDATED_NEW_BASELINE",
+            "REVIEW_INVALIDATED_SAME_BASELINE",
+            "FINDINGS_CONTRACT",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "accept_updater_pass"
+            },
+            "REVIEW_INVALIDATED_NEW_BASELINE": {
+              "goto": "accept_updater_review_invalidated_new_baseline"
+            },
+            "REVIEW_INVALIDATED_SAME_BASELINE": {
+              "goto": "accept_updater_review_invalidated_same_baseline"
+            },
+            "FINDINGS_CONTRACT": {
+              "goto": "accept_updater_findings_contract"
+            },
+            "ERROR": {
+              "goto": "accept_updater_error"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_updater_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_updater_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_updater_replacement"
+          }
+        },
+        "accept_updater_pass": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "updater",
+                "PASS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "BUILDER",
+            "ARBITER",
+            "REFUSED"
+          ],
+          "on": {
+            "BUILDER": {
+              "goto": "prepare_builder"
+            },
+            "ARBITER": {
+              "goto": "prepare_arbiter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_updater_review_invalidated_new_baseline": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "updater",
+                "REVIEW_INVALIDATED_NEW_BASELINE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CHECKER",
+            "REFUSED"
+          ],
+          "on": {
+            "CHECKER": {
+              "goto": "prepare_checker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_updater_review_invalidated_same_baseline": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "updater",
+                "REVIEW_INVALIDATED_SAME_BASELINE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "DOUBLECHECKER",
+            "REFUSED"
+          ],
+          "on": {
+            "DOUBLECHECKER": {
+              "goto": "prepare_doublechecker"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_updater_findings_contract": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "updater",
+                "FINDINGS_CONTRACT"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CONSULTANT",
+            "REFUSED"
+          ],
+          "on": {
+            "CONSULTANT": {
+              "goto": "prepare_consultant"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_updater_error": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "updater",
+                "ERROR"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_updater_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "updater",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_arbiter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "arbiter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "arbiter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_arbiter_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/prepare_role.py",
+              "args": [
+                "arbiter",
+                "--replacement"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "arbiter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "arbiter": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/arbiter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "FINDINGS",
+            "ERROR_REPAIRABLE",
+            "ERROR_REPLACEMENT",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "accept_arbiter_pass"
+            },
+            "FINDINGS": {
+              "goto": "accept_arbiter_findings"
+            },
+            "ERROR_REPAIRABLE": {
+              "goto": "accept_arbiter_error_repairable"
+            },
+            "ERROR_REPLACEMENT": {
+              "goto": "accept_arbiter_error_replacement"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_arbiter_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_arbiter_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_arbiter_replacement"
+          }
+        },
+        "accept_arbiter_pass": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "arbiter",
+                "PASS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CLOSE",
+            "REFUSED"
+          ],
+          "on": {
+            "CLOSE": {
+              "goto": "emit_learning_request"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_arbiter_findings": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "arbiter",
+                "FINDINGS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "MANAGER",
+            "REFUSED"
+          ],
+          "on": {
+            "MANAGER": {
+              "goto": "prepare_manager"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_arbiter_error_repairable": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "arbiter",
+                "ERROR_REPAIRABLE"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "TROUBLESHOOTER",
+            "REFUSED"
+          ],
+          "on": {
+            "TROUBLESHOOTER": {
+              "goto": "prepare_troubleshooter"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_arbiter_error_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "arbiter",
+                "ERROR_REPLACEMENT"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "REPLACE_ARBITER",
+            "REFUSED"
+          ],
+          "on": {
+            "REPLACE_ARBITER": {
+              "goto": "prepare_arbiter_replacement"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_arbiter_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/accept_role.py",
+              "args": [
+                "arbiter",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PAUSE",
+            "REFUSED"
+          ],
+          "on": {
+            "PAUSE": {
+              "goto": "human_pause"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        }
+      }
+    },
+    "learning": {
+      "workspace": "learning",
+      "start": "receive_request",
+      "nodes": {
+        "receive_request": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "receive"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ASSESS",
+            "CLOSE",
+            "REFUSED"
+          ],
+          "on": {
+            "ASSESS": {
+              "goto": "prepare_learning"
+            },
+            "CLOSE": {
+              "goto": "emit_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_learning": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "prepare"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "learning"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_learning_replacement": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "replace"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "ACK",
+            "REFUSED"
+          ],
+          "on": {
+            "READY": {
+              "goto": "learning"
+            },
+            "ACK": {
+              "goto": "emit_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "emit_ack": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "emit_ack"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACK",
+            "REFUSED"
+          ],
+          "on": {
+            "ACK": {
+              "goto": "after_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "after_ack": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "after_ack"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "NEXT",
+            "CLOSE",
+            "REFUSED"
+          ],
+          "on": {
+            "NEXT": {
+              "goto": "receive_request"
+            },
+            "CLOSE": {
+              "finish": "succeeded"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "learning": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/learning.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "FINDINGS",
+            "ERROR_TRANSIENT_RESOLVED",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "accept_learning_pass"
+            },
+            "FINDINGS": {
+              "goto": "accept_learning_findings"
+            },
+            "ERROR_TRANSIENT_RESOLVED": {
+              "goto": "accept_learning_error_transient_resolved"
+            },
+            "ERROR": {
+              "goto": "accept_learning_error"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_learning_human_blocked"
+            }
+          },
+          "on_error": {
+            "goto": "prepare_learning_replacement"
+          },
+          "on_unknown": {
+            "goto": "prepare_learning_replacement"
+          }
+        },
+        "accept_learning_pass": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "accept",
+                "PASS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACK",
+            "REFUSED"
+          ],
+          "on": {
+            "ACK": {
+              "goto": "emit_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_learning_findings": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "accept",
+                "FINDINGS"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACK",
+            "REFUSED"
+          ],
+          "on": {
+            "ACK": {
+              "goto": "emit_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_learning_error_transient_resolved": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "accept",
+                "ERROR_TRANSIENT_RESOLVED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "REPLACE_LEARNING",
+            "ACK",
+            "REFUSED"
+          ],
+          "on": {
+            "REPLACE_LEARNING": {
+              "goto": "prepare_learning_replacement"
+            },
+            "ACK": {
+              "goto": "emit_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_learning_error": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "accept",
+                "ERROR"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACK",
+            "REFUSED"
+          ],
+          "on": {
+            "ACK": {
+              "goto": "emit_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "accept_learning_human_blocked": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 10,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "accept",
+                "HUMAN_BLOCKED"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACK",
+            "REFUSED"
+          ],
+          "on": {
+            "ACK": {
+              "goto": "emit_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        }
+      }
+    }
+  },
+  "seams": {
+    "learning_request": {
+      "producer": {
+        "plane": "foreground",
+        "node": "emit_learning_request",
+        "outcome": "REQUEST"
+      },
+      "consumer": {
+        "plane": "learning",
+        "node": "receive_request"
+      }
+    },
+    "learning_ack": {
+      "producer": {
+        "plane": "learning",
+        "node": "emit_ack",
+        "outcome": "ACK"
+      },
+      "consumer": {
+        "plane": "foreground",
+        "node": "accept_learning_ack"
+      }
+    }
+  }
+}

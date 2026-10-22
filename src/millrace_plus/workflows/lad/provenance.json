@@ -1,0 +1,505 @@
+{
+  "format": "millrace-lad-provenance/v1",
+  "repository": "https://github.com/tim-osterhus/lad-factory",
+  "commit": "58e87f7d8941de144e29cdd619b41cff2a78b770",
+  "license": "Apache-2.0",
+  "modification_statement": "Reauthored for Millrace graph v3 with retained session accounting, explicit role routes and two recurring seams. No upstream executable controller or native platform identity is imported.",
+  "inputs": [
+    {
+      "original_path": "AGENTS.md",
+      "sha256": "fb613de251be366cd1f9f10999fbed4b0787edcf1a31d1e9b9c4fe33d2eec20e",
+      "bytes": 561,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/AGENTS.md",
+      "destinations": [
+        "PROVENANCE.md"
+      ],
+      "disposition": "inert research evidence only; not copied or installed as instructions"
+    },
+    {
+      "original_path": "LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/LICENSE",
+      "destinations": [
+        "licenses/lad-factory-Apache-2.0.txt"
+      ],
+      "disposition": "copied unchanged"
+    },
+    {
+      "original_path": "SETUP.md",
+      "sha256": "500ea2fda13801bc05f4c53e40dec5ffcef163fba5ca7b1d48083504c3e1db46",
+      "bytes": 5319,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/SETUP.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "docs/provenance.md",
+      "sha256": "9beb9d9177f02586a8f45679551fba93fe512f6c85e0d0c9fd8084071c0d7ec7",
+      "bytes": 2333,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/docs/provenance.md",
+      "destinations": [
+        "context/contracts.md",
+        "context/role-contracts.md",
+        "PROVENANCE.md"
+      ],
+      "disposition": "adapted contract/revision/attribution principles; original runtime-specific mechanisms excluded"
+    },
+    {
+      "original_path": "context/continuation.md",
+      "sha256": "50cbad104af572d3f3a1002cefedcd9053bac4f7d866c7520ddc633a2927d29d",
+      "bytes": 5841,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/context/continuation.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "context/contracts.md",
+      "sha256": "d476b1a7ee49519f2c6090eaae3b8aa73ea36df7058f5e251065212c2d5e509e",
+      "bytes": 6988,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/context/contracts.md",
+      "destinations": [
+        "context/contracts.md",
+        "context/role-contracts.md",
+        "PROVENANCE.md"
+      ],
+      "disposition": "adapted contract/revision/attribution principles; original runtime-specific mechanisms excluded"
+    },
+    {
+      "original_path": "context/instruction-revisions.md",
+      "sha256": "d7a563e98305a735ab41be3fb9b3589bdcaeaae7af470be6d53e3c7c276f56e1",
+      "bytes": 8261,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/context/instruction-revisions.md",
+      "destinations": [
+        "context/contracts.md",
+        "context/role-contracts.md",
+        "PROVENANCE.md"
+      ],
+      "disposition": "adapted contract/revision/attribution principles; original runtime-specific mechanisms excluded"
+    },
+    {
+      "original_path": "context/nested-models.md",
+      "sha256": "c22535d0af355b6df915db5c9dd0ef606fabe7b9e18cb266e6cd15b75da35bc9",
+      "bytes": 2312,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/context/nested-models.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "context/routing.md",
+      "sha256": "d5cb0889eb294ff4a88af8c534f9afb0c6399edfb6a9237ece1c39f51e5dd597",
+      "bytes": 2118,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/context/routing.md",
+      "destinations": [
+        "context/contracts.md",
+        "context/role-contracts.md",
+        "PROVENANCE.md"
+      ],
+      "disposition": "adapted contract/revision/attribution principles; original runtime-specific mechanisms excluded"
+    },
+    {
+      "original_path": "context/transitions.md",
+      "sha256": "5a444fc6883a0b778da5f947956837a2feb13465b257cc750022640f7f0a0528",
+      "bytes": 14721,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/context/transitions.md",
+      "destinations": [
+        "workflow.json",
+        "scripts/boundaries.py",
+        "context/routes.md",
+        "README.md"
+      ],
+      "disposition": "routing/budgets/continuation adapted into explicit graph, guards and operator guidance; no Orchestrator executor"
+    },
+    {
+      "original_path": "prompts/arbiter.md",
+      "sha256": "4eaf0fcd107933e7b283b2ee7f20290301a51a41fe612eca567fe6b5a4afbef6",
+      "bytes": 1224,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/arbiter.md",
+      "destinations": [
+        "prompts/arbiter.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/builder.md",
+      "sha256": "cd32cf540e0d398f0bfb9d3c82a437e8420fa1f1cf24a5ff52b26173462f6814",
+      "bytes": 966,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/builder.md",
+      "destinations": [
+        "prompts/builder.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/checker.md",
+      "sha256": "2011a64a16175d86f5be068ce29ef03a1627478187ada7e77c63f367c7790c81",
+      "bytes": 1866,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/checker.md",
+      "destinations": [
+        "prompts/checker.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/consultant.md",
+      "sha256": "0721e344abf9b8fc5a640981acc1f9f3ea645cf0ae8182435ddc110686220183",
+      "bytes": 1205,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/consultant.md",
+      "destinations": [
+        "prompts/consultant.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/doublechecker.md",
+      "sha256": "1d8a219d0536a44026c5b24cd16faaf4c3f1ce62a3c524187325a65e46021313",
+      "bytes": 999,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/doublechecker.md",
+      "destinations": [
+        "prompts/doublechecker.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/fixer.md",
+      "sha256": "57463aa69cb2fda4ac82eb08843c110eb31fc496521f5973b85df8e97ffe8e11",
+      "bytes": 849,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/fixer.md",
+      "destinations": [
+        "prompts/fixer.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/learning.md",
+      "sha256": "415330df104597b3c0e53d89b1d2df571a31a3b8f39ef5b730de12692c26dc63",
+      "bytes": 1431,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/learning.md",
+      "destinations": [
+        "prompts/learning.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/manager.md",
+      "sha256": "afb5a46c4a51a5c9b20ec08d4e85aa67522e07eb5f24e9c95f8c80dbdd9e718d",
+      "bytes": 1341,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/manager.md",
+      "destinations": [
+        "prompts/manager.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/orchestrator.md",
+      "sha256": "88105bd95a8e468d68bcc722fb85c43d905fbcc7365ddaaeb40e2a0e7b3d51cc",
+      "bytes": 10855,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/orchestrator.md",
+      "destinations": [
+        "workflow.json",
+        "scripts/boundaries.py",
+        "context/routes.md",
+        "README.md"
+      ],
+      "disposition": "routing/budgets/continuation adapted into explicit graph, guards and operator guidance; no Orchestrator executor"
+    },
+    {
+      "original_path": "prompts/planner.md",
+      "sha256": "a10d328974dd1eb292d1cea161ea07bd228009d8bf3be78d99855c67665d947e",
+      "bytes": 1046,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/planner.md",
+      "destinations": [
+        "prompts/planner.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/recon.md",
+      "sha256": "391c8fd5450f32f3a20e639f2be166565038f388ac927474cddd0153ffb950eb",
+      "bytes": 861,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/recon.md",
+      "destinations": [
+        "prompts/recon.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/setup.md",
+      "sha256": "98d4ececa9e270902aa25a649fecffa115b996fc949067a5263731dabb904843",
+      "bytes": 3092,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/setup.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "prompts/troubleshooter.md",
+      "sha256": "5dcc4e211602160c6fd0fac3d5b8ef7b89a7fde3d33001ea6417e9f8f29d3db1",
+      "bytes": 969,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/troubleshooter.md",
+      "destinations": [
+        "prompts/troubleshooter.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "prompts/updater.md",
+      "sha256": "ffbc1e79588fdebc615320ec59a4b58d345055855256e84b943a1fa108596b63",
+      "bytes": 999,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/prompts/updater.md",
+      "destinations": [
+        "prompts/updater.md",
+        "context/role-contracts.md",
+        "workflow.json"
+      ],
+      "disposition": "adapted role responsibility and artifact contract; control moved to graph"
+    },
+    {
+      "original_path": "templates/README.md",
+      "sha256": "9ae5dd7cd5117d0ccf6066da292c16d983954e0e402f3505a9e81d4d61aa462a",
+      "bytes": 1616,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/templates/README.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "templates/assignment.md",
+      "sha256": "8263e7e6dabf8ae15f2fab49577bddbd27ffd6dc9707ae7dcf5e32c69c7623af",
+      "bytes": 2771,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/templates/assignment.md",
+      "destinations": [
+        "templates/assignment.md"
+      ],
+      "disposition": "reauthored independent workspace template preserving useful contract"
+    },
+    {
+      "original_path": "templates/bootstrap.md",
+      "sha256": "836e737d4ef9b2939d8a2e6c61d785c641ff70406bfdb8d174dd33747e2a1376",
+      "bytes": 2909,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/templates/bootstrap.md",
+      "destinations": [
+        "templates/bootstrap.md"
+      ],
+      "disposition": "reauthored independent workspace template preserving useful contract"
+    },
+    {
+      "original_path": "templates/goal.md",
+      "sha256": "d54cbcacd7f24f0016bd387d8fd919880f1dd5b29819edb16c66738be4fd3230",
+      "bytes": 1501,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/templates/goal.md",
+      "destinations": [
+        "templates/goal.md"
+      ],
+      "disposition": "reauthored independent workspace template preserving useful contract"
+    },
+    {
+      "original_path": "templates/installation-profile.md",
+      "sha256": "1650d529a43ed60589b79cb5f2365e55bc8e76efa93875dfb6740f484a4db5f7",
+      "bytes": 4274,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/templates/installation-profile.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "templates/packet.md",
+      "sha256": "4189446697de67050b2579642d4bb1668117b7ac74bab875041d6ceea7c688d0",
+      "bytes": 897,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/templates/packet.md",
+      "destinations": [
+        "templates/packet.md"
+      ],
+      "disposition": "reauthored independent workspace template preserving useful contract"
+    },
+    {
+      "original_path": "templates/result.md",
+      "sha256": "0193b6b209d3044313ed603487a5d719c143e5cf16e9e3ff00d16689e54967cd",
+      "bytes": 1565,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/templates/result.md",
+      "destinations": [
+        "templates/result.md"
+      ],
+      "disposition": "reauthored independent workspace template preserving useful contract"
+    },
+    {
+      "original_path": "templates/state.md",
+      "sha256": "fc52f2076490ec2d8a0d897b9614ecf516612c914bb8cc5041eea2ab640bacd3",
+      "bytes": 4369,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/templates/state.md",
+      "destinations": [
+        "templates/state.md"
+      ],
+      "disposition": "reauthored independent workspace template preserving useful contract"
+    },
+    {
+      "original_path": "adapter-templates/README.md",
+      "sha256": "cb38200a55021c09fcf77a3237aa34b6ec09562c05820c0abdeb78359f45be2d",
+      "bytes": 4484,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/README.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/cross-harness.md",
+      "sha256": "107034416421a67c2f3fd141fc20b171e275235c4966def1c2562cb1dea187d5",
+      "bytes": 11070,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/cross-harness.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/claude-code/README.md",
+      "sha256": "23b837b9c777ff1ca925d983b59e3f596feed09405bb7b191012cfb59b4bb5e5",
+      "bytes": 6296,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/claude-code/README.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/claude-code/agent.md.template",
+      "sha256": "dc2f054282bb9ccb7cf4098cdda3f4e72c3732e33b02c330f786f480dfcfb4e4",
+      "bytes": 489,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/claude-code/agent.md.template",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/codex-cli/README.md",
+      "sha256": "2177e63b102d0bb480ebe99a230614420e2cefd5d3da7b7e516986bc4fe99ab5",
+      "bytes": 6690,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/codex-cli/README.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/codex-cli/default-profile.md",
+      "sha256": "642ca9b7f1f58f87e2d83386dc38b501058491a4673c4fc49b93f551efe513aa",
+      "bytes": 1793,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/codex-cli/default-profile.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/hermes-agent/README.md",
+      "sha256": "94e9979909a886a32507a4fd8cfe206263ab37bb3e7a71a9a864e42cd96ad1b0",
+      "bytes": 8403,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/hermes-agent/README.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/hermes-agent/entrypoint.md.template",
+      "sha256": "79896ff11164ec793e135e8e868f497c1ad140ed7a04c2a00bc800ff7fafe6d7",
+      "bytes": 82,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/hermes-agent/entrypoint.md.template",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/opencode/README.md",
+      "sha256": "0c512a4160196a58d13d74fa68feec97c5e0a1c98cdf56389b20cb8dee6d6aec",
+      "bytes": 5822,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/opencode/README.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/opencode/agent-prompt.md.template",
+      "sha256": "9b5ec2593ca2ecb67b9ca3d59001a037e646c6c55d87cde33a06c08ae32ab04a",
+      "bytes": 238,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/opencode/agent-prompt.md.template",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/pi/README.md",
+      "sha256": "c2c9ba1bed3258908c460e10f1be6571e33c461685f38f46a2709aac4978d2fd",
+      "bytes": 6546,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/pi/README.md",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    },
+    {
+      "original_path": "adapter-templates/pi/lad-read.md.template",
+      "sha256": "9d3e781cd28e12823679287865bbd5e3cd10e7140f8fb9ff0afa1cf147fac759",
+      "bytes": 149,
+      "source_url": "https://github.com/tim-osterhus/lad-factory/blob/58e87f7d8941de144e29cdd619b41cff2a78b770/adapter-templates/pi/lad-read.md.template",
+      "destinations": [
+        "context/harness.md",
+        "README.md"
+      ],
+      "disposition": "summarized fresh invocation/artifact handoff/uncertainty principles; host-specific authority and unsupported integrations excluded"
+    }
+  ]
+}

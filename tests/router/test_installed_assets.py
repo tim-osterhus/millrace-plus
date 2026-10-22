@@ -28,12 +28,33 @@ def test_v023_templates_installed_and_initializable(
     entries = json.loads(listed.stdout)["templates"]
     assert [v["selector"] for v in entries] == [
         "bundled:document-review",
+        "bundled:lad",
         "bundled:software-change",
     ]
     standalone.py(
         "import importlib.util; assert importlib.util.find_spec('millrace') is None"
     )
-    for name in ("document-review", "software-change"):
+    # The integration job supplies its admitted pinned Node executable. Public
+    # Python-only CI still verifies every ESM byte through the artifact inventory.
+    node = os.environ.get("MILLRACE_TEST_PAPERCLIP_NODE")
+    if node:
+        package = standalone.py(
+            "from pathlib import Path; "
+            "import millrace_plus.integrations.paperclip_bridge as bridge; "
+            "print(Path(bridge.__file__).parent / 'paperclip/index.js')"
+        ).stdout.strip()
+        loaded = standalone.run(
+            node, "--input-type=module", "--eval",
+            "const mod = await import(process.argv[1]); "
+            "const adapter = mod.createServerAdapter(); "
+            "if (adapter.type !== 'millrace_graph' || "
+            "typeof adapter.execute !== 'function' || "
+            "typeof adapter.testEnvironment !== 'function') process.exit(1); "
+            "console.log(adapter.type);",
+            package, check=True,
+        )
+        assert loaded.stdout.strip() == "millrace_graph"
+    for name in ("document-review", "lad", "software-change"):
         copy = standalone.cwd / name
         standalone.run(
             str(console), "catalog", "init", f"bundled:{name}", str(copy), check=True
@@ -105,6 +126,29 @@ def test_v023_templates_installed_and_initializable(
         )
         + "\n"
     )
+    lad = standalone.cwd / "lad"
+    lad_copy = standalone.cwd / "lad-copy"
+    standalone.run(str(console), "catalog", "copy", str(lad), str(lad_copy), check=True)
+    lad_files = files(lad)
+    assert len(lad_files) == 37
+    assert files(lad_copy) == lad_files
+    assert all(not (lad / rel).samefile(lad_copy / rel) for rel in lad_files)
+    prompt = lad_copy / "prompts/planner.md"
+    prompt.write_bytes(prompt.read_bytes() + b"\nLocal LAD guidance.\n")
+    assert files(lad) == lad_files
+    standalone.py(
+        "from pathlib import Path; import shutil, sys; "
+        "from millrace_plus import catalog; "
+        "source = catalog.bundled_root() / 'lad'; "
+        "assert source.resolve().is_relative_to(Path(sys.prefix).resolve()); "
+        "shutil.rmtree(source)"
+    )
+    lad_after_removal = standalone.cwd / "lad-after-removal"
+    standalone.run(
+        str(console), "catalog", "copy", str(lad_copy), str(lad_after_removal),
+        check=True,
+    )
+    assert files(lad_after_removal) == files(lad_copy)
     core = Path(os.environ.get("MILLRACE_TEST_CORE_WHEEL", artifacts["core_wheel"]))
     assert _sha256(core) == _sha256(artifacts["core_wheel"])
     env = Env(root / "stock-installed", [core, artifacts["plus_sdist_wheel"]])
@@ -227,12 +271,15 @@ print(json.dumps(origins))
 def test_every_stock_workflow_asset_is_in_wheel_and_sdist(
     artifacts: dict[str, Path],  # noqa: F811 - pytest fixture injection
 ) -> None:
-    source_root = PLUS_ROOT / "src/millrace_plus/workflows"
+    # The complete package inventory includes Python adapters and non-Python
+    # workflow, skill and local ESM assets. Compare bytes, not just filenames.
+    source_root = PLUS_ROOT / "src/millrace_plus"
     assets = [
         path
         for path in source_root.rglob("*")
         if path.is_file()
         and not path.is_symlink()
+        and path.name != ".DS_Store"
         and "__pycache__" not in path.relative_to(source_root).parts
     ]
 
@@ -240,7 +287,7 @@ def test_every_stock_workflow_asset_is_in_wheel_and_sdist(
         names = set(wheel.namelist())
         for source in assets:
             relative = source.relative_to(source_root).as_posix()
-            packaged = f"millrace_plus/workflows/{relative}"
+            packaged = f"millrace_plus/{relative}"
             assert packaged in names, packaged
             assert wheel.read(packaged) == source.read_bytes(), packaged
 
@@ -248,7 +295,7 @@ def test_every_stock_workflow_asset_is_in_wheel_and_sdist(
         names = sdist.getnames()
         for source in assets:
             relative = source.relative_to(source_root).as_posix()
-            suffix = f"/src/millrace_plus/workflows/{relative}"
+            suffix = f"/src/millrace_plus/{relative}"
             matches = [name for name in names if name.endswith(suffix)]
             assert len(matches) == 1, (suffix, matches)
             member = sdist.extractfile(matches[0])

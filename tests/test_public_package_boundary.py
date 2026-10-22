@@ -60,10 +60,11 @@ def test_public_workflow_boundary_exposes_only_the_verdict_arbiter_contract() ->
     for path in (PROJECT_ROOT / "src/millrace_plus/workflows").glob("*/workflow.json"):
         graph = json.loads(path.read_text())
         assert "selected_authority" not in graph
-        for node in graph["planes"]["main"]["nodes"].values():
-            assert node["result"] == "json-v1"
-            assert set(node["outcomes"]) == set(node["on"])
-            assert "on_error" in node and "on_unknown" in node
+        for plane in graph["planes"].values():
+            for node in plane["nodes"].values():
+                assert node["result"] == "json-v1"
+                assert set(node["outcomes"]) == set(node["on"])
+                assert "on_error" in node and "on_unknown" in node
 
 
 def test_public_release_text_has_no_staging_or_prepublication_claims() -> None:
@@ -257,7 +258,9 @@ def test_installed_catalog_without_core_from_public_selection(tmp_path: Path) ->
         text=True,
     )
     selectors = [v["selector"] for v in json.loads(listed.stdout)["templates"]]
-    assert selectors == ["bundled:document-review", "bundled:software-change"]
+    assert selectors == [
+        "bundled:document-review", "bundled:lad", "bundled:software-change",
+    ]
     for selector in selectors:
         destination = outside / selector.split(":")[1]
         subprocess.run(

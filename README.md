@@ -42,6 +42,9 @@ The Python 3.12 `millrace==0.23.0` bundle includes Core, Plus and OS.
 
 Templates live under `millrace_plus/workflows/`. Catalog commands work without Core.
 
+The candidate adds `bundled:lad`, a twelve-role software factory with sequential foreground work, a separate Learning plane and retained session bounds.
+Its copied README documents intake, pauses and recovery. Native LAD execution requires separate qualification.
+
 Use `millrace-plus catalog home set /absolute/path/to/catalog` to save a per-user catalog root that survives package upgrades.
 An explicit `--catalog-home` overrides the saved selection. `catalog home reset` restores the default.
 See [catalog](https://github.com/tim-osterhus/millrace-plus/blob/v0.23.0/docs/catalog.md), [workflows](https://github.com/tim-osterhus/millrace-plus/blob/v0.23.0/docs/workflows.md), and [authoring](https://github.com/tim-osterhus/millrace-plus/blob/v0.23.0/docs/authoring.md).
