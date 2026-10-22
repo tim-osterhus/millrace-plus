@@ -47,6 +47,16 @@ Mark each criterion pass, gap, or unavailable.
 Reject stale source identities, omitted criteria, contradictory artifacts, and unsupported claims.
 Write a per-criterion verdict and a full-goal decision.
 
+Distinguish machine-authoritative identities from narrative reporting. When the
+verified request, input, accepted-result and artifact identities agree, an optional
+prose identity transcription error alone establishes neither a stable-criterion
+gap nor human dependence. Disclose the reporting inaccuracy and assess the frozen
+criteria and closure conditions using the verified evidence; do not repair an
+immutable accepted artifact. A criterion explicitly requiring a correct displayed
+identity still applies. An authoritative identity mismatch retains its existing
+handling, and genuinely unavailable human authority or inputs still require the
+existing HUMAN_BLOCKED evidence.
+
 For gaps, propose bounded remediation tied to original criteria.
 For unavailable authority or inputs, identify the required human action.
 Recommend closure only when every original criterion passes and required work is complete.
