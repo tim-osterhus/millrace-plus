@@ -16,6 +16,7 @@ env:
 
 jobs:
   public-validation:
+    if: github.ref != 'refs/heads/codex/v0231-plus-build-diagnostic-20261023'
     name: Public standalone validation
     runs-on: ubuntu-latest
     steps:
@@ -71,6 +72,7 @@ jobs:
         run: git diff --check
 
   matched-validation:
+    if: github.ref != 'refs/heads/codex/v0231-plus-build-diagnostic-20261023'
     timeout-minutes: 30
     name: Exact Core and Plus validation
     runs-on: ubuntu-latest
@@ -145,3 +147,63 @@ jobs:
           uv run --no-project --python 3.12 --with ruff==0.15.21 ruff check src tests
       - name: Check source unchanged
         run: git diff --exit-code
+
+  release-build-diagnostic:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/v0231-plus-build-diagnostic-20261023'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    env:
+      DIAGNOSTIC_OUTPUT: ${{ runner.temp }}/plus-build-diagnostic
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: 4581cbeb51cdf41bdc0ebbdfc678591caaa32b68
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
+        with:
+          version: 0.13.5
+          checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
+      - name: Record frozen source and resolved interpreter
+        run: |
+          test "$(git rev-parse HEAD)" = 4581cbeb51cdf41bdc0ebbdfc678591caaa32b68
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          mkdir -m 700 "$DIAGNOSTIC_OUTPUT"
+          uv --version > "$DIAGNOSTIC_OUTPUT/uv-version.txt"
+          DIAGNOSTIC_PYTHON=$(uv python find 3.12)
+          "$DIAGNOSTIC_PYTHON" - <<'PYCODE'
+          import json, os, subprocess, sys, zlib
+          from pathlib import Path
+          report = {"source": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+                    "workflow_commit": os.environ["GITHUB_SHA"],
+                    "interpreter": sys.executable, "version": sys.version,
+                    "zlib_build": zlib.ZLIB_VERSION, "zlib_runtime": zlib.ZLIB_RUNTIME_VERSION,
+                    "scope": "Hosted reproduction, not recovered failed-run artifacts"}
+          (Path(os.environ["DIAGNOSTIC_OUTPUT"]) / "runtime.json").write_text(json.dumps(report, indent=2) + "\n")
+          PYCODE
+      - name: Reproduce publisher build and preserve both archives
+        run: |
+          uv -v build --force-pep517 --python 3.12 > "$DIAGNOSTIC_OUTPUT/build.log" 2>&1
+          mkdir "$DIAGNOSTIC_OUTPUT/dist"
+          cp dist/millrace_plus-0.23.1-py3-none-any.whl dist/millrace_plus-0.23.1.tar.gz "$DIAGNOSTIC_OUTPUT/dist/"
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ["DIAGNOSTIC_OUTPUT"])
+          expected = {"millrace_plus-0.23.1-py3-none-any.whl": "6a6718ad1e733ac25113bd464d8f46737a89364050ceaa7b54c1b03967c1cb30",
+                      "millrace_plus-0.23.1.tar.gz": "70844b471445b5a2a20942209aa3c8b5d979ffe46b4838058652edf7f9c80ddc"}
+          files = {p.name: {"sha256": hashlib.sha256(p.read_bytes()).hexdigest(), "bytes": p.stat().st_size,
+                            "expected_sha256": expected[p.name]} for p in (root / "dist").iterdir()}
+          (root / "artifacts.json").write_text(json.dumps(files, indent=2) + "\n")
+          PYCODE
+          uv run --no-project --python 3.12 --with hatchling==1.32.4 python - <<'PYCODE' > "$DIAGNOSTIC_OUTPUT/resolved-backend.json"
+          import importlib.metadata as m, json
+          print(json.dumps({"scope": "Resolver comparison; actual isolated build resolution is in build.log",
+                            "versions": {n: m.version(n) for n in ("hatchling", "packaging", "pathspec", "pluggy", "trove-classifiers")}}, indent=2))
+          PYCODE
+      - name: Upload diagnostic bytes and reports without publishing
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: frozen-plus-build-diagnostic
+          if-no-files-found: error
+          path: ${{ env.DIAGNOSTIC_OUTPUT }}
