@@ -13,7 +13,7 @@ env:
   PYTHONDONTWRITEBYTECODE: "1"
   OS_PEER_SOURCE_SHA: "72bc08d81182822483e57e70ae309ed0fe9c31c7"
   EXPECTED_WHEEL_SHA256: "6a6718ad1e733ac25113bd464d8f46737a89364050ceaa7b54c1b03967c1cb30"
-  EXPECTED_SDIST_SHA256: "70844b471445b5a2a20942209aa3c8b5d979ffe46b4838058652edf7f9c80ddc"
+  EXPECTED_SDIST_SHA256: "d57bd28a0385306256071ba579f1975f8d619f936938fd1391b5a4f3ce0b72fe"
   CORE_WHEEL_SHA256: "b5c2ac37259031136384e1d573dae8ea0e7597e5b1c792bd26ae42c019ab7778"
   CORE_SDIST_SHA256: "9cd836b5c689444def1c2351360a817f4455ad5756baf69b73b5d08ca0132489"
 
@@ -131,7 +131,8 @@ jobs:
           assert {p.name for p in Path("dist").iterdir() if p.name != ".gitignore"} == set(expected)
           for name, digest in expected.items():
               assert digest != "0" * 64, "Release artifact manifest has not been frozen"
-              assert hashlib.sha256((Path("dist") / name).read_bytes()).hexdigest() == digest
+              actual = hashlib.sha256((Path("dist") / name).read_bytes()).hexdigest()
+              assert actual == digest, f"{name}: expected {digest}, actual {actual}"
           PYCODE
       - name: Check source unchanged
         run: git diff --exit-code
@@ -166,7 +167,8 @@ jobs:
           files = sorted(Path("dist").iterdir())
           for path in files:
               key = "EXPECTED_WHEEL_SHA256" if path.suffix == ".whl" else "EXPECTED_SDIST_SHA256"
-              assert hashlib.sha256(path.read_bytes()).hexdigest() == os.environ[key]
+              actual = hashlib.sha256(path.read_bytes()).hexdigest()
+              assert actual == os.environ[key], f"{path.name}: expected {os.environ[key]}, actual {actual}"
           PYCODE
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086
         with:

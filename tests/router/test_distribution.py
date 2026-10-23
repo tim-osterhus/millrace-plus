@@ -17,8 +17,10 @@ import hashlib
 import json
 import os
 import runpy
+import shutil
 import subprocess
 import sys
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -382,6 +384,32 @@ def test_matched_candidate_wheels_and_public_controls(
     artifacts: dict[str, Path],
 ) -> None:
     root = artifacts["root"]
+    source = root / "nested-peer-source"
+    source.mkdir()
+    for name in (
+        "LICENSE", "README.md", "pyproject.toml", "src", "tests", "docs", ".github"
+    ):
+        original = PLUS_ROOT / name
+        if original.is_dir():
+            shutil.copytree(
+                original, source / name, ignore=shutil.ignore_patterns("__pycache__")
+            )
+        else:
+            shutil.copyfile(original, source / name)
+    peer = source / ".ci-os"
+    peer.mkdir()
+    for name in ("LICENSE", "README.md", "pyproject.toml"):
+        (peer / name).write_text(f"Unrelated peer {name}\n")
+    nested_dist = root / "nested-peer-dist"
+    nested_dist.mkdir()
+    _build(source, nested_dist, "--sdist")
+    with tarfile.open(_one(nested_dist, "*.tar.gz")) as archive:
+        prefix = f"millrace_plus-{PLUS_CANDIDATE_VERSION}/"
+        assert not any("/.ci-os/" in name for name in archive.getnames())
+        for name in ("LICENSE", "README.md", "pyproject.toml"):
+            member = archive.extractfile(prefix + name)
+            assert member is not None
+            assert member.read() == (PLUS_ROOT / name).read_bytes()
     plus_wheel = artifacts["plus_wheel"]
     # Generic Core payload: identical from checkout and from the rebuilt sdist.
     assert _record(artifacts["core_wheel"]) == _record(artifacts["core_sdist_wheel"])

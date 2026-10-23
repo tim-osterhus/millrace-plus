@@ -31,9 +31,9 @@ packages = ["src/millrace_plus"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "LICENSE",
-    "README.md",
-    "pyproject.toml",
+    "/LICENSE",
+    "/README.md",
+    "/pyproject.toml",
     "src/millrace_plus",
     "tests/router",
     "tests/test_package_metadata.py",
