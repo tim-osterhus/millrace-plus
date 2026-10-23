@@ -157,7 +157,7 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
-          ref: 27dfc1fb5929c49b56faf8dffd71bb52677db9ad
+          ref: 92b0c12ab2c917a93122c56f21e28e611763f264
           persist-credentials: false
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -171,7 +171,7 @@ jobs:
           checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
       - name: Record frozen source and resolved interpreter
         run: |
-          test "$(git rev-parse HEAD)" = 27dfc1fb5929c49b56faf8dffd71bb52677db9ad
+          test "$(git rev-parse HEAD)" = 92b0c12ab2c917a93122c56f21e28e611763f264
           test -z "$(git status --porcelain=v1 --untracked-files=all -- . ':(exclude).ci-os')"
           mkdir -m 700 "$DIAGNOSTIC_OUTPUT"
           uv --version > "$DIAGNOSTIC_OUTPUT/uv-version.txt"
@@ -198,7 +198,7 @@ jobs:
           from pathlib import Path
           root = Path(os.environ["DIAGNOSTIC_OUTPUT"])
           expected = {"millrace_plus-0.23.1-py3-none-any.whl": "6a6718ad1e733ac25113bd464d8f46737a89364050ceaa7b54c1b03967c1cb30",
-                      "millrace_plus-0.23.1.tar.gz": "d57bd28a0385306256071ba579f1975f8d619f936938fd1391b5a4f3ce0b72fe"}
+                      "millrace_plus-0.23.1.tar.gz": "b666e736f8ffa3a4df98039f6197c9da1b36729a645479f1e69ff3ca27d440f2"}
           files, members = {}, {}
           for p in Path("dist").iterdir():
               if p.name == ".gitignore":
