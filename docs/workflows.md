@@ -28,6 +28,6 @@ Every launch begins with graph-owned session bootstrap and deterministic intake.
 
 A new Core run on a used LAD copy pauses with the retained session and continuation. It never resets counters or automatically replans. Ordinary within-run resume/recovery retains the original cursor. Follow copied `context/harness.md` for supported replacement preparation, CLOSE/ACK and exact Learning-plane cleanup after a hard stop.
 
-Deterministic peers provide offline workflow evidence. Native LAD execution, a real Paperclip account and remote MCP deployment require separate qualification. The catalog does not establish those routes by copying their assets.
+Deterministic peers cover all twelve roles and the workflow gates offline. Selected native evidence covers one small existing-project foreground route using Codex CLI 0.163.0 with configured Luna Max. It reached accepted foreground and domain success with CLOSE/ACK and writer closure. Native Learning, repair and full-factory execution remain unqualified. Live Paperclip proof is deferred. The separate shared MCP command proof does not qualify native LAD routes or general deployments. Copying catalog assets establishes no native route qualification.
 
 The historical six-workflow compiler manifest and `millrace_workflow_package` resource API are absent from this release. Their matching v0.22 source and guides remain in preserved Git commit `ad91c7f`. They do not define current template or runtime requirements.

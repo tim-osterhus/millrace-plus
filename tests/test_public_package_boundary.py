@@ -71,7 +71,7 @@ def test_public_release_text_has_no_staging_or_prepublication_claims() -> None:
     """Successor: retain the truthful unpublished candidate boundary."""
     for name in ("README.md", "docs/release.md"):
         text = _text(name).lower()
-        assert "0.23.0" in text and "unpublished" not in text
+        assert "0.23.1" in text and "unpublished" not in text
         assert "release" in text and "equal version" in text
         assert "0.0.0" not in text
 
@@ -80,7 +80,7 @@ def test_public_release_text_identifies_exact_bundle_and_independent_members() -
     """Successor: exact source-bound component pairing replaces old bundle pins."""
     for name in ("README.md", "docs/release.md"):
         text = _text(name)
-        assert "millrace-ai==0.23.0" in text
+        assert "millrace-ai==0.23.1" in text
         assert "matched" in text and "publication" in text
     assert "millrace-router-execution/v2" in _text("README.md")
 

@@ -1,8 +1,8 @@
 # Authoring editable router workflows
 
-Use Core and Plus 0.23.0 with the public execution-v2 contract.
+Use Core and Plus 0.23.1 with the public execution-v2 contract.
 
-The 0.23.1 candidate also supports [reusable local child calls](subworkflows.md)
+Plus 0.23.1 also supports [reusable local child calls](subworkflows.md)
 over that unchanged Core contract. Declare a helper command node with cwd `.`,
 all handled `CHILD_*` outcomes and a finite outer timeout covering wait + cleanup
 + 10 seconds. New logical occurrences use new call keys; retrying an occurrence

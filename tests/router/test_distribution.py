@@ -5,7 +5,7 @@ test-owned directories, rebuilds the Core wheel from its sdist, and installs
 exact local wheel files with `uv pip install --offline --no-deps --no-cache`
 into separate fresh virtual environments. Installed checks run with
 `PYTHONPATH` unset, `python -I` (or the installed console script), a temporary
-`HOME`, and a working directory unrelated to both checkouts. Equal `0.23.0`
+`HOME`, and a working directory unrelated to both checkouts. Equal package-version
 metadata is never treated as compatibility: offline same-version stub wheels
 without (or with the wrong) execution contract must be refused.
 """
@@ -27,17 +27,20 @@ from millrace.router import execution
 
 PLUS_ROOT = Path(__file__).resolve().parents[2]
 CORE_ROOT = Path(execution.__file__).resolve().parents[3]
-VERSION = "0.23.0"
+VERSION = "0.23.1"
 PLUS_CANDIDATE_VERSION = "0.23.1"
 ROUTER_REQUIREMENT = "millrace-ai<0.24.0,>=0.23.0; extra == 'router'"
 BASELINE_PLUS_WHEEL_SHA256 = (
     "5c2025e4f6d592bf4c927d659b4d729e17a62e49bc13f5b380de1b2d6bff480f"
 )
-BASELINE_PLUS_WHEEL = PLUS_ROOT.parents[2] / (
-    "lab/tasks/v023-canonical-cutover-plan/2026-10-21/"
-    "execution/publication/plus/bootstrap-recovery/public-artifacts/"
-    "millrace_plus-0.23.0-py3-none-any.whl"
-)
+BASELINE_PLUS_WHEEL = Path(os.environ.get(
+    "MILLRACE_TEST_BASELINE_PLUS_WHEEL",
+    str(PLUS_ROOT.parents[2] / (
+        "lab/tasks/v023-canonical-cutover-plan/2026-10-21/"
+        "execution/publication/plus/bootstrap-recovery/public-artifacts/"
+        "millrace_plus-0.23.0-py3-none-any.whl"
+    )),
+))
 
 
 def _sha256(path: Path) -> str:

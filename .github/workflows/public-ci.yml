@@ -3,7 +3,16 @@ name: Public CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "codex/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_DATE_EPOCH: "1580601600"
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
 
 jobs:
   public-validation:
@@ -60,3 +69,79 @@ jobs:
 
       - name: Diff whitespace
         run: git diff --check
+
+  matched-validation:
+    timeout-minutes: 30
+    name: Exact Core and Plus validation
+    runs-on: ubuntu-latest
+    env:
+      CORE_SOURCE_SHA: dea6bc3f1529f9ca1ced665ccff050c8f4f58884
+      OS_PEER_SOURCE_SHA: 72bc08d81182822483e57e70ae309ed0fe9c31c7
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: tim-osterhus/millrace
+          ref: ${{ env.CORE_SOURCE_SHA }}
+          path: .ci-core
+          persist-credentials: false
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: tim-osterhus/millrace-os
+          ref: ${{ env.OS_PEER_SOURCE_SHA }}
+          path: .ci-os
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
+        with:
+          version: 0.13.5
+      - name: Build exact selected Core
+        run: |
+          test "$(git -C .ci-core rev-parse HEAD)" = "$CORE_SOURCE_SHA"
+          uv build .ci-core --out-dir "$RUNNER_TEMP/core-dist" --force-pep517 --python 3.12
+          echo "MILLRACE_TEST_CORE_WHEEL=$RUNNER_TEMP/core-dist/millrace_ai-0.23.1-py3-none-any.whl" >> "$GITHUB_ENV"
+          echo "MILLRACE_TEST_CORE_SDIST=$RUNNER_TEMP/core-dist/millrace_ai-0.23.1.tar.gz" >> "$GITHUB_ENV"
+      - name: Build isolated accepted OS peer for deterministic bridge tests
+        run: |
+          test "$(git -C .ci-os rev-parse HEAD)" = "$OS_PEER_SOURCE_SHA"
+          uv build .ci-os --wheel --out-dir "$RUNNER_TEMP/os-peer" --force-pep517 --python 3.12
+          echo "MILLRACE_TEST_OS_PEER_WHEEL=$RUNNER_TEMP/os-peer/millrace_os-0.23.0-py3-none-any.whl" >> "$GITHUB_ENV"
+      - name: Download immutable package replacement baseline
+        run: |
+          python3 - <<'PYCODE'
+          import hashlib, json, os, pathlib, urllib.request
+          root = pathlib.Path(os.environ["RUNNER_TEMP"]) / "baseline-plus"
+          root.mkdir()
+          name = "millrace_plus-0.23.0-py3-none-any.whl"
+          digest = "5c2025e4f6d592bf4c927d659b4d729e17a62e49bc13f5b380de1b2d6bff480f"
+          release = json.load(urllib.request.urlopen("https://pypi.org/pypi/millrace-plus/0.23.0/json", timeout=60))
+          item, = [item for item in release["urls"] if item["filename"] == name]
+          assert item["digests"]["sha256"] == digest
+          raw = urllib.request.urlopen(item["url"], timeout=60).read()
+          assert hashlib.sha256(raw).hexdigest() == digest
+          path = root / name
+          path.write_bytes(raw)
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write("MILLRACE_TEST_BASELINE_PLUS_WHEEL=" + str(path) + "\n")
+          PYCODE
+      - name: Cache Core backend for offline distribution proofs
+        run: uv run --no-project --python 3.12 --with 'uv_build==0.11.30' python -c 'import uv_build'
+      - name: Full matched artifact suite
+        run: |
+          env -u PYTHONPATH uv run --no-project --python 3.12 --with pytest==9.1.1 --with hatchling==1.32.4 --with "$MILLRACE_TEST_CORE_WHEEL" --with "$MILLRACE_TEST_OS_PEER_WHEEL" --with . pytest -q -ra --junitxml="$RUNNER_TEMP/plus-results.xml"
+          python3 - <<'PYCODE'
+          import os, xml.etree.ElementTree as ET
+          from pathlib import Path
+          results = ET.parse(Path(os.environ["RUNNER_TEMP"]) / "plus-results.xml")
+          cases = list(results.iter("testcase"))
+          assert len(cases) == 1028, len(cases)
+          skipped = [case for case in cases if case.find("skipped") is not None]
+          assert len(skipped) == 21, len(skipped)
+          for case in skipped:
+              assert "test_paperclip_plugin" in case.attrib["classname"]
+              assert "task-owned pinned Node/loader profile is unavailable" in case.find("skipped").attrib["message"]
+          PYCODE
+          uv run --no-project --python 3.12 --with ruff==0.15.21 ruff check src tests
+      - name: Check source unchanged
+        run: git diff --exit-code

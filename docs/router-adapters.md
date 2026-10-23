@@ -5,7 +5,7 @@
 Stock graph-v3 examples and independent copies are documented in [Workflows](workflows.md) and [Catalog](catalog.md). Their Claude binding is an editable example; it does not impose Claude settings semantics on Pi/Codex. The legacy compiler-format workflow resource API is excluded from current artifacts.
 
 
-This page describes the optional native adapters in Millrace Plus 0.23.0.
+This page describes the optional native adapters in Millrace Plus 0.23.1.
 Native qualification remains scoped to the source, artifacts, CLI and selected route in its recorded receipt.
 
 The split is strict. Core owns generic graph validation, durable state,
@@ -30,7 +30,7 @@ The `millrace-plus` console script runs `millrace_plus.router.cli:cli`.
 - An absent Core, an older same-version Core without that module, or a
   different contract id is refused with `core_absent`,
   `core_contract_missing`, or `core_contract_mismatch`. There is no fallback.
-- Equal `0.23.0` metadata is not compatibility evidence. The handshake, not the
+- Equal `0.23.1` metadata is not compatibility evidence. The handshake, not the
   version string, decides whether a Core is usable.
 
 Core runs and tests without Plus. A Core-only host, such as plain
@@ -386,8 +386,8 @@ instructions: the authored prompt must request its selected `json-v1` result.
 There is no positional prompt, attach/server mode, continuation, session reuse,
 interactive fallback or permission bypass. Finite native ask permissions
 auto-reject; project `opencode.json` may widen permissions. A tool permission
-denial can precede a valid final result. Later native qualification must record
-the selected project permissions, provider/model and authentication route.
+denial can precede a valid final result. Native qualification records the selected project permissions, provider/model
+and authentication route.
 
 Core's declared invocation environment reaches the child without an ambient
 environment merge. Native config/auth remain native; the adapter neither copies
@@ -415,6 +415,10 @@ KILL after two seconds, with a five-second cleanup bound. Forced cleanup keeps
 fresh recovery; no native session is replayed. Foreground closure does not
 attest detached processes or remote effects.
 
-Current R4 evidence is offline fake-process evidence only. No OpenCode binary
-was downloaded or executed and no native/provider route is qualified. Installed
-wheel/sdist integration and any native qualification have separate gates.
+Offline fake-process tests cover the event and lifecycle failure cases. Selected
+native qualification covers OpenCode 1.19.3 with the configured DeepSeek Flash
+route: a useful run, cancellation and fresh recovery. This evidence remains
+limited to its exact accepted artifacts and configuration. HTTP-start status
+remains unknown on cancellation. Raw `may_live` and guarded effective `stopped`
+are distinct observations. The proof does not attest the backend-effective
+model or effort, detached effects, other providers or arbitrary platforms.
