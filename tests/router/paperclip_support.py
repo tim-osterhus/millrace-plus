@@ -211,11 +211,11 @@ def paperclip(tmp_path, monkeypatch):
             "binding_state_root": str(root / "bindings"),
             "helper_executable": str(Path(sys.executable).parent / "millrace-plus"),
             "instance_settings": {
-                "path": [
-                    str(Path(sys.executable).resolve().parent),
-                    "/usr/bin",
-                    "/bin",
-                ],
+                "path": list(
+                    dict.fromkeys(
+                        [str(Path(sys.executable).resolve().parent), "/usr/bin", "/bin"]
+                    )
+                ),
                 "env_allowlist": [],
                 "host_paths": {},
             },
