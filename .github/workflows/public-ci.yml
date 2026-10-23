@@ -153,7 +153,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
-      DIAGNOSTIC_OUTPUT: ${{ runner.temp }}/plus-build-diagnostic
+      DIAGNOSTIC_OUTPUT: /tmp/millrace-plus-build-diagnostic
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
