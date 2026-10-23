@@ -45,13 +45,25 @@ def test_assignment_duplicate_and_result_correlation(paperclip) -> None:
     assert first["terminal_outcome"] == "READY"
     artifact = Path(first["result_root"]) / first["refs"][0]
     assert artifact.read_bytes() == paperclip.assignment["description"].encode()
+    saved = bridge.inspect(paperclip.config_file, paperclip.assignment_file)
+    creates = [
+        request
+        for request in paperclip.requests
+        if request["operation"] == "create_instance"
+    ]
+    assert creates
+    assert all(request == saved["envelopes"]["create"] for request in creates)
+    instances = paperclip.client.list_instances("local")
+    assert [instance["instance_id"] for instance in instances] == [first["instance_id"]]
+    assert [run["id"] for run in instances[0]["runs"]] == [first["run_id"]]
+    settled_requests = copy.deepcopy(paperclip.requests)
     paperclip.assignment["attempt_id"] = "attempt-2"
     paperclip.write()
     second = bridge.run(paperclip.config_file, paperclip.assignment_file)
     assert second["run_id"] == first["run_id"]
     assert second["instance_id"] == first["instance_id"]
     assert second["attempt_id"] == "attempt-2"
-    assert paperclip.operations.count("create_instance") == 1
+    assert paperclip.requests == settled_requests
     assert paperclip.operations.count("start_run") == 1
 
 
