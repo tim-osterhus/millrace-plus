@@ -6,6 +6,11 @@ project and Core state home. The parent graph owns its branches and retries.
 There is no helper service. Install the optional router dependency to execute
 calls; catalog operations still work without Core.
 
+For subworkflow execution, install and invoke Plus in one environment, such as
+a virtual environment or a pipx environment. The helper currently requires the
+`millrace-plus` script beside that environment's Python interpreter. Split
+user-site/system script locations are not supported for subworkflow execution.
+
 The helper's fixed semantic outcomes are `CHILD_SUCCEEDED`, `CHILD_FAILED`,
 `CHILD_CANCELLED`, `CHILD_ATTENTION`, `CHILD_REFUSED` and `CHILD_UNCERTAIN`.
 They exit zero and emit exactly one Core json-v1 object with `outcome`,

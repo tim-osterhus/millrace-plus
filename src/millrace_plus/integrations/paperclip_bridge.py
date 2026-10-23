@@ -623,7 +623,10 @@ def _observe(store, saved, client, context, cancelled):
                     assignment, context, "refused", "os_request_refused", saved
                 )
             if saved["instance_id"] is None:
-                if saved["cancel_intent"] and saved["phase"] == "prepared":
+                if (
+                    saved["cancel_intent"]
+                    and saved["phase"] in {"prepared", "terminal"}
+                ):
                     _save(store, saved, phase="terminal")
                     return _result(
                         assignment,

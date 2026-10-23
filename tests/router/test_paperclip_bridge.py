@@ -183,7 +183,28 @@ def test_early_cancel_prevents_create_and_start(paperclip) -> None:
         paperclip.config_file, paperclip.assignment_file, cancelled=lambda: True
     )
     assert result["status"] == "cancelled"
+    assert result["diagnostic"] == "cancelled_before_create"
+    saved = bridge.inspect(paperclip.config_file, paperclip.assignment_file)
+    assert saved["phase"] == "terminal" and saved["cancel_intent"]
+    assert saved["instance_id"] is None and saved["run_id"] is None
+    assert saved["cleanup_required"] is False
+    assert saved["envelopes"]["start"] is None
+    assert saved["envelopes"]["cancel"] is None
+    assert saved["receipts"] == {}
+    for attempt in ("attempt-2", "attempt-3"):
+        paperclip.assignment["attempt_id"] = attempt
+        paperclip.write()
+        replayed = bridge.run(
+            paperclip.config_file, paperclip.assignment_file, cancelled=lambda: False
+        )
+        assert replayed["status"] == "cancelled"
+        assert replayed["diagnostic"] == "cancelled_before_create"
+        assert replayed["attempt_id"] == attempt
+        assert replayed["binding_digest"] == result["binding_digest"]
+        assert bridge.inspect(paperclip.config_file, paperclip.assignment_file) == saved
     assert paperclip.operations == []
+    assert paperclip.requests == []
+    assert paperclip.client.list_instances("local") == []
 
 
 def test_credential_rotation_and_shared_config_refusal(paperclip) -> None:
