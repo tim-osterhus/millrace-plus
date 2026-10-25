@@ -29,6 +29,7 @@ from .configuration import (  # noqa: E402
     strict_json,
     text,
 )
+from .setting_layers import merge_setting_layers  # noqa: E402
 
 ADAPTER_ID = "codex_exec"
 ADAPTER_CONTRACT = "millrace-codex-exec/v1"
@@ -174,30 +175,22 @@ def resolve(
     parsed: Mapping[str, object],
     runtime: Mapping[str, object],
 ) -> dict[str, object]:
-    values: dict[str, object] = {}
-    provenance: dict[str, object] = {}
     for key in sorted(SETTINGS):
         if key in parsed and key in workflow and parsed[key] != workflow[key]:
             raise RouterError("conflicting_codex_setting")
-        for source, layer in (
-            ("node", node_values),
-            ("plane", plane),
-            ("workflow", workflow),
-            ("profile", parsed),
-            ("runtime", runtime),
-        ):
-            if key in layer:
-                values[key] = layer[key]
-                provenance[key] = {"source": source, "policy": None}
-                break
-        else:
+    result = merge_setting_layers(
+        SETTINGS,
+        ("runtime", runtime),
+        ("profile", parsed),
+        ("workflow", workflow),
+        ("plane", plane),
+        ("node", node_values),
+    )
+    effective = cast(Mapping[str, object], result["effective"])
+    for key in sorted(SETTINGS):
+        if key not in effective:
             raise RouterError("missing_effective_codex_setting", key)
-    return {
-        "requested": values.copy(),
-        "effective": values,
-        "provenance": provenance,
-        "warnings": [],
-    }
+    return result
 
 
 def _environment(names: tuple[str, ...]) -> None:

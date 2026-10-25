@@ -25,6 +25,7 @@ from .configuration import (  # noqa: E402
     strict_json,
     text,
 )
+from .setting_layers import merge_setting_layers  # noqa: E402
 
 ADAPTER_ID = "opencode_run"
 ADAPTER_CONTRACT = "millrace-opencode-run/v1"
@@ -140,18 +141,7 @@ def node(
 
 
 def _resolve(*layers: tuple[str, Mapping[str, object]]) -> dict[str, object]:
-    values: dict[str, object] = {}
-    provenance: dict[str, object] = {}
-    for source, layer in layers:
-        for key in sorted(SETTINGS & layer.keys()):
-            values[key] = layer[key]
-            provenance[key] = {"source": source, "policy": None}
-    return {
-        "requested": values.copy(),
-        "effective": values,
-        "provenance": provenance,
-        "warnings": [],
-    }
+    return merge_setting_layers(SETTINGS, *layers)
 
 
 def validate_configuration(config: AdapterConfiguration) -> None:

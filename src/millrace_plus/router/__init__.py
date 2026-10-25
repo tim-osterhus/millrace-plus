@@ -22,10 +22,18 @@ This package module itself imports no Core code.
 from __future__ import annotations
 
 import importlib
+import re
+from importlib import metadata
 
 REQUIRED_EXECUTION_CONTRACT = "millrace-router-execution/v2"
+REQUIRED_PROCESS_CONTRACT = "owned-process-v1"
+MINIMUM_PROCESS_CORE = "0.23.2"
 
-__all__ = ("REQUIRED_EXECUTION_CONTRACT", "CoreContractError", "require_core")
+__all__ = (
+    "REQUIRED_EXECUTION_CONTRACT", "REQUIRED_PROCESS_CONTRACT",
+    "MINIMUM_PROCESS_CORE", "CoreContractError", "require_core",
+    "require_owned_process",
+)
 
 
 class CoreContractError(ImportError):
@@ -60,3 +68,47 @@ def require_core() -> str:
             "core_contract_mismatch", f"{requirement} Found {found!r}."
         )
     return REQUIRED_EXECUTION_CONTRACT
+
+
+def require_owned_process() -> str:
+    """Gate live helper-consuming dispatch; pure capture/reload never calls this."""
+    requirement = (
+        "This native contract requires millrace-ai>=0.23.2 with public "
+        "millrace.router.process OWNED_PROCESS_CONTRACT 'owned-process-v1'."
+    )
+    try:
+        require_core()
+    except CoreContractError:
+        raise
+    except Exception as exc:
+        raise CoreContractError("core_contract_missing", requirement) from exc
+    try:
+        version = metadata.version("millrace-ai")
+        # Distribution metadata uses normalized PEP 440 release/suffix forms.
+        match = re.fullmatch(
+            r"(?:(?P<epoch>\d+)!)?(?P<release>\d+(?:\.\d+)*)"
+            r"(?P<pre>(?:a|b|rc)\d+)?(?P<post>\.post\d+)?"
+            r"(?P<dev>\.dev\d+)?(?:\+[a-z0-9]+(?:[._-][a-z0-9]+)*)?",
+            version, re.IGNORECASE,
+        )
+        if match is None:
+            raise ValueError("unsupported_core_version")
+        release = tuple(int(part) for part in match["release"].split("."))
+        release += (0,) * max(0, 3 - len(release))
+        while len(release) > 3 and release[-1] == 0:
+            release = release[:-1]
+        below = release < (0, 23, 2)
+        prerelease = match["pre"] or (match["dev"] and not match["post"])
+        if not int(match["epoch"] or "0") and (
+            below or (release == (0, 23, 2) and prerelease)
+        ):
+            raise ValueError("core_below_process_minimum")
+    except Exception as exc:
+        raise CoreContractError("core_process_version", requirement) from exc
+    try:
+        process = importlib.import_module("millrace.router.process")
+    except Exception as exc:
+        raise CoreContractError("core_process_missing", requirement) from exc
+    if getattr(process, "OWNED_PROCESS_CONTRACT", None) != REQUIRED_PROCESS_CONTRACT:
+        raise CoreContractError("core_process_mismatch", requirement)
+    return REQUIRED_PROCESS_CONTRACT

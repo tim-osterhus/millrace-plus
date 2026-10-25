@@ -15,6 +15,25 @@
 Millrace Plus supplies editable workflow templates, native harness adapters and advisory agent skills for Millrace 0.23.
 Its ordinary workflow copies run without a Plus catalog service.
 
+## Unpublished 0.23.2 development candidate
+
+The current development pairing is `millrace-plus==0.23.2` with
+`millrace-ai==0.23.2`, using exact matched locally built artifacts. These
+candidates are unpublished; the installation instructions below describe the
+published 0.23.1 release, whose artifacts and qualification remain unchanged.
+
+The migrated Codex and OpenCode adapters require `millrace-ai>=0.23.2` plus the
+public `owned-process-v1` capability at invocation. The optional `router` extra
+deliberately retains `millrace-ai>=0.23.0,<0.24.0` for unchanged Pi and Claude
+consumers under execution-v2. That wider install range does not establish
+Codex/OpenCode compatibility: an older Core gives a counted, stopped preflight
+failure before native preparation or child launch. Equal versions alone do not
+establish either execution or helper compatibility.
+
+Offline Linux acceptance of shared primitives is separate from exact native
+route and platform qualification. See the [candidate release policy](docs/release.md)
+for pairing and publication boundaries; it makes no new OS or bundle pairing claim.
+
 Reusable local child calls use ordinary command nodes and independent copies.
 See [subworkflows](docs/subworkflows.md) for pinned requests, finite waiting,
 explicit cancellation and retained uncertainty after interruption.
@@ -23,7 +42,7 @@ The optional [Paperclip bridge](docs/paperclip.md) maps server-owned issue
 descriptions to pinned independent workflow copies through an existing local
 Millrace OS service. Its local adapter reports results without changing issues.
 
-## Install
+## Published 0.23.1 installation
 
 Python 3.11 or newer is required. The base package does not transitively install Core or OS.
 

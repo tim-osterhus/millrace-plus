@@ -5,7 +5,8 @@
 Stock graph-v3 examples and independent copies are documented in [Workflows](workflows.md) and [Catalog](catalog.md). Their Claude binding is an editable example; it does not impose Claude settings semantics on Pi/Codex. The legacy compiler-format workflow resource API is excluded from current artifacts.
 
 
-This page describes the optional native adapters in Millrace Plus 0.23.1.
+This page describes the optional native adapters in the development Millrace Plus
+0.23.2 candidate. Public 0.23.1 qualification remains evidence for its original bytes.
 Native qualification remains scoped to the source, artifacts, CLI and selected route in its recorded receipt.
 
 The split is strict. Core owns generic graph validation, durable state,
@@ -19,6 +20,12 @@ facade. It keeps no state and no scheduler, and it does not ship a copy of Core.
 The base distribution declares no runtime dependencies. The optional `router`
 extra declares the one-way dependency `millrace-ai>=0.23.0,<0.24.0`.
 
+The `router` extra keeps its older Core lower bound for unchanged Pi and Claude
+consumers. Codex and OpenCode require Core 0.23.2 or later plus owned-process-v1
+when invoked. Installing an older Core remains possible but produces a counted,
+stopped preflight failure for those two consumers before any native preparation
+or child launch. Use matched development artifacts for their offline proof.
+
 The `millrace-plus` console script runs `millrace_plus.router.cli:cli`.
 `python -m millrace_plus.router` is the module form of the same entry point.
 
@@ -30,8 +37,28 @@ The `millrace-plus` console script runs `millrace_plus.router.cli:cli`.
 - An absent Core, an older same-version Core without that module, or a
   different contract id is refused with `core_absent`,
   `core_contract_missing`, or `core_contract_mismatch`. There is no fallback.
-- Equal `0.23.1` metadata is not compatibility evidence. The handshake, not the
+- Equal package metadata is not compatibility evidence. The handshake, not the
   version string, decides whether a Core is usable.
+
+Codex and OpenCode additionally require Core 0.23.2 or later with public
+`millrace.router.process.OWNED_PROCESS_CONTRACT = "owned-process-v1"` at live
+invocation. That consuming-contract gate precedes native host preparation,
+version probing and spawning. Missing/unsupported capability or an older Core
+returns an existing-schema stopped, no-child preflight failure. Core may persist
+its normal counted failed attempt; this does not claim zero framework mutation.
+Pure planning, saved completion validation and historical reload do not query the
+helper capability or current native resources. Pi/Claude retain execution-v2
+admission without the process gate; no blanket import-time requirement is added.
+
+The public process helper owns bounded byte delivery, fair stream draining,
+deadlines and local group cleanup. Plus retains native framing, settings,
+finality, evidence and failure/writer mapping. Codex snapshots its final file once
+at root/output closure before root-policy descendant cleanup. A captured
+`completed` result with `may_live` stays held until exact reconciliation and
+explicit resume uses the retained result once; a failed attempt instead requires
+a fresh explicit retry. Refactored bytes require their own offline acceptance and
+later exact native qualification. Linux fake-process tests do not qualify macOS
+or any provider route. No historical native allowance transfers to this candidate.
 
 Core runs and tests without Plus. A Core-only host, such as plain
 `millrace router` or Core controls called without the Plus resolver, refuses a
@@ -414,6 +441,14 @@ KILL after two seconds, with a five-second cleanup bound. Forced cleanup keeps
 `may_live` and produces no semantic completion. Public reconciliation precedes
 fresh recovery; no native session is replayed. Foreground closure does not
 attest detached processes or remote effects.
+
+The migrated Codex and OpenCode paths observe Core's first generic stop before
+parsing later cleanup bytes. Cancellation or timeout therefore keeps its
+classification when a TERM handler emits a native error or malformed record.
+Cleanup bytes still contribute diagnostics, counts and digests. An earlier
+native failure keeps its own classification; Codex's failed turn can still exit
+naturally before a later control request starts cleanup. These rules change no
+stored native envelope or writer-reconciliation contract.
 
 Offline fake-process tests cover the event and lifecycle failure cases. Selected
 native qualification covers OpenCode 1.19.3 with the configured DeepSeek Flash

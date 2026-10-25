@@ -47,6 +47,13 @@ def run(
     )
 
 
+def _assert_group_closed(pid: int) -> None:
+    # Test-local ownership observation; the public byte API returns this fact
+    # from its live call and intentionally exposes no arbitrary-PID probe.
+    with pytest.raises(ProcessLookupError):
+        os.killpg(pid, 0)
+
+
 def test_core_seam_environment_reaches_native_child(tmp_path: Path) -> None:
     seam = tmp_path / "seam-input.json"
     seam.write_text('{"format":"millrace-seam-input/v1"}')
@@ -491,9 +498,7 @@ def test_stdin_pressure_and_prompt_cleanup(tmp_path: Path, variant: str) -> None
         assert time.monotonic() - started_at < 5
         if variant == "flood_cancel":
             assert result.adapter_evidence["stderr_truncated"] is True
-    from millrace_plus.router.codex import _group
-
-    assert not _group(pids[0])
+    _assert_group_closed(pids[0])
 
 
 def test_surrogate_environment_redaction() -> None:
@@ -516,6 +521,45 @@ def _failed(*errors: str, failed: str | None = "turn failed") -> list[dict[str, 
     if failed is not None:
         values.append({"type": "turn.failed", "error": {"message": failed}})
     return values
+
+
+@pytest.mark.parametrize("cause", ["cancelled", "timeout"])
+@pytest.mark.parametrize("late_kind", ["failed_turn", "malformed"])
+def test_generic_stop_precedes_term_handler_native_failure(
+    tmp_path: Path, cause: str, late_kind: str,
+) -> None:
+    import hashlib
+
+    marker = tmp_path / "term-ready"
+    late = (
+        wire(_failed("cleanup error", failed="cleanup failed"))
+        if late_kind == "failed_turn" else b"not json\n"
+    )
+    before = (
+        "def term(*_):\n"
+        f" os.write(1,{late!r});os.write(2,b'cleanup stderr\\n');sys.exit(0)\n"
+        "signal.signal(signal.SIGTERM,term)\n"
+        f"Path({str(marker)!r}).touch()\n"
+        "while True: time.sleep(.01)\n"
+    )
+    plan, _ = prepared(tmp_path, before=before, final=None)
+    roots: list[int] = []
+    result = run(
+        plan, tmp_path, started=roots.append,
+        poll=marker.exists if cause == "cancelled" else lambda: False,
+        timeout=3 if cause == "cancelled" else 0.7,
+    )
+    assert marker.exists() and len(roots) == 1
+    assert result.classification == cause and result.diagnostic == "codex_" + cause
+    assert result.stdout == b"" and result.writer_state == "may_live"
+    assert b"cleanup stderr" in result.stderr
+    if late_kind == "failed_turn":
+        assert L_ERR + b"cleanup error\n" in result.stderr
+        assert L_FAIL + b"cleanup failed\n" in result.stderr
+    evidence = result.adapter_evidence
+    assert evidence["event_bytes"] == len(late)
+    assert evidence["stream_sha256"] == hashlib.sha256(late).hexdigest()
+    _assert_group_closed(roots[0])
 
 
 def _invoke(
@@ -562,8 +606,6 @@ def test_failure_messages_become_labelled_bounded_diagnostics(
 ) -> None:
     """Non-completed transports retain only the last error and the failed turn."""
     import hashlib
-
-    from millrace_plus.router.codex import _group
 
     kwargs: dict[str, Any] = {"final": None, "exit_code": 1}
     expected: bytes | None = None
@@ -664,7 +706,7 @@ def test_failure_messages_become_labelled_bounded_diagnostics(
     assert evidence["stderr_truncated"] is truncated
     assert evidence["failure_code"] == outcome[1]
     assert evidence["final"] is None
-    assert not _group(pids[0])
+    _assert_group_closed(pids[0])
     if variant == "observed_failed_shape":
         stream = wire(values)
         assert result.exit_code == 1

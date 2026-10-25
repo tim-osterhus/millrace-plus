@@ -1,4 +1,32 @@
-# Millrace Plus 0.23.1 release policy
+# Millrace Plus release policy
+
+## Unpublished 0.23.2 development candidate
+
+The current candidate pairing uses exact matched locally built artifacts:
+
+| Surface | Candidate contract |
+| --- | --- |
+| Plus package | `millrace-plus==0.23.2` |
+| Core package | `millrace-ai==0.23.2` |
+| Runtime dependency | None |
+| Optional router dependency | `millrace-ai>=0.23.0,<0.24.0` (deliberately retained) |
+| Codex/OpenCode invocation minimum | `millrace-ai>=0.23.2` plus `owned-process-v1` |
+| Public execution contract | `millrace-router-execution/v2` |
+
+The 0.23.2 candidate is unpublished. Install and verify its exact local wheels;
+the pins above describe the candidate pair, not registry availability. This
+pairing does not select new OS or bundle artifacts or authorize publication.
+Published 0.23.1 artifacts and their recorded qualification remain unchanged.
+
+The wider optional router range remains usable by unchanged Pi and Claude
+consumers. Codex and OpenCode additionally check their helper minimum and
+capability before native preparation, probe or spawn. Refusal is a counted,
+stopped preflight failure; it does not start a native child. Equal versions alone
+do not establish compatibility. Offline process/artifact checks do not qualify
+native/provider routes or macOS lifecycle behavior; those need their own exact
+source, artifact, route and platform receipts.
+
+## Published 0.23.1 release
 
 The selected release set is Core, Plus, OS and the dependency-only bundle at 0.23.1.
 The release workflow verifies artifact digests before publication. Publication receipts establish registry availability.

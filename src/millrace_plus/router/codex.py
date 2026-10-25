@@ -2,20 +2,16 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import re
-import selectors
-import signal
 import stat
-import subprocess
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO, cast
+from typing import cast
 
-from . import require_core
+from . import CoreContractError, require_core, require_owned_process
 
 require_core()
 
@@ -29,7 +25,8 @@ from millrace.router.execution import (  # noqa: E402
 )
 
 from . import codex_configuration as c  # noqa: E402
-from .configuration import fields, mapping, strict_json, text  # noqa: E402
+from .configuration import fields, mapping, text  # noqa: E402
+from .stream_records import FramingError, JsonLineRecords  # noqa: E402
 
 ENVIRONMENT = {
     "PATH",
@@ -90,39 +87,36 @@ class Stream:
     """Bounded JSONL framing; items remain opaque and never supply result bytes."""
 
     def __init__(self) -> None:
-        self.buffer = bytearray()
-        self.hash = hashlib.sha256()
-        self.bytes = 0
+        self.records = JsonLineRecords(
+            total_limit=c.EVENT_LIMIT, record_limit=c.LINE_LIMIT
+        )
+        self.hash = self.records.hash
         self.count = 0
         self.errors = 0
         self.thread: str | None = None
         self.state = "header"
-        self.invalid = False
         # Last valid diagnostic messages; emitted only for non-completed transport.
         self.error_message: str | None = None
         self.failed_message: str | None = None
 
+    @property
+    def bytes(self) -> int:
+        return self.records.bytes
+
+    @property
+    def invalid(self) -> bool:
+        return self.records.invalid
+
     def feed(self, raw: bytes) -> None:
-        self.bytes += len(raw)
-        self.hash.update(raw)
-        if self.invalid:
-            return
-        if self.bytes > c.EVENT_LIMIT:
-            self.invalid = True
-            raise RouterError("codex_event_limit")
-        self.buffer.extend(raw)
         try:
-            while b"\n" in self.buffer:
-                line, _, tail = self.buffer.partition(b"\n")
-                self.buffer = bytearray(tail)
-                if len(line) > c.LINE_LIMIT:
-                    raise RouterError("codex_line_limit")
-                self.event(mapping(strict_json(bytes(line))))
-            if len(self.buffer) > c.LINE_LIMIT:
-                raise RouterError("codex_line_limit")
+            self.records.feed(raw, self.event)
+        except FramingError as exc:
+            code = (
+                "codex_event_limit"
+                if exc.code == "event_limit" else "codex_invalid_events"
+            )
+            raise RouterError(code) from exc
         except (RouterError, UnicodeError, RecursionError) as exc:
-            self.invalid = True
-            self.buffer.clear()
             raise RouterError("codex_invalid_events") from exc
 
     def event(self, event: dict[str, object]) -> None:
@@ -179,28 +173,15 @@ class Stream:
     def finish(self) -> tuple[str, str | None]:
         if self.invalid:
             return "protocol_failure", "codex_invalid_events"
-        if self.buffer:
-            try:
-                self.event(mapping(strict_json(bytes(self.buffer))))
-                self.buffer.clear()
-            except (RouterError, UnicodeError, RecursionError):
-                self.invalid = True
-                return "protocol_failure", "codex_invalid_events"
+        try:
+            self.records.finish(self.event)
+        except (RouterError, FramingError, UnicodeError, RecursionError):
+            return "protocol_failure", "codex_invalid_events"
         if self.state == "settled":
             return "completed", None
         if self.state == "failed" or self.errors:
             return "execution_failure", "codex_turn_failed"
         return "protocol_failure", "codex_incomplete_events"
-
-
-def _group(pid: int) -> bool:
-    try:
-        os.killpg(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
 
 
 def _read_file(
@@ -289,6 +270,8 @@ class ProcessResult:
     code: int | None
     pid: int | None
     truncated: bool
+    event_bytes: int = 0
+    event_sha256: str | None = None
 
 
 def _values(env: Mapping[str, str]) -> list[bytes]:
@@ -383,280 +366,128 @@ def _process(
     stream: Stream | None = None,
     final_path: str | None = None,
 ) -> ProcessResult:
-    """One bounded owned process; close polling continues after root exit and EOF."""
+    """Compose byte ownership with Codex's final snapshot and two-axis result."""
+    from millrace.router.process import (
+        OwnedProcessError,
+        ProcessRequest,
+        run_owned_process,
+    )
+
     probe = stream is None
-    if os.name != "posix":
-        return ProcessResult(
-            b"",
-            b"",
-            "execution_failure",
-            "stopped",
-            "unsupported_platform",
-            None,
-            None,
-            False,
-        )
-    selector = selectors.DefaultSelector()
-    process: subprocess.Popen[bytes] | None = None
-    stderr = bytearray()
-    stdout = bytearray()
-    offset = 0
-    truncated = False
     transport: str | None = None
     failure: str | None = None
     raw = b""
-    cleanup: float | None = None
-    cleanup_requested = False
-    term_at: float | None = None
-    forced = False
-    killed = False
-    normal_return = False
+    native_error: BaseException | None = None
 
     def fail(kind: str, code: str) -> None:
-        nonlocal transport, failure, cleanup, cleanup_requested
+        nonlocal transport, failure
         if transport is None:
             transport, failure = kind, code
-        cleanup_requested = True
-        if cleanup is None:
-            cleanup = time.monotonic()
 
-    def drain(wait: float) -> None:
-        nonlocal offset, truncated, transport, failure
-        for key, _ in selector.select(wait):
-            if key.data == "stdin":
-                try:
-                    assert prompt is not None
-                    count = os.write(key.fd, prompt[offset : offset + 8192])
-                    offset += count
-                except BlockingIOError:
-                    continue
-                except BrokenPipeError:
-                    fail("execution_failure", "codex_stdin_closed")
-                    count = 0
-                assert prompt is not None
-                if offset == len(prompt) or count == 0:
-                    selector.unregister(key.fileobj)
-                    cast(BinaryIO, key.fileobj).close()
-                continue
-            while True:
-                try:
-                    chunk = os.read(key.fd, 8192)
-                except BlockingIOError:
-                    break
-                if not chunk:
-                    selector.unregister(key.fileobj)
-                    break
-                if key.data == "stdout" and stream is not None:
-                    try:
-                        stream.feed(chunk)
-                    except (
-                        RouterError,
-                        UnicodeError,
-                        RecursionError,
-                        TypeError,
-                        ValueError,
-                    ):
-                        fail("protocol_failure", "codex_invalid_events")
-                    if stream.state == "failed" and transport is None:
-                        transport, failure = "execution_failure", "codex_turn_failed"
-                else:
-                    target = stdout if key.data == "stdout" else stderr
-                    limit = 4096 if probe else 65536
-                    room = limit - len(target)
-                    target.extend(chunk[:room])
-                    if len(chunk) > room:
-                        if key.data == "stdout":
-                            fail("execution_failure", "codex_version_protocol")
-                        else:
-                            truncated = True
-                # Keep stream pressure from starving controls/deadlines.
-                if poll():
-                    fail("cancelled", "codex_cancelled")
-                if time.time() >= deadline:
-                    fail("timeout", "codex_timeout")
-                if cleanup_requested:
-                    break
-                if cleanup is not None and time.monotonic() - cleanup >= 5:
-                    break
+    def stopped(cause: str) -> None:
+        kind, code = {
+            "unsupported_platform": ("execution_failure", "unsupported_platform"),
+            "start_failed": ("execution_failure", "codex_launch_failed"),
+            "cancelled": ("cancelled", "codex_cancelled"),
+            "timeout": ("timeout", "codex_timeout"),
+            "stdin_failed": ("execution_failure", "codex_stdin_closed"),
+            "stdout_overflow": ("execution_failure", "codex_version_protocol"),
+        }.get(cause, ("execution_failure", "codex_io_failed"))
+        if probe and cause == "timeout" and process_deadline < deadline:
+            kind, code = "execution_failure", "codex_version_timeout"
+        fail(kind, code)
 
-    try:
-        stop = poll()
-        if stop or time.time() >= deadline:
-            return ProcessResult(
-                b"",
-                b"",
-                "cancelled" if stop else "timeout",
-                "stopped",
-                "codex_cancelled" if stop else "codex_timeout",
-                None,
-                None,
-                False,
-            )
+    def feed(chunk: bytes) -> None:
+        nonlocal native_error
+        assert stream is not None
         try:
-            process = subprocess.Popen(
-                argv,
-                cwd=cwd,
-                env=env,
-                stdin=subprocess.DEVNULL if probe else subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                start_new_session=True,
-            )
-        except (OSError, ValueError):
-            return ProcessResult(
-                b"",
-                b"",
-                "execution_failure",
-                "stopped",
-                "codex_launch_failed",
-                None,
-                None,
-                False,
-            )
-        assert process.stdout is not None and process.stderr is not None
-        for name, pipe in (("stdout", process.stdout), ("stderr", process.stderr)):
-            os.set_blocking(pipe.fileno(), False)
-            selector.register(pipe, selectors.EVENT_READ, name)
-        if process.stdin is not None:
-            os.set_blocking(process.stdin.fileno(), False)
-            selector.register(process.stdin, selectors.EVENT_WRITE, "stdin")
-        started(process.pid)
-        probe_deadline = min(deadline, time.time() + 5)
-        while True:
-            stop = poll()
-            if stop:
-                fail("cancelled", "codex_cancelled")
-            if time.time() >= deadline:
-                fail("timeout", "codex_timeout")
-            if probe and time.time() >= probe_deadline:
-                fail("execution_failure", "codex_version_timeout")
-            drain(0.02)
-            code = process.poll()
-            if code is not None:
-                if cleanup is None:
-                    cleanup = time.monotonic()
-                # Root may have exited between select and poll: drain to EOF/EAGAIN
-                # again before a candidate attempt or any forced cleanup.
-                drain(0)
-                if process.stdin is not None and not process.stdin.closed:
-                    selector.unregister(process.stdin)
-                    process.stdin.close()
-                    if prompt is not None and offset < len(prompt):
-                        fail("execution_failure", "codex_stdin_closed")
-            closed = not selector.get_map()
-            if code is not None and closed and transport is None and not forced:
-                if probe:
-                    if code == 0 and bytes(stdout) in {
-                        b"codex-cli 0.163.0",
-                        b"codex-cli 0.163.0\n",
-                        b"codex-cli 0.163.0\r\n",
-                    }:
-                        transport, raw = "completed", bytes(stdout)
-                    else:
-                        fail("execution_failure", "codex_version_mismatch")
-                elif code != 0:
-                    fail("execution_failure", "codex_nonzero_exit")
-                else:
-                    assert stream is not None and final_path is not None
-                    kind, error = stream.finish()
-                    if kind != "completed":
-                        fail(kind, error or "codex_incomplete_events")
-                    else:
-                        try:
-                            candidate = _read_file(
-                                final_path, c.FINAL_LIMIT, poll, deadline
-                            )
-                            if not candidate:
-                                raise RouterError("codex_empty_final")
-                            candidate.decode("utf-8")
-                            raw, transport = candidate, "completed"
-                        except (OSError, RouterError, UnicodeError) as exc:
-                            error = (
-                                exc.code
-                                if isinstance(exc, RouterError)
-                                else "codex_invalid_final"
-                            )
-                            fail(
-                                {
-                                    "codex_cancelled": "cancelled",
-                                    "codex_timeout": "timeout",
-                                }.get(error, "protocol_failure"),
-                                error,
-                            )
-            group_alive = _group(process.pid)
-            if code is not None and closed and not group_alive:
-                normal_return = True
-                return ProcessResult(
-                    raw if transport == "completed" else b"",
-                    bytes(stderr),
-                    transport or "execution_failure",
-                    "may_live" if forced else "stopped",
-                    failure
-                    or (None if transport == "completed" else "codex_close_timeout"),
-                    code,
-                    process.pid,
-                    truncated,
+            stream.feed(chunk)
+        except (
+            RouterError, UnicodeError, RecursionError, TypeError, ValueError
+        ) as exc:
+            native_error = exc
+            fail("protocol_failure", "codex_invalid_events")
+            raise
+        if stream.state == "failed":
+            fail("execution_failure", "codex_turn_failed")
+
+    def drained(code: int) -> None:
+        nonlocal raw, transport
+        if transport is not None:
+            return
+        if probe:
+            if code == 0 and bytes(version) in {
+                b"codex-cli 0.163.0", b"codex-cli 0.163.0\n", b"codex-cli 0.163.0\r\n",
+            }:
+                transport, raw = "completed", bytes(version)
+            else:
+                fail("execution_failure", "codex_version_mismatch")
+        elif code != 0:
+            fail("execution_failure", "codex_nonzero_exit")
+        else:
+            assert stream is not None and final_path is not None
+            kind, error = stream.finish()
+            if kind != "completed":
+                fail(kind, error or "codex_incomplete_events")
+                return
+            try:
+                candidate = _read_file(final_path, c.FINAL_LIMIT, poll, deadline)
+                if not candidate:
+                    raise RouterError("codex_empty_final")
+                candidate.decode("utf-8")
+                # A finite snapshot callback cannot commit completion over budget.
+                if poll():
+                    raise RouterError("codex_cancelled")
+                if time.time() >= deadline:
+                    raise RouterError("codex_timeout")
+                raw, transport = candidate, "completed"
+            except (OSError, RouterError, UnicodeError) as exc:
+                error = (
+                    exc.code if isinstance(exc, RouterError) else "codex_invalid_final"
                 )
-            if cleanup is not None:
-                now = time.monotonic()
-                if group_alive and term_at is None:
-                    term_at, forced = now, True
-                    try:
-                        os.killpg(process.pid, signal.SIGTERM)
-                    except (ProcessLookupError, PermissionError):
-                        pass
-                if (
-                    group_alive
-                    and term_at is not None
-                    and now - term_at >= 2
-                    and not killed
-                ):
-                    killed = True
-                    try:
-                        os.killpg(process.pid, signal.SIGKILL)
-                    except (ProcessLookupError, PermissionError):
-                        pass
-                if now - cleanup >= 5:
-                    normal_return = True
-                    return ProcessResult(
-                        raw if transport == "completed" else b"",
-                        bytes(stderr),
-                        transport or "execution_failure",
-                        "may_live" if forced else "unknown",
-                        failure
-                        or (
-                            None if transport == "completed" else "codex_close_timeout"
-                        ),
-                        code,
-                        process.pid,
-                        truncated,
-                    )
-    finally:
-        selector.close()
-        if process is not None:
-            if not normal_return and _group(process.pid):
-                # Includes on_started/poll exceptions: ownership survives the callback.
-                try:
-                    os.killpg(process.pid, signal.SIGTERM)
-                except (ProcessLookupError, PermissionError):
-                    pass
-                until = time.monotonic() + 2
-                while _group(process.pid) and time.monotonic() < until:
-                    process.poll()
-                    time.sleep(0.02)
-                if _group(process.pid):
-                    try:
-                        os.killpg(process.pid, signal.SIGKILL)
-                    except (ProcessLookupError, PermissionError):
-                        pass
-            for owned_pipe in (process.stdin, process.stdout, process.stderr):
-                if owned_pipe is not None:
-                    owned_pipe.close()
-            if process.poll() is None:
-                try:
-                    process.wait(timeout=0.2)
-                except subprocess.TimeoutExpired:
-                    pass
+                fail({"codex_cancelled": "cancelled", "codex_timeout": "timeout"}.get(
+                    error, "protocol_failure"
+                ), error)
+
+    version = bytearray()
+
+    def version_bytes(chunk: bytes) -> None:
+        version.extend(chunk[:max(0, 4096 - len(version))])
+
+    process_deadline = min(deadline, time.time() + 5) if probe else deadline
+    request = ProcessRequest(
+        argv, cwd, env, None if probe else prompt, process_deadline,
+        stdin_limit=1114112,
+        stdout_capture_limit=4096 if probe else 1,
+        stderr_capture_limit=4096 if probe else 65536,
+        stdout_fail_limit=4096 if probe else None,
+        stderr_fail_limit=None,
+        cleanup_on_root_exit=True,
+    )
+    try:
+        result = run_owned_process(
+            request, poll=poll, on_started=started,
+            on_stdout=version_bytes if probe else feed, on_drained=drained,
+            on_stop=stopped,
+        )
+    except OwnedProcessError as exc:
+        if native_error is None or exc.__cause__ is not native_error:
+            raise
+        result = exc.result
+    if result.stop_cause is not None:
+        stopped(result.stop_cause)
+    if transport is None:
+        fail("execution_failure", "codex_close_timeout")
+    writer = (
+        "may_live" if result.cleanup_forced else
+        "stopped" if result.cleanup_confirmed else "unknown"
+    )
+    return ProcessResult(
+        raw if transport == "completed" else b"", result.stderr,
+        transport or "execution_failure", writer, failure, result.exit_code,
+        result.pid, result.stderr_truncated, result.stdout_bytes,
+        result.stdout_sha256 if result.stdout_bytes else None,
+    )
 
 
 class CodexExecAdapter:
@@ -683,6 +514,15 @@ class CodexExecAdapter:
     ) -> AdapterResult:
         details = c.launch_details(plan)
         evidence = c.evidence(plan.invocation_id)
+        try:
+            require_owned_process()
+        except CoreContractError as exc:
+            failure = "codex_" + exc.code
+            evidence["failure_code"] = failure
+            return AdapterResult(
+                b"", ("[codex] " + failure).encode(), "execution_failure",
+                "stopped", failure, None, evidence,
+            )
         native_env = launch_environment(env)
         try:
             prompt = _preflight(details, poll, deadline)
@@ -764,9 +604,9 @@ class CodexExecAdapter:
             else "incomplete",
             thread_id=stream.thread,
             event_count=stream.count,
-            event_bytes=stream.bytes,
+            event_bytes=result.event_bytes,
             error_count=stream.errors,
-            stream_sha256=stream.hash.hexdigest() if stream.bytes else None,
+            stream_sha256=result.event_sha256,
             final={"size": len(result.raw), "text_sha256": c.digest(result.raw)}
             if result.transport == "completed"
             else None,

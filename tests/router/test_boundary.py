@@ -39,6 +39,7 @@ from millrace_plus.router.pi import PiJsonAdapter
 SOURCE = Path(__file__).resolve().parents[2] / "src" / "millrace_plus" / "router"
 PUBLIC_CORE = {
     "millrace.router.execution",
+    "millrace.router.process",
     "millrace.router.control",
     "millrace.router.cli",
 }
@@ -86,6 +87,8 @@ def test_production_imports_only_public_core_modules() -> None:
         "pi.py",
         "preflight.py",
         "resolver.py",
+        "setting_layers.py",
+        "stream_records.py",
     ]
     used: set[str] = set()
     for path in modules:
@@ -96,7 +99,7 @@ def test_production_imports_only_public_core_modules() -> None:
         assert "sqlite3" not in text and "Store" not in text, path.name
         assert 'importlib.import_module("millrace.router.' not in text.replace(
             "millrace.router.execution", ""
-        )
+        ).replace("millrace.router.process", "")
     assert used == PUBLIC_CORE
     assert _core_imports(SOURCE / "__init__.py") == set()
     for name in (

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import base64
 import copy
+import hashlib
 import json
 import os
 import subprocess
 import time
 from dataclasses import replace
 from pathlib import Path
+from threading import Event, Thread
 from typing import Any
 
 import pytest
@@ -457,6 +459,103 @@ def test_cooperative_cancel_and_late_output_never_complete(
     result = run(plan, tmp_path, poll=marker.exists)
     assert result.classification == "cancelled" and result.stdout == b"", result
     assert result.writer_state == "may_live"
+
+
+@pytest.mark.parametrize("cause", ["cancelled", "timeout"])
+@pytest.mark.parametrize("late_kind", ["native_error", "malformed"])
+def test_generic_stop_precedes_term_handler_native_failure(
+    tmp_path: Path, cause: str, late_kind: str,
+) -> None:
+    marker = tmp_path / "term-ready"
+    late = wire([{
+        "type": "error", "timestamp": 3, "sessionID": "ses-test",
+        "error": {"name": "APIError", "data": {"message": "cleanup error"}},
+    }]) if late_kind == "native_error" else b"not json\n"
+    before = (
+        "def term(*_):\n"
+        f" os.write(1,{late!r});os.write(2,b'cleanup stderr\\n');sys.exit(0)\n"
+        "signal.signal(signal.SIGTERM,term)\n"
+        f"Path({str(marker)!r}).touch()\n"
+        "while True: time.sleep(.01)\n"
+    )
+    plan = prepared(tmp_path, before=before)
+    roots: list[int] = []
+    result = run(
+        plan, tmp_path, started=roots.append,
+        poll=marker.exists if cause == "cancelled" else lambda: False,
+        timeout=3 if cause == "cancelled" else 0.7,
+    )
+    assert marker.exists() and len(roots) == 1
+    assert result.classification == cause and result.diagnostic == "opencode_" + cause
+    assert result.stdout == b"" and result.writer_state == "may_live"
+    evidence = result.adapter_evidence
+    assert evidence["event_bytes"] == len(late)
+    assert evidence["stream_sha256"] == hashlib.sha256(late).hexdigest()
+    assert evidence["stderr_bytes"] == len(b"cleanup stderr\n")
+    assert evidence["stderr_sha256"] == hashlib.sha256(
+        b"cleanup stderr\n"
+    ).hexdigest()
+    assert b"cleanup error" not in result.stderr
+
+
+def test_native_error_before_later_public_cancel_keeps_failure(
+    single_flow, monkeypatch,
+) -> None:
+    from millrace_plus.router import opencode
+
+    native_error = Event()
+    queued, errors = [], []
+    ids = {}
+    original = opencode.Stream.event
+
+    def observe(stream, value):
+        try:
+            original(stream, value)
+        except RouterError as exc:
+            if exc.code == "opencode_native_error":
+                native_error.set()
+            raise
+
+    workflow, project, home = flow(
+        single_flow,
+        values=[{
+            "type": "error", "timestamp": 3, "sessionID": "ses-test",
+            "error": {"name": "APIError"},
+        }],
+        before="signal.signal(signal.SIGTERM, signal.SIG_IGN)",
+        after="time.sleep(30)",
+    )
+    instance = str(create_instance(workflow, project, state_home=home)["instance_id"])
+
+    def cancel_later():
+        if native_error.wait(5):
+            time.sleep(0.1)  # The native parsing failure precedes this request.
+            try:
+                queued.append(control.cancel_run(
+                    instance, str(ids["run_id"]), state_home=home, request_id=new_id(),
+                ))
+            except Exception as exc:
+                errors.append(exc)
+
+    monkeypatch.setattr(opencode.Stream, "event", observe)
+    canceller = Thread(target=cancel_later)
+    canceller.start()
+    try:
+        result = start_run(instance, state_home=home, on_started=ids.update)
+    finally:
+        canceller.join(6)
+    assert not canceller.is_alive() and not errors
+    assert native_error.is_set() and len(queued) == 1
+    assert queued[0]["status"] == "queued" and result["cancel_requested"]
+    assert result["count"] == 1 and result["transitions"] == []
+    assert result["pause_reason"] == "writer_unknown"
+    completion = result["completions"][0]
+    assert completion["transport"] == "protocol_failure"
+    assert completion["diagnostic"] == "opencode_native_error"
+    assert completion["writer"] == "may_live" and completion["stdout"] == ""
+    assert control.inspect_run(
+        instance, str(result["id"]), state_home=home,
+    )["completions"] == [completion]
 
 
 @pytest.mark.parametrize(

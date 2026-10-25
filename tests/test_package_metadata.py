@@ -13,7 +13,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = PROJECT_ROOT / "src" / "millrace_plus" / "skills"
-RELEASE_IDENTITY = "0.23.1"
+RELEASE_IDENTITY = "0.23.2"
 PACKAGE_DOCS = (
     "docs/authoring.md",
     "docs/public-validation.md",
@@ -144,10 +144,11 @@ def test_source_tree_does_not_shadow_runtime_or_import_private_runtime_code() ->
 
     # v0.23 successor: assert "import millrace" / "from millrace." not in source_text
     #   -> AST allowlist: no millrace imports outside router; inside router only
-    #      millrace.router.{execution,control,cli}, no private "from ... import _"
+    #      millrace.router.{execution,process,control,cli}; no private imports
     router_root = PROJECT_ROOT / "src" / "millrace_plus" / "router"
     allowed_router_core = {
         "millrace.router.execution",
+        "millrace.router.process",
         "millrace.router.control",
         "millrace.router.cli",
     }
@@ -254,7 +255,7 @@ def test_paperclip_local_esm_package_has_no_package_dependencies() -> None:
     package = json.loads((root / "package.json").read_text())
     assert package == {
         "name": "@millrace/paperclip-adapter",
-        "version": RELEASE_IDENTITY,
+        "version": "0.23.1",  # Retained independently versioned integration.
         "type": "module",
         "exports": {".": "./index.js"},
         "engines": {"node": ">=24.11.0"},

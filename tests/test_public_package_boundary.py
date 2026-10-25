@@ -71,7 +71,8 @@ def test_public_release_text_has_no_staging_or_prepublication_claims() -> None:
     """Successor: retain the truthful unpublished candidate boundary."""
     for name in ("README.md", "docs/release.md"):
         text = _text(name).lower()
-        assert "0.23.1" in text and "unpublished" not in text
+        assert "0.23.2" in text and "unpublished" in text
+        assert "published 0.23.1" in text
         assert "release" in text and "equal version" in text
         assert "0.0.0" not in text
 
@@ -80,7 +81,8 @@ def test_public_release_text_identifies_exact_bundle_and_independent_members() -
     """Successor: exact source-bound component pairing replaces old bundle pins."""
     for name in ("README.md", "docs/release.md"):
         text = _text(name)
-        assert "millrace-ai==0.23.1" in text
+        assert "millrace-ai==0.23.2" in text and "millrace-plus==0.23.2" in text
+        assert "millrace-ai>=0.23.2" in text and "owned-process-v1" in text
         assert "matched" in text and "publication" in text
     assert "millrace-router-execution/v2" in _text("README.md")
 
@@ -164,7 +166,7 @@ def test_built_artifacts_have_durable_v022_public_text(
         metadata = wheel.read(
             next(n for n in names if n.endswith(".dist-info/METADATA"))
         ).decode()
-        assert "Version: 0.23.1" in metadata and "unpublished" not in metadata.lower()
+        assert "Version: 0.23.2" in metadata
     with tarfile.open(next(tmp_path.glob("*.tar.gz"))) as archive:
         names = archive.getnames()
         assert not any("/millrace_workflow_package/" in n for n in names)

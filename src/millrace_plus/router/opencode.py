@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
-import os
-import selectors
-import signal
-import subprocess
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO, cast
+from typing import cast
 
-from . import require_core
+from . import CoreContractError, require_core, require_owned_process
 
 require_core()
 from millrace.router.execution import (  # noqa: E402
@@ -27,7 +22,8 @@ from millrace.router.execution import (  # noqa: E402
 )
 
 from . import opencode_configuration as c  # noqa: E402
-from .configuration import fields, mapping, number, strict_json, text  # noqa: E402
+from .configuration import fields, mapping, number, text  # noqa: E402
+from .stream_records import FramingError, JsonLineRecords  # noqa: E402
 
 
 def _identity(value: object) -> str:
@@ -51,38 +47,34 @@ class Stream:
     """Bounded framing and identities; only one stopped message supplies bytes."""
 
     def __init__(self) -> None:
-        self.buffer = bytearray()
-        self.hash = hashlib.sha256()
-        self.bytes = 0
+        self.records = JsonLineRecords(
+            total_limit=c.EVENT_LIMIT, record_limit=c.LINE_LIMIT
+        )
+        self.hash = self.records.hash
         self.count = 0
         self.errors = 0
         self.session: str | None = None
         self.final_message: str | None = None
-        self.invalid = False
         self.parts: dict[str, str] = {}
         self.texts: dict[str, list[bytes]] = {}
 
+    @property
+    def bytes(self) -> int:
+        return self.records.bytes
+
+    @property
+    def invalid(self) -> bool:
+        return self.records.invalid
+
     def feed(self, raw: bytes) -> None:
-        self.bytes += len(raw)
-        self.hash.update(raw)
-        if self.invalid:
-            return
         try:
-            if self.bytes > c.EVENT_LIMIT:
-                raise RouterError("opencode_event_limit")
-            self.buffer.extend(raw)
-            while b"\n" in self.buffer:
-                line, _, tail = self.buffer.partition(b"\n")
-                self.buffer = bytearray(tail)
-                if len(line) > c.LINE_LIMIT:
-                    raise RouterError("opencode_line_limit")
-                self.event(mapping(strict_json(bytes(line))))
-            if len(self.buffer) > c.LINE_LIMIT:
-                raise RouterError("opencode_line_limit")
-        except (RouterError, UnicodeError, ValueError, TypeError, RecursionError):
-            self.invalid = True
-            self.buffer.clear()
-            raise
+            self.records.feed(raw, self.event)
+        except FramingError as exc:
+            if exc.code in {"event_limit", "line_limit"}:
+                raise RouterError("opencode_" + exc.code) from exc
+            if isinstance(exc.__cause__, RouterError):
+                raise exc.__cause__ from exc
+            raise RouterError("opencode_invalid_events") from exc
 
     def event(self, event: dict[str, object]) -> None:
         self.count += 1
@@ -191,15 +183,12 @@ class Stream:
     def finish(self) -> bytes:
         if self.invalid:
             raise RouterError("opencode_invalid_events")
-        if self.buffer:
-            # A complete final JSON record without a newline is legal; a partial
-            # one is rejected by strict_json. EOF is established by the owner.
-            try:
-                self.event(mapping(strict_json(bytes(self.buffer))))
-                self.buffer.clear()
-            except (RouterError, UnicodeError, ValueError, TypeError, RecursionError):
-                self.invalid = True
-                raise
+        try:
+            self.records.finish(self.event)
+        except FramingError as exc:
+            if isinstance(exc.__cause__, RouterError):
+                raise exc.__cause__ from exc
+            raise RouterError("opencode_invalid_events") from exc
         if not self.final_message or self.errors:
             raise RouterError("opencode_missing_stop")
         raw = b"".join(self.texts.get(self.final_message, []))
@@ -218,16 +207,9 @@ class _Process:
     pid: int | None = None
     stderr_bytes: int = 0
     stderr_sha256: str | None = None
+    event_bytes: int = 0
+    event_sha256: str | None = None
 
-
-def _group(pid: int) -> bool:
-    try:
-        os.killpg(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
 
 
 def _process(
@@ -241,193 +223,105 @@ def _process(
     prompt: bytes = b"",
     stream: Stream | None = None,
 ) -> _Process:
-    """Own pipes/group through delivery, EOF and closure, with bounded cleanup."""
+    """Keep OpenCode's native failure and conservative cleanup mapping local."""
+    from millrace.router.process import (
+        OwnedProcessError,
+        ProcessRequest,
+        run_owned_process,
+    )
+
     probe = stream is None
-    if os.name != "posix":
-        return _Process(failure="opencode_unsupported_platform")
-    stop = poll()
-    if stop or time.time() >= deadline:
-        return _Process(
-            transport="cancelled" if stop else "timeout",
-            failure="opencode_cancelled" if stop else "opencode_timeout",
-        )
-    try:
-        child = subprocess.Popen(
-            argv,
-            cwd=cwd,
-            env=env,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True,
-        )
-    except (OSError, ValueError):
-        return _Process(failure="opencode_spawn_failed")
-    assert child.stdin and child.stdout and child.stderr
-    selector = selectors.DefaultSelector()
-    version = bytearray()
-    stderr_hash = hashlib.sha256()
-    stderr_bytes = 0
-    offset = 0
-    reason: str | None = None
+    native_error: BaseException | None = None
     failure: str | None = None
-    cleanup: float | None = None
-    killed = False
-    finished = False
-    end = time.monotonic() + max(0, deadline - time.time())
-    probe_end = min(end, time.monotonic() + 5)
+    transport: str | None = None
 
     def fail(kind: str, code: str) -> None:
-        nonlocal reason, failure
-        if reason is None:
-            reason, failure = kind, code
+        nonlocal transport, failure
+        if transport is None:
+            transport, failure = kind, code
 
+    def stopped(cause: str) -> None:
+        kind, code = {
+            "unsupported_platform": (
+                "execution_failure", "opencode_unsupported_platform"
+            ),
+            "start_failed": ("execution_failure", "opencode_spawn_failed"),
+            "cancelled": ("cancelled", "opencode_cancelled"),
+            "timeout": ("timeout", "opencode_timeout"),
+            "stdin_failed": ("execution_failure", "opencode_stdin_failure"),
+            "stdout_overflow": ("execution_failure", "opencode_version_protocol"),
+            "stderr_overflow": ("protocol_failure", "opencode_stderr_limit"),
+        }.get(cause, ("execution_failure", "opencode_io_failed"))
+        if probe and cause == "timeout" and process_deadline < deadline:
+            kind, code = "execution_failure", "opencode_version_timeout"
+        fail(kind, code)
+
+    def feed(chunk: bytes) -> None:
+        nonlocal native_error
+        assert stream is not None
+        try:
+            stream.feed(chunk)
+        except (
+            RouterError, UnicodeError, ValueError, TypeError, RecursionError
+        ) as exc:
+            native_error = exc
+            fail(
+                "protocol_failure",
+                exc.code if isinstance(exc, RouterError) else "opencode_invalid_events",
+            )
+            raise
+
+    process_deadline = min(deadline, time.time() + 5) if probe else deadline
+    request = ProcessRequest(
+        argv, cwd, env, prompt, process_deadline,
+        stdin_limit=max(1, len(prompt)),
+        stdout_capture_limit=4096 if probe else 1,
+        stderr_capture_limit=1,
+        stdout_fail_limit=4096 if probe else None,
+        stderr_fail_limit=c.STDERR_LIMIT,
+    )
     try:
-        for name, pipe, event in (
-            ("stdin", child.stdin, selectors.EVENT_WRITE),
-            ("stdout", child.stdout, selectors.EVENT_READ),
-            ("stderr", child.stderr, selectors.EVENT_READ),
-        ):
-            os.set_blocking(pipe.fileno(), False)
-            selector.register(pipe, event, name)
-        started(child.pid)
-        while True:
-            now = time.monotonic()
-            if poll():
-                fail("cancelled", "opencode_cancelled")
-            if now >= end:
-                fail("timeout", "opencode_timeout")
-            if probe and now >= probe_end:
-                fail("execution_failure", "opencode_version_timeout")
-            if reason is not None and cleanup is None:
-                cleanup = now
-                try:
-                    os.killpg(child.pid, signal.SIGTERM)
-                except (ProcessLookupError, PermissionError):
-                    pass
-            if cleanup is not None and now - cleanup >= 2 and not killed:
-                try:
-                    os.killpg(child.pid, signal.SIGKILL)
-                except (ProcessLookupError, PermissionError):
-                    pass
-                killed = True
-            for key, _ in selector.select(0.02):
-                pipe = cast(BinaryIO, key.fileobj)
-                if key.data == "stdin":
-                    if offset == len(prompt) or reason is not None:
-                        selector.unregister(pipe)
-                        pipe.close()
-                        continue
-                    try:
-                        offset += os.write(key.fd, prompt[offset : offset + 8192])
-                    except BlockingIOError:
-                        pass
-                    except BrokenPipeError:
-                        selector.unregister(pipe)
-                        pipe.close()
-                        fail("execution_failure", "opencode_stdin_failure")
-                    continue
-                try:
-                    chunk = os.read(key.fd, 8192)
-                except BlockingIOError:
-                    continue
-                if not chunk:
-                    selector.unregister(pipe)
-                    continue
-                if key.data == "stderr":
-                    stderr_bytes += len(chunk)
-                    stderr_hash.update(chunk)
-                    if stderr_bytes > c.STDERR_LIMIT:
-                        fail("protocol_failure", "opencode_stderr_limit")
-                elif probe:
-                    room = max(0, 4096 - len(version))
-                    version.extend(chunk[:room])
-                    if len(chunk) > room:
-                        fail("execution_failure", "opencode_version_protocol")
-                else:
-                    assert stream is not None
-                    try:
-                        stream.feed(chunk)
-                    except (
-                        RouterError,
-                        UnicodeError,
-                        ValueError,
-                        TypeError,
-                        RecursionError,
-                    ) as exc:
-                        fail(
-                            "protocol_failure",
-                            exc.code
-                            if isinstance(exc, RouterError)
-                            else "opencode_invalid_events",
-                        )
-            code = child.poll()
-            if code is not None and offset < len(prompt):
-                fail("execution_failure", "opencode_stdin_failure")
-            closed = not selector.get_map()
-            natural = code is not None and closed and not _group(child.pid)
-            if natural or (cleanup is not None and time.monotonic() - cleanup >= 5):
-                raw = b""
-                if reason is None:
-                    if code != 0:
-                        fail("execution_failure", "opencode_nonzero_exit")
-                    elif probe:
-                        if bytes(version) in {b"1.19.3", b"1.19.3\n", b"1.19.3\r\n"}:
-                            raw = bytes(version)
-                        else:
-                            fail("execution_failure", "opencode_version_mismatch")
-                    else:
-                        assert stream is not None
-                        try:
-                            raw = stream.finish()
-                        except (
-                            RouterError,
-                            UnicodeError,
-                            ValueError,
-                            TypeError,
-                            RecursionError,
-                        ) as exc:
-                            fail(
-                                "protocol_failure",
-                                exc.code
-                                if isinstance(exc, RouterError)
-                                else "opencode_invalid_events",
-                            )
-                finished = True
-                return _Process(
-                    raw if reason is None else b"",
-                    reason or "completed",
-                    "may_live" if cleanup is not None else "stopped",
-                    failure,
-                    code,
-                    child.pid,
-                    stderr_bytes,
-                    stderr_hash.hexdigest() if stderr_bytes else None,
+        result = run_owned_process(
+            request, poll=poll, on_started=started,
+            on_stdout=None if probe else feed, on_stop=stopped,
+        )
+    except OwnedProcessError as exc:
+        if native_error is None or exc.__cause__ is not native_error:
+            raise
+        result = exc.result
+    if result.stop_cause is not None:
+        stopped(result.stop_cause)
+    raw = b""
+    if transport is None:
+        if result.exit_code != 0:
+            transport, failure = "execution_failure", "opencode_nonzero_exit"
+        elif probe:
+            if result.stdout in {b"1.19.3", b"1.19.3\n", b"1.19.3\r\n"}:
+                raw = result.stdout
+            else:
+                transport, failure = "execution_failure", "opencode_version_mismatch"
+        else:
+            assert stream is not None
+            try:
+                raw = stream.finish()
+            except (
+                RouterError, UnicodeError, ValueError, TypeError, RecursionError
+            ) as exc:
+                transport = "protocol_failure"
+                failure = (
+                    exc.code
+                    if isinstance(exc, RouterError) else "opencode_invalid_events"
                 )
-    finally:
-        selector.close()
-        for pipe in (child.stdin, child.stdout, child.stderr):
-            pipe.close()
-        if not finished:
-            # Callback exceptions cannot orphan a process this invocation owns.
-            try:
-                os.killpg(child.pid, signal.SIGTERM)
-            except (ProcessLookupError, PermissionError):
-                pass
-            until = time.monotonic() + 2
-            while _group(child.pid) and time.monotonic() < until:
-                child.poll()
-                time.sleep(0.02)
-            if _group(child.pid):
-                try:
-                    os.killpg(child.pid, signal.SIGKILL)
-                except (ProcessLookupError, PermissionError):
-                    pass
-        if child.poll() is None:
-            try:
-                child.wait(timeout=0.2)
-            except subprocess.TimeoutExpired:
-                pass
+    writer = (
+        "may_live" if result.pid is not None and result.stop_cause is not None
+        else "stopped" if result.cleanup_confirmed else "may_live"
+    )
+    return _Process(
+        raw if transport is None else b"", transport or "completed", writer,
+        failure, result.exit_code, result.pid, result.stderr_bytes,
+        result.stderr_sha256 if result.stderr_bytes else None,
+        result.stdout_bytes, result.stdout_sha256 if result.stdout_bytes else None,
+    )
 
 
 class OpenCodeRunAdapter:
@@ -454,6 +348,15 @@ class OpenCodeRunAdapter:
     ) -> AdapterResult:
         c.launch_details(plan)
         evidence = c.evidence(plan.invocation_id)
+        try:
+            require_owned_process()
+        except CoreContractError as exc:
+            failure = "opencode_" + exc.code
+            evidence["failure_code"] = failure
+            return AdapterResult(
+                b"", ("[opencode] " + failure).encode(), "execution_failure",
+                "stopped", failure, None, evidence,
+            )
         # Core supplies the declared environment. Do not widen it with ambient
         # variables or inspect/copy native config and credential stores.
         native_env = dict(env)
@@ -500,9 +403,9 @@ class OpenCodeRunAdapter:
             if result.transport == "completed"
             else "incomplete",
             event_count=stream.count,
-            event_bytes=stream.bytes,
+            event_bytes=result.event_bytes,
             error_count=stream.errors,
-            stream_sha256=stream.hash.hexdigest() if stream.bytes else None,
+            stream_sha256=result.event_sha256,
             stderr_bytes=result.stderr_bytes,
             stderr_sha256=result.stderr_sha256,
             final={

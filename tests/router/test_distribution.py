@@ -29,8 +29,8 @@ from millrace.router import execution
 
 PLUS_ROOT = Path(__file__).resolve().parents[2]
 CORE_ROOT = Path(execution.__file__).resolve().parents[3]
-VERSION = "0.23.1"
-PLUS_CANDIDATE_VERSION = "0.23.1"
+VERSION = "0.23.2"
+PLUS_CANDIDATE_VERSION = "0.23.2"
 ROUTER_REQUIREMENT = "millrace-ai<0.24.0,>=0.23.0; extra == 'router'"
 BASELINE_PLUS_WHEEL_SHA256 = (
     "5c2025e4f6d592bf4c927d659b4d729e17a62e49bc13f5b380de1b2d6bff480f"
@@ -67,15 +67,17 @@ def _one(folder: Path, pattern: str) -> Path:
     return found[0]
 
 
-def _stub_wheel(folder: Path, name: str, files: dict[str, str]) -> Path:
+def _stub_wheel(
+    folder: Path, name: str, files: dict[str, str], *, version: str = VERSION
+) -> Path:
     """An offline same-version `millrace-ai` stand-in for a non-candidate Core."""
     folder.mkdir(parents=True)
-    wheel = folder / f"millrace_ai-{VERSION}-py3-none-any.whl"
-    info = f"millrace_ai-{VERSION}.dist-info"
+    wheel = folder / f"millrace_ai-{version}-py3-none-any.whl"
+    info = f"millrace_ai-{version}.dist-info"
     payload = {
         **files,
         f"{info}/METADATA": (
-            f"Metadata-Version: 2.1\nName: millrace-ai\nVersion: {VERSION}\n"
+            f"Metadata-Version: 2.1\nName: millrace-ai\nVersion: {version}\n"
             f"Summary: test-owned {name} stub\n"
         ),
         f"{info}/WHEEL": (
@@ -991,7 +993,7 @@ def test_package_update_keeps_copies_independent(artifacts: dict[str, Path]) -> 
     env.install(artifacts["plus_wheel"], force_reinstall=True)
     assert env.py(
         "import importlib.metadata as m; "
-        "assert m.version('millrace-plus') == '0.23.1'; "
+        "assert m.version('millrace-plus') == '0.23.2'; "
         "import importlib.util; "
         "assert importlib.util.find_spec('millrace') is None"
     ).returncode == 0
@@ -1033,7 +1035,7 @@ def test_package_update_keeps_copies_independent(artifacts: dict[str, Path]) -> 
     ).stdout.strip()
     assert initialized_b["provenance"] == {
         "template_id": "bundled:software-change",
-        "plus_version": "0.23.1",
+        "plus_version": "0.23.2",
         "sha256": candidate_digest,
     }
     assert copy_digest == candidate_digest
@@ -1276,3 +1278,95 @@ def test_stock_inputs_reject_ambiguous_manifest_json_without_writing(
         assert request_path.read_bytes() == original
     else:
         assert not request_path.exists()
+
+
+@pytest.mark.parametrize(
+    "case,code",
+    [
+        ("minimum", None),
+        ("older", "core_process_version"),
+        ("missing", "core_process_missing"),
+        ("wrong", "core_process_mismatch"),
+    ],
+)
+def test_installed_owned_process_capability(artifacts, case, code) -> None:
+    from opencode_support import request as opencode_request
+    from test_codex_configuration import request as codex_request
+
+    from millrace_plus.router.codex import CodexExecAdapter
+    from millrace_plus.router.opencode import OpenCodeRunAdapter
+
+    root = artifacts["root"] / ("process-capability-" + case)
+    core = artifacts["core_wheel"]
+    if case != "minimum":
+        with zipfile.ZipFile(core) as wheel:
+            files = {
+                name: wheel.read(name).decode()
+                for name in wheel.namelist()
+                if name.startswith("millrace/") and name.endswith(".py")
+            }
+        if case == "missing":
+            files.pop("millrace/router/process.py")
+        elif case == "wrong":
+            files["millrace/router/process.py"] = 'OWNED_PROCESS_CONTRACT="wrong"\n'
+        core = _stub_wheel(
+            root / "stub", case, files, version="0.23.1" if case == "older" else VERSION
+        )
+    env = Env(root / "env", [core, artifacts["plus_wheel"]])
+    result = env.py(
+        "from millrace_plus.router import (\n"
+        " require_core, require_owned_process, CoreContractError)\n"
+        "from millrace_plus.router.pi import PiJsonAdapter\n"
+        "from millrace_plus.router.claude import ClaudePrintAdapter\n"
+        "assert require_core() == 'millrace-router-execution/v2'\n"
+        "assert PiJsonAdapter.adapter_id == 'pi_json'\n"
+        "assert ClaudePrintAdapter.adapter_id == 'claude_print'\n"
+        "try:\n"
+        " print(require_owned_process())\n"
+        "except CoreContractError as error:\n"
+        " print(error.code)\n"
+    )
+    assert result.stdout.strip() == (code or "owned-process-v1")
+    if code is None:
+        return
+    plans = []
+    for adapter, request in (
+        (CodexExecAdapter(), codex_request(root)),
+        (OpenCodeRunAdapter(), opencode_request(root)),
+    ):
+        plan = adapter.plan(request)
+        plans.append({
+            "invocation_id": plan.invocation_id, "adapter_id": plan.adapter_id,
+            "adapter_contract": plan.adapter_contract, "argv": plan.argv,
+            "environment": dict(plan.environment), "settings": plan.settings,
+            "details": plan.details,
+            "generated_controls": {
+                key: base64.b64encode(raw).decode()
+                for key, raw in plan.generated_controls.items()
+            },
+        })
+    result = env.py(
+        "import base64,json,subprocess,time\nfrom pathlib import Path\n"
+        "from millrace.router.execution import LaunchPlan,CompletionFacts\n"
+        "from millrace_plus.router.codex import CodexExecAdapter\n"
+        "from millrace_plus.router.opencode import OpenCodeRunAdapter\n"
+        "def forbidden(*a,**k): raise AssertionError('refusal spawned child')\n"
+        "subprocess.Popen=forbidden\n"
+        f"plans=json.loads({json.dumps(plans)!r})\n"
+        "for adapter,body in zip((CodexExecAdapter(),OpenCodeRunAdapter()),plans):\n"
+        " body['argv']=tuple(body['argv'])\n"
+        " body['generated_controls']={k:base64.b64decode(v) "
+        "for k,v in body['generated_controls'].items()}\n"
+        " plan=LaunchPlan(**body)\n"
+        " result=adapter.invoke(plan,cwd=Path.cwd(),env={},deadline=time.time()+2,"
+        "poll=lambda:False,on_started=forbidden)\n"
+        " assert (result.classification,result.writer_state,result.exit_code)=="
+        "('execution_failure','stopped',None)\n"
+        " assert result.stdout==b'' and result.adapter_evidence['probe_pid'] is None\n"
+        f" assert result.adapter_evidence['failure_code'].endswith({code!r})\n"
+        " adapter.validate_completion(plan,CompletionFacts(plan.invocation_id,None,"
+        "result.stdout,result.stderr,result.classification,result.writer_state,"
+        "result.diagnostic,result.exit_code,result.adapter_evidence,'adapter'))\n"
+        "print('stopped native refusals: 2')\n"
+    )
+    assert result.stdout.strip() == "stopped native refusals: 2"
