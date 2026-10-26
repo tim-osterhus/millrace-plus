@@ -65,6 +65,35 @@ def test_configuration_and_inherited_settings(tmp_path: Path) -> None:
         adapter.validate_configuration(replace(config(req), runtime={"unknown": 1}))
 
 
+@pytest.mark.parametrize("layer", ["runtime", "profile", "workflow", "plane", "node"])
+@pytest.mark.parametrize("selected", [
+    {}, {"model": "operator-selected"}, {"reasoning_effort": "high"},
+    {"model": "operator-selected", "reasoning_effort": "high"},
+])
+def test_independent_model_effort_overrides_preserve_omitted_native_defaults(
+    tmp_path: Path, layer: str, selected: dict
+) -> None:
+    req = request(tmp_path)
+    if layer == "profile":
+        profile = json.loads(req.files["claude.json"])
+        profile.update(selected)
+        req = replace(
+            req, files={**req.files, "claude.json": json.dumps(profile).encode()}
+        )
+    elif layer == "node":
+        req = replace(req, node_config={"prompt": "task.txt", **selected})
+    else:
+        req = replace(req, **{layer: selected})
+    plan = c.ClaudePrintAdapter().plan(req)
+    assert plan.settings["effective"] == selected
+    for setting, flag in (("model", "--model"), ("reasoning_effort", "--effort")):
+        if setting in selected:
+            assert plan.argv[plan.argv.index(flag) + 1] == selected[setting]
+            assert plan.settings["provenance"][setting]["source"] == layer
+        else:
+            assert flag not in plan.argv
+
+
 def test_launch_and_environment_inheritance(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -2,7 +2,7 @@
 
 ## Editable stock workflows
 
-Stock graph-v3 examples and independent copies are documented in [Workflows](workflows.md) and [Catalog](catalog.md). Their Claude binding is an editable example; it does not impose Claude settings semantics on Pi/Codex. The legacy compiler-format workflow resource API is excluded from current artifacts.
+Stock graph examples and independent copies are documented in [Workflows](workflows.md) and [Catalog](catalog.md). Their Claude binding is an editable example; it does not impose Claude settings semantics on Pi/Codex. The legacy compiler-format workflow resource API is excluded from current artifacts.
 
 
 This page describes the optional native adapters in the development Millrace Plus
@@ -457,3 +457,70 @@ limited to its exact accepted artifacts and configuration. HTTP-start status
 remains unknown on cancellation. Raw `may_live` and guarded effective `stopped`
 are distinct observations. The proof does not attest the backend-effective
 model or effort, detached effects, other providers or arbitrary platforms.
+
+## LAD copied-worker boundary
+
+New `bundled:lad` copies use graph-v4 and need the matched optional-limits Core
+0.23.2 candidate. They omit the two overall run bounds, retain parallel capacity
+two, and keep finite 1,800-second native and 10-second command invocation
+limits. Explicit operator limits still apply. Existing finite v3/v7 runs retain
+their captured startup limits and original elapsed anchor.
+
+The supplied `profiles/claude.json` pins Claude Code 2.1.296 and omits model and
+effort. Resolve each field independently through runtime, profile, workflow,
+plane and node settings. Omitted fields leave native inheritance intact. For
+example, set `model` or `reasoning_effort` inside the graph's
+`planes.foreground.nodes.builder.invoke.config` only when an operator has
+selected those values. Runtime, workflow and plane defaults use the existing
+`adapter_settings.claude_print` contract/config envelope. The package provides
+no forced model/effort combination.
+
+LAD's invocation material is the selected role prompt plus its pinned common
+contracts, assignment and predecessor references. Initial Checker preparation
+receives original criteria, request identity, the approved packet's identifiers,
+dependencies and paths, and any original pinned baseline. It omits opaque
+predecessor results/specification refs, recovery pending routes, Consultant
+carriers and Fixer/review refs before the requirement freeze. Full evidence stays
+in canonical state and the recovery occurrences. The accepting boundary pins
+the baseline and retains an immutable original-byte backup before downstream
+work. A scoped baseline guard may restore only those verified original bytes,
+retain the tamper observation, and route Consultant then a fresh Checker.
+Ordinary state reads remain strict. Recovery does not replay target edits or
+checks; missing/corrupt backup or unrelated integrity errors stay held.
+
+The shared Claude wrapper appends a native `StructuredOutput` instruction and
+passes a schema for declared `outcome`, `summary` and `refs`. It uses print JSON
+mode and `--dangerously-skip-permissions --permission-prompts none`. Its explicit
+invocation environment is not an ambient environment merge. The wrapper does
+not inventory or attest native project/user settings, hooks, MCP/plugins,
+credentials, detached effects or backend-effective model/effort. The editable
+LAD guidance does not install host configuration or change those permissions.
+The permission bypass is not a sandbox.
+
+Direct role execution is the default and needs no helper facility. Planner
+stays direct. Offline helper inventory, terminal-observation, collection and
+integration fixtures exercise structural validation only. An
+`offline_validator_fixture` qualification never authorizes ordinary prepare or
+dispatch, including a repeated READY entry; no native helper route is qualified.
+A future exact facility qualification must supply its actual task/descendant
+inventory, closure, collected failures/cancellations and parent integration.
+Unknown helper closure remains a hold.
+
+Copied scripts run normally with stdlib-only Python, including `python -S`.
+Only explicit `scripts/init_session.py --upgrade-session` lazily loads matching
+installed public Plus/Core controls. Upgrade requires exact session, instance,
+original run and expected state version, stopped effective writers, current
+authored-revision eligibility and unchanged retained evidence. It preserves the
+old session archive, accepted artifacts, original occurrence/source/guidance
+identities and original-run Learning payloads. Retained v7 accepts a compatible
+finite-v3 candidate; it does not accept a v4 tag change or convert the Core
+store. The caller must own and join its controller/OS callers and exclude other
+domain/helper/ownership-maintenance writers before invoking publication. Paused,
+quiescent or a saved receipt does not prove those joins. The held public context
+excludes controller/append operations and supplies facts; it is non-reentrant,
+and callers must not invoke mutators inside it.
+
+Offline fixture acceptance covers that validator and owned-caller procedure.
+Actual used-copy publication, OS/external writer joins and native helper closure
+need separate route-specific operation qualification; they are not established
+by these development docs or by existing native adapter receipts.

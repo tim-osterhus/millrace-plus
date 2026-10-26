@@ -1,6 +1,8 @@
 # Visible LAD routes
 
-Modified from the pinned Orchestrator and transition policy; see `PROVENANCE.md`. Each row is native outcome → dedicated acceptance guard → finite route. The graph is authoritative.
+Modified from the pinned Orchestrator and transition policy. See `PROVENANCE.md`. The graph is v4 and sets `max_parallel_invocations` to 2. It adds no total-run cap or per-role quota. The role outcome rows below are native result markers accepted by dedicated guards. The graph, not a prompt or role recommendation, determines the next node.
+
+## Role outcomes
 
 - `recon:PASS` → `PLANNER`
 - `recon:FINDINGS` → `CONSULTANT`
@@ -63,4 +65,17 @@ Modified from the pinned Orchestrator and transition policy; see `PROVENANCE.md`
 - `arbiter:ERROR_REPLACEMENT` → `REPLACE_ARBITER`
 - `arbiter:HUMAN_BLOCKED` → `PAUSE`
 
-Every native transport/protocol error or unknown goes through `prepare_<role>_replacement`. There is no Core retry on native roles. Preparation/acceptance/guard failure pauses. Normal/operator retries never replenish session debits. Native role nodes never schedule another role.
+The second actual Fixer–Doublechecker pair enters Learning, including a passing review. Learning preserves the saved pending route and emits ACK in the original Core run.
+
+## Deterministic result observations
+
+The following names are guard outcomes, not role-authored markers:
+
+- `INVALID_RESULT` records a recoverable malformed or incomplete result and its rejected bytes. It then selects guarded same-role replacement. If the result is valid and only its required history log is missing, the guard can restore that file from the retained result. It does not rerun the native task or check.
+- `INVALID_REPEAT` indicates an unchanged invalid-result fingerprint. The graph selects Troubleshooter.
+- `INVALID_CONSULT` selects Consultant when the recorded recovery requires diagnosis beyond the current role.
+- `INVALID_HOLD` selects the human hold when the same invalid condition persists at Consultant.
+- Learning’s `INVALID_ACK` emits the saved ACK without changing the saved route.
+- `TECHNICAL_RECOVERY` from replacement preparation means the failed prerequisite is unchanged. The graph selects Troubleshooter. A Troubleshooter replacement selects Consultant. A Consultant replacement selects human hold.
+
+`REFUSED`, deterministic command errors, and unknown command outcomes pause for reconciliation. Only a new source or technical observation can change the failure cause. These observations do not count attempts or grant new allowance. Existing Core writer barriers and source/guidance authority still govern all acceptance and continuation.

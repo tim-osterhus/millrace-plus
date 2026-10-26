@@ -10,7 +10,8 @@ Callers cannot substitute another resolver here. Core resolves its builtin
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import cast
 
@@ -35,6 +36,7 @@ __all__ = [
     "submit_revision",
     "start_run",
     "inspect_run",
+    "exclusive_run_snapshot",
     "recover_run",
     "pause_run",
     "pause_plane",
@@ -282,6 +284,38 @@ def inspect_run(
     return _core.inspect_run(
         instance_id, run_id, state_home=state_home, adapter_resolver=resolve_adapter
     )
+
+
+@contextmanager
+def exclusive_run_snapshot(
+    instance_id: str,
+    run_id: str,
+    *,
+    state_home: Path,
+    expected_state_version: int,
+    catalog_home: Path | None = None,
+) -> Iterator[dict[str, object]]:
+    """Yield Core's exact snapshot after catalog ownership checks inside its scope.
+
+    The caller retains Core's non-reentrant scope and its writer/domain readiness
+    obligations through publication and postvalidation. Entry refusals propagate.
+    """
+    with _core.exclusive_run_snapshot(
+        instance_id,
+        run_id,
+        state_home=state_home,
+        expected_state_version=expected_state_version,
+        adapter_resolver=resolve_adapter,
+    ) as snapshot:
+        identity = _core.inspect_instance(
+            instance_id, state_home=state_home, adapter_resolver=resolve_adapter
+        )
+        _catalog.check_ownership(
+            Path(str(identity["workflow_file"])),
+            Path(str(identity["project_root"])),
+            catalog_home=catalog_home,
+        )
+        yield snapshot
 
 
 def recover_run(

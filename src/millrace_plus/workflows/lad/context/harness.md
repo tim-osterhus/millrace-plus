@@ -1,19 +1,39 @@
-# Harness and operator boundaries
+# Native invocation and operator boundaries
 
-Modified from LAD Factory setup, continuation, nested-model and adapter-template Markdown at the pin in `PROVENANCE.md`. The source Claude Code, Codex CLI, Hermes, OpenCode, Pi and cross-harness guides contribute fresh invocation, artifact handoff and unknown-effect principles. They do not install native host configuration or qualify those routes. No Hermes adapter, persistent session, native Orchestrator or Goal/heartbeat/callback controller is added.
+Modified from LAD Factory setup, continuation, nested-model, and adapter-template Markdown at the pin in `PROVENANCE.md`. This file describes current adapter and migration limits. It does not authorize a provider call or helper task.
 
-The shipped graph selects existing Plus `claude_print` with profile `millrace-claude-print-profile/v1`, Claude `2.1.296`. Absent model/effort preserves native inheritance. Operators edit an independent copy using supported binding/profile/settings contracts before starting; OpenCode and other bindings require their own accepted profile. This workflow grants no provider calls or spending. Tests use command peers only; offline evidence never qualifies a native route.
+## Packaged Claude invocation
 
-No nested delegation is selected for the initial graph, and Planner always works alone. The upstream four-nested/depth-two/check-count guidance is not an enforced adapter mechanism. Any future delegation requires an explicit native allowance and descendant accounting; this workflow does not police descendants or turn 60 session roles into a native grant.
+The stock graph selects Plus `claude_print` with profile `millrace-claude-print-profile/v1` and Claude Code 2.1.296. The graph omits model and reasoning effort, preserving native inheritance. The adapter launches with `--print --output-format json --json-schema` and `--dangerously-skip-permissions --permission-prompts none`. Millrace provides no approval bridge for these permission-bypassed calls. Use a disposable or version-controlled target. Review the requested scope before starting.
 
-All native nodes forbid Core retry. Errors and unknowns pass replacement preparation, preserving the failed reservation and shared one-replacement debit. Existing Core writer guards still determine whether dispatch is possible. Deterministic commands fail closed and never auto-retry. Unknown native effects require exact inspection and closure before replacement; an artifact or elapsed time is not proof.
+The adapter appends an instruction to use Claude Code’s StructuredOutput tool with the schema for that invocation. The `outcome` enum comes from the exact runtime-selected markers. The schema also requires string `summary` and an array of project-relative `refs`, with no extra fields. The generated `claude-prompt.txt` and `claude-result-schema.json` live in the invocation root. These are adapter files, not workflow workspace authority. Do not infer or access a temporary invocation path.
 
-The supported operator path inspects the exact paused run/plane/invocation and retained LAD occurrence, resolves writer uncertainty through public controls, records an exact workflow-owned replacement/terminal intent and explicitly redirects to the declared preparation/terminal node. Never redirect to a native role. Normal preparation with a READY occurrence refuses; it is not a retry route. Raw Core retry_invocation or redirect into normal preparation is outside LAD's accounting guarantee and must be reconciled against actual native usage before claiming acceptance. No Core enforcement hook is promised.
+The graph’s native role timeout is 1,800 seconds. Deterministic command nodes use 10 seconds. The workflow adds no total invocation or elapsed-time cap. Finite Core limits explicitly selected at startup remain in force. This documents existing settings. It grants no additional provider allowance.
 
-After that public inspection, retain a regular contained Markdown note under foreground `lad-recovery/` naming the session, exact old occurrence, observed Core/native writer identities and closure evidence. From the foreground workspace run `python3 ../scripts/boundaries.py record_replacement --role ROLE --occurrence UUID --evidence lad-recovery/NOTE.md` when the workflow scripts live in the project parent; otherwise use the actual copied workflow's absolute script path. This records a digest-pinned intent and the exact `prepare_ROLE_replacement` continuation without dispatching. Explicitly redirect through that node using current public control versions. It reserves replacement and ordinary debits before any native dispatch; stale source/guidance or conflicting intent refuses. A note is evidence, never an override of Core writer guards.
+## Direct work and optional helper evidence
 
-Recover pending Learning waits in their original Core run. A new run on a used copy stops at bootstrap and cannot resume the old seam. Locked/result-first revision boundaries govern any explicit future acceptance of a Learning candidate. Learning never edits active guidance.
+The stock graph passes no helper flags, so `prepare_role.py` defaults to `helper_mode: direct` with null qualification. Planner always remains direct. Do not create nested tasks or make extra model calls from a role prompt.
 
-For a terminal failure decision, retain a workflow-owned `foreground/lad-state/operator-intent.json` note with exactly `format:millrace-lad-operator-intent/v1`, the retained `session_id`, `decision:terminal_failure`, and nonblank `reason`. After public writer inspection and explicit operator decision, redirect the foreground plane to `terminal_failure`; that node validates this exact intent and takes CLOSE/ACK. This note is domain input, not surgery on Core stores. It does not resolve an already selected/pinned seam; recover or reconcile that original wait first.
+The existing `prepare_role.py` accepts `--helper-mode` with `direct` or `native_helpers`. It also accepts `--helper-qualification PATH`. A `native_helpers` result must match its occurrence and include all required evidence:
 
-If Core's invocation/elapsed ceiling, forced cancellation or unknown writer prevents CLOSE, keep `cleanup_required:true`. Do not call paused/seam-exhausted Learning terminal. Inspect the exact run and planes with public controls, cancel the exact Learning plane when appropriate, verify native writer closure, and retain an explicit workflow recovery note with those observations. A hard-stop note cannot depend on another graph command after the ceiling. A terminal run projection alone does not prove external writer closure.
+- an evidence ref
+- an independently issued, digest-pinned complete task inventory
+- terminal observations for completed, failed, or cancelled tasks
+- result refs, history logs, and integration evidence
+- complete nested-task ancestry
+
+Qualification refs bind `binding`, `facility_version`, `parent_task_id`, and an inventory ref. The only accepted scope is `offline_validator_fixture`. This fixture checks how the validator handles complete task evidence. It is not a live helper run, host binding, or permission. No live native helper facility is qualified. The workflow remains useful with the default direct mode.
+
+## Legacy session upgrade
+
+Ordinary copied commands remain standard-library-only under `python3 -S`. A v1 session is read under its original contract. Inspection, role preparation, and a new run never upgrade it. The explicit initializer path with `--upgrade-session` lazily loads the installed Plus facade. It requires the exact `--project-root`, `--session-id`, `--instance-id`, `--run-id`, `--state-home`, and `--expected-state-version` values. `--catalog-home` is optional. There is no `--joined` assertion.
+
+The caller owns and joins the exact caller lifecycles and excludes other writers before upgrade. A paused run, a Core lock, or a quiescent-looking plane does not attest that OS or native helper callers have joined. Upgrade preserves the existing v1 session ID and archived source/history references. It does not revalidate old checks, permit stale guidance dispatch, auto-resume a seam, or qualify actual used-copy operations.
+
+## Recovery and closure
+
+The adapter does not retry native outcomes. Deterministic acceptance and preparation guards retain rejected bytes, route, and source identity. Use the graph’s selected recovery outcome. Do not issue a raw retry or redirect to normal preparation. An unknown native effect needs exact writer inspection and closure before replacement. An artifact or elapsed time does not prove task closure.
+
+The graph acknowledges Learning’s saved route in the original Core run. A fresh run on a used copy does not resume the old seam. For a replacement, use the exact occurrence and source/guidance evidence selected by the guard. Do not change ledger or guidance files by hand.
+
+The terminal-failure intent and cleanup rules remain workflow-owned. If a hard limit, cancellation, or unknown writer prevents CLOSE, preserve cleanup-required state and inspect exact run and plane evidence through public controls. A terminal projection alone is not proof that native or OS writers have stopped. These instructions do not qualify native routes, OS joins, or actual used-copy operations.

@@ -1,18 +1,21 @@
 # Role assignment
 
-Modified from pinned LAD Factory `templates/assignment.md`; see `PROVENANCE.md`.
+Modified from pinned LAD Factory `templates/assignment.md`. See `PROVENANCE.md`.
 
 Session/occurrence/role/lineage: `<exact prepared input>`
-Original request/specification/packet/baseline: `<immutable cited inputs>`
-Source/guidance: `<prepared identity>`
-Writable paths: `<packet paths under target only>`
-Current reserved attempt: `<already debited>`; future capacity: `<remaining>`
-Recovery/pending route: `<exact saved role or Learning route>`
+Input/source/guidance identities: `<captured values>`
+`created_at` UTC: `<captured timestamp>`
+Source context: `<captured v2 field>`
+Helper mode/qualification: `<captured v2 fields>`
+Original request/specification/packet/baseline: `<pinned inputs>`
+Accepted refs: `<accepted occurrence refs>`
+Writable paths: `<assigned packet paths under target, if this role may edit>`
+Saved route or recovery cause: `<exact accepted input>`
 
 ## Evidence
 
-Read the prepared input and preserve ownership, original criteria and frozen baseline. No nested delegation is selected. Never dispatch a successor or edit canonical state.
+Read the exact prepared input and preserve the request, criteria, source, pinned guidance, and any parent-pinned Checker baseline. Treat event records as history, not allowance. Do not dispatch a successor or edit canonical state.
 
 ## Outcome
 
-Write the declared role result and return one matching Core json-v1 completion.
+Write the declared v2 LAD result and required artifacts. Return exactly one Core json-v1 completion marker selected by the runtime.

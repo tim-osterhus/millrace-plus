@@ -9,16 +9,18 @@ from pathlib import Path
 from lad_state import (
     LadError,
     assert_foreground,
+    atomic,
     canonical,
-    debit,
     digest,
     emit,
     fields,
     identifier,
     load,
+    load_json,
     mark,
     packet,
     read,
+    record_event,
     roots,
     run,
     save,
@@ -46,7 +48,7 @@ def _criteria(state: dict, result: dict, foreground: Path) -> None:
 
 def _plan(state: dict, occurrence: dict, result: dict, foreground: Path) -> None:
     plan = result["data"].get("plan")
-    if not isinstance(plan, list) or not plan or len(plan) > 60:
+    if not isinstance(plan, list) or not plan:
         raise LadError("complete_ordered_plan_required")
     all_criteria = {row["id"] for row in state["criteria"]}
     if not all_criteria:
@@ -109,6 +111,9 @@ def _plan(state: dict, occurrence: dict, result: dict, foreground: Path) -> None
                 or ".." in path.parts
                 or str(path) != name
                 or name in {".", ""}
+                or any(part in {".git", ".env", ".env.local", "credentials.json",
+                                "secrets.json", "lad-state", "lad-results"}
+                       for part in path.parts)
             ):
                 raise LadError("packet_path_escape")
         # Every packet is an occurrence-scoped immutable draft, not a role-written
@@ -119,6 +124,11 @@ def _plan(state: dict, occurrence: dict, result: dict, foreground: Path) -> None
         )
         if artifact is None:
             raise LadError("packet_markdown_not_evidenced")
+        packet_text = read(
+            foreground, f"lad-results/{occurrence['occurrence_id']}/" + markdown
+        ).decode("utf-8", "strict")
+        if "Development check:" not in packet_text:
+            raise LadError("packet_development_check_required")
         for ref in row["input_refs"]:
             fields(ref, {"occurrence_id", "sha256"})
             if (
@@ -153,28 +163,73 @@ def _plan(state: dict, occurrence: dict, result: dict, foreground: Path) -> None
     state["pending"] = None
 
 
-def _recover(state: dict, occurrence: dict, *, kind: str = "execution") -> str:
+def _cause(occurrence: dict, result: dict, kind: str) -> str:
+    failure = result["data"].get("failure", {})
+    return digest(canonical({
+        "kind": kind, "role": occurrence["role"], "lineage": occurrence["lineage"],
+        "operation": failure.get("operation"),
+        "findings": [{key: row[key]
+                      for key in ("id", "criterion", "path", "reproduction")}
+                     for row in result["findings"]],
+    }))
+
+
+def _recover(
+    state: dict, occurrence: dict, *, kind: str = "execution", cause: str | None = None
+) -> str:
     if occurrence["role"] not in {"troubleshooter", "consultant"}:
         state["pending"] = {
-            "kind": kind,
-            "target": occurrence["role"],
+            "kind": kind, "target": occurrence["role"],
             "lineage": occurrence["lineage"],
-            "occurrence_id": occurrence["occurrence_id"],
+            "occurrence_id": occurrence["occurrence_id"], "cause_id": cause,
         }
     elif not state["pending"]:
         raise LadError("saved_interrupted_role_required")
+    pending = state["pending"]
+    if pending.get("cause_id") is not None and any(
+        state["occurrences"][oid]["role"] == "troubleshooter"
+        and accepted["result"]["data"].get("cause_id") == pending["cause_id"]
+        and accepted["result"]["data"].get("repair_verified") is True
+        for oid, accepted in state["accepted"].items()
+    ):
+        return "CONSULTANT"
     return "TROUBLESHOOTER"
 
 
 def _consult(state: dict, occurrence: dict) -> str:
-    if not state["pending"]:
+    if not state["pending"] or state["pending"]["kind"] != "remediation":
         state["pending"] = {
-            "kind": "contract",
-            "target": occurrence["role"],
+            "kind": "contract", "target": occurrence["role"],
             "lineage": occurrence["lineage"],
             "occurrence_id": occurrence["occurrence_id"],
+            "cause_id": digest(canonical({"role": occurrence["role"],
+                                          "lineage": occurrence["lineage"],
+                                          "kind": "contract"})),
         }
     return "CONSULTANT"
+
+
+def _proposal(state: dict, occurrence: dict, result: dict, foreground: Path) -> None:
+    data = result["data"]
+    pending = state["pending"]
+    if pending is None or data.get("trigger_occurrence_id") != pending["occurrence_id"]:
+        raise LadError("consultant_trigger_required")
+    if data.get("cause_id") != pending.get("cause_id"):
+        raise LadError("consultant_cause_changed")
+    step = text(data.get("next_step"))
+    ref = fields(data.get("next_evidence"), {"path", "sha256"})
+    evidence = read(
+        foreground, f"lad-results/{occurrence['occurrence_id']}/" + ref["path"]
+    )
+    if (ref not in result["artifacts"] or digest(evidence) != ref["sha256"]
+        or step not in evidence.decode("utf-8", "strict")):
+        raise LadError("consultant_step_evidence_required")
+    if any(state["occurrences"][oid]["role"] == "consultant"
+           and previous["result"]["data"].get("cause_id") == pending.get("cause_id")
+           and previous["result"]["data"].get("next_step") == step
+           and previous["result"]["source_sha256"] == result["source_sha256"]
+           for oid, previous in state["accepted"].items()):
+        raise LadError("unchanged_consultant_step")
 
 
 def _review(state: dict, occurrence: dict, result: dict, foreground: Path) -> None:
@@ -196,6 +251,37 @@ def _review(state: dict, occurrence: dict, result: dict, foreground: Path) -> No
                 "criteria": occurrence["packet"]["criteria"],
                 "finding_ids": [row["id"] for row in result["findings"]],
             }
+            if occurrence["format"] == "millrace-lad-input/v2":
+                freeze_ref = fields(
+                    result["data"].get("baseline_freeze"), {"path", "sha256"}
+                )
+                freeze_raw = read(
+                    foreground,
+                    f"lad-results/{occurrence['occurrence_id']}/" + freeze_ref["path"],
+                )
+                freeze = fields(load_json(freeze_raw), {
+                    "format", "occurrence_id", "criteria", "path", "sha256"
+                })
+                expected_freeze = {
+                    "format": "millrace-lad-baseline-freeze/v1",
+                    "occurrence_id": occurrence["occurrence_id"],
+                    "criteria": occurrence["packet"]["criteria"],
+                    "path": baseline["path"], "sha256": baseline["sha256"],
+                }
+                if (freeze != expected_freeze
+                    or digest(freeze_raw) != freeze_ref["sha256"]):
+                    raise LadError("baseline_freeze_mismatch")
+                if digest(read(foreground, baseline["path"])) != baseline["sha256"]:
+                    raise LadError("baseline_changed_before_pin")
+                pin_path = f"lad-state/baseline-pins/{occurrence['occurrence_id']}.json"
+                pin_raw = canonical(baseline) + b"\n"
+                atomic(
+                    foreground,
+                    f"lad-state/baseline-pins/{occurrence['occurrence_id']}.md",
+                    read(foreground, baseline["path"]), immutable=True,
+                )
+                atomic(foreground, pin_path, pin_raw, immutable=True)
+                baseline["parent_pin"] = {"path": pin_path, "sha256": digest(pin_raw)}
             state["baselines"][lineage] = baseline
         state["pending"] = None
     elif (
@@ -239,7 +325,9 @@ def _gate(state: dict, occurrence: dict, result: dict) -> str:
     passed = result["outcome"] == "PASS"
     target = "updater" if passed else ("fixer" if len(pairs) < 2 else "troubleshooter")
     if target == "troubleshooter":
-        _recover(state, occurrence, kind="review")
+        target = _recover(
+            state, occurrence, kind="review", cause=_cause(occurrence, result, "review")
+        ).lower()
     if len(pairs) >= 2 and lineage not in state["learning"]:
         state["pending"] = {
             "kind": "learning_gate",
@@ -249,6 +337,7 @@ def _gate(state: dict, occurrence: dict, result: dict) -> str:
             "pairs": pairs[:2],
             "source_sha256": result["source_sha256"],
             "guidance_sha256": occurrence["guidance_sha256"],
+            "cause_id": state["pending"].get("cause_id") if state["pending"] else None,
         }
         return "ASSESS"
     return target.upper()
@@ -261,11 +350,23 @@ def choose(state: dict, occurrence: dict, result: dict, foreground: Path) -> str
     if role == "learning":
         if data.get("pending_route") != state["pending"] or not state["request"]:
             raise LadError("learning_changed_pending_route")
-        if (
-            outcome == "ERROR_TRANSIENT_RESOLVED"
-            and state["usage"].get("learning:" + lineage, 0) < 2
-        ):
-            return "REPLACE_LEARNING"
+        if outcome == "ERROR_TRANSIENT_RESOLVED":
+            prerequisite = digest(canonical({
+                "failure": data["failure"], "source": result["source_sha256"],
+            }))
+            prior = [accepted["result"] for oid, accepted in state["accepted"].items()
+                     if state["occurrences"][oid]["role"] == "learning"
+                     and state["occurrences"][oid]["lineage"] == lineage]
+            if not any(previous["outcome"] == outcome and digest(canonical({
+                "failure": previous["data"]["failure"],
+                "source": previous["source_sha256"],
+            })) == prerequisite for previous in prior):
+                state["learning"][lineage] = {
+                    "disposition": "retrying",
+                    "occurrence_id": occurrence["occurrence_id"],
+                    "prerequisite": prerequisite,
+                }
+                return "REPLACE_LEARNING"
         state["learning"][lineage] = {
             "disposition": "passed"
             if outcome == "PASS"
@@ -288,7 +389,9 @@ def choose(state: dict, occurrence: dict, result: dict, foreground: Path) -> str
     if outcome in {"ERROR", "ERROR_REPAIRABLE", "FINDINGS_UNINSPECTABLE"}:
         if role == "troubleshooter":
             return "CONSULTANT"
-        return _recover(state, occurrence)
+        return _recover(
+            state, occurrence, cause=_cause(occurrence, result, "execution")
+        )
     if role == "recon":
         return "PLANNER" if outcome == "PASS" else _consult(state, occurrence)
     if role == "planner":
@@ -353,7 +456,8 @@ def choose(state: dict, occurrence: dict, result: dict, foreground: Path) -> str
         if (
             data.get("resume_role") != pending["target"]
             or data.get("repair_verified") is not True
-            or not occurrence["local_repair_allowed"]
+            or data.get("trigger_occurrence_id") != pending["occurrence_id"]
+            or data.get("cause_id") != pending.get("cause_id")
         ):
             raise LadError("repair_resume_evidence_required")
         if outcome == "PASS_REVIEW_REPAIRED":
@@ -362,11 +466,18 @@ def choose(state: dict, occurrence: dict, result: dict, foreground: Path) -> str
             return "DOUBLECHECKER"
         return "RESUME_" + pending["target"].upper()
     if role == "consultant":
+        _proposal(state, occurrence, result, foreground)
+        if state["pending"]["kind"] == "baseline_tamper":
+            # The original baseline was restored, never replaced or re-pinned.
+            # A fresh independent Checker must establish the review again.
+            if outcome != "REPAIR_EXECUTION":
+                raise LadError("baseline_recheck_required")
+            return "CHECKER"
         if outcome in {"REPAIR_SPEC", "REPAIR_PACKETS"}:
-            debit(state, ["planning_repair"], str(uuid.uuid4()), "planning_repair")
+            record_event(state, str(uuid.uuid4()), "planning_repair")
             return "PLANNER" if outcome == "REPAIR_SPEC" else "MANAGER"
         if outcome == "REPAIR_EXECUTION":
-            return _recover(state, occurrence)
+            return "TROUBLESHOOTER"
         raise LadError("unsupported_consultant_route")
     if role == "updater":
         if outcome == "FINDINGS_CONTRACT":
@@ -422,7 +533,22 @@ def choose(state: dict, occurrence: dict, result: dict, foreground: Path) -> str
             return "CLOSE"
         if not any(value["status"] == "gap" for value in verdict.values()):
             raise LadError("remediation_gap_required")
-        debit(state, ["remediation"], str(uuid.uuid4()), "remediation")
+        gap_ids = sorted(key for key, value in verdict.items()
+                         if value["status"] == "gap")
+        for oid, accepted in state["accepted"].items():
+            previous = accepted["result"]
+            if (state["occurrences"][oid]["role"] == "arbiter"
+                and previous["outcome"] == "FINDINGS"
+                and sorted(key for key, value in previous["data"]["verdict"].items()
+                           if value["status"] == "gap") == gap_ids
+                and previous["source_sha256"] == result["source_sha256"]):
+                state["pending"] = {
+                    "kind": "remediation", "target": "manager",
+                    "lineage": "unpacketized",
+                    "occurrence_id": occurrence["occurrence_id"], "criteria": gap_ids,
+                }
+                return "CONSULTANT"
+        record_event(state, str(uuid.uuid4()), "remediation")
         state["pending"] = {
             "kind": "remediation",
             "target": "manager",

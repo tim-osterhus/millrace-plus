@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -50,11 +51,19 @@ def ledger(project: Path) -> dict:
     return json.loads((project / "foreground/lad-state/session.json").read_bytes())
 
 
-def bootstrap(project: Path) -> None:
+def role_occurrences(state: dict, role: str) -> list[dict]:
+    return [state["occurrences"][event["id"]] for event in state["events"]
+            if event["kind"] == "role"
+            and state["occurrences"][event["id"]]["role"] == role]
+
+
+def bootstrap(project: Path, *, request: bytes | None = None) -> None:
     shutil.copyfile(
         Path(__file__).parent / "fixtures/lad_peer.py", project / "scripts/lad_peer.py"
     )
-    (project / "request.md").write_text("Original request: answer() returns 42.\n")
+    (project / "request.md").write_bytes(
+        request if request is not None else b"Original request: answer() returns 42.\n"
+    )
     assert (
         command(project, "init_session.py", "--project-root", "..")["outcome"]
         == "NEW_SESSION"
@@ -125,7 +134,9 @@ def test_all_roles_have_graph_routes() -> None:
 
     graph = json.loads((LAD / "workflow.json").read_bytes())
     parsed = parse_graph((LAD / "workflow.json").read_bytes())
-    assert parsed.max_invocations == 609
+    assert parsed.format == "millrace-router/v4"
+    assert parsed.max_invocations is None and parsed.max_elapsed is None
+    assert parsed.max_parallel == 2
     for plane in graph["planes"].values():
         for role, node in plane["nodes"].items():
             if node["invoke"].get("binding") != "claude":
@@ -208,7 +219,6 @@ def test_arbiter_process_deviation_requires_human_choice(tmp_path: Path) -> None
     command(project, "lad_peer.py", "arbiter", "clean", "HUMAN_BLOCKED")
     state = ledger(project)
     oid = state["active"]["foreground"]
-    occurrence = project / "foreground/lad-state/occurrences" / oid
     file = project / "foreground/lad-results" / oid / "result.json"
     blocked = json.loads(file.read_bytes())
     verdict = blocked["data"]["verdict"]
@@ -229,7 +239,6 @@ def test_arbiter_process_deviation_requires_human_choice(tmp_path: Path) -> None
         "reported process deviation without changing the stable criterion.",
     }
     assert blocked["findings"] == []
-    snapshot = (project / "foreground/lad-state/session.json").read_bytes()
     for criterion, reason in [
         ("operating-constraint", "finding_identity"),
         ("answer", "remediation_gap_required"),
@@ -249,18 +258,24 @@ def test_arbiter_process_deviation_requires_human_choice(tmp_path: Path) -> None
         }
         file.write_text(json.dumps(invalid))
         refused = command(project, "accept_role.py", "arbiter", "FINDINGS")
-        assert refused["outcome"] == "REFUSED"
-        assert reason in refused["summary"]
-        assert (project / "foreground/lad-state/session.json").read_bytes() == snapshot
+        if reason == "finding_identity":
+            assert refused["outcome"] == "INVALID_RESULT"
+            assert ledger(project)["replacement_intents"][oid]["diagnostic"] == reason
+        else:
+            assert refused["outcome"] == "REFUSED"
+            assert reason in refused["summary"]
+        assert ledger(project)["events"] == state["events"]
+        assert ledger(project)["criteria"] == state["criteria"]
+        assert oid not in ledger(project)["accepted"]
 
     file.write_text(json.dumps(blocked))
     accepted = command(project, "accept_role.py", "arbiter", "HUMAN_BLOCKED")
     assert accepted["outcome"] == "PAUSE"
     held = ledger(project)
     assert held["criteria"] == state["criteria"]
-    assert held["usage"] == state["usage"]
-    assert held["usage"]["all"] == 7 and held["usage"]["arbiter"] == 1
-    assert "remediation" not in held["usage"]
+    assert held["events"] == state["events"]
+    assert len(held["occurrences"]) == 7 and len(role_occurrences(held, "arbiter")) == 1
+    assert all(row["kind"] != "remediation" for row in held["events"])
     assert held["terminal"] is None
     assert held["pending"]["kind"] == "human"
     assert held["pending"]["target"] == "arbiter"
@@ -279,11 +294,6 @@ def test_arbiter_process_deviation_requires_human_choice(tmp_path: Path) -> None
         "goto": "human_pause"
     }
     assert "pause" in nodes["human_pause"]["on"]["HOLD"]
-    for name in ("prompts/arbiter.md", "context/role-contracts.md"):
-        guidance = (occurrence / "guidance" / name).read_text()
-        assert "HUMAN_BLOCKED" in guidance
-        assert "human_choice" in guidance
-        assert "findings=[]" in guidance
 
 
 @pytest.mark.parametrize("manifest_kind", ["helper", "paperclip", "direct"])
@@ -318,7 +328,7 @@ def test_all_launchers_bootstrap_and_reuse_session(
         expected = str(
             uuid.uuid5(
                 uuid.NAMESPACE_URL,
-                "millrace-lad-session/v1/" + hashlib.sha256(encoded).hexdigest(),
+                "millrace-lad-session/v2/" + hashlib.sha256(encoded).hexdigest(),
             )
         )
     first = command(project, "init_session.py", "--project-root", "..")
@@ -400,12 +410,12 @@ def test_server_local_missing_intake_and_alias_conflict(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "field",
     [
-        "usage",
+        "legacy",
         "events",
         "active",
         "occurrences",
         "accepted",
-        "limits",
+        "migration",
         "identity_sha256",
         "continuation",
         "session_id",
@@ -445,7 +455,7 @@ def test_corrupt_session_authority_never_replenishes(
         "extra",
     ],
 )
-def test_stale_or_malformed_role_result_preserves_debit(
+def test_invalid_role_result_records_recovery_without_new_dispatch(
     tmp_path: Path, field: str
 ) -> None:
     project = copied(tmp_path)
@@ -458,10 +468,17 @@ def test_stale_or_malformed_role_result_preserves_debit(
     result = json.loads(file.read_bytes())
     result[field] = [] if field == "artifacts" else "wrong"
     file.write_text(json.dumps(result))
-    before = (project / "foreground/lad-state/session.json").read_bytes()
-    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "REFUSED"
-    assert (project / "foreground/lad-state/session.json").read_bytes() == before
-    assert ledger(project)["usage"] == {"all": 1, "recon": 1}
+    before_events = state["events"]
+    rejected = file.read_bytes()
+    assert command(
+        project, "accept_role.py", "recon", "PASS"
+    )["outcome"] == "INVALID_RESULT"
+    assert ledger(project)["events"] == before_events
+    assert file.read_bytes() == rejected
+    assert oid not in ledger(project)["accepted"]
+    assert (ledger(project)["replacement_intents"][oid]["reason"]
+            == "invalid_semantic_result")
+    assert len(role_occurrences(ledger(project), "recon")) == 1
 
 
 def test_accepted_artifact_is_immutable_and_replay_is_once(tmp_path: Path) -> None:
@@ -479,16 +496,16 @@ def test_accepted_artifact_is_immutable_and_replay_is_once(tmp_path: Path) -> No
     assert command(project, "prepare_role.py", "planner")["outcome"] == "REFUSED"
 
 
-def test_native_replacement_uses_shared_budget_and_normal_redirect_refuses(
+def test_native_replacement_records_fresh_owner_and_normal_redirect_refuses(
     tmp_path: Path,
 ) -> None:
     project = copied(tmp_path)
     bootstrap(project)
     command(project, "prepare_role.py", "recon")
     original = ledger(project)["active"]["foreground"]
-    before = ledger(project)["usage"]
+    before = ledger(project)["events"]
     assert command(project, "prepare_role.py", "recon")["outcome"] == "REFUSED"
-    assert ledger(project)["usage"] == before
+    assert ledger(project)["events"] == before
     assert (
         command(project, "prepare_role.py", "recon", "--replacement")["outcome"]
         == "READY"
@@ -497,13 +514,16 @@ def test_native_replacement_uses_shared_budget_and_normal_redirect_refuses(
     replacement = state["active"]["foreground"]
     assert replacement != original
     assert state["occurrences"][replacement]["replacement_of"] == original
-    assert state["usage"] == {"all": 2, "recon": 2, "replacement:recon:unpacketized": 1}
+    assert len(role_occurrences(state, "recon")) == 2
     assert original in state["replacement_intents"]
     assert (
         command(project, "prepare_role.py", "recon", "--replacement")["outcome"]
-        == "REFUSED"
+        == "TECHNICAL_RECOVERY"
     )
-    assert ledger(project)["usage"] == state["usage"]
+    assert ledger(project)["events"] == state["events"]
+    assert ledger(project)["pending"]["occurrence_id"] == replacement
+    assert ledger(project)["active"]["foreground"] == replacement
+    assert ledger(project)["continuation"]["node"] == "prepare_troubleshooter"
 
 
 def test_provenance_and_all_useful_role_assets() -> None:
@@ -525,6 +545,25 @@ def test_provenance_and_all_useful_role_assets() -> None:
     for row in provenance["inputs"]:
         assert len(row["sha256"]) == 64 and row["disposition"]
         assert all((LAD / name).is_file() for name in row["destinations"])
+    corrected = provenance["corrected_reference"]
+    assert corrected["commit"] == "a7e5a19a319786fb3138fb938764c5d77607b7b0"
+    assert {row["original_path"] for row in corrected["inputs"]} == {
+        "context/contracts.md", "context/transitions.md", "context/routing.md",
+        "context/nested-models.md", "prompts/planner.md", "prompts/checker.md",
+        "adapter-templates/claude-code/README.md",
+    }
+    for row in corrected["inputs"]:
+        assert len(row["sha256"]) == 64 and row["bytes"] > 0
+        assert corrected["commit"] in row["source_url"]
+        assert row["disposition"]
+        assert all((LAD / name).is_file() for name in row["destinations"])
+    destinations = provenance["adaptation"]["destination_hashes"]
+    assert len({row["path"] for row in destinations}) == len(destinations)
+    assert "scripts/session_compat.py" in {row["path"] for row in destinations}
+    for row in destinations:
+        raw = (LAD / row["path"]).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == row["sha256"]
+        assert len(raw) == row["bytes"]
     prompts = list((LAD / "prompts").glob("*.md"))
     assert len(prompts) == 12
     for prompt in prompts:
@@ -620,8 +659,9 @@ def test_learning_semantic_routes_preserve_pending(
             ]
             == "ACK"
         )
-        assert ledger(project)["usage"]["learning:answer"] == 2
-        assert ledger(project)["usage"]["replacement:learning:answer"] == 1
+        assert len(role_occurrences(ledger(project), "learning")) == 2
+        assert sum(row["replacement_of"] is not None
+                   for row in role_occurrences(ledger(project), "learning")) == 1
     acknowledgement = command_at(project, "learning", "learning_seam.py", "emit_ack")
     assert acknowledgement["outcome"] == "ACK", acknowledgement
     seam = seam_envelope(project, "foreground", acknowledgement)
@@ -727,6 +767,10 @@ def test_small_gate_slice_original_run_reload_and_close(
         foreground["nodes"]["accept_learning_ack"]["on"][outcome] = {
             "goto": "terminal_failure"
         }
+    for outcome in ("CONSULTANT", "BASELINE_TAMPER"):
+        foreground["nodes"]["accept_learning_ack"]["on"][outcome] = {
+            "pause": {"reason": "fixture_unselected_recovery"}
+        }
     # Test-only explicit pause after accepted assessment, before ACK. No graph
     # edits on resume: the exact original Core run retains the selected request.
     graph["planes"]["learning"]["nodes"]["accept_learning_pass"]["on"]["ACK"] = {
@@ -797,8 +841,8 @@ def test_small_gate_slice_original_run_reload_and_close(
         for row in paused["invocations"]
     )
     assert len(paused["seam_occurrences"]) == 1
-    before_usage = ledger(project)["usage"]
-    # Repeated public inspect reloads; no new run, identity or role debit.
+    before_history = ledger(project)["events"]
+    # Repeated public inspect reloads; no new run, identity or role occurrence.
     assert control.inspect_run(instance, run_id, state_home=home) == paused
     resumed = control.resume_plane(
         instance,
@@ -816,79 +860,100 @@ def test_small_gate_slice_original_run_reload_and_close(
         "succeeded",
     }
     assert len(after["seam_occurrences"]) == len(after["seam_acknowledgements"]) == 4
-    assert ledger(project)["usage"] == before_usage
+    assert ledger(project)["events"] == before_history
     assert not ledger(project)["continuation"]["cleanup_required"]
 
 
-@pytest.mark.parametrize(
-    "key",
-    [
-        "all",
-        "recon",
-        "planner",
-        "manager",
-        "builder:original",
-        "checker:original",
-        "doublechecker:original",
-        "updater:original",
-        "fixer:original",
-        "consultant",
-        "troubleshooter:original",
-        "learning:original",
-        "arbiter",
-        "planning_repair",
-        "local_repair:original",
-        "remediation",
-        "replacement:checker:original",
-    ],
-)
-def test_every_finite_budget_refuses_before_reserving(key: str) -> None:
-    import runpy
-
-    api = runpy.run_path(str(LAD / "scripts/lad_state.py"))
-    state = api["new_state"]("local", "local")
-    ceiling = api["CAPS"][key.split(":", 1)[0]]
-    for _ in range(ceiling):
-        api["debit"](state, [key], str(uuid.uuid4()), "test_fixture")
-    before = json.dumps(state, sort_keys=True)
-    with pytest.raises(api["LadError"], match="budget_exhausted"):
-        api["debit"](state, [key], str(uuid.uuid4()), "test_fixture")
-    assert json.dumps(state, sort_keys=True) == before
 
 
-def test_planning_repair_and_remediation_never_replenish(tmp_path: Path) -> None:
+def test_planning_repairs_require_new_steps_not_a_capacity_allowance(
+    tmp_path: Path,
+) -> None:
     project = copied(tmp_path)
     before_role(project, "consultant")
     assert step(project, "consultant", "REPAIR_SPEC") == "PLANNER"
-    assert ledger(project)["usage"]["planning_repair"] == 1
     assert step(project, "planner", "FINDINGS") == "CONSULTANT"
-    command(project, "prepare_role.py", "consultant")
+    assert step(project, "consultant", "REPAIR_SPEC") == "PLANNER"
+    assert sum(
+        row["kind"] == "planning_repair" for row in ledger(project)["events"]
+    ) == 2
+    assert step(project, "planner", "FINDINGS") == "CONSULTANT"
+    assert command(project, "prepare_role.py", "consultant")["outcome"] == "READY"
     command(project, "lad_peer.py", "consultant", "clean", "REPAIR_SPEC")
-    assert (
-        command(project, "accept_role.py", "consultant", "REPAIR_SPEC")["outcome"]
-        == "REFUSED"
+    before = (project / "foreground/lad-state/session.json").read_bytes()
+    refused = command(project, "accept_role.py", "consultant", "REPAIR_SPEC")
+    assert refused["outcome"] == "REFUSED"
+    assert "unchanged_consultant_step" in refused["summary"]
+    assert (project / "foreground/lad-state/session.json").read_bytes() == before
+    state = ledger(project)
+    assert len(role_occurrences(state, "consultant")) == 3  # Beyond old session cap2.
+    oid = state["active"]["foreground"]
+    result_file = project / "foreground/lad-results" / oid / "result.json"
+    result = json.loads(result_file.read_bytes())
+    result["data"]["next_step"] = (
+        "Inspect the cited input gap and add its missing prerequisite proof."
     )
-    assert ledger(project)["usage"]["planning_repair"] == 1
-    assert ledger(project)["usage"]["consultant"] == 2
-    other = copied(tmp_path / "remediation")
-    before_role(other, "arbiter")
-    assert step(other, "arbiter", "FINDINGS") == "MANAGER"
-    spent = ledger(other)["usage"].copy()
-    assert spent["remediation"] == 1
-    assert step(other, "manager") == "BUILDER"
-    assert ledger(other)["plan"][0]["lineage"] == "answer"
+    evidence = result_file.parent / "diagnosis.md"
+    evidence.write_text(
+        evidence.read_text() + "\n" + result["data"]["next_step"] + "\n"
+    )
+    checksum = hashlib.sha256(evidence.read_bytes()).hexdigest()
+    for ref in result["artifacts"]:
+        if ref["path"] == "diagnosis.md":
+            ref["sha256"] = checksum
+    result["data"]["next_evidence"]["sha256"] = checksum
+    result_file.write_text(json.dumps(result))
+    assert command(
+        project, "accept_role.py", "consultant", "REPAIR_SPEC"
+    )["outcome"] == "PLANNER"
+    assert sum(
+        row["kind"] == "planning_repair" for row in ledger(project)["events"]
+    ) == 3
+
+
+def test_repeated_original_gap_needs_a_materially_new_review_basis(
+    tmp_path: Path,
+) -> None:
+    project = copied(tmp_path)
+    before_role(project, "arbiter")
+    original = ledger(project)["criteria"]
+    assert step(project, "arbiter", "FINDINGS") == "MANAGER"
+    assert step(project, "manager") == "BUILDER"
+    assert command(project, "prepare_role.py", "builder")["outcome"] == "READY"
+    command(project, "lad_peer.py", "builder", "clean")
+    state = ledger(project)
+    oid = state["active"]["foreground"]
+    result_file = project / "foreground/lad-results" / oid / "result.json"
+    result = json.loads(result_file.read_bytes())
+    old_source = result["source_sha256"]
+    target = project / "foreground/target/answer.py"
+    target.write_text("def answer():\n    return 6 * 7\n")
+    files = {"answer.py": hashlib.sha256(target.read_bytes()).hexdigest()}
+    result["source_sha256"] = hashlib.sha256(json.dumps(
+        files, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()).hexdigest()
+    for artifact in result["artifacts"]:
+        file = result_file.parent / artifact["path"]
+        file.write_text(file.read_text().replace(old_source, result["source_sha256"]))
+        artifact["sha256"] = hashlib.sha256(file.read_bytes()).hexdigest()
+    result_file.write_text(json.dumps(result))
+    assert command(project, "accept_role.py", "builder", "PASS")["outcome"] == "CHECKER"
+    assert step(project, "checker") == "UPDATER"
+    assert step(project, "updater") == "ARBITER"
+    assert step(project, "arbiter", "FINDINGS") == "MANAGER"
+    assert sum(row["kind"] == "remediation" for row in ledger(project)["events"]) == 2
+    assert ledger(project)["criteria"] == original
+    assert step(project, "manager") == "BUILDER"
     for role in ("builder", "checker", "updater"):
-        step(other, role)
-    command(other, "prepare_role.py", "arbiter")
-    command(other, "lad_peer.py", "arbiter", "clean", "FINDINGS")
-    assert (
-        command(other, "accept_role.py", "arbiter", "FINDINGS")["outcome"] == "REFUSED"
-    )
-    assert ledger(other)["usage"]["remediation"] == 1
-    assert ledger(other)["usage"]["builder:answer"] == spent["builder:answer"] + 1
+        step(project, role)
+    assert step(project, "arbiter", "FINDINGS") == "CONSULTANT"
+    assert sum(row["kind"] == "remediation" for row in ledger(project)["events"]) == 2
+    assert ledger(project)["criteria"] == original
 
 
-def test_prerequisite_repair_uses_saved_role_replacement_debit(tmp_path: Path) -> None:
+def test_prerequisite_repair_preserves_saved_role_and_replacement_link(
+    tmp_path: Path,
+) -> None:
     project = copied(tmp_path)
     before_role(project, "troubleshooter")
     old = ledger(project)["pending"]["occurrence_id"]
@@ -903,9 +968,9 @@ def test_prerequisite_repair_uses_saved_role_replacement_debit(tmp_path: Path) -
     state = ledger(project)
     oid = state["active"]["foreground"]
     assert state["occurrences"][oid]["replacement_of"] == old
-    assert state["usage"]["replacement:builder:answer"] == 1
-    assert state["usage"]["local_repair:answer"] == 1
-    assert state["usage"]["builder:answer"] == 2
+    assert state["occurrences"][oid]["replacement_intent"]["old_occurrence_id"] == old
+    assert state["pending"]["occurrence_id"] == old
+    assert len(role_occurrences(state, "builder")) == 2
 
 
 def test_updater_changed_source_requires_review_before_acceptance(
@@ -949,7 +1014,7 @@ def test_scope_escape_and_baseline_mutation_refuse(tmp_path: Path) -> None:
     (project / "foreground/target/unowned.py").write_text("unauthorized = True\n")
     command(project, "lad_peer.py", "fixer", "repair")
     assert command(project, "accept_role.py", "fixer", "PASS")["outcome"] == "REFUSED"
-    assert ledger(project)["usage"]["fixer:answer"] == 1
+    assert len(role_occurrences(ledger(project), "fixer")) == 1
 
 
 def test_interrupted_owned_bootstrap_staging_and_pristine_greenfield(
@@ -1013,13 +1078,15 @@ def test_operator_intent_records_exact_continuation_without_dispatch(
         )["outcome"]
         == "INTENT_RECORDED"
     )
-    assert ledger(project)["usage"] == state["usage"]
+    assert ledger(project)["events"] == state["events"]
     assert ledger(project)["continuation"]["node"] == "prepare_recon_replacement"
     assert (
         command(project, "prepare_role.py", "recon", "--replacement")["outcome"]
         == "READY"
     )
-    assert ledger(project)["usage"]["replacement:recon:unpacketized"] == 1
+    assert ledger(project)["occurrences"][ledger(project)["active"]["foreground"]][
+        "replacement_of"
+    ] == oid
 
 
 def test_catalog_copy_and_stdlib_only_scripts(tmp_path: Path) -> None:
@@ -1032,6 +1099,8 @@ def test_catalog_copy_and_stdlib_only_scripts(tmp_path: Path) -> None:
     ).read_bytes()
     for script in (destination / "scripts").glob("*.py"):
         tree = ast.parse(script.read_text())
+        parents = {child: parent for parent in ast.walk(tree)
+                   for child in ast.iter_child_nodes(parent)}
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 names = [item.name.split(".")[0] for item in node.names]
@@ -1039,12 +1108,19 @@ def test_catalog_copy_and_stdlib_only_scripts(tmp_path: Path) -> None:
                 names = [(node.module or "").split(".")[0]]
             else:
                 continue
-            assert set(names) <= sys.stdlib_module_names | {
-                "lad_state",
-                "boundaries",
-                "prepare_role",
-                "accept_role",
-            }
+            if set(names) == {"millrace_plus"}:
+                assert script.name == "session_compat.py"
+                parent = parents.get(node)
+                while parent is not None and not isinstance(parent, ast.FunctionDef):
+                    parent = parents.get(parent)
+                assert parent is not None and parent.name == "upgrade_session"
+                assert isinstance(node, ast.ImportFrom)
+                assert node.module == "millrace_plus.router"
+            else:
+                assert set(names) <= sys.stdlib_module_names | {
+                    "lad_state", "boundaries", "prepare_role", "accept_role",
+                    "session_compat",
+                }
     # Ordinary isolated Python mode proves the copied folder's scripts import
     # their own modules without Plus or a service on sys.path.
     result = subprocess.run(
@@ -1078,12 +1154,12 @@ def test_interrupted_preparation_reuses_only_its_committed_reservation(
     assert command(project, "prepare_role.py", "recon")["outcome"] == "REFUSED"
     state = ledger(project)
     oid = state["active"]["foreground"]
-    assert state["usage"] == {"all": 1, "recon": 1}
+    assert len(state["occurrences"]) == 1 and len(state["events"]) == 1
     assert outside.read_text() == "{}"
     projection.unlink()
     assert command(project, "prepare_role.py", "recon")["outcome"] == "READY"
     assert ledger(project)["active"]["foreground"] == oid
-    assert ledger(project)["usage"] == state["usage"]
+    assert ledger(project)["events"] == state["events"]
     assert command(project, "prepare_role.py", "recon")["outcome"] == "REFUSED"
 
 
@@ -1123,9 +1199,11 @@ assert manifest["files"]==item["guidance_files"]
 assert digest(canonical(manifest))==item["guidance_snapshot_sha256"]
 for name,checksum in manifest["files"].items():
     assert digest((root/name).read_bytes())==checksum
-assert len(manifest["files"])==11
+assert "context/role-contracts.md" in manifest["files"]
+assert "templates/result.md" in manifest["files"]
+assert not any(name.startswith("prompts/") and name!="prompts/"+item["role"]+".md"
+               for name in manifest["files"])
 assert "Inputs from dispatch:" in (root/("prompts/"+item["role"]+".md")).read_text()
-assert "LAD role artifacts" in (root/"context/role-contracts.md").read_text()
 assert item["accepted_input_refs"]
 for accepted_id,ref in item["accepted_input_refs"].items():
     file=Path(item["foreground_root"]).parent/ref["workspace"]/ref["path"]
@@ -1147,7 +1225,7 @@ print("durable guidance and accepted refs verified from cwd/input only")
 
 
 @pytest.mark.parametrize("mutation", ["file", "manifest"])
-def test_corrupt_durable_guidance_refuses_without_new_debit(
+def test_corrupt_durable_guidance_refuses_without_new_occurrence(
     tmp_path: Path, mutation: str
 ) -> None:
     project = copied(tmp_path)
@@ -1172,7 +1250,7 @@ def test_corrupt_durable_guidance_refuses_without_new_debit(
         == "RECONCILE"
     )
     assert (project / "foreground/lad-state/session.json").read_bytes() == before
-    assert ledger(project)["usage"] == {"all": 1, "recon": 1}
+    assert len(role_occurrences(ledger(project), "recon")) == 1
 
 
 def test_native_error_follows_replacement_preparation(tmp_path: Path) -> None:
@@ -1199,6 +1277,12 @@ def test_native_error_follows_replacement_preparation(tmp_path: Path) -> None:
             for outcome in node["outcomes"]:
                 if outcome != "REFUSED":
                     node["on"][outcome] = {"finish": "succeeded"}
+    for node in plane["nodes"].values():
+        for outcome, action in node["on"].items():
+            if "goto" in action and action["goto"] not in plane["nodes"]:
+                node["on"][outcome] = {
+                    "pause": {"reason": "fixture_unselected_recovery"}
+                }
     graph["planes"] = {"foreground": plane}
     graph["seams"] = {}
     graph["limits"]["max_parallel_invocations"] = 1
@@ -1234,11 +1318,9 @@ def test_native_error_follows_replacement_preparation(tmp_path: Path) -> None:
         "recon",
         "accept_recon_pass",
     ]
-    assert ledger(project)["usage"] == {
-        "all": 2,
-        "recon": 2,
-        "replacement:recon:unpacketized": 1,
-    }
+    assert len(role_occurrences(ledger(project), "recon")) == 2
+    assert sum(row["replacement_of"] is not None
+               for row in role_occurrences(ledger(project), "recon")) == 1
     assert len(ledger(project)["accepted"]) == 1
 
 
@@ -1281,13 +1363,15 @@ def test_bootstrap_and_exact_intake_bytes(tmp_path: Path) -> None:
     assert (project / "foreground/request.md").read_bytes() == raw
 
 
-def test_graph_uses_bound609_and_disjoint_planes() -> None:
+def test_graph_omits_overall_bounds_and_keeps_finite_stages() -> None:
     graph = json.loads((LAD / "workflow.json").read_bytes())
-    assert graph["limits"] == {
-        "max_invocations": 2 + 180 + 120 + 300 + 1 + 6,
-        "max_elapsed_seconds": 35900,
-        "max_parallel_invocations": 2,
-    }
+    assert graph["format"] == "millrace-router/v4"
+    assert graph["limits"] == {"max_parallel_invocations": 2}
+    for plane in graph["planes"].values():
+        for node in plane["nodes"].values():
+            assert node["invoke"]["timeout_seconds"] == (
+                1800 if node["invoke"]["binding"] == "claude" else 10
+            )
     assert graph["planes"]["foreground"]["start"] == "init_session"
     assert graph["planes"]["learning"]["start"] == "receive_request"
     used = graph["planes"]["foreground"]["nodes"]["init_session"]["on"][
@@ -1359,7 +1443,7 @@ def test_real_graph_useful_roles_gate_and_close(tmp_path: Path, scenario: str) -
     nodes = [(row["plane_id"], row["node"]) for row in view["invocations"]]
     if scenario in {"gate", "unresolved"}:
         assert len(state["pairs"]["answer"]) == 2
-        assert state["usage"]["learning:answer"] == 1
+        assert len(role_occurrences(state, "learning")) == 1
         request = nodes.index(("foreground", "emit_learning_request"))
         ack = nodes.index(("learning", "emit_ack"))
         assert all(plane == "learning" for plane, _ in nodes[request + 1 : ack + 1])
@@ -1370,7 +1454,7 @@ def test_real_graph_useful_roles_gate_and_close(tmp_path: Path, scenario: str) -
         4 if scenario in {"gate", "unresolved"} else 2
     )
     assert len(view["seam_acknowledgements"]) == len(view["seam_occurrences"])
-    # A second run on the used copy pauses without replenishing any debit.
+    # A second run pauses without resetting history or creating new work.
     before = (project / "foreground/lad-state/session.json").read_bytes()
     receipt = control.start_run(
         instance,
@@ -1400,3 +1484,1194 @@ def test_real_graph_useful_roles_gate_and_close(tmp_path: Path, scenario: str) -
     assert all(
         plane["active_invocation"] is None for plane in closed["planes"].values()
     )
+
+
+def test_new_v2_session_has_history_without_capacity_authority(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    state = ledger(project)
+    assert state["format"] == "millrace-lad-session/v2"
+    assert "legacy" in state and state["legacy"] is None
+    assert "migration" in state and state["migration"] is None
+    assert "limits" not in state and "usage" not in state
+    assert state["events"] == [] and state["occurrences"] == {}
+    before = (project / "foreground/lad-state/session.json").read_bytes()
+    assert command(project, "init_session.py", "--project-root", "..")["outcome"] == (
+        "EXISTING_SESSION_PRISTINE"
+    )
+    assert (project / "foreground/lad-state/session.json").read_bytes() == before
+
+
+def test_direct_occurrence_requires_no_helper_facility(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    assert command(project, "prepare_role.py", "recon")["outcome"] == "READY"
+    state = ledger(project)
+    oid = state["active"]["foreground"]
+    item = state["occurrences"][oid]
+    assert item["format"] == "millrace-lad-input/v2"
+    assert item.get("helper_mode") == "direct"
+    assert "helper_qualification" in item and item["helper_qualification"] is None
+    assert {"id", "kind"} == set(state["events"][-1])
+    assert state["events"][-1] == {"id": oid, "kind": "role"}
+    # A second visible dispatch still needs reconciliation/new occurrence.
+    before = (project / "foreground/lad-state/session.json").read_bytes()
+    assert command(project, "prepare_role.py", "recon")["outcome"] == "REFUSED"
+    assert (project / "foreground/lad-state/session.json").read_bytes() == before
+
+
+def test_checker_prefreeze_context_excludes_builder_appendix(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    before_role(project, "builder")
+    assert command(project, "prepare_role.py", "builder")["outcome"] == "READY"
+    command(project, "lad_peer.py", "builder", "clean")
+    oid = ledger(project)["active"]["foreground"]
+    output = project / "foreground/lad-results" / oid
+    result_file = output / "result.json"
+    result = json.loads(result_file.read_bytes())
+    marker = "HOSTILE_BUILDER_DERIVED_TEST_DIFF_APPENDIX_42"
+    # This is valid worker evidence before acceptance, not mutation of an
+    # already accepted artifact that would merely exercise old immutability.
+    for artifact in result["artifacts"]:
+        if artifact["path"] == "implementation.md":
+            file = output / artifact["path"]
+            raw = file.read_bytes() + ("\n" + marker + "\n").encode()
+            file.write_bytes(raw)
+            artifact["sha256"] = hashlib.sha256(raw).hexdigest()
+    result_file.write_text(json.dumps(result))
+    assert command(project, "accept_role.py", "builder", "PASS")["outcome"] != "REFUSED"
+    assert command(project, "prepare_role.py", "checker")["outcome"] == "READY"
+    state = ledger(project)
+    checker = state["occurrences"][state["active"]["foreground"]]
+    assert oid not in checker["accepted_input_refs"]
+    assert all(
+        ref["role"] not in {"builder", "fixer", "doublechecker"}
+        for ref in checker["accepted_input_refs"].values()
+    )
+    guidance = Path(checker["guidance_root"])
+    for name in checker["guidance_files"]:
+        assert marker not in (guidance / name).read_text()
+
+
+@pytest.mark.parametrize("relative", ["large.bin", "dist/data.bin"])
+def test_scoped_large_source_does_not_relax_artifact_io(
+    tmp_path: Path, relative: str
+) -> None:
+    project = copied(tmp_path)
+    before_role(project, "manager")
+    assert command(project, "prepare_role.py", "manager")["outcome"] == "READY"
+    command(project, "lad_peer.py", "manager", "clean")
+    oid = ledger(project)["active"]["foreground"]
+    result_file = project / "foreground/lad-results" / oid / "result.json"
+    result = json.loads(result_file.read_bytes())
+    result["data"]["plan"][0]["paths"].append(relative)
+    for ref in result["artifacts"]:
+        artifact = result_file.parent / ref["path"]
+        artifact.write_text(artifact.read_text() + "\nScope addition: " + relative
+                            + " is an explicitly owned relevant asset.\n")
+        ref["sha256"] = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    result_file.write_text(json.dumps(result))
+    assert command(project, "accept_role.py", "manager", "PASS")["outcome"] != "REFUSED"
+    target = project / "foreground/target"
+    target.mkdir(exist_ok=True)
+    raw = b"x" * (4 * 1024 * 1024 + 1)
+    (target / relative).parent.mkdir(parents=True, exist_ok=True)
+    (target / relative).write_bytes(raw)
+    assert command(project, "prepare_role.py", "builder")["outcome"] == "READY"
+    state = ledger(project)
+    item = state["occurrences"][state["active"]["foreground"]]
+    assert item["source_files"][relative] == hashlib.sha256(raw).hexdigest()
+    program = """
+import sys
+from pathlib import Path
+from lad_state import LadError,read
+try:
+    read(Path(sys.argv[1]),sys.argv[2])
+except LadError as exc:
+    assert str(exc)=='file_too_large'
+else:
+    raise AssertionError('scoped source relaxed strict artifact/control IO')
+"""
+    child = subprocess.run(
+        [sys.executable, "-B", "-S", "-c", program, str(project / "foreground"),
+         "target/" + relative],
+        cwd=project / "scripts",
+        env={"PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert child.returncode == 0, child.stdout + child.stderr
+
+
+def test_v2_reader_does_not_derive_shape_from_new_constructor(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    program = """
+import sys
+from pathlib import Path
+import lad_state
+def forbidden(*args):
+    raise AssertionError('reader called mutable constructor')
+lad_state.new_state=forbidden
+assert lad_state.load(Path(sys.argv[1]))['format']=='millrace-lad-session/v2'
+"""
+    child = subprocess.run(
+        [sys.executable, "-B", "-S", "-c", program, str(project / "foreground")],
+        cwd=project / "scripts",
+        env={"PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        timeout=10,
+    )
+    assert child.returncode == 0, child.stdout + child.stderr
+
+
+def test_recorded_events_have_no_capacity_admission(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    program = """
+import sys
+from pathlib import Path
+from lad_state import LadError,load,record_event,save
+state=load(Path(sys.argv[1]))
+for index in range(65):
+    record_event(state,'repair-'+str(index),'planning_repair')
+save(Path(sys.argv[1]),state)
+assert len(load(Path(sys.argv[1]))['events'])==65
+try:
+    record_event(state,'repair-64','planning_repair')
+except LadError as exc:
+    assert str(exc)=='duplicate_history_event'
+else:
+    raise AssertionError('duplicate history accepted')
+"""
+    child = subprocess.run(
+        [sys.executable, "-B", "-S", "-c", program, str(project / "foreground")],
+        cwd=project / "scripts",
+        env={"PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        timeout=10,
+    )
+    assert child.returncode == 0, child.stdout + child.stderr
+
+
+def test_parent_baseline_pin_rejects_worker_digest_forgery(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    before_role(project, "checker")
+    assert step(project, "checker") == "UPDATER"
+    state = ledger(project)
+    baseline = state["baselines"]["answer"]
+    parent_pin = project / "foreground" / baseline["parent_pin"]["path"]
+    retained = parent_pin.read_bytes()
+    baseline_file = project / "foreground" / baseline["path"]
+    baseline_file.write_bytes(baseline_file.read_bytes() + b"\nForged expectations.\n")
+    oid = baseline["occurrence_id"]
+    output = project / "foreground/lad-results" / oid
+    result_file = output / "result.json"
+    result = json.loads(result_file.read_bytes())
+    forged = hashlib.sha256(baseline_file.read_bytes()).hexdigest()
+    for artifact in result["artifacts"]:
+        if artifact["path"] == "baseline.md":
+            artifact["sha256"] = forged
+    freeze_file = output / "baseline-freeze.json"
+    freeze = json.loads(freeze_file.read_bytes())
+    freeze["sha256"] = forged
+    freeze_file.write_text(json.dumps(freeze))
+    result["data"]["baseline_freeze"]["sha256"] = hashlib.sha256(
+        freeze_file.read_bytes()
+    ).hexdigest()
+    for artifact in result["artifacts"]:
+        if artifact["path"] == "baseline-freeze.json":
+            artifact["sha256"] = result["data"]["baseline_freeze"]["sha256"]
+    result_file.write_text(json.dumps(result))
+    # Keep the other recorded worker claims coherent to isolate the independent
+    # parent pin, rather than only repeating accepted-output tamper coverage.
+    state["accepted"][oid]["result"] = result
+    state["accepted"][oid]["sha256"] = hashlib.sha256(
+        json.dumps(
+            result, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode()
+    ).hexdigest()
+    state["baselines"]["answer"]["sha256"] = forged
+    state.pop("integrity_sha256")
+    state["integrity_sha256"] = hashlib.sha256(
+        json.dumps(
+            state, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode()
+    ).hexdigest()
+    (project / "foreground/lad-state/session.json").write_text(json.dumps(state))
+    assert command(project, "prepare_role.py", "updater")["outcome"] == "REFUSED"
+    assert parent_pin.read_bytes() == retained
+    assert ledger(project)["packet_index"] == state["packet_index"]
+
+
+@pytest.mark.parametrize("git", [False, True], ids=["nongit", "git"])
+@pytest.mark.parametrize("change", ["dirty_again", "new", "expected_cache"])
+def test_outside_packet_writes_are_distinct_from_check_products(
+    tmp_path: Path, git: bool, change: str
+) -> None:
+    project = copied(tmp_path)
+    target = project / "foreground/target"
+    target.mkdir()
+    outside = target / "outside.txt"
+    outside.write_text("Original user file.\n")
+    if git:
+        for args in [
+            ["init", "--quiet"],
+            ["add", "--", "outside.txt"],
+            ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+             "commit", "--quiet", "-m", "fixture baseline"],
+        ]:
+            child = subprocess.run(
+                ["git", "-C", str(target), *args],
+                env={"PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1",
+                     "GIT_CONFIG_GLOBAL": "/dev/null"},
+                capture_output=True,
+                timeout=10,
+            )
+            assert child.returncode == 0, child.stderr
+    outside.write_text("User's preexisting dirty work.\n")
+    before_role(project, "builder")
+    assert command(project, "prepare_role.py", "builder")["outcome"] == "READY"
+    command(project, "lad_peer.py", "builder", "clean")
+    before = (project / "foreground/lad-state/session.json").read_bytes()
+    if change == "dirty_again":
+        outside.write_text("Unauthorized overwrite of already dirty user work.\n")
+    elif change == "new":
+        (target / "unauthorized.txt").write_text("Not owned by the packet.\n")
+    else:
+        cache = target / "__pycache__"
+        cache.mkdir()
+        (cache / "expected.pyc").write_bytes(b"reproducible check cache")
+    reply = command(project, "accept_role.py", "builder", "PASS")
+    if change == "expected_cache":
+        assert reply["outcome"] == "CHECKER", reply
+        assert outside.read_text() == "User's preexisting dirty work.\n"
+    else:
+        assert reply["outcome"] == "REFUSED", reply
+        assert "out_of_scope_source_change" in reply["summary"]
+        assert (project / "foreground/lad-state/session.json").read_bytes() == before
+
+
+@pytest.mark.parametrize("kind", ["planning_repair", "remediation"])
+def test_v2_role_event_cannot_be_relabelled_with_coherent_checksum(
+    tmp_path: Path, kind: str
+) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    assert command(project, "prepare_role.py", "recon")["outcome"] == "READY"
+    state = ledger(project)
+    state["events"][0]["kind"] = kind
+    state.pop("integrity_sha256")
+    state["integrity_sha256"] = hashlib.sha256(
+        json.dumps(
+            state, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode()
+    ).hexdigest()
+    file = project / "foreground/lad-state/session.json"
+    file.write_text(json.dumps(state))
+    before = file.read_bytes()
+    result = command(project, "init_session.py", "--project-root", "..")
+    assert result["outcome"] == "RECONCILE", result
+    assert "occurrence_role_history_mismatch" in result["summary"]
+    assert file.read_bytes() == before
+
+
+def helper_authority(project: Path, defect: str) -> tuple[dict, list[dict]]:
+    """Inert independently pinned facility records, never live qualification."""
+    workspace = project / "foreground"
+
+    def write(relative: str, value: dict | str) -> dict:
+        file = workspace / relative
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text(json.dumps(value) if isinstance(value, dict) else value)
+        return {
+            "path": relative, "sha256": hashlib.sha256(file.read_bytes()).hexdigest()
+        }
+
+    tasks = []
+    parent = "fixture-parent"
+    for task_id, task_parent, state, area in (
+        ("alpha", parent, "completed", "helpers/alpha"),
+        ("child", "alpha", "cancelled", "helpers/alpha/child"),
+        ("beta", parent, "failed", "helpers/beta"),
+    ):
+        result_ref = write(area + "/result.md", f"Collected {task_id}: {state}.")
+        history = f"Recon task {task_id}; parent {task_parent}; role fixture-helper.\n"
+        if defect == "large_helper_log" and task_id == "child":
+            history += "x" * (5120 - len(history.encode()))
+        history_ref = write(area + "/historylog/Recon_0000-102526.md", history)
+        terminal = {
+            "format": "millrace-lad-facility-terminal/v1",
+            "binding": "fixture-binding", "facility_version": "fixture-v1",
+            "task_id": task_id, "parent_task_id": task_parent,
+            "terminal_state": state, "result_ref": result_ref,
+            "collected": not (defect == "uncollected_child" and task_id == "child"),
+            "started_at": "2026-10-25T00:00:00+00:00", "historylog_ref": history_ref,
+        }
+        terminal_ref = write("helper-authority/" + task_id + "-terminal.json", terminal)
+        tasks.append({
+            "task_id": task_id, "parent_task_id": task_parent, "role": "fixture-helper",
+            "work_area": area, "model": None, "effort": None, "result_ref": result_ref,
+            "terminal_state": (
+                "running" if defect == "live_task" and task_id == "beta" else state
+            ),
+            "terminal_observation_ref": terminal_ref,
+        })
+    if defect == "duplicate_inventory":
+        tasks.append(dict(tasks[0]))
+    inventory = write("helper-authority/inventory.json", {
+        "format": "millrace-lad-facility-inventory/v1",
+        "binding": "fixture-binding", "facility_version": "fixture-v1",
+        "parent_task_id": parent, "complete": True, "tasks": tasks,
+    })
+    qualification = write("helper-authority/qualification.json", {
+        "format": "millrace-lad-helper-qualification/v1",
+        "scope": "offline_validator_fixture", "binding": "fixture-binding",
+        "facility_version": "fixture-v1", "parent_task_id": parent,
+        "inventory_ref": inventory,
+    })
+    return qualification, tasks
+
+
+@pytest.mark.parametrize("defect", [
+    "none", "empty_self_report", "missing_child", "wrong_parent", "live_task",
+    "uncollected_child", "duplicate_inventory", "forged_terminal",
+    "missing_integration",
+    "large_helper_log",
+])
+def test_helper_inventory_terminal_collection_and_integration_gate(
+    tmp_path: Path, defect: str
+) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    qualification, tasks = helper_authority(project, defect)
+    original = (project / "foreground/lad-state/session.json").read_bytes()
+    refused = command(
+        project, "prepare_role.py", "recon", "--helper-mode", "native_helpers",
+        "--helper-qualification", qualification["path"],
+    )
+    assert refused["outcome"] == "REFUSED"
+    assert "native_helpers_not_qualified" in refused["summary"]
+    assert (project / "foreground/lad-state/session.json").read_bytes() == original
+    assert command(project, "prepare_role.py", "recon")["outcome"] == "READY"
+    # The qualification check must precede the existing READY reuse shortcut too.
+    refused = command(
+        project, "prepare_role.py", "recon", "--helper-mode", "native_helpers",
+        "--helper-qualification", qualification["path"],
+    )
+    assert refused["outcome"] == "REFUSED"
+    assert "native_helpers_not_qualified" in refused["summary"]
+    command(project, "lad_peer.py", "recon", "clean")
+    state = ledger(project)
+    oid = state["active"]["foreground"]
+    workspace = project / "foreground"
+    result_file = workspace / "lad-results" / oid / "result.json"
+    result = json.loads(result_file.read_bytes())
+    qual = json.loads((workspace / qualification["path"]).read_bytes())
+    integration = workspace / "lad-results" / oid / "integration.md"
+    integration.write_text(
+        f"Integrated occurrence {oid}, parent fixture-parent. "
+        + ("alpha child beta" if defect != "missing_integration" else "alpha beta")
+    )
+    evidence = {
+        "format": "millrace-lad-helper-evidence/v1", "occurrence_id": oid,
+        "parent_task_id": (
+            "wrong-parent" if defect == "wrong_parent" else "fixture-parent"
+        ),
+        "binding": "fixture-binding", "facility_version": "fixture-v1",
+        "inventory_ref": qual["inventory_ref"], "tasks": tasks,
+        "integration_ref": {"path": str(integration.relative_to(workspace)),
+                            "sha256": hashlib.sha256(
+                                integration.read_bytes()
+                            ).hexdigest()},
+    }
+    if defect == "empty_self_report":
+        evidence["tasks"] = []
+    elif defect == "missing_child":
+        evidence["tasks"] = [row for row in tasks if row["task_id"] != "child"]
+    elif defect == "forged_terminal":
+        (workspace / tasks[0]["terminal_observation_ref"]["path"]).write_text("{}")
+    file = result_file.parent / "helper-evidence.json"
+    file.write_text(json.dumps(evidence))
+    result["helper_evidence"] = {
+        "path": str(file.relative_to(workspace)),
+        "sha256": hashlib.sha256(file.read_bytes()).hexdigest(),
+    }
+    result["helper_mode"] = "native_helpers"
+    fixture_result = result_file.parent / "fixture-validation-result.json"
+    fixture_result.write_text(json.dumps(result))
+    before = (workspace / "lad-state/session.json").read_bytes()
+    program = """
+import json,sys
+from pathlib import Path
+from accept_role import validate_helpers,validate_execution_evidence
+from lad_state import LadError
+workspace=Path(sys.argv[1])
+item=json.loads((workspace/'lad-state/active-role.json').read_bytes())
+item['helper_mode']='native_helpers'
+path=sys.argv[3]
+import hashlib
+item['helper_qualification']={
+    'path':path,'sha256':hashlib.sha256((workspace/path).read_bytes()).hexdigest()
+}
+result=json.loads(Path(sys.argv[2]).read_bytes())
+try:
+    validate_helpers(workspace,item,result)
+except (LadError,ValueError,KeyError,TypeError):
+    structural=False
+else:
+    structural=True
+try:
+    validate_execution_evidence(workspace,item,result)
+except LadError as exc:
+    assert str(exc)=='native_helpers_not_qualified'
+else:
+    raise AssertionError('fixture qualification became production acceptance')
+print(json.dumps({'structural':structural}))
+"""
+    child = subprocess.run(
+        [sys.executable, "-B", "-S", "-c", program, str(workspace),
+         str(fixture_result), qualification["path"]],
+        cwd=project / "scripts", env={"PATH": "/usr/bin:/bin"},
+        capture_output=True, timeout=10,
+    )
+    assert child.returncode == 0, child.stdout + child.stderr
+    assert json.loads(child.stdout)["structural"] == (defect == "none")
+    assert (workspace / "lad-state/session.json").read_bytes() == before
+    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "PLANNER"
+    assert oid in ledger(project)["accepted"]
+
+
+def test_planner_cannot_select_helpers(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    before_role(project, "planner")
+    qualification, _ = helper_authority(project, "none")
+    before = (project / "foreground/lad-state/session.json").read_bytes()
+    reply = command(
+        project, "prepare_role.py", "planner", "--helper-mode", "native_helpers",
+        "--helper-qualification", qualification["path"],
+    )
+    assert reply["outcome"] == "REFUSED", reply
+    assert (project / "foreground/lad-state/session.json").read_bytes() == before
+
+
+def test_invalid_result_fresh_owner_then_same_repaired_cause_consults(
+    tmp_path: Path,
+) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    owners = []
+    for index, expected in enumerate((
+        "INVALID_RESULT", "INVALID_REPEAT", "INVALID_CONSULT"
+    )):
+        assert command(
+            project, "prepare_role.py", "recon", *(["--replacement"] if index else [])
+        )["outcome"] == "READY"
+        command(project, "lad_peer.py", "recon", "clean")
+        state = ledger(project)
+        oid = state["active"]["foreground"]
+        assert oid not in owners
+        if owners:
+            assert state["occurrences"][oid]["replacement_of"] == owners[-1]
+        owners.append(oid)
+        file = project / "foreground/lad-results" / oid / "result.json"
+        result = json.loads(file.read_bytes())
+        result["occurrence_id"] = "wrong-occurrence"
+        file.write_text(json.dumps(result))
+        rejected = file.read_bytes()
+        reply = command(project, "accept_role.py", "recon", "PASS")
+        assert reply["outcome"] == expected, reply
+        assert file.read_bytes() == rejected
+        assert oid not in ledger(project)["accepted"]
+        assert ledger(project)["packet_index"] == 0
+        if index == 1:
+            assert command(
+                project, "prepare_role.py", "troubleshooter"
+            )["outcome"] == "READY"
+            command(project, "lad_peer.py", "troubleshooter", "clean")
+            assert command(
+                project, "accept_role.py", "troubleshooter",
+                "PASS_PREREQUISITE_REPAIRED"
+            )["outcome"] == "RESUME_RECON"
+    assert ledger(project)["continuation"]["node"] == "prepare_consultant"
+
+
+@pytest.mark.parametrize("same_cause", [False, True])
+def test_repaired_cause_recurrence_is_distinct_from_unrelated_failure(
+    tmp_path: Path, same_cause: bool
+) -> None:
+    project = copied(tmp_path)
+    before_role(project, "builder")
+    prerequisite = project / "foreground/fixture-prerequisite.json"
+    prerequisite.write_text('{"available":false}')
+    for index in range(2):
+        assert command(
+            project, "prepare_role.py", "builder", *(["--replacement"] if index else [])
+        )["outcome"] == "READY"
+        command(project, "lad_peer.py", "builder", "clean", "ERROR")
+        state = ledger(project)
+        oid = state["active"]["foreground"]
+        file = project / "foreground/lad-results" / oid / "result.json"
+        result = json.loads(file.read_bytes())
+        result["data"]["failure"]["operation"] = (
+            "read fixture-prerequisite" if index == 0 or same_cause
+            else "other local check"
+        )
+        file.write_text(json.dumps(result))
+        reply = command(project, "accept_role.py", "builder", "ERROR")
+        assert reply["outcome"] == (
+            "CONSULTANT" if index and same_cause else "TROUBLESHOOTER"
+        ), reply
+        if index == 0:
+            assert command(
+                project, "prepare_role.py", "troubleshooter"
+            )["outcome"] == "READY"
+            prerequisite.write_text('{"available":true}')
+            command(project, "lad_peer.py", "troubleshooter", "clean")
+            assert command(
+                project, "accept_role.py", "troubleshooter",
+                "PASS_PREREQUISITE_REPAIRED"
+            )["outcome"] == "RESUME_BUILDER"
+    assert ledger(project)["packet_index"] == 0
+
+
+def test_missing_history_restores_paperwork_without_replaying_code(
+    tmp_path: Path,
+) -> None:
+    project = copied(tmp_path)
+    before_role(project, "builder")
+    assert command(project, "prepare_role.py", "builder")["outcome"] == "READY"
+    command(project, "lad_peer.py", "builder", "clean")
+    state = ledger(project)
+    oid = state["active"]["foreground"]
+    output = project / "foreground/lad-results" / oid
+    result_file = output / "result.json"
+    retained = result_file.read_bytes()
+    result = json.loads(retained)
+    history = next(
+        row for row in result["artifacts"] if row["path"].startswith("historylog/")
+    )
+    (output / history["path"]).unlink()
+    target = project / "foreground/target/answer.py"
+    source, modified = target.read_bytes(), target.stat().st_mtime_ns
+    reply = command(project, "accept_role.py", "builder", "PASS")
+    assert reply["outcome"] == "CHECKER", reply
+    assert target.read_bytes() == source and target.stat().st_mtime_ns == modified
+    assert ledger(project)["events"] == state["events"]
+    preserved = project / "foreground/lad-state/rejections" / oid
+    assert any(file.read_bytes() == retained for file in preserved.glob("*.json"))
+    assert command(project, "accept_role.py", "builder", "PASS")["outcome"] == "CHECKER"
+
+
+@pytest.mark.parametrize("size", [5119, 5120])
+def test_historylog_limit_counts_strict_utf8_bytes(tmp_path: Path, size: int) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    command(project, "prepare_role.py", "recon")
+    command(project, "lad_peer.py", "recon", "clean")
+    state = ledger(project)
+    oid = state["active"]["foreground"]
+    output = project / "foreground/lad-results" / oid
+    file = output / "result.json"
+    result = json.loads(file.read_bytes())
+    history = next(
+        row for row in result["artifacts"] if row["path"].startswith("historylog/")
+    )
+    log = output / history["path"]
+    raw = log.read_bytes()
+    raw += "é".encode() * ((size - len(raw)) // 2)
+    raw += b"x" * (size - len(raw))
+    assert len(raw) == size and len(raw.decode()) < size
+    log.write_bytes(raw)
+    history["sha256"] = hashlib.sha256(raw).hexdigest()
+    file.write_text(json.dumps(result))
+    reply = command(project, "accept_role.py", "recon", "PASS")
+    assert reply["outcome"] == ("PLANNER" if size == 5119 else "INVALID_RESULT"), reply
+    assert (oid in ledger(project)["accepted"]) == (size == 5119)
+
+
+def test_manager_accepts_more_than_sixty_meaningful_ordered_packets(
+    tmp_path: Path,
+) -> None:
+    project = copied(tmp_path)
+    names = ["answer"] + ["answer_" + str(index) for index in range(1, 61)]
+    request = ("Original required functions:\n" + "\n".join(
+        name + "() returns 42" for name in names
+    ) + "\n").encode()
+    bootstrap(project, request=request)
+    assert step(project, "recon") == "PLANNER"
+    assert step(project, "planner", scenario="many_packets") == "MANAGER"
+    assert step(project, "manager", scenario="many_packets") == "BUILDER"
+    retained = ledger(project)
+    assert len(retained["plan"]) == len(retained["criteria"]) == 61
+    assert [row["id"] for row in retained["criteria"]] == names
+    assert [row["lineage"] for row in retained["plan"]] == names
+    assert retained["packet_index"] == 0
+    # Twenty-one actual packet completions cross the former all=60 role
+    # ceiling (three setup roles + 63 owned preparations/acceptances). The remaining
+    # forty original packets stay intact; this is a finite useful journey.
+    for _ in range(21):
+        for role in ("builder", "checker", "updater"):
+            step(project, role, scenario="many_packets")
+    progressed = ledger(project)
+    assert all(row["accepted"] is True for row in progressed["plan"][:21])
+    assert progressed["plan"][21:] == retained["plan"][21:]
+    assert progressed["packet_index"] == 21
+    assert progressed["criteria"] == retained["criteria"]
+    assert len(role_occurrences(progressed, "manager")) == 1
+    assert len(progressed["events"]) == len(progressed["occurrences"]) == 66
+    assert len({row["id"] for row in progressed["events"]}) == 66
+    assert len(progressed["accepted"]) == 66
+    for name in names[:21]:
+        namespace = {}
+        exec((project / "foreground/target" / (name + ".py")).read_text(), namespace)
+        assert namespace[name]() == 42
+    assert "limits" not in progressed and "usage" not in progressed
+    assert (project / "foreground/request.md").read_bytes() == request
+
+
+@pytest.mark.parametrize("owned", [False, True], ids=["outside", "owned"])
+def test_source_links_are_observed_but_never_grant_escaping_writes(
+    tmp_path: Path, owned: bool
+) -> None:
+    project = copied(tmp_path)
+    target = project / "foreground/target"
+    target.mkdir()
+    protected = tmp_path / "external-user.txt"
+    protected.write_text("User bytes outside the task.\n")
+    link = target / ("answer.py" if owned else "reference-link")
+    link.symlink_to(protected)
+    before_role(project, "builder")
+    before = (project / "foreground/lad-state/session.json").read_bytes()
+    result = command(project, "prepare_role.py", "builder")
+    if owned:
+        assert result["outcome"] == "REFUSED", result
+        assert "writable_source_link_requires_reconciliation" in result["summary"]
+        assert (project / "foreground/lad-state/session.json").read_bytes() == before
+    else:
+        assert result["outcome"] == "READY", result
+        command(project, "lad_peer.py", "builder", "clean")
+        assert command(
+            project, "accept_role.py", "builder", "PASS"
+        )["outcome"] == "CHECKER"
+    assert protected.read_text() == "User bytes outside the task.\n"
+
+
+def test_ignored_protected_user_input_is_not_a_disposable_check_product(
+    tmp_path: Path,
+) -> None:
+    project = copied(tmp_path)
+    target = project / "foreground/target"
+    target.mkdir()
+    protected = target / ".env"
+    protected.write_text("fixture-setting=original\n")
+    (target / ".gitignore").write_text(".env\n")
+    for args in [
+        ["init", "--quiet"], ["add", "--", ".gitignore"],
+        ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+         "commit", "--quiet", "-m", "fixture ignore baseline"],
+        ["check-ignore", ".env"],
+    ]:
+        child = subprocess.run(
+            ["git", "-C", str(target), *args],
+            env={"PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1",
+                 "GIT_CONFIG_GLOBAL": "/dev/null"},
+            capture_output=True, timeout=10,
+        )
+        assert child.returncode == 0, child.stderr
+    before_role(project, "builder")
+    assert command(project, "prepare_role.py", "builder")["outcome"] == "READY"
+    command(project, "lad_peer.py", "builder", "clean")
+    before = (project / "foreground/lad-state/session.json").read_bytes()
+    protected.write_text("fixture-setting=unauthorized\n")
+    result = command(project, "accept_role.py", "builder", "PASS")
+    assert result["outcome"] == "REFUSED", result
+    assert "out_of_scope_source_change" in result["summary"]
+    assert (project / "foreground/lad-state/session.json").read_bytes() == before
+
+
+@pytest.mark.parametrize("missing", [False, True], ids=["changed", "missing"])
+@pytest.mark.parametrize("entry", ["prepare", "accept"])
+def test_baseline_tamper_restores_original_then_consultant_fresh_checker(
+    tmp_path: Path, missing: bool, entry: str
+) -> None:
+    project = copied(tmp_path)
+    before_role(project, "updater")
+    foreground = project / "foreground"
+    state = ledger(project)
+    baseline = state["baselines"]["answer"]
+    original = (foreground / baseline["path"]).read_bytes()
+    pin = (foreground / baseline["parent_pin"]["path"]).read_bytes()
+    accepted = dict(state["accepted"])
+    target = foreground / "target/answer.py"
+    target_raw, modified = target.read_bytes(), target.stat().st_mtime_ns
+    if entry == "accept":
+        assert command(project, "prepare_role.py", "updater")["outcome"] == "READY"
+        command(project, "lad_peer.py", "updater", "clean")
+        state = ledger(project)
+    projection = foreground / baseline["path"]
+    bad = original + b"\nWorker replacement expectations are forbidden.\n"
+    if missing:
+        projection.unlink()
+    else:
+        projection.write_bytes(bad)
+    reply = command(
+        project, "prepare_role.py" if entry == "prepare" else "accept_role.py",
+        "updater", *([] if entry == "prepare" else ["PASS"]),
+    )
+    assert reply["outcome"] == "BASELINE_TAMPER", reply
+    restored = ledger(project)
+    assert restored["baselines"] == state["baselines"]
+    assert restored["accepted"] == accepted
+    assert restored["events"] == state["events"]
+    assert restored["pending"]["kind"] == "baseline_tamper"
+    assert restored["continuation"]["node"] == "prepare_consultant"
+    assert "answer" not in restored["reviews"]
+    assert projection.read_bytes() == original
+    assert (foreground / baseline["parent_pin"]["path"]).read_bytes() == pin
+    owner = state["active"]["foreground"]
+    observation_file = foreground / f"lad-state/baseline-pins/{owner}-restoration.json"
+    observation = json.loads(observation_file.read_bytes())
+    if missing:
+        assert observation["observed"] is None
+    else:
+        assert (foreground / observation["observed"]["path"]).read_bytes() == bad
+    assert step(project, "consultant", "REPAIR_EXECUTION") == "CHECKER"
+    assert step(project, "checker") == "UPDATER"
+    after = ledger(project)
+    assert after["baselines"] == state["baselines"]
+    assert after["pending"] is None
+    assert len(role_occurrences(after, "checker")) == 2
+    assert after["reviews"]["answer"]["occurrence_id"] != baseline["occurrence_id"]
+    assert projection.read_bytes() == original
+    assert observation_file.read_bytes() == json.dumps(
+        observation, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode() + b"\n"
+    assert target.read_bytes() == target_raw and target.stat().st_mtime_ns == modified
+    consultant = role_occurrences(after, "consultant")[0]
+    ref = consultant["pending"]["restoration"]
+    assert ref["sha256"] == hashlib.sha256(observation_file.read_bytes()).hexdigest()
+    snapshot = (foreground / "lad-state/session.json").read_bytes()
+    if missing:
+        observation_file.write_bytes(observation_file.read_bytes() + b" ")
+    else:
+        (foreground / observation["observed"]["path"]).write_bytes(b"Lost observation")
+    assert command(project, "prepare_role.py", "updater")["outcome"] == "REFUSED"
+    assert (foreground / "lad-state/session.json").read_bytes() == snapshot
+    assert projection.read_bytes() == original
+    graph = json.loads((project / "workflow.json").read_bytes())
+    nodes = graph["planes"]["foreground"]["nodes"]
+    assert nodes["prepare_updater"]["on"]["BASELINE_TAMPER"] == {
+        "goto": "prepare_consultant"
+    }
+    assert nodes["accept_consultant_repair_execution"]["on"]["CHECKER"] == {
+        "goto": "prepare_checker"
+    }
+
+
+@pytest.mark.parametrize("damage", [
+    "missing_backup", "corrupt_backup", "backup_symlink", "projection_symlink",
+    "other_artifact", "outside_source", "wrong_owner",
+])
+def test_baseline_restoration_refuses_unverified_authority(
+    tmp_path: Path, damage: str
+) -> None:
+    project = copied(tmp_path)
+    before_role(project, "updater")
+    foreground = project / "foreground"
+    state = ledger(project)
+    baseline = state["baselines"]["answer"]
+    projection = foreground / baseline["path"]
+    original = projection.read_bytes()
+    backup = foreground / (
+        "lad-state/baseline-pins/" + baseline["occurrence_id"] + ".md"
+    )
+    projection.write_bytes(b"Observed baseline tamper.\n")
+    if damage == "missing_backup":
+        backup.unlink()
+    elif damage == "corrupt_backup":
+        backup.write_bytes(b"Not the original expectations.\n")
+    elif damage == "backup_symlink":
+        backup.unlink()
+        backup.symlink_to(projection)
+    elif damage == "projection_symlink":
+        projection.unlink()
+        projection.symlink_to(backup)
+    elif damage == "other_artifact":
+        checker_result = state["accepted"][baseline["occurrence_id"]]["result"]
+        artifact = next(row for row in checker_result["artifacts"]
+                        if row["path"] == "review.md")
+        (projection.parent / artifact["path"]).write_bytes(b"Corrupt review too.\n")
+    elif damage == "outside_source":
+        (foreground / "target/unapproved.py").write_text("unauthorized = True\n")
+    session_before = (foreground / "lad-state/session.json").read_bytes()
+    reply = command(
+        project, "prepare_role.py", "planner" if damage == "wrong_owner" else "updater"
+    )
+    assert reply["outcome"] == "REFUSED", reply
+    assert (foreground / "lad-state/session.json").read_bytes() == session_before
+    assert not list((foreground / "lad-state/baseline-pins").glob("*-restoration.json"))
+    if damage != "projection_symlink":
+        assert projection.read_bytes() != original
+
+
+@pytest.mark.parametrize("window", ["observation", "restored", "routed"])
+def test_baseline_restoration_interruption_finishes_route_without_replay(
+    tmp_path: Path, window: str
+) -> None:
+    project = copied(tmp_path)
+    before_role(project, "updater")
+    foreground = project / "foreground"
+    state = ledger(project)
+    baseline = state["baselines"]["answer"]
+    projection = foreground / baseline["path"]
+    original = projection.read_bytes()
+    projection.write_bytes(original + b"\nBad replacement observed.\n")
+    target = foreground / "target/answer.py"
+    modified = target.stat().st_mtime_ns
+    program = '''
+import sys
+from pathlib import Path
+import accept_role
+class FixtureCrash(BaseException):
+    pass
+real_atomic, real_save = accept_role.atomic, accept_role.save
+window, baseline = sys.argv[2:4]
+def atomic(root, name, raw, **kwargs):
+    real_atomic(root, name, raw, **kwargs)
+    if (window == 'observation' and name.endswith('-restoration.json')) or (
+        window == 'restored' and name == baseline
+    ):
+        raise FixtureCrash()
+def save(root, state):
+    real_save(root, state)
+    if window == 'routed':
+        raise FixtureCrash()
+accept_role.atomic, accept_role.save = atomic, save
+try:
+    accept_role.guard_baseline(Path(sys.argv[1]), 'updater', preparing=True)
+except FixtureCrash:
+    sys.exit(81)
+raise AssertionError('fault window not reached')
+'''
+    child = subprocess.run(
+        [sys.executable, "-B", "-S", "-c", program,
+         str(foreground), window, baseline["path"]],
+        cwd=project / "scripts", capture_output=True, text=True, timeout=10,
+    )
+    assert child.returncode == 81, child.stdout + child.stderr
+    assert command(
+        project, "prepare_role.py", "updater"
+    )["outcome"] == "BASELINE_TAMPER"
+    after = ledger(project)
+    assert after["events"] == state["events"]
+    assert after["accepted"] == state["accepted"]
+    assert after["baselines"] == state["baselines"]
+    assert after["continuation"]["node"] == "prepare_consultant"
+    assert projection.read_bytes() == original
+    assert target.stat().st_mtime_ns == modified
+    assert len(list((foreground / "lad-state/baseline-pins").glob(
+        "*-restoration.json"
+    ))) == 1
+    assert step(project, "consultant", "REPAIR_EXECUTION") == "CHECKER"
+
+
+def test_real_graph_baseline_tamper_routes_consultant_and_new_checker(
+    tmp_path: Path,
+) -> None:
+    project = copied(tmp_path)
+    (project / "request.md").write_text("Original request: answer() returns 42.\n")
+    _, view = started(project, tmp_path / "state", "baseline_tamper")
+    assert view["status"] == "succeeded", view
+    state = ledger(project)
+    assert state["terminal"] == "succeeded" and state["request"] is None
+    assert len(role_occurrences(state, "checker")) == 2
+    assert len(role_occurrences(state, "consultant")) == 1
+    updaters = role_occurrences(state, "updater")
+    assert len(updaters) == 2
+    assert updaters[0]["occurrence_id"] not in state["accepted"]
+    assert updaters[1]["occurrence_id"] in state["accepted"]
+    baseline = state["baselines"]["answer"]
+    foreground = project / "foreground"
+    backup = foreground / (
+        "lad-state/baseline-pins/" + baseline["occurrence_id"] + ".md"
+    )
+    assert (foreground / baseline["path"]).read_bytes() == backup.read_bytes()
+    observations = list((foreground / "lad-state/baseline-pins").glob(
+        "*-restoration.json"
+    ))
+    assert len(observations) == 1
+    observed = json.loads(observations[0].read_bytes())
+    assert b"Unauthorized new expectation" in (
+        foreground / observed["observed"]["path"]
+    ).read_bytes()
+    nodes = [row["node"] for row in view["invocations"]]
+    first_accept = nodes.index("accept_updater_pass")
+    assert nodes[first_accept + 1:first_accept + 5] == [
+        "prepare_consultant", "consultant", "accept_consultant_repair_execution",
+        "prepare_checker",
+    ]
+    assert len(view["seam_occurrences"]) == 2
+    assert len(view["seam_acknowledgements"]) == 2
+    namespace = {}
+    exec((foreground / "target/answer.py").read_text(), namespace)
+    assert namespace["answer"]() == 42
+
+
+@pytest.mark.parametrize("replacement", [False, True])
+@pytest.mark.parametrize("tampered_baseline", [False, True])
+def test_interrupted_stored_fixture_helper_never_rematerializes_ready(
+    tmp_path: Path, replacement: bool, tampered_baseline: bool
+) -> None:
+    project = copied(tmp_path)
+    role = "updater" if tampered_baseline else "recon"
+    if tampered_baseline:
+        before_role(project, "updater")
+    else:
+        bootstrap(project)
+    assert command(project, "prepare_role.py", role)["outcome"] == "READY"
+    if replacement:
+        assert command(
+            project, "prepare_role.py", role, "--replacement"
+        )["outcome"] == "READY"
+    foreground = project / "foreground"
+    state = ledger(project)
+    oid = state["active"]["foreground"]
+    occurrence = state["occurrences"][oid]
+    occurrence["helper_mode"] = "native_helpers"
+    occurrence["helper_qualification"] = {
+        "path": "fixture-only.json", "sha256": "f" * 64
+    }
+    occurrence.pop("input_sha256")
+    occurrence["input_sha256"] = hashlib.sha256(json.dumps(
+        occurrence, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()).hexdigest()
+    output = foreground / "lad-state/occurrences" / oid
+    (output / "ready.json").unlink()
+    (output / "input.json").write_text(json.dumps(occurrence))
+    (foreground / "lad-state/active-role.json").write_text(json.dumps(occurrence))
+    state.pop("integrity_sha256")
+    state["integrity_sha256"] = hashlib.sha256(json.dumps(
+        state, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()).hexdigest()
+    session = foreground / "lad-state/session.json"
+    session.write_text(json.dumps(state))
+    if tampered_baseline:
+        baseline = foreground / state["baselines"]["answer"]["path"]
+        baseline.write_bytes(b"Bad baseline; unsupported owner cannot restore it.\n")
+    before = session.read_bytes()
+    reply = command(
+        project, "prepare_role.py", role, *(["--replacement"] if replacement else [])
+    )
+    assert reply["outcome"] == "REFUSED", reply
+    assert ("baseline_owner_mismatch" if tampered_baseline
+            else "native_helpers_not_qualified") in reply["summary"]
+    assert not (output / "ready.json").exists()
+    assert session.read_bytes() == before
+    if tampered_baseline:
+        assert baseline.read_bytes().startswith(b"Bad baseline;")
+        assert not list((foreground / "lad-state/baseline-pins").glob(
+            "*-restoration.json"
+        ))
+
+
+def test_accepted_replacement_owner_cannot_rebase_on_stale_pending(
+    tmp_path: Path,
+) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    assert command(project, "prepare_role.py", "recon")["outcome"] == "READY"
+    original = ledger(project)["active"]["foreground"]
+    assert command(
+        project, "prepare_role.py", "recon", "--replacement"
+    )["outcome"] == "READY"
+    replacement = ledger(project)["active"]["foreground"]
+    assert replacement != original
+    command(project, "lad_peer.py", "recon", "clean")
+    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "PLANNER"
+    state = ledger(project)
+    assert state["pending"]["occurrence_id"] == original
+    assert state["pending"]["target"] == "recon"
+    assert state["occurrences"][original]["lineage"] == (
+        state["occurrences"][replacement]["lineage"]
+    )
+    assert replacement in state["accepted"] and original not in state["accepted"]
+    session = project / "foreground/lad-state/session.json"
+    before = session.read_bytes()
+    rejected = command(project, "prepare_role.py", "recon", "--replacement")
+    assert rejected["outcome"] == "REFUSED", rejected
+    assert "replacement_route_not_selected" in rejected["summary"]
+    assert session.read_bytes() == before
+    assert len(role_occurrences(ledger(project), "recon")) == 2
+    assert ledger(project)["active"]["foreground"] == replacement
+
+
+@pytest.mark.parametrize("recovery", ["baseline", "planning"])
+def test_fresh_checker_excludes_valid_hostile_consultant_and_tamper_carriers(
+    tmp_path: Path, recovery: str
+) -> None:
+    project = copied(tmp_path)
+    foreground = project / "foreground"
+    marker = "HOSTILE_CONSULTANT_IMPLEMENTATION_DERIVED_APPENDIX_42"
+    bad_marker = "HOSTILE_BASELINE_EXPECTATION_REPLACEMENT_42"
+    forbidden = [marker.encode(), bad_marker.encode()]
+    if recovery == "baseline":
+        before_role(project, "updater")
+        original_baseline = ledger(project)["baselines"]["answer"]
+        baseline = foreground / original_baseline["path"]
+        retained_baseline = baseline.read_bytes()
+        baseline.write_bytes(retained_baseline + bad_marker.encode())
+        assert command(
+            project, "prepare_role.py", "updater"
+        )["outcome"] == "BASELINE_TAMPER"
+        saved_pending = ledger(project)["pending"]
+        restoration = saved_pending["restoration"]
+        observed = json.loads((foreground / restoration["path"]).read_bytes())
+        forbidden += [
+            restoration["path"].encode(), observed["observed"]["path"].encode()
+        ]
+        selected_outcome = "REPAIR_EXECUTION"
+    else:
+        before_role(project, "consultant")
+        saved_pending = ledger(project)["pending"]
+        selected_outcome = "REPAIR_SPEC"
+    assert command(project, "prepare_role.py", "consultant")["outcome"] == "READY"
+    command(project, "lad_peer.py", "consultant", "clean", selected_outcome)
+    consultant = ledger(project)["active"]["foreground"]
+    output = foreground / "lad-results" / consultant
+    result_file = output / "result.json"
+    result = json.loads(result_file.read_bytes())
+    diagnosis = output / "diagnosis.md"
+    # Valid hostile evidence is supplied BEFORE acceptance. Recompute every
+    # affected digest so this exercises selective exposure, not immutability.
+    diagnosis.write_bytes(diagnosis.read_bytes() + b"\n" + b"\n".join(forbidden))
+    checksum = hashlib.sha256(diagnosis.read_bytes()).hexdigest()
+    for artifact in result["artifacts"]:
+        if artifact["path"] == "diagnosis.md":
+            artifact["sha256"] = checksum
+    result["data"]["next_evidence"]["sha256"] = checksum
+    result_file.write_text(json.dumps(result))
+    assert command(
+        project, "accept_role.py", "consultant", selected_outcome
+    )["outcome"] == ("CHECKER" if recovery == "baseline" else "PLANNER")
+    accepted_consultant = ledger(project)["accepted"][consultant]
+    if recovery == "planning":
+        # Requirement-role envelopes/Markdown may themselves carry the accepted
+        # Consultant ref. A role-name whitelist must not expose them wholesale.
+        for role, route in (("planner", "MANAGER"), ("manager", "BUILDER")):
+            assert command(project, "prepare_role.py", role)["outcome"] == "READY"
+            command(project, "lad_peer.py", role, "clean")
+            owner = ledger(project)["active"]["foreground"]
+            role_file = foreground / "lad-results" / owner / "result.json"
+            value = json.loads(role_file.read_bytes())
+            for artifact in value["artifacts"]:
+                evidence = role_file.parent / artifact["path"]
+                evidence.write_bytes(evidence.read_bytes() + b"\n" + marker.encode()
+                                     + b"\n" + consultant.encode())
+                artifact["sha256"] = hashlib.sha256(evidence.read_bytes()).hexdigest()
+            if role == "manager":
+                value["data"]["plan"][0]["input_refs"] = [{
+                    "occurrence_id": consultant,
+                    "sha256": accepted_consultant["sha256"],
+                }]
+            role_file.write_text(json.dumps(value))
+            assert command(
+                project, "accept_role.py", role, "PASS"
+            )["outcome"] == route
+        assert step(project, "builder") == "CHECKER"
+    assert command(project, "prepare_role.py", "checker")["outcome"] == "READY"
+    state = ledger(project)
+    checker = state["occurrences"][state["active"]["foreground"]]
+    assert checker["pending"] is None
+    assert checker["fixer"] is None and checker["finding_ids"] == []
+    assert checker["review"] is None
+    assert checker["accepted_inputs"] == checker["accepted_input_refs"] == {}
+    assert checker["specification"] is None
+    assert set(checker["packet"]) == {
+        "id", "lineage", "criteria", "depends_on", "paths"
+    }
+    assert checker["criteria"] == state["criteria"]
+    for key, value in checker["packet"].items():
+        assert value == state["plan"][state["packet_index"]][key]
+    materialized = foreground / "lad-state/occurrences" / checker["occurrence_id"]
+    payloads = [p.read_bytes() for p in materialized.rglob("*") if p.is_file()]
+    payloads.append((foreground / "lad-state/active-role.json").read_bytes())
+    for ref in checker["accepted_input_refs"].values():
+        workspace = project / ref["workspace"]
+        raw = (workspace / ref["path"]).read_bytes()
+        payloads.append(raw)
+        accepted_result = json.loads(raw)
+        for artifact in accepted_result["artifacts"]:
+            payloads.append((workspace / Path(ref["path"]).parent / artifact["path"])
+                            .read_bytes())
+    for raw in payloads:
+        assert consultant.encode() not in raw
+        assert all(value not in raw for value in forbidden)
+    assert state["accepted"][consultant] == accepted_consultant
+    assert marker.encode() in diagnosis.read_bytes()
+    if recovery == "baseline":
+        assert state["pending"] == saved_pending
+        assert state["occurrences"][consultant]["pending"] == saved_pending
+        assert (foreground / restoration["path"]).is_file()
+        assert baseline.read_bytes() == retained_baseline
+    command(project, "lad_peer.py", "checker", "clean")
+    assert command(project, "accept_role.py", "checker", "PASS")["outcome"] == "UPDATER"
+    assert step(project, "updater") == "ARBITER"
+    after = ledger(project)
+    assert after["plan"][0]["accepted"] is True
+    assert after["accepted"][consultant] == accepted_consultant
+    if recovery == "baseline":
+        assert after["baselines"]["answer"] == original_baseline
+        assert (foreground / restoration["path"]).is_file()
+
+
+def test_matching_baseline_owner_with_unsupported_helpers_cannot_restore(
+    tmp_path: Path,
+) -> None:
+    project = copied(tmp_path)
+    before_role(project, "updater")
+    assert command(project, "prepare_role.py", "updater")["outcome"] == "READY"
+    command(project, "lad_peer.py", "updater", "clean")
+    foreground = project / "foreground"
+    state = ledger(project)
+    oid = state["active"]["foreground"]
+    item = state["occurrences"][oid]
+    assert item["role"] == "updater" and state["continuation"]["node"] == "updater"
+    item["helper_mode"] = "native_helpers"
+    item["helper_qualification"] = {
+        "path": "fixture-only.json", "sha256": "f" * 64
+    }
+    item.pop("input_sha256")
+    item["input_sha256"] = hashlib.sha256(json.dumps(
+        item, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()).hexdigest()
+    (foreground / "lad-state/occurrences" / oid / "input.json").write_text(
+        json.dumps(item)
+    )
+    (foreground / "lad-state/active-role.json").write_text(json.dumps(item))
+    result_file = foreground / "lad-results" / oid / "result.json"
+    result = json.loads(result_file.read_bytes())
+    result["input_sha256"] = item["input_sha256"]
+    result["helper_mode"] = "native_helpers"
+    result_file.write_text(json.dumps(result))
+    state.pop("integrity_sha256")
+    state["integrity_sha256"] = hashlib.sha256(json.dumps(
+        state, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()).hexdigest()
+    session = foreground / "lad-state/session.json"
+    session.write_text(json.dumps(state))
+    baseline = foreground / state["baselines"]["answer"]["path"]
+    bad = b"Unsupported owner must never restore these observed bad bytes.\n"
+    baseline.write_bytes(bad)
+    before = session.read_bytes()
+    ready = foreground / "lad-state/occurrences" / oid / "ready.json"
+    ready_before = ready.read_bytes()
+    reply = command(project, "accept_role.py", "updater", "PASS")
+    assert reply["outcome"] == "REFUSED", reply
+    assert "baseline_writer_reconciliation_required" in reply["summary"]
+    assert session.read_bytes() == before and baseline.read_bytes() == bad
+    assert ready.read_bytes() == ready_before
+    assert not list((foreground / "lad-state/baseline-pins").glob(
+        "*-restoration.json"
+    ))

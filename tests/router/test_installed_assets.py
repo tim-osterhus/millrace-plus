@@ -130,7 +130,8 @@ def test_v023_templates_installed_and_initializable(
     lad_copy = standalone.cwd / "lad-copy"
     standalone.run(str(console), "catalog", "copy", str(lad), str(lad_copy), check=True)
     lad_files = files(lad)
-    assert len(lad_files) == 37
+    assert len(lad_files) == 38
+    assert "scripts/session_compat.py" in lad_files
     assert files(lad_copy) == lad_files
     assert all(not (lad / rel).samefile(lad_copy / rel) for rel in lad_files)
     prompt = lad_copy / "prompts/planner.md"

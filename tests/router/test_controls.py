@@ -947,6 +947,7 @@ def test_facade_signatures_match_core_controls_without_resolver() -> None:
         "pause_run",
         "cancel_run",
         "reconcile_invocation",
+        "exclusive_run_snapshot",
     }
     for name in core.__all__:
         theirs = inspect.signature(getattr(core, name)).parameters
@@ -969,3 +970,122 @@ def test_facade_signatures_match_core_controls_without_resolver() -> None:
                 and type(theirs[key].default) is not object
             ):
                 assert parameter.default == theirs[key].default, (name, key)
+
+
+@pytest.mark.parametrize("failure", [None, "catalog", "caller"])
+def test_exclusive_snapshot_facade_resolver_catalog_and_lifetime(
+    tmp_path, monkeypatch, failure,
+):
+    from contextlib import contextmanager
+
+    import millrace_plus.router.control as facade
+    from millrace_plus.catalog import CatalogError
+
+    operation = getattr(facade, "exclusive_run_snapshot", None)
+    assert callable(operation), "Plus must expose the public snapshot context"
+    assert "exclusive_run_snapshot" in facade.__all__
+    instance, run = "a" * 32, "b" * 32
+    home, catalog = tmp_path / "state", tmp_path / "catalog"
+    workflow, project = tmp_path / "copy/workflow.json", tmp_path / "project"
+    facts = {"id": run, "status": "paused", "state_version": 7}
+    identity = {"workflow_file": str(workflow), "project_root": str(project)}
+    calls, events = [], []
+    held = False
+
+    class CallerInterrupted(BaseException):
+        pass
+
+    @contextmanager
+    def core_scope(*args, **kwargs):
+        nonlocal held
+        calls.append((args, kwargs))
+        held = True
+        events.append("enter")
+        try:
+            yield facts
+        finally:
+            events.append("exit")
+            held = False
+
+    def inspect_identity(*args, **kwargs):
+        assert held, "catalog identity must be obtained inside exclusion"
+        assert args == (instance,)
+        assert kwargs == {
+            "state_home": home, "adapter_resolver": facade.resolve_adapter,
+        }
+        events.append("identity")
+        return identity
+
+    def ownership(*args, **kwargs):
+        assert held, "catalog ownership must be checked inside exclusion"
+        assert args == (workflow, project)
+        assert kwargs == {"catalog_home": catalog}
+        events.append("catalog")
+        if failure == "catalog":
+            raise CatalogError("catalog_ownership", "fixture refusal")
+
+    monkeypatch.setattr(
+        facade._core, "exclusive_run_snapshot", core_scope, raising=False,
+    )
+    monkeypatch.setattr(facade._core, "inspect_instance", inspect_identity)
+    monkeypatch.setattr(facade._catalog, "check_ownership", ownership)
+    context = operation(
+        instance, run, state_home=home, expected_state_version=7, catalog_home=catalog,
+    )
+    assert events == [] and not held
+
+    def caller():
+        with context as snapshot:
+            assert held and snapshot is facts
+            events.append("publication")
+            if failure == "caller":
+                raise CallerInterrupted()
+            events.append("postvalidation")
+            assert held
+
+    if failure == "catalog":
+        with pytest.raises(CatalogError, match="fixture refusal"):
+            caller()
+        assert events == ["enter", "identity", "catalog", "exit"]
+    elif failure == "caller":
+        with pytest.raises(CallerInterrupted):
+            caller()
+        assert events == ["enter", "identity", "catalog", "publication", "exit"]
+    else:
+        caller()
+        assert events == [
+            "enter", "identity", "catalog", "publication", "postvalidation", "exit",
+        ]
+    assert not held
+    assert calls == [((instance, run), {
+        "state_home": home, "expected_state_version": 7,
+        "adapter_resolver": facade.resolve_adapter,
+    })]
+
+
+def test_exclusive_snapshot_facade_core_refusal_precedes_catalog(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    from millrace.router.execution import RouterError
+
+    import millrace_plus.router.control as facade
+
+    operation = getattr(facade, "exclusive_run_snapshot", None)
+    assert callable(operation), "Plus must expose the public snapshot context"
+
+    @contextmanager
+    def refuse(*args, **kwargs):
+        raise RouterError("stale_state_version")
+        yield  # A context manager whose entry refuses before any ownership read.
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Core entry refusal must precede catalog reads and publication")
+
+    monkeypatch.setattr(facade._core, "exclusive_run_snapshot", refuse, raising=False)
+    monkeypatch.setattr(facade._core, "inspect_instance", forbidden)
+    monkeypatch.setattr(facade._catalog, "check_ownership", forbidden)
+    with pytest.raises(RouterError, match="stale_state_version"):
+        with operation(
+            "a" * 32, "b" * 32, state_home=tmp_path, expected_state_version=7,
+        ):
+            forbidden()

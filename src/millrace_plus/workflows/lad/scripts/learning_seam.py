@@ -8,8 +8,6 @@ import uuid
 from pathlib import Path
 
 from lad_state import (
-    CAPS,
-    SESSION_ROLES,
     LadError,
     atomic,
     canonical,
@@ -229,52 +227,60 @@ def learning_prepare(replacement: bool) -> None:
     from prepare_role import prepare
 
     foreground, state, request = selected()
-    lineage = request["lineage"]
-    if replacement and (
-        state["usage"].get("learning:" + lineage, 0) >= 2
-        or state["usage"].get("replacement:learning:" + lineage, 0) >= 1
-    ):
-        # A dispatched failed/unknown attempt stays spent; no third attempt.
-        state["learning"][lineage] = {
-            "disposition": "failed",
-            "occurrence_id": state["active"].get("learning"),
+    try:
+        occurrence = prepare(
+            foreground, Path.cwd(), "learning", replacement=replacement
+        )
+    except LadError as exc:
+        if str(exc) != "unchanged_execution_prerequisite":
+            raise
+        current = load(foreground)
+        current["pending"] = request["payload"]["pending_route"]
+        current["learning"][request["lineage"]] = {
+            "disposition": "failed", "occurrence_id": current["active"].get("learning"),
+            "diagnostic": "unchanged_execution_prerequisite",
         }
-        mark(state, "emit_ack")
-        save(foreground, state)
-        emit("ACK", "Learning attempts exhausted; preserving legal pending route.")
+        mark(current, "emit_ack")
+        save(foreground, current)
+        emit("ACK", "Recorded failed assessment; original pending route retained.")
         return
-    occurrence = prepare(foreground, Path.cwd(), "learning", replacement=replacement)
     emit("READY", "Reserved Learning=" + occurrence["occurrence_id"])
 
 
 def learning_accept(outcome: str) -> None:
-    from accept_role import accept
+    from accept_role import accept_checked
 
     foreground, _, _ = selected()
     emit(
-        accept(foreground, Path.cwd(), "learning", outcome),
+        accept_checked(foreground, Path.cwd(), "learning", outcome),
         "Learning accepted before ACK.",
     )
 
 
 def legal_pending(state: dict, request: dict, foreground: Path) -> None:
     payload = request["payload"]
+    current_source = source(foreground)
+    expected_guidance = guidance()
+    if state.get("legacy") is not None:
+        archived = load_json(read(foreground, state["legacy"]["path"]))
+        original = archived["request"]
+        if original is not None and original["id"] == request["id"]:
+            from session_compat import source_v1
+
+            if payload != original["payload"]:
+                raise LadError("legacy_pending_payload_changed")
+            current_source = source_v1(foreground)
+            expected_guidance = original["payload"]["guidance_sha256"]
     if (
-        payload["source_sha256"] != digest(canonical(source(foreground)))
-        or payload["guidance_sha256"] != guidance()
+        payload["source_sha256"] != digest(canonical(current_source))
+        or payload["guidance_sha256"] != expected_guidance
         or payload["pending_route"] != state["pending"]
     ):
         raise LadError("saved_route_authority_changed")
     if request["kind"] == "ASSESS":
         target = state["pending"]["target"]
-        if target not in {"updater", "troubleshooter"}:
+        if target not in {"updater", "troubleshooter", "consultant"}:
             raise LadError("illegal_pending_route")
-        key = target if target in SESSION_ROLES else target + ":" + request["lineage"]
-        if (
-            state["usage"].get("all", 0) >= CAPS["all"]
-            or state["usage"].get(key, 0) >= CAPS[target]
-        ):
-            raise LadError("saved_route_budget_exhausted")
 
 
 def emit_ack() -> None:
@@ -352,6 +358,7 @@ def accept_ack() -> None:
             "target": "doublechecker",
             "lineage": pending["lineage"],
             "occurrence_id": pending["occurrence_id"],
+            "cause_id": pending.get("cause_id"),
         }
     else:
         state["pending"] = None

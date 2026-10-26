@@ -227,6 +227,7 @@ def test_lad_package_inventory_matches_admitted_workflow_assets() -> None:
         "templates/result.md", "scripts/lad_state.py", "scripts/init_session.py",
         "scripts/setup_intake.py", "scripts/prepare_role.py", "scripts/accept_role.py",
         "scripts/boundaries.py", "scripts/learning_seam.py",
+        "scripts/session_compat.py",
         *(f"prompts/{role}.md" for role in roles),
     }
     actual = {
@@ -234,17 +235,18 @@ def test_lad_package_inventory_matches_admitted_workflow_assets() -> None:
         for path in root.rglob("*")
         if path.is_file() and "__pycache__" not in path.parts
     }
-    assert len(expected) == 37
+    assert len(expected) == 38
     assert actual == expected
     assert not any(path.is_symlink() for path in root.rglob("*"))
     graph = json.loads((root / "workflow.json").read_text())
-    assert graph["format"] == "millrace-router/v3"
+    assert graph["format"] == "millrace-router/v4"
     assert set(graph["planes"]) == {"foreground", "learning"}
-    assert graph["limits"] == {
-        "max_invocations": 609,
-        "max_elapsed_seconds": 35900,
-        "max_parallel_invocations": 2,
-    }
+    assert graph["limits"] == {"max_parallel_invocations": 2}
+    for plane in graph["planes"].values():
+        for node in plane["nodes"].values():
+            assert node["invoke"]["timeout_seconds"] == (
+                1800 if node["invoke"]["binding"] == "claude" else 10
+            )
     assert all((root / asset).is_file() for asset in graph["control_files"])
     license_text = (root / "licenses/lad-factory-Apache-2.0.txt").read_text()
     assert "Apache License" in license_text

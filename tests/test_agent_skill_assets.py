@@ -105,9 +105,11 @@ def test_advisory_inventory_results_and_agent_metadata(tmp_path: Path) -> None:
 
 
 def test_stock_graphs_have_no_implicit_skill_authority() -> None:
-    # Stock workflows intentionally remain finite graph-v3 examples.
+    # The two finite v3 examples and optional-bound v4 LAD have no skill authority.
     for path in (ROOT / "src/millrace_plus/workflows").glob("*/workflow.json"):
         graph = json.loads(path.read_text())
-        assert graph["format"] == "millrace-router/v3"
+        assert graph["format"] == (
+            "millrace-router/v4" if path.parent.name == "lad" else "millrace-router/v3"
+        )
         assert all("skills/" not in asset for asset in graph["control_files"])
         assert "selected_authority" not in graph
