@@ -273,12 +273,24 @@ def _source_files(source: Path) -> list[tuple[Path, bool]]:
         name == Path("workflow.json") and not directory for name, directory in files
     ):
         raise CatalogError(
-            "invalid_template", f"Required graph-v3 workflow.json missing: {source}"
+            "invalid_template", f"Required workflow.json missing: {source}"
         )
     value = strict_json(graph.read_bytes())
-    if not isinstance(value, dict) or value.get("format") != "millrace-router/v3":
+    if not isinstance(value, dict):
         raise CatalogError(
-            "invalid_template", f"Reauthor this folder as millrace-router/v3: {graph}"
+            "invalid_template",
+            f"Reauthor this folder as millrace-router/v3 or "
+            f"millrace-router/v4: {graph}",
+        )
+    graph_format = value.get("format")
+    if not isinstance(graph_format, str) or graph_format not in (
+        "millrace-router/v3",
+        "millrace-router/v4",
+    ):
+        raise CatalogError(
+            "invalid_template",
+            f"Reauthor this folder as millrace-router/v3 or "
+            f"millrace-router/v4: {graph}",
         )
     controls = value.get("control_files", [])
     if isinstance(controls, list) and any(

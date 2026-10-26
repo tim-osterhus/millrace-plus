@@ -1,4 +1,4 @@
 interface:
   display_name: "Author Millrace workflow graphs"
-  short_description: "Design graph-v3 workflows with explicit planes, outcomes, routes and seams."
-  default_prompt: "Use $millrace-loop-configuration for graph-v3 workflows, json-v1 results and public controls. Treat this guidance as advisory. The graph owns routing."
+  short_description: "Design graph-v4 workflows with explicit planes, outcomes, routes and seams."
+  default_prompt: "Use $millrace-loop-configuration for graph-v4 workflows and fresh store-v8 state. Overall bounds can be omitted independently. Keep invocation timeouts finite. Bundled graph-v3 workflows and existing store-v7 runs remain finite. Use json-v1 results and public controls. Treat this guidance as advisory. The graph owns routing."

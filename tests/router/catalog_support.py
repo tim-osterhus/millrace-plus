@@ -17,8 +17,13 @@ def stock(
 ) -> tuple[Path, Path, Path, Path]:
     root.mkdir(parents=True, exist_ok=True)
     workflow = root / "workflow"
+    bundled_graph = catalog.bundled_root() / name / "workflow.json"
+    stock_graph = bundled_graph.read_bytes()
     catalog.init_template(f"bundled:{name}", workflow, catalog_home=root / "catalog")
-    graph = json.loads((workflow / "workflow.json").read_text())
+    copied_graph = (workflow / "workflow.json").read_bytes()
+    assert copied_graph == stock_graph
+    graph = json.loads(copied_graph)
+    assert graph["format"] == "millrace-router/v3"
     for node, value in graph["planes"]["main"]["nodes"].items():
         prompt = value["invoke"]["config"].get("prompt")
         if prompt:

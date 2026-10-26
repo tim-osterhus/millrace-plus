@@ -242,6 +242,11 @@ def test_copy_path_refusals_and_cleanup(
         '{"format":"millrace-router/v3","n":NaN}',
         '{"format":"old"}',
         '{"format":"millrace-router/v2"}',
+        '{"format":"millrace-router/v999"}',
+        '{"format":[]}',
+        '{"format":{}}',
+        '{"format":null}',
+        '{"format":17}',
         '{"format":"millrace-router/v3","control_files":["__pycache__/x"]}',
     ],
 )
@@ -250,10 +255,11 @@ def test_invalid_graph_marker_refuses_before_destination(
 ) -> None:
     source = _flow(tmp_path / "source")
     (source / "workflow.json").write_text(raw)
-    with pytest.raises(catalog.CatalogError):
+    with pytest.raises(catalog.CatalogError) as error:
         catalog.copy_workflow(
             source, tmp_path / "copy", catalog_home=tmp_path / "catalog"
         )
+    assert error.value.code == "invalid_template"
     assert not (tmp_path / "copy").exists()
 
 
@@ -383,3 +389,30 @@ def test_unknown_named_user_tilde_is_typed_api_and_cli_error(
     assert not (tmp_path / missing).exists()
     assert settings.read_bytes() == settings_before
     assert (real_source / "step.py").read_bytes() == source_sentinel
+
+
+@pytest.mark.parametrize("version", ["v3", "v4"])
+def test_catalog_copy_accepts_v3_and_v4_and_refuses_unknown_format(
+    tmp_path, monkeypatch, version
+):
+    source = _flow(tmp_path / "bundled/optional")
+    graph = source / "workflow.json"
+    graph.write_text(json.dumps({"format": f"millrace-router/{version}", "limits": {}}))
+    original = graph.read_bytes()
+    monkeypatch.setattr(catalog, "bundled_root", lambda: source.parent)
+    destination = tmp_path / "copy"
+    catalog.init_template(
+        "bundled:optional", destination, catalog_home=tmp_path / "local"
+    )
+    assert graph.read_bytes() == original
+    assert (destination / "workflow.json").read_bytes() == original
+    saved = tmp_path / "saved"
+    catalog.copy_workflow(destination, saved, catalog_home=tmp_path / "local")
+    assert (saved / "workflow.json").read_bytes() == original
+    graph.write_text(json.dumps({"format": "millrace-router/v999", "limits": {}}))
+    refused = tmp_path / "refused"
+    with pytest.raises(catalog.CatalogError):
+        catalog.init_template(
+            "bundled:optional", refused, catalog_home=tmp_path / "local"
+        )
+    assert not refused.exists()

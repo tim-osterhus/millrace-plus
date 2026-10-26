@@ -899,9 +899,20 @@ def test_advisory_commands_and_json_result_use_current_public_controls(
             root = _command_project(tmp_path / skill.parent.name / str(index))
             graph_path = root / "workflow/workflow.json"
             graph = json.loads(graph_path.read_text())
-            config = graph["planes"]["main"]["nodes"]["step"]["invoke"]["config"]
-            config.clear()
-            config["args"] = ["-c", f"print({block!r})"]
+            example = json.loads(block)
+            assert isinstance(example, dict)
+            fragment = "format" in example or "limits" in example
+            if fragment:
+                # These declared partial settings need a complete workflow;
+                # the existing command still emits a genuine result object.
+                assert set(example) == {"format", "limits"}
+                assert example["format"] == "millrace-router/v4"
+                graph.update(example)
+            else:
+                assert "outcome" in example
+                config = graph["planes"]["main"]["nodes"]["step"]["invoke"]["config"]
+                config.clear()
+                config["args"] = ["-c", f"print({block!r})"]
             graph_path.write_text(json.dumps(graph))
             home = root / "state"
             made = control.create_instance(
@@ -922,6 +933,11 @@ def test_advisory_commands_and_json_result_use_current_public_controls(
                 made["instance_id"], started["run_id"], state_home=home
             )
             assert result["status"] == "succeeded", result
+            if fragment:
+                assert result["startup_cap"] == example["limits"].get("max_invocations")
+                assert result["startup_elapsed"] == example["limits"].get(
+                    "max_elapsed_seconds"
+                )
 
 
 def test_package_update_keeps_copies_independent(artifacts: dict[str, Path]) -> None:

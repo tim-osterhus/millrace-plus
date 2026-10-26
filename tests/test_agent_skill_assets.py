@@ -28,15 +28,50 @@ def test_advisory_inventory_results_and_agent_metadata(tmp_path: Path) -> None:
         agent = (folder / "agents/openai.yaml").read_text()
         assert f"name: {folder.name}" in text
         assert f"${folder.name}" in agent
-        assert "graph-v3" in agent and "json-v1" in agent and "advisory" in agent
+        assert all(
+            marker in agent
+            for marker in (
+                "graph-v4",
+                "store-v8",
+                "invocation timeouts finite",
+                "graph-v3",
+                "store-v7",
+                "remain finite",
+                "json-v1",
+                "advisory",
+            )
+        )
         assert "advisory package data" in text
+        assert "max_invocations" in text and "max_elapsed_seconds" in text
+        assert "independently" in text and "finite" in text
+        assert "explicit null or zero" in text.lower()
+        assert "do not relabel or convert" in text.lower()
+        assert "1,800-second fallback warning" in text
         for block in re.findall(r"```json\n(.*?)\n```", text, re.S):
-            result = json.loads(block)
-            assert result == {
-                "outcome": "DONE",
-                "summary": "Verified the requested change",
-                "refs": [],
-            }
+            example = json.loads(block)
+            if "format" in example:
+                assert folder.name == "millrace-loop-configuration"
+                assert set(example) == {"format", "limits"}
+                assert example["format"] == "millrace-router/v4"
+                assert isinstance(example["limits"], dict)
+            else:
+                assert example == {
+                    "outcome": "DONE",
+                    "summary": "Verified the requested change",
+                    "refs": [],
+                }
+        if folder.name == "millrace-loop-configuration":
+            examples = [
+                json.loads(block)
+                for block in re.findall(r"```json\n(.*?)\n```", text, re.S)
+                if '"format"' in block
+            ]
+            assert [example["limits"] for example in examples] == [
+                {},
+                {"max_invocations": 100},
+                {"max_elapsed_seconds": 600},
+            ]
+            assert "max_parallel_invocations` still defaults to 1" in text
         for forbidden in (
             "kernel_ping",
             "millrace run daemon",
@@ -70,6 +105,7 @@ def test_advisory_inventory_results_and_agent_metadata(tmp_path: Path) -> None:
 
 
 def test_stock_graphs_have_no_implicit_skill_authority() -> None:
+    # Stock workflows intentionally remain finite graph-v3 examples.
     for path in (ROOT / "src/millrace_plus/workflows").glob("*/workflow.json"):
         graph = json.loads(path.read_text())
         assert graph["format"] == "millrace-router/v3"

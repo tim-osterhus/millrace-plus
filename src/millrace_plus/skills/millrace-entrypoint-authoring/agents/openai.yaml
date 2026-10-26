@@ -1,4 +1,4 @@
 interface:
   display_name: "Author Millrace step instructions"
-  short_description: "Write prompts for graph nodes with explicit outcomes and evidence."
-  default_prompt: "Use $millrace-entrypoint-authoring for graph-v3 workflows, json-v1 results and public controls. Treat this guidance as advisory. The graph owns routing."
+  short_description: "Write prompts for graph-v4 nodes with explicit outcomes and evidence."
+  default_prompt: "Use $millrace-entrypoint-authoring for graph-v4 workflows and fresh store-v8 state. Overall bounds can be omitted independently. Keep invocation timeouts finite. Bundled graph-v3 workflows and existing store-v7 runs remain finite. Use json-v1 results and public controls. Treat this guidance as advisory. The graph owns routing."

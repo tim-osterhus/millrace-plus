@@ -1,6 +1,6 @@
 ---
 name: millrace-instruction-manual
-description: Inspect and control graph-v3 instances through public catalog and router commands.
+description: Inspect graph-v4 instances through public catalog and router commands.
 ---
 
 # Operate Millrace workflows
@@ -15,7 +15,14 @@ Inspect durable receipts separately from HTTP observations. Never change a saved
 
 These instructions are advisory package data, not runtime-installed authority.
 The graph declares routing. Executors return evidence and never mutate Core state.
-Use graph format `millrace-router/v3` and fresh store-v7 state. Unsupported historical formats refuse without migration.
+For new authored graphs, use `millrace-router/v4`.
+A new v4 instance uses store-v8.
+The required `limits` object may omit `max_invocations` and `max_elapsed_seconds` independently.
+An omitted key means no overall bound. Explicit null or zero is invalid.
+Keep every invocation timeout finite.
+The 1,800-second fallback warning applies only when no effective invocation timeout is supplied.
+Bundled stock workflows and existing graph-v3/store-v7 records retain their finite limit contract.
+Do not relabel or convert stock files and runs. The catalog refuses unsupported formats without migration.
 
 ## Result contract
 

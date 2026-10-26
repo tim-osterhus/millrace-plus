@@ -296,3 +296,36 @@ def test_config_refusals_have_no_effects(paperclip, patch) -> None:
         records.parse_config(records.canonical({**paperclip.config, **patch}))
     assert paperclip.operations == []
     assert not Path(paperclip.config["binding_state_root"]).exists()
+
+
+
+def test_optional_child_limits_do_not_change_finite_bridge_deadline(paperclip):
+    import math
+
+    graph_file = paperclip.definition / "workflow.json"
+    graph = json.loads(graph_file.read_text())
+    graph["format"], graph["limits"] = "millrace-router/v4", {}
+    graph_file.write_text(json.dumps(graph))
+    # Refresh the existing explicit definition pin after authoring the new graph.
+    paperclip.script((paperclip.definition / "step.py").read_text())
+    result = bridge.run(paperclip.config_file, paperclip.assignment_file)
+    assert result["status"] == "succeeded", result
+    saved = bridge.inspect(paperclip.config_file, paperclip.assignment_file)
+    assert (records.date(saved["deadline_at"]) - records.date(saved["created_at"])
+            ).total_seconds() == paperclip.config["wait_seconds"]
+    assert saved["cleanup_deadline_at"] is None
+    view = paperclip.client.inspect_run(
+        "local", result["instance_id"], result["run_id"]
+    )
+    for key in ("startup_cap", "startup_elapsed", "startup_deadline", "cap",
+                "max_elapsed", "deadline"):
+        assert key in view and view[key] is None
+    assert view["count"] == 1
+    assert view["invocations"][0]["run_deadline"] is None
+    assert math.isfinite(view["invocations"][0]["deadline"])
+    assert bridge.run(paperclip.config_file, paperclip.assignment_file)["run_id"] == (
+        view["id"]
+    )
+    assert bridge.inspect(paperclip.config_file, paperclip.assignment_file)[
+        "deadline_at"
+    ] == saved["deadline_at"]
