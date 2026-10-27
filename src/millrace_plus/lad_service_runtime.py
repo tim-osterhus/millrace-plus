@@ -721,7 +721,11 @@ def _send(
         _save(service, intent, before, record)
         before = copy.deepcopy(record)
         _validate_lifecycle(service, intent, record)
-        response = client.submit(sent, deadline=deadline)
+        response = (
+            client._submit_prevalidated(sent, deadline=deadline)
+            if type(client) is WorkflowOSClient
+            else client.submit(sent, deadline=deadline)
+        )
     else:
         response = client.observe(sent, deadline=deadline)
     _observe_row(service, row, response)
@@ -1655,7 +1659,7 @@ class Runtime:
             ):
                 raise IntakeError("invalid_holder_recovery")
         if lost and item["recovery_proof"] is None:
-            from .lad_service_disposition import retain
+            from .lad_service_disposition import read_ref, retain
 
             before = copy.deepcopy(self.record)
             if item["recovery_before"] is None:
@@ -1664,18 +1668,21 @@ class Runtime:
                     canonical({"instance": before_instance, "run": before_run}) + b"\n",
                     "recovery-before",
                 )
-                _save(self.service, self.intent, before, self.record)
-                before = copy.deepcopy(self.record)
             if mapping(item["recover"])["envelope"] is None:
+                prepared = mapping(
+                    strict_json(read_ref(self.service, item["recovery_before"]))
+                )
+                prepared_run = mapping(prepared["run"])
                 item["recover"] = _row(
                     _env(
                         "recover_run",
                         _operation_id(request_id, "child-recover"),
                         instance=instance,
                         run=run_id,
-                        expected=before_run["state_version"],
+                        expected=prepared_run["state_version"],
                     )
                 )
+            if self.record != before:
                 _save(self.service, self.intent, before, self.record)
             row = mapping(item["recover"])
             _send(

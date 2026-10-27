@@ -865,6 +865,71 @@ def saved_child_maintenance(active, task, call, request_id):
     return active.record["maintenance"][request_id]["resume"]
 
 
+@pytest.mark.parametrize("ambiguous", [False, True])
+def test_prevalidated_send_has_one_probe_and_possible_post_replays_get_only(
+    setup, monkeypatch, ambiguous
+):
+    active = activate(setup)
+    stop_id = uuid.uuid4().hex
+    row = saved_stop(active, stop_id)
+    sent = copy.deepcopy(row["envelope"])
+    connection = runtime.WorkflowOSClient(active.service.config["os_profile"], "local")
+    methods = []
+
+    def request(method, path, **kwargs):
+        methods.append(method)
+        if method == "OPTIONS":
+            return capabilities()
+        if method == "POST":
+            saved = Service(setup.home).intake.lifecycle()[1]["stops"][stop_id]["pause"]
+            assert saved["reservation"] == "unknown" and saved["envelope"] == sent
+            result = setup.peer.submit(sent, deadline=kwargs["deadline"])
+            if ambiguous:
+                raise SubworkflowError("os_unavailable")
+            return result
+        assert method == "GET"
+        return setup.peer.observe(sent, deadline=kwargs["deadline"])
+
+    monkeypatch.setattr(connection, "_request", request)
+    if ambiguous:
+        with pytest.raises(SubworkflowError, match="os_unavailable"):
+            runtime._send(
+                active.service, active.intent, active.record, row, connection, 10**10
+            )
+        assert row["reservation"] == "unknown"
+    else:
+        runtime._send(
+            active.service, active.intent, active.record, row, connection, 10**10
+        )
+    assert methods == ["OPTIONS", "POST"]
+    reopened = runtime.Runtime(Service(setup.home), client=setup.peer)
+    saved = reopened.record["stops"][stop_id]["pause"]
+    runtime._send(
+        reopened.service, reopened.intent, reopened.record, saved, connection, 10**10
+    )
+    assert methods == ["OPTIONS", "POST", "OPTIONS", "GET"]
+    assert saved["envelope"] == sent and runtime._joined(reopened.service, saved)
+    assert (
+        sum(value["request_id"] == sent["request_id"] for value in setup.peer.sent) == 1
+    )
+
+
+def test_send_capability_failure_preserves_unsent_lifecycle(setup, monkeypatch):
+    active = activate(setup)
+    row = saved_stop(active, uuid.uuid4().hex)
+    before = copy.deepcopy(active.record)
+    posted = copy.deepcopy(setup.peer.sent)
+    monkeypatch.setattr(
+        setup.peer, "capabilities", lambda **kwargs: {**capabilities(), "home": "other"}
+    )
+    with pytest.raises(SubworkflowError):
+        runtime._send(
+            active.service, active.intent, active.record, row, setup.peer, 10**10
+        )
+    assert active.record == before == Service(setup.home).intake.lifecycle()[1]
+    assert row["reservation"] == "unsent" and setup.peer.sent == posted
+
+
 def corrupt_call(row, fault):
     if fault in {
         "operation",
@@ -1099,6 +1164,134 @@ def test_real_full_gate_precedes_fresh_recovery_and_reopen(setup, monkeypatch):
     )
     assert proof["run_id"] == record["run_id"]
     assert saved["os_observations"][-1]["holder_joined"] is None
+
+
+@pytest.mark.parametrize(
+    "interruption", ["before-save", "after-save", "legacy-partial"]
+)
+def test_recovery_preparation_saves_snapshot_and_original_envelope_together(
+    setup, monkeypatch, interruption
+):
+    from millrace_plus.lad_service_disposition import read_ref
+
+    active, task, journal, record = closed_child(setup, status="paused")
+    paused_parent(active, setup)
+    lost_start(active, journal, record, setup)
+    recovery_peer(setup, monkeypatch)
+    evidence = setup.home.parent / "recovery-preparation.txt"
+    evidence.write_text("same child recovery")
+    request_id = uuid.uuid4().hex
+    real_save = runtime._save
+    prepared = {}
+
+    def interrupted(service, intent, before, current):
+        item = current["maintenance"].get(request_id)
+        previous = before["maintenance"].get(request_id)
+        if (
+            item is not None
+            and item["recovery_before"] is not None
+            and previous["recovery_before"] is None
+        ):
+            snapshot = runtime.strict_json(read_ref(service, item["recovery_before"]))
+            sent = item["recover"]["envelope"]
+            assert sent is not None
+            assert sent["expected_state_version"] == snapshot["run"]["state_version"]
+            assert item["recover"]["reservation"] == "unsent"
+            prepared.update(copy.deepcopy(item))
+            if interruption != "before-save":
+                real_save(service, intent, before, current)
+            raise RuntimeError("preparation interrupted")
+        return real_save(service, intent, before, current)
+
+    monkeypatch.setattr(runtime, "_save", interrupted)
+    with pytest.raises(RuntimeError, match="preparation interrupted"):
+        active.decide(task["task_id"], "continue", request_id, evidence)
+    monkeypatch.setattr(runtime, "_save", real_save)
+    reopened = runtime.Runtime(Service(setup.home), client=setup.peer)
+    saved = reopened.record["maintenance"][request_id]
+    if interruption == "before-save":
+        assert saved["recovery_before"] is None
+        assert saved["recover"]["envelope"] is None
+    else:
+        assert saved["recovery_before"] == prepared["recovery_before"]
+        assert saved["recover"] == prepared["recover"]
+    recover_id = prepared["recover"]["envelope"]["request_id"]
+    assert not any(sent["request_id"] == recover_id for sent in setup.peer.sent)
+    if interruption == "legacy-partial":
+        before = copy.deepcopy(reopened.record)
+        saved["recover"] = runtime._row(None)
+        reopened.service.intake.save_lifecycle(reopened.intent, before, reopened.record)
+        key = (record["instance_id"], record["run_id"])
+        setup.peer.runs[key]["state_version"] += 1
+        setup.peer.instances[key[0]]["runs"][0]["state_version"] += 1
+        reopened = runtime.Runtime(Service(setup.home), client=setup.peer)
+        with pytest.raises(IntakeError, match="stale_state_version"):
+            reopened.decide(task["task_id"], "continue", request_id, evidence)
+        saved = Service(setup.home).intake.lifecycle()[1]["maintenance"][request_id]
+        assert saved["recovery_before"] == prepared["recovery_before"]
+        assert saved["recover"] == prepared["recover"]
+        assert not any(sent["request_id"] == recover_id for sent in setup.peer.sent)
+    else:
+        reopened.decide(task["task_id"], "continue", request_id, evidence)
+        saved = Service(setup.home).intake.lifecycle()[1]["maintenance"][request_id]
+        assert saved["recover"]["envelope"] == prepared["recover"]["envelope"]
+        assert sum(sent["request_id"] == recover_id for sent in setup.peer.sent) == 1
+
+
+@pytest.mark.parametrize("later", ["null", "false", "true", "true-then-false"])
+def test_historical_recovery_cannot_override_latest_exact_false_observation(
+    setup, monkeypatch, later
+):
+    from millrace_plus import lad_service_disposition as disposition
+
+    active, task, journal, record = closed_child(setup, status="paused")
+    paused_parent(active, setup)
+    lost_id = lost_start(active, journal, record, setup)
+    recovery_peer(setup, monkeypatch)
+    evidence = setup.home.parent / "recovery-later-observation.txt"
+    evidence.write_text("same child recovery")
+    active.decide(task["task_id"], "continue", uuid.uuid4().hex, evidence)
+    _, saved = active.call(active.service.intake.tasks(task["task_id"])[0])
+    sent = saved["envelopes"]["start"]
+    core = saved["receipts"]["start"]
+    values = (
+        [True, False]
+        if later == "true-then-false"
+        else [{"null": None, "false": False, "true": True}[later]]
+    )
+    for joined in values:
+        seen = observation(
+            sent,
+            joined=joined,
+            core=core,
+            source="core_receipt" if joined is None else "os_owned_call",
+        )
+        if joined is None:
+            seen["phase"] = "receipt_observed"
+        saved["os_observations"].append(seen)
+    journal.save(saved)
+    reopened = runtime.Runtime(Service(setup.home), client=setup.peer)
+    _, saved = reopened.call(reopened.service.intake.tasks(task["task_id"])[0])
+    old = next(
+        row
+        for row in disposition.task_sent_calls(saved, reopened.record)
+        if row["envelope"]["request_id"] == lost_id
+    )
+    if later == "false":
+        assert disposition._recovery_for(reopened, saved, lost_id) is None
+        assert reopened._recovery_observation(saved) == (None, False)
+        with pytest.raises(IntakeError, match="holder_recovery_required"):
+            disposition._physical(reopened, saved, allow_recovery=True)
+        assert old in disposition._uncovered_sent_calls(reopened, saved)
+    else:
+        physical = disposition._physical(reopened, saved, allow_recovery=True)
+        assert disposition._recovery_for(reopened, saved, lost_id) is not None
+        assert old not in disposition._uncovered_sent_calls(reopened, saved)
+        if later == "null":
+            assert any("recovery" in item for item in physical["sent_calls"])
+        else:
+            assert runtime._joined(reopened.service, old)
+    assert reopened.service.intake.tasks(task["task_id"])[0]["status"] == "running"
 
 
 def test_lost_prior_maintenance_join_uses_ordinary_recovery_but_never_abandonment(

@@ -114,8 +114,15 @@ Every lookup uses the original saved envelope target, including a start envelope
 whose run target was null. A learned run ID is used only for exact run inspection.
 
 Actual retained matching `os_owned_call/holder_joined:true` proves physical join.
-False means known unjoined; null means receipt-only/lost observation. A later null
-does not erase an earlier exact true. A terminal receipt, PID absence, timeout or
+False means known unjoined; null means receipt-only/lost observation. A latest
+false for an exact call remains held and cannot use lost-observation recovery; null
+or missing observation can use the existing recovery gates. A retained exact true
+remains valid through later null. The recovery snapshot reference and its matching
+original-version envelope are saved together by one lifecycle compare-and-swap.
+On the persistent service's built-in HTTP control-send path
+(`lad_service_runtime._send`), capability validation precedes unknown-send
+reservation and the POST uses that prior check. Standalone, custom and subclass
+submit paths keep their normal validation. A terminal receipt, PID absence, timeout or
 `call_returned` does not prove join. This includes dispatch-prevented calls: any
 known live or unjoined call remains held. Preparation/parent-read deadline failure
 can raise before a result is published; it never means a child is running.

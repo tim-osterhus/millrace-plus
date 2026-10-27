@@ -216,6 +216,37 @@ def test_capability_negotiation_precedes_post(fixture, monkeypatch):
     assert post.data == canonical({"home": "local", "request": request})
 
 
+def test_submit_requires_valid_capabilities_before_post(fixture, monkeypatch):
+    sent = envelope("start_run", fixture["request"], instance_id=CHILD, expected=1)
+    opener = Opener([canonical({**capabilities(), "holder_joined_supported": False})])
+    monkeypatch.setattr(client, "build_opener", lambda *handlers: opener)
+    connection = client.WorkflowOSClient(reference(fixture["profile"]), "local")
+    with pytest.raises(SubworkflowError):
+        connection.submit(sent, deadline=time.monotonic() + 1)
+    assert [request.get_method() for request, _ in opener.requests] == ["OPTIONS"]
+
+
+@pytest.mark.parametrize("fault", ["credential", "profile", "response"])
+def test_prevalidated_submit_keeps_post_boundary_checks(fixture, monkeypatch, fault):
+    sent = envelope("start_run", fixture["request"], instance_id=CHILD, expected=1)
+    value = observation(sent, core=receipt(sent, run=RUN))
+    if fault == "response":
+        value["request_id"] = "f" * 32
+    opener = Opener([canonical(capabilities()), canonical(value)])
+    monkeypatch.setattr(client, "build_opener", lambda *handlers: opener)
+    connection = client.WorkflowOSClient(reference(fixture["profile"]), "local")
+    connection.capabilities(deadline=time.monotonic() + 1)
+    if fault == "credential":
+        fixture["credential"].write_bytes(canonical({"token": None}))
+    elif fault == "profile":
+        fixture["profile"].write_bytes(fixture["profile"].read_bytes() + b" ")
+    with pytest.raises(SubworkflowError):
+        connection._submit_prevalidated(sent, deadline=time.monotonic() + 1)
+    assert [request.get_method() for request, _ in opener.requests] == (
+        ["OPTIONS", "POST"] if fault == "response" else ["OPTIONS"]
+    )
+
+
 def test_start_get_uses_original_envelope_target(fixture, monkeypatch):
     sent = envelope("start_run", fixture["request"], instance_id=CHILD, expected=1)
     opener = Opener([canonical(observation(sent, core=receipt(sent, run=RUN)))])

@@ -783,6 +783,14 @@ def _recovery_for(
             ),
             None,
         )
+        if sent_call is not None and not _joined(runtime.service, sent_call):
+            history = cast(list[object], sent_call["observations"])
+            if history:
+                latest = validate_call(
+                    history[-1], str(record["os_home"]), mapping(sent_call["envelope"])
+                )
+                if latest["holder_joined"] is False:
+                    return None
         _validate_recovery_ref(
             runtime.service, ref, record, lost_id, sent_call=sent_call
         )

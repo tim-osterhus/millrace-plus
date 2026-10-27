@@ -435,8 +435,18 @@ class WorkflowOSClient:
         *,
         deadline: float,
     ) -> dict[str, object]:
-        body = request_body(self.home, envelope)
+        request_body(self.home, envelope)
         self.capabilities(deadline=deadline)
+        return self._submit_prevalidated(envelope, deadline=deadline)
+
+    def _submit_prevalidated(
+        self,
+        envelope: dict[str, object],
+        *,
+        deadline: float,
+    ) -> dict[str, object]:
+        """Send after the durable caller has already verified capabilities."""
+        body = request_body(self.home, envelope)
         value = self._request(
             "POST",
             "requests",
