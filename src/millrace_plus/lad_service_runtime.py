@@ -967,7 +967,12 @@ class LocalClient:
         self, envelope: dict[str, object], *, deadline: float
     ) -> dict[str, object]:
         self.runtime.verify()
-        return self.connection.submit(envelope, deadline=deadline)
+        # Child _dispatch has already validated capabilities before reservation.
+        return (
+            self.connection._submit_prevalidated(envelope, deadline=deadline)
+            if type(self.connection) is WorkflowOSClient
+            else self.connection.submit(envelope, deadline=deadline)
+        )
 
     def observe(
         self, envelope: dict[str, object], *, deadline: float

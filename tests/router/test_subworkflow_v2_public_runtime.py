@@ -110,7 +110,7 @@ def test_public_proven_create_expiry_preserves_live_start_join(runtime, monkeypa
     runtime.children.append(pair)
     release = pair[0] / pair[1] / "project/release"
     posted, observed = [], []
-    submit, observe = WorkflowOSClient.submit, WorkflowOSClient.observe
+    submit, observe = WorkflowOSClient._submit_prevalidated, WorkflowOSClient.observe
 
     def track_submit(client, envelope, *, deadline):
         posted.append(copy.deepcopy(envelope))
@@ -120,7 +120,7 @@ def test_public_proven_create_expiry_preserves_live_start_join(runtime, monkeypa
         observed.append(copy.deepcopy(envelope))
         return observe(client, envelope, deadline=deadline)
 
-    monkeypatch.setattr(WorkflowOSClient, "submit", track_submit)
+    monkeypatch.setattr(WorkflowOSClient, "_submit_prevalidated", track_submit)
     monkeypatch.setattr(WorkflowOSClient, "observe", track_observe)
     try:
 

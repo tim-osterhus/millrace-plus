@@ -300,6 +300,39 @@ def claimed(f):
     return active, task
 
 
+def test_wrapped_child_dispatch_keeps_verify_and_unknown_on_authority_failure(
+    setup, monkeypatch
+):
+    from millrace_plus import subworkflow_v2 as helper
+
+    active, task = claimed(setup)
+    storage, saved = active.call(task)
+    connection = runtime.WorkflowOSClient(active.service.config["os_profile"], "local")
+    events = []
+
+    def request(method, path, **kwargs):
+        events.append(method)
+        assert method == "OPTIONS"
+        return capabilities()
+
+    def refuse():
+        events.append("verify")
+        assert helper._reservation(storage.load(), "create") == "unknown"
+        raise IntakeError("lifecycle_authority_changed")
+
+    monkeypatch.setattr(connection, "_request", request)
+    monkeypatch.setattr(active, "verify", refuse)
+    with pytest.raises(IntakeError, match="lifecycle_authority_changed"):
+        helper._dispatch(
+            storage, saved, "create", runtime.LocalClient(active, connection), 12345.0
+        )
+    assert events == ["OPTIONS", "verify"]
+    retained = storage.load()
+    assert helper._reservation(retained, "create") == "unknown"
+    assert retained["envelopes"] == saved["envelopes"]
+    assert retained["os_observations"] == []
+
+
 def closed_child(f, *, status="failed", joined=True, writer="stopped"):
     from millrace_plus import subworkflow_v2 as helper
     from millrace_plus.subworkflow_persistent_records import reduce_full_views
@@ -928,6 +961,35 @@ def test_send_capability_failure_preserves_unsent_lifecycle(setup, monkeypatch):
         )
     assert active.record == before == Service(setup.home).intake.lifecycle()[1]
     assert row["reservation"] == "unsent" and setup.peer.sent == posted
+
+
+def test_send_preserves_http_subclass_submit_override(setup, monkeypatch):
+    active = activate(setup)
+    stop_id = uuid.uuid4().hex
+    row = saved_stop(active, stop_id)
+    submitted = []
+
+    class CustomHTTP(runtime.WorkflowOSClient):
+        def submit(self, envelope, *, deadline):
+            stored = Service(setup.home).intake.lifecycle()[1]["stops"][stop_id][
+                "pause"
+            ]
+            assert stored["reservation"] == "unknown"
+            submitted.append((copy.deepcopy(envelope), deadline))
+            return setup.peer.submit(envelope, deadline=deadline)
+
+    connection = CustomHTTP(active.service.config["os_profile"], "local")
+    monkeypatch.setattr(connection, "capabilities", lambda **kwargs: capabilities())
+    monkeypatch.setattr(
+        connection,
+        "_submit_prevalidated",
+        lambda *args, **kwargs: pytest.fail("subclass submit bypassed"),
+    )
+    runtime._send(
+        active.service, active.intent, active.record, row, connection, 12345.0
+    )
+    assert submitted == [(row["envelope"], 12345.0)]
+    assert runtime._joined(active.service, row)
 
 
 def corrupt_call(row, fault):

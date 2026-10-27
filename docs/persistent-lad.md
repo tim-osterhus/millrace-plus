@@ -8,9 +8,10 @@ and run identities remain separate. `bundled:lad` remains the standalone per-tas
 workflow.
 
 This is a development candidate with bounded Linux offline evidence. Native
-provider, macOS and actual used-copy qualification remain separate. Long-history
-qualification is deferred to controlled production workflows; synthetic codec
-checks do not establish 1-day/30-day runtime fit.
+provider, macOS and actual used-copy qualification remain separate. An offline
+one-day/thirty-day workload-equivalent study is selected after child-dispatch
+closeout; it is not actual elapsed-day or live-production qualification. Existing
+synthetic codec checks do not establish runtime history fit.
 
 ## Qualification status
 
@@ -18,14 +19,16 @@ The candidate passed 201 runtime cases, seven unaffected corrective checks and
 two installed integration cases with public cleanup. Independent source review
 found no blockers.
 
-The complete public fault-recovery journey (B4) remains unqualified. The reviewed
-candidate is approved for a local development commit, with that qualification
-deferred to controlled live-workflow follow-up. Full packet acceptance and the
-persistent-service release gate remain open. The B4 test stays enabled; failed
-run states remain preserved without a claim of domain closure.
+The complete public fault-recovery journey (B4) remains FAILED/UNQUALIFIED. A
+separate B4 requalification follows the child-dispatch closeout. Full packet
+acceptance and the persistent-service release gate remain open. The B4 test
+stays enabled; earlier failed run states remain preserved without a claim of
+domain closure.
 
-Long-history testing is deferred separately. Neither deferral establishes native
-provider, macOS, used-copy or long-run qualification.
+An offline one-day/thirty-day workload-equivalent history study is selected as a
+separate follow-up. Its driver and bounded execution recipe are pending; results
+will not establish actual elapsed-day, live-production, native-provider, macOS
+or used-copy qualification. Neither B4 nor history has a new result yet.
 
 ## Setup and activation
 
@@ -119,10 +122,12 @@ false for an exact call remains held and cannot use lost-observation recovery; n
 or missing observation can use the existing recovery gates. A retained exact true
 remains valid through later null. The recovery snapshot reference and its matching
 original-version envelope are saved together by one lifecycle compare-and-swap.
-On the persistent service's built-in HTTP control-send path
-(`lad_service_runtime._send`), capability validation precedes unknown-send
-reservation and the POST uses that prior check. Standalone, custom and subclass
-submit paths keep their normal validation. A terminal receipt, PID absence, timeout or
+On the exact official HTTP routes, the persistent service's
+`lad_service_runtime._send` and child `subworkflow_v2._dispatch` each use one
+validated capability for a private prevalidated POST; the service validates
+before unknown-send reservation. Direct standalone `WorkflowOSClient.submit`
+keeps normal capability negotiation, while custom clients and subclass
+overrides keep normal validation. A terminal receipt, PID absence, timeout or
 `call_returned` does not prove join. This includes dispatch-prevented calls: any
 known live or unjoined call remains held. Preparation/parent-read deadline failure
 can raise before a result is published; it never means a child is running.

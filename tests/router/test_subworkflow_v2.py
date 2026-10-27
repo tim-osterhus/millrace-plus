@@ -8,6 +8,7 @@ import json
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import SimpleNamespace
 
 import pytest
 from persistent_lad_support import (
@@ -768,6 +769,175 @@ def retained_cancel(fixture, client, identifier="a" * 32):
         clock=timer,
         sleep=timer.sleep,
     )
+
+
+def prepared_dispatch(fixture, monkeypatch, operation):
+    peer = CancelClient(fixture)
+    if operation.startswith("cancel:"):
+        advance(fixture, peer)
+    original = helper._dispatch
+
+    def before_send(storage, saved, selected, client, deadline):
+        if selected == operation:
+            raise RuntimeError("dispatch prepared")
+        return original(storage, saved, selected, client, deadline)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(helper, "_dispatch", before_send)
+        with pytest.raises(RuntimeError, match="dispatch prepared"):
+            if operation.startswith("cancel:"):
+                retained_cancel(fixture, peer)
+            else:
+                advance(fixture, peer)
+    storage = journal(fixture)
+    saved = storage.load()
+    assert helper._reservation(saved, operation) == "unsent"
+    return peer, storage, saved
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+@pytest.mark.parametrize(
+    "operation,ambiguous",
+    [("create", True), ("start", False), ("start", True), ("cancel:" + "a" * 32, True)],
+)
+def test_prevalidated_child_dispatch_probes_before_unknown_and_never_repeats_effect(
+    fixture, monkeypatch, wrapped, operation, ambiguous
+):
+    from millrace_plus.lad_service_runtime import LocalClient
+
+    peer, storage, saved = prepared_dispatch(fixture, monkeypatch, operation)
+    sent = copy.deepcopy(helper._envelopes(saved)[operation])
+    connection = helper.WorkflowOSClient(fixture["request"]["os_profile"], "local")
+    events = []
+    deadline = 12345.0
+
+    def request(method, path, **kwargs):
+        events.append((method, kwargs["deadline"]))
+        assert kwargs["deadline"] == deadline
+        if method == "OPTIONS":
+            assert helper._reservation(storage.load(), operation) == "unsent"
+            return capabilities()
+        assert method == "POST"
+        stored = storage.load()
+        assert helper._reservation(stored, operation) == "unknown"
+        assert helper._envelopes(stored)[operation] == sent
+        assert json.loads(kwargs["body"])["request"] == sent
+        return peer.submit(sent, deadline=kwargs["deadline"])
+
+    monkeypatch.setattr(connection, "_request", request)
+    client = (
+        LocalClient(
+            SimpleNamespace(verify=lambda: events.append(("verify", deadline))),
+            connection,
+        )
+        if wrapped
+        else connection
+    )
+    if ambiguous:
+        peer.fail_submit = sent["operation"]
+        with pytest.raises(SubworkflowError, match="os_unavailable"):
+            helper._dispatch(storage, saved, operation, client, deadline)
+    else:
+        helper._dispatch(storage, saved, operation, client, deadline)
+    assert events == (
+        [("OPTIONS", deadline), ("verify", deadline), ("POST", deadline)]
+        if wrapped
+        else [("OPTIONS", deadline), ("POST", deadline)]
+    )
+    assert helper._reservation(storage.load(), operation) == (
+        "unknown" if ambiguous else "observed"
+    )
+    peer.fail_submit = None
+    posts = copy.deepcopy(peer.sent)
+    if operation.startswith("cancel:"):
+        retained_cancel(fixture, peer)
+    else:
+        advance(fixture, peer)
+    assert sum(row["request_id"] == sent["request_id"] for row in peer.sent) == 1
+    assert peer.sent[: len(posts)] == posts
+    assert any(
+        event[0] == "observe" and event[1]["request_id"] == sent["request_id"]
+        for event in peer.events
+    )
+    assert helper._envelopes(storage.load())[operation] == sent
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_child_dispatch_capability_refusal_preserves_unsent(
+    fixture, monkeypatch, wrapped
+):
+    from millrace_plus.lad_service_runtime import LocalClient
+
+    _, storage, saved = prepared_dispatch(fixture, monkeypatch, "start")
+    before = storage.path.read_bytes()
+    connection = helper.WorkflowOSClient(fixture["request"]["os_profile"], "local")
+    events = []
+
+    def request(method, path, **kwargs):
+        events.append(method)
+        assert method == "OPTIONS"
+        return {**capabilities(), "home": "other"}
+
+    monkeypatch.setattr(connection, "_request", request)
+    client = (
+        LocalClient(
+            SimpleNamespace(verify=lambda: pytest.fail("verify after refusal")),
+            connection,
+        )
+        if wrapped
+        else connection
+    )
+    with pytest.raises(SubworkflowError):
+        helper._dispatch(storage, saved, "start", client, 12345.0)
+    assert events == ["OPTIONS"]
+    assert storage.path.read_bytes() == before
+    assert helper._reservation(saved, "start") == "unsent"
+
+
+@pytest.mark.parametrize("kind", ["http", "wrapped-http", "local"])
+def test_child_dispatch_preserves_submit_overrides(fixture, monkeypatch, kind):
+    from millrace_plus.lad_service_runtime import LocalClient
+
+    peer, storage, saved = prepared_dispatch(fixture, monkeypatch, "start")
+    events = []
+    deadline = 12345.0
+
+    class CustomHTTP(helper.WorkflowOSClient):
+        def submit(self, envelope, *, deadline):
+            events.append(("submit", deadline))
+            assert helper._reservation(storage.load(), "start") == "unknown"
+            return peer.submit(envelope, deadline=deadline)
+
+    class CustomLocal(LocalClient):
+        def submit(self, envelope, *, deadline):
+            events.append(("submit", deadline))
+            assert helper._reservation(storage.load(), "start") == "unknown"
+            return peer.submit(envelope, deadline=deadline)
+
+    connection_type = helper.WorkflowOSClient if kind == "local" else CustomHTTP
+    connection = connection_type(fixture["request"]["os_profile"], "local")
+
+    def request(method, path, **kwargs):
+        events.append((method, kwargs["deadline"]))
+        assert method == "OPTIONS"
+        return capabilities()
+
+    monkeypatch.setattr(connection, "_request", request)
+    owner = SimpleNamespace(verify=lambda: events.append(("verify", deadline)))
+    client = (
+        connection
+        if kind == "http"
+        else CustomLocal(owner, connection)
+        if kind == "local"
+        else LocalClient(owner, connection)
+    )
+    helper._dispatch(storage, saved, "start", client, deadline)
+    assert events == (
+        [("OPTIONS", deadline), ("verify", deadline), ("submit", deadline)]
+        if kind == "wrapped-http"
+        else [("OPTIONS", deadline), ("submit", deadline)]
+    )
+    assert helper._reservation(storage.load(), "start") == "observed"
 
 
 def test_proven_create_refresh_keeps_unresolved_cancel_fresh(fixture):

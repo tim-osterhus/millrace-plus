@@ -724,7 +724,11 @@ def _dispatch(
         else "observing"
     )
     _save(journal, record)
-    response = client.submit(sent, deadline=deadline)
+    response = (
+        client._submit_prevalidated(sent, deadline=deadline)
+        if type(client) is WorkflowOSClient
+        else client.submit(sent, deadline=deadline)
+    )
     _observe(record, operation, response)
     _save(journal, record)
 
