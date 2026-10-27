@@ -109,7 +109,9 @@ def test_stock_graphs_have_no_implicit_skill_authority() -> None:
     for path in (ROOT / "src/millrace_plus/workflows").glob("*/workflow.json"):
         graph = json.loads(path.read_text())
         assert graph["format"] == (
-            "millrace-router/v4" if path.parent.name == "lad" else "millrace-router/v3"
+            "millrace-router/v4"
+            if path.parent.name in {"lad", "lad-service"}
+            else "millrace-router/v3"
         )
         assert all("skills/" not in asset for asset in graph["control_files"])
         assert "selected_authority" not in graph

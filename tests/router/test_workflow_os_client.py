@@ -405,3 +405,104 @@ def test_non_utf8_and_bom_json_refuse_before_http_mutation(
         with pytest.raises(SubworkflowError, match="invalid_json"):
             connection.submit(sent, deadline=time.monotonic() + 1)
         assert [request.get_method() for request, _ in opener.requests] == ["OPTIONS"]
+
+
+def plane_call(fixture, plane):
+    sent = envelope(
+        "resume_plane" if plane is not None else "resume_run",
+        fixture["request"],
+        instance_id=CHILD,
+        run_id=RUN,
+        expected=8,
+        explicit_id="d" * 32,
+    )
+    sent["plane_id"] = plane
+    core = receipt(sent, run=RUN)
+    core["plane_id"] = plane
+    return sent, observation(sent, core=core)
+
+
+def through_call_boundary(fixture, monkeypatch, method, sent, value):
+    if method == "validate":
+        return client.validate_call(value, "local", sent)
+    values = [canonical(value)]
+    if method == "submit":
+        values.insert(0, canonical(capabilities()))
+    opener = Opener(values)
+    monkeypatch.setattr(client, "build_opener", lambda *handlers: opener)
+    connection = client.WorkflowOSClient(reference(fixture["profile"]), "local")
+    result = getattr(connection, method)(sent, deadline=time.monotonic() + 1)
+    if method == "submit":
+        assert [request.get_method() for request, _ in opener.requests] == [
+            "OPTIONS",
+            "POST",
+        ]
+        assert opener.requests[-1][0].data == canonical(
+            {"home": "local", "request": sent}
+        )
+    else:
+        assert [request.get_method() for request, _ in opener.requests] == ["GET"]
+        assert parse_qs(urlsplit(opener.requests[0][0].full_url).query) == {
+            "home": ["local"],
+            "instance_id": [CHILD],
+            "run_id": [RUN],
+        }
+    return result
+
+
+@pytest.mark.parametrize("method", ["validate", "submit", "observe"])
+@pytest.mark.parametrize("plane", [None, "foreground", "service"])
+def test_exact_receipt_plane_survives_all_call_boundaries(
+    fixture, monkeypatch, method, plane
+):
+    sent, value = plane_call(fixture, plane)
+    before = canonical(sent), canonical(value)
+    assert client.validate_receipt(value["core_receipt"], sent) == value["core_receipt"]
+    assert through_call_boundary(fixture, monkeypatch, method, sent, value) == value
+    assert (canonical(sent), canonical(value)) == before
+
+
+@pytest.mark.parametrize("method", ["validate", "submit", "observe"])
+@pytest.mark.parametrize(
+    "expected,actual",
+    [
+        ("foreground", None),
+        ("foreground", "learning"),
+        ("foreground", "missing"),
+        (None, "foreground"),
+        (None, False),
+        (None, ""),
+    ],
+)
+def test_wrong_null_or_missing_receipt_plane_refuses_without_normalization(
+    fixture, monkeypatch, method, expected, actual
+):
+    sent, value = plane_call(fixture, expected)
+    if actual == "missing":
+        value["core_receipt"].pop("plane_id")
+    else:
+        value["core_receipt"]["plane_id"] = actual
+    before = canonical(sent), canonical(value)
+    with pytest.raises(SubworkflowError, match="wrong_core_target"):
+        through_call_boundary(fixture, monkeypatch, method, sent, value)
+    assert (canonical(sent), canonical(value)) == before
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("request_id", "f" * 32),
+        ("request_digest", "0" * 64),
+        ("operation", "cancel_run"),
+        ("status", "other"),
+        ("instance_id", "f" * 32),
+        ("run_id", "f" * 32),
+    ],
+)
+def test_matching_plane_cannot_hide_other_receipt_identity_or_digest_failures(
+    fixture, field, value
+):
+    sent, observed = plane_call(fixture, "foreground")
+    observed["core_receipt"][field] = value
+    with pytest.raises(SubworkflowError):
+        client.validate_call(observed, "local", sent)

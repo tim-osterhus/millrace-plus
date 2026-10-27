@@ -606,8 +606,8 @@
     "destination_hashes": [
       {
         "path": "README.md",
-        "sha256": "dd6bf6a07a61c05c35943488bdfa32cbe41d6720aa869ffd7da8a11e7bbd33ac",
-        "bytes": 3534
+        "sha256": "3cd51962f28f0fd4e2c6091079d88de6f2f268bfa27f7dbd519353197395bc03",
+        "bytes": 3745
       },
       {
         "path": "context/contracts.md",
@@ -616,8 +616,8 @@
       },
       {
         "path": "context/harness.md",
-        "sha256": "0f2d8257b07a9cec1ee58b1a3eb15fc3a05d547a87805dcd9b1fb32661a1aa2d",
-        "bytes": 5183
+        "sha256": "d848679b95d00d7e14d4890ed3bd6f28842d59d5cbe5cbaa6a5d817667d16f5d",
+        "bytes": 5326
       },
       {
         "path": "context/role-contracts.md",
@@ -711,8 +711,8 @@
       },
       {
         "path": "scripts/accept_role.py",
-        "sha256": "278378dea83e489e6def2f2971b483116b605518f46ab6772c6410a1eeac6507",
-        "bytes": 30471
+        "sha256": "4fe82f97e9ccb19bc3dd6d3317461cde31d46a9ed308acbd22d56ab099e7c9b8",
+        "bytes": 30996
       },
       {
         "path": "scripts/boundaries.py",
@@ -726,8 +726,8 @@
       },
       {
         "path": "scripts/lad_state.py",
-        "sha256": "970c5cae33f763224f45baba28ddd1aad53023587db4b013c35dd93b6d47b9da",
-        "bytes": 34908
+        "sha256": "953bd530bf66f36d549e4daec5738bb1c515619adedcea738010f20adda9ae9a",
+        "bytes": 35962
       },
       {
         "path": "scripts/learning_seam.py",
@@ -736,8 +736,8 @@
       },
       {
         "path": "scripts/prepare_role.py",
-        "sha256": "fe368c1af2ff20af29f56e75f6673bbaf70726dc47570d1f86d869eecb2e7dce",
-        "bytes": 18195
+        "sha256": "c4edbc252269680867e8f6a82eb277e827f70fff0a658ac7b482e1b38c8842a4",
+        "bytes": 18491
       },
       {
         "path": "scripts/session_compat.py",
@@ -781,7 +781,7 @@
       },
       {
         "path": "workflow.json",
-        "sha256": "c73119bffa96ddfcfccf918ce38d7d7d8c8b2cbe84b320f2dd4901db4020dbdd",
+        "sha256": "c5c81e5ea9eafebe0a162fa2c49f87563a35e3924c271a1e9ae7fdc0f1b071b2",
         "bytes": 155009
       }
     ]

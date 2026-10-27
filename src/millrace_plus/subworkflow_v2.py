@@ -199,7 +199,7 @@ def _prepare(
         "instance_id": None,
         "run_id": None,
         "os_observations": [],
-        "observation": {},
+        "observation": None if journal.local_source is not None else {},
         "phase": "prepared",
         "diagnostic": None,
         "copy_prepared": False,
@@ -208,13 +208,19 @@ def _prepare(
         "cancel_intent": None,
         "cancellations": {},
     }
+    if journal.local_source is not None:
+        from .subworkflow_persistent_records import JOURNAL_FORMAT as persistent_marker
+
+        record.update(format=persistent_marker, local_source=journal.local_source)
     record["authority_sha256"] = digest(authority(record))
     record["record_sha256"] = digest(record)
     preflight(record)
     # Validate before even creating the call root. Locks use only the call home.
     from .subworkflow_v2_records import validate_journal
 
-    validate_journal(record, journal.home, journal.key)
+    validate_journal(
+        record, journal.home, journal.key, _local_source=journal.local_source
+    )
     with journal.lock():
         if journal.path.exists() or os.path.lexists(journal.root):
             raise SubworkflowError("call_conflict")
@@ -420,6 +426,7 @@ def _refresh(
     client: Client,
     deadline: float,
     clock: Callable[[], float],
+    sleep: Callable[[float], None] = time.sleep,
 ) -> None:
     before = canonical(record)
     for operation, sent in _envelopes(record).items():
@@ -427,12 +434,24 @@ def _refresh(
             break
         if sent is None or _reservation(record, operation) == "unsent":
             continue
+        if operation == "create":
+            receipt = mapping(record["receipts"]).get("create")
+            # Journal validation checks retained call-v2 rows. An exact applied
+            # receipt and its actual true join survive the ephemeral OS cache.
+            if (
+                receipt is not None
+                and record["instance_id"] is not None
+                and validate_receipt(receipt, mapping(sent))["status"] == "applied"
+                and has_join_proof(record, operation)
+            ):
+                continue
         _observe(record, operation, client.observe(mapping(sent), deadline=deadline))
         if canonical(record) != before:
             _save(journal, record)
             before = canonical(record)
     instance = record["instance_id"]
-    if instance is not None and clock() < deadline:
+    read_progress = False
+    while instance is not None and clock() < deadline:
         view = client.read(str(instance), deadline=deadline)
         paths = mapping(record["paths"])
         if (
@@ -466,7 +485,38 @@ def _refresh(
                 "start_run",
             ):
                 raise SubworkflowError("wrong_start_identity")
-            record["observation"] = run
+            if journal.local_source is not None:
+                from .subworkflow_persistent_records import (
+                    _ReadProgress,
+                    reduce_full_views,
+                )
+
+                try:
+                    record["observation"] = reduce_full_views(
+                        view,
+                        run,
+                        instance_id=str(instance),
+                        run_id=str(record["run_id"]),
+                        start_request_id=operation_id(
+                            mapping(record["request"]), "start_run"
+                        ),
+                        paths=paths,
+                        settings=mapping(record["settings"]),
+                    )
+                except _ReadProgress:
+                    read_progress = True
+                    remaining = deadline - clock()
+                    if remaining > 0:
+                        sleep(min(5, remaining))
+                    if clock() >= deadline:
+                        raise _ReadProgress("observation_window_expired") from None
+                    continue
+                read_progress = False
+            else:
+                record["observation"] = run
+        break
+    if read_progress:
+        raise _ReadProgress("observation_window_expired")
     if canonical(record) != before:
         _save(journal, record)
 
@@ -546,9 +596,12 @@ def _outcome(record: dict[str, object]) -> tuple[str, str | None]:
                 return "CHILD_REFUSED", "create_refused"
             if operation == "start" and record["run_id"] is None:
                 return "CHILD_REFUSED", "start_refused"
-    run = mapping(record["observation"])
+    run = mapping(record["observation"]) if record["observation"] is not None else {}
+    closure = closed
+    if "local_source" in record:
+        from .subworkflow_persistent_records import closed as closure
     if run.get("status") in TERMINAL | {"paused"}:
-        if not closed(run, attention=True):
+        if not closure(run, attention=True):
             return "CHILD_UNCERTAIN", "writers_unresolved"
         if any(
             mapping(value).get("status") == "queued"
@@ -610,14 +663,17 @@ def _join_tail(
     sleep: Callable[[float], None],
 ) -> tuple[str, str | None]:
     # This is a read-only terminal/paused join wait, never the dispatch loop.
+    first_poll = True
     while _join_tail_eligible(record):
         remaining = deadline - clock()
         if remaining <= 0:
             break
-        sleep(min(5, remaining))
+        if not first_poll:
+            sleep(min(5, remaining))
         if clock() >= deadline:
             break
-        _refresh(journal, record, client, deadline, clock)
+        _refresh(journal, record, client, deadline, clock, sleep)
+        first_poll = False
     return _outcome(record)
 
 
@@ -625,6 +681,20 @@ def _observation_error_outcome(
     record: dict[str, object],
     error: SubworkflowError,
 ) -> tuple[str, str | None]:
+    if "local_source" in record:
+        from .subworkflow_persistent_records import _ReadProgress
+
+        if isinstance(error, _ReadProgress):
+            outcome, diagnostic = _outcome(record)
+            if outcome in {
+                "CHILD_UNCERTAIN",
+                "CHILD_OBSERVATION_LOST",
+                "CHILD_REFUSED",
+            }:
+                return outcome, diagnostic
+            # No coherent current pair completed this window. Preserve prior
+            # evidence and the occupied task; never promote it to completion.
+            return "CHILD_RUNNING", "observation_window_expired"
     if error.code == "observation_window_expired":
         return _outcome(record)
     return "CHILD_UNCERTAIN", error.code
@@ -667,14 +737,18 @@ def _result(
 ) -> dict[str, object]:
     manifest = result_manifest(record, outcome, diagnostic)
     try:
-        validate_result(manifest)
+        validate_result(manifest, _local_source=journal.local_source)
     except SubworkflowError as exc:
         if exc.code != "record_too_large":
             raise
         outcome, diagnostic = "CHILD_UNCERTAIN", "result_limit"
         manifest = result_manifest(record, outcome, diagnostic)
-        manifest.update(observation={}, receipts={}, os_observations=[])
-        validate_result(manifest)
+        if journal.local_source is not None:
+            # A diagnostic may omit the summary, never sent-control or join facts.
+            manifest.update(observation=None, status=None)
+        else:
+            manifest.update(observation={}, receipts={}, os_observations=[])
+        validate_result(manifest, _local_source=journal.local_source)
     result = {
         "outcome": outcome,
         "summary": diagnostic or outcome,
@@ -697,7 +771,15 @@ def _result(
         try:
             with output.open("rb") as stream:
                 previous = stream.read(RESULT_LIMIT + 1)
-            owner = parse_result(previous)
+            if journal.local_source is not None:
+                from .workflow_os_client import _utf8_json
+
+                owner = validate_result(
+                    _utf8_json(previous, RESULT_LIMIT),
+                    _local_source=journal.local_source,
+                )
+            else:
+                owner = parse_result(previous)
         except (OSError, SubworkflowError):
             raise SubworkflowError("output_not_owned") from None
         if owner["call_identity"] != record["request_sha256"]:
@@ -752,10 +834,11 @@ def cancel(
     client: Client | None = None,
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
+    _local_source: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Persist explicit intent before sending; never restart an ambiguous child."""
     identifier = _id(request_id)
-    journal = Journal(call_home, call_key)
+    journal = Journal(call_home, call_key, _local_source=_local_source)
     with journal.lock(observer=True):
         record = journal.load()
         connection = _retained_client(record, client, clock)
@@ -786,7 +869,7 @@ def cancel(
         deadline = clock() + int(mapping(record["request"])["cleanup_seconds"])
         try:
             while clock() < deadline:
-                _refresh(journal, record, connection, deadline, clock)
+                _refresh(journal, record, connection, deadline, clock, sleep)
                 _pending_cancels(journal, record, connection, deadline, clock)
                 outcome, diagnostic = _outcome(record)
                 if outcome != "CHILD_RUNNING":
@@ -810,13 +893,17 @@ def reconcile(
     *,
     client: Client | None = None,
     clock: Callable[[], float] = time.monotonic,
+    _local_source: dict[str, object] | None = None,
+    _deadline: float | None = None,
 ) -> dict[str, object]:
     """One bounded refresh; no public mutation or pending-cancel dispatch."""
-    journal = Journal(call_home, call_key)
+    journal = Journal(call_home, call_key, _local_source=_local_source)
     with journal.lock(observer=True):
         record = journal.load()
         connection = _retained_client(record, client, clock)
         deadline = clock() + int(mapping(record["request"])["cleanup_seconds"])
+        if _deadline is not None:
+            deadline = min(deadline, _deadline)
         try:
             _refresh(journal, record, connection, deadline, clock)
             outcome, diagnostic = _outcome(record)
@@ -863,16 +950,24 @@ def _advance_bytes(
     client: Client | None = None,
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
+    _local_source: dict[str, object] | None = None,
+    _deadline: float | None = None,
 ) -> dict[str, object]:
     # Service callers pass the exact bytes already checked against their claim.
     request = parse_request(raw, cwd=canonical_path(str(cwd or Path.cwd())))
     deadline = clock() + int(request["observe_seconds"])
+    if _deadline is not None:
+        deadline = min(deadline, _deadline)
     # Home comes only from pinned profile bytes. Service callers supply a check and
     # their verified claim digest; neither can change an existing call binding.
     profile = load_profile(request["os_profile"], home=expected_home)
     os_home = str(profile["os_home"])
     connection = client or WorkflowOSClient(request["os_profile"], os_home, clock=clock)
-    journal = Journal(Path(str(request["call_home"])), str(request["call_key"]))
+    journal = Journal(
+        Path(str(request["call_home"])),
+        str(request["call_key"]),
+        _local_source=_local_source,
+    )
     # Acquisition never blocks; the journal lock covers only atomic local updates.
     with journal.lock(observer=True):
         record = _prepare(
@@ -889,7 +984,7 @@ def _advance_bytes(
         try:
             while clock() < deadline:
                 if record["cancel_intent"] is not None:
-                    _refresh(journal, record, connection, deadline, clock)
+                    _refresh(journal, record, connection, deadline, clock, sleep)
                     _pending_cancels(journal, record, connection, deadline, clock)
                     outcome, diagnostic = _outcome(record)
                     if outcome != "CHILD_RUNNING":
@@ -905,7 +1000,9 @@ def _advance_bytes(
                         _dispatch(journal, record, "create", connection, deadline)
                     else:
                         try:
-                            _refresh(journal, record, connection, deadline, clock)
+                            _refresh(
+                                journal, record, connection, deadline, clock, sleep
+                            )
                         except SubworkflowError as exc:
                             if exc.code not in {"os_unavailable", "os_http_404"}:
                                 raise
@@ -936,7 +1033,7 @@ def _advance_bytes(
                 ):
                     _dispatch(journal, record, "start", connection, deadline)
                 if clock() < deadline:
-                    _refresh(journal, record, connection, deadline, clock)
+                    _refresh(journal, record, connection, deadline, clock, sleep)
                 outcome, diagnostic = _outcome(record)
                 if outcome != "CHILD_RUNNING":
                     outcome, diagnostic = _join_tail(

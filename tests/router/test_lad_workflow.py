@@ -1380,11 +1380,18 @@ def test_graph_omits_overall_bounds_and_keeps_finite_stages() -> None:
     graph = json.loads((LAD / "workflow.json").read_bytes())
     assert graph["format"] == "millrace-router/v4"
     assert graph["limits"] == {"max_parallel_invocations": 2}
-    for plane in graph["planes"].values():
-        for node in plane["nodes"].values():
-            assert node["invoke"]["timeout_seconds"] == (
-                1800 if node["invoke"]["binding"] == "claude" else 10
-            )
+    assert graph["defaults"] == {"timeout_seconds": 1800}
+    invocations = [
+        node["invoke"]
+        for plane in graph["planes"].values()
+        for node in plane["nodes"].values()
+    ]
+    assert {invoke["binding"] for invoke in invocations} == {"command", "claude"}
+    commands = [invoke for invoke in invocations if invoke["binding"] == "command"]
+    native = [invoke for invoke in invocations if invoke["binding"] == "claude"]
+    assert len(commands) == 94 and len(native) == 12
+    assert all(invoke["timeout_seconds"] == 90 for invoke in commands)
+    assert all(invoke["timeout_seconds"] == 1800 for invoke in native)
     assert graph["planes"]["foreground"]["start"] == "init_session"
     assert graph["planes"]["learning"]["start"] == "receive_request"
     used = graph["planes"]["foreground"]["nodes"]["init_session"]["on"][

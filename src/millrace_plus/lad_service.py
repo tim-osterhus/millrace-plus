@@ -42,6 +42,9 @@ DECISIONS = {
     "acknowledge-failed",
     "acknowledge-cancelled",
     "cancel-queued",
+    "cancel-active",
+    "settle",
+    "settle-no-run",
 }
 
 
@@ -468,11 +471,30 @@ def validate_shared_target(
     record, service, task = _target_claim(value)
     claim = mapping(task["claim"])
     project = _path(str(project), directory=True)
-    call = subworkflows.inspect(Path(str(claim["call_home"])), str(claim["call_key"]))
+    persistent_runtime = None
+    try:
+        service.intake.lifecycle()
+    except IntakeError as exc:
+        if exc.code != "lifecycle_missing":
+            raise
+    else:
+        from .lad_service_runtime import Runtime
+
+        persistent_runtime = Runtime(service, client=client)
+    call = (
+        persistent_runtime.call(task)[1]
+        if persistent_runtime is not None
+        else subworkflows.inspect(Path(str(claim["call_home"])), str(claim["call_key"]))
+    )
     request, paths = mapping(call["request"]), mapping(call["paths"])
     parent, inputs = mapping(request["parent"]), mapping(request["inputs"])
     if (
-        call["format"] != "millrace-plus-subworkflow-call/v2"
+        call["format"]
+        != (
+            "millrace-plus-lad-subworkflow-call/v1"
+            if persistent_runtime is not None
+            else "millrace-plus-subworkflow-call/v2"
+        )
         or call["claim_sha256"] != record["claim_sha256"]
         or call["definition"] != claim["definition"]
         or request["output_ref"] != claim["output_ref"]
@@ -518,8 +540,11 @@ def validate_shared_target(
     live_script = _path(str(script))
     _check_roots(service.config, (service.home, project, Path(str(paths["workflow"]))))
     deadline = clock() + 10
-    connection = client or WorkflowOSClient(
-        call["os_profile"], str(call["os_home"]), clock=clock
+    connection = (
+        persistent_runtime.client
+        if persistent_runtime is not None
+        else client
+        or WorkflowOSClient(call["os_profile"], str(call["os_home"]), clock=clock)
     )
     sent = mapping(mapping(call["envelopes"])["start"])
     if (
@@ -722,16 +747,9 @@ class Service:
     def _decision_receipt(
         self, request_id: str, intent: dict[str, object]
     ) -> dict[str, object]:
-        if intent["decision"] != "cancel-queued":
-            raise IntakeError("decision_requires_lifecycle")
-        return {
-            "format": "millrace-plus-lad-decision-receipt/v1",
-            "service_id": self.service_id,
-            "task_id": intent["task_id"],
-            "request_id": request_id,
-            "intent_sha256": hashlib.sha256(canonical(intent)).hexdigest(),
-            "disposition": "cancelled-before-start",
-        }
+        from .lad_service_disposition import receipt
+
+        return receipt(self, request_id, intent)
 
     def _decision_aftermath(
         self,
@@ -739,20 +757,20 @@ class Service:
         intent: dict[str, object],
         receipt: dict[str, object],
     ) -> None:
-        if intent["decision"] != "cancel-queued":
-            raise IntakeError("decision_requires_lifecycle")
-        if (
-            task["status"] != "cancelled"
-            or task["claim"] is not None
-            or task["terminal_receipt"] != receipt
-            or receipt["disposition"] != "cancelled-before-start"
-        ):
-            raise IntakeError("invalid_intake")
+        from .lad_service_disposition import aftermath
+
+        aftermath(self, task, intent, receipt)
 
     def submit(self, key: str, request_file: Path) -> dict[str, object]:
         payload = _read_exact(request_file, limit=65536)
+        validate_request(payload)
+        from .lad_service_runtime import preflight_submit, wake
+
+        preflight_submit(self, payload)
         with target_lock(self.config, protected_roots=(self.home,)):
-            return self.intake.submit(key, payload)
+            result = self.intake.submit(key, payload)
+        wake(self)
+        return result
 
     def status(self, task_id: str | None = None) -> dict[str, object]:
         tasks = self.intake.tasks(task_id)
@@ -767,6 +785,11 @@ class Service:
         }
 
     def cancel(self, task_id: str, request_id: str) -> dict[str, object]:
+        task = self.intake.tasks(identity(task_id))[0]
+        if task["claim"] is not None:
+            from .lad_service_runtime import Runtime
+
+            return Runtime(self).cancel(task_id, request_id)
         intent: dict[str, object] = {
             "task_id": identity(task_id),
             "decision": "cancel-queued",
@@ -778,12 +801,36 @@ class Service:
             )
 
     def claim_next(
-        self, *, writer_guard: Callable[[], None]
+        self,
+        *,
+        writer_guard: Callable[[], None],
+        _deadline: float | None = None,
+        _clock: Callable[[], float] = time.monotonic,
+        _sleep: Callable[[float], None] = time.sleep,
     ) -> dict[str, object] | None:
-        """Internal finite claim. Caller must check exact public writer authority."""
-        with target_lock(self.config, protected_roots=(self.home,)):
-            writer_guard()  # Unknown writers must raise. Marker/lock is not evidence.
-            return self.intake.claim(self._build_claim)
+        """Internal claim; only target mutex acquisition may wait within its node."""
+        while True:
+            if _deadline is not None and _clock() >= _deadline:
+                raise IntakeError("target_busy")
+            acquired = False
+            try:
+                with target_lock(self.config, protected_roots=(self.home,)):
+                    acquired = True
+                    if _deadline is not None and _clock() >= _deadline:
+                        raise IntakeError("target_busy")
+                    # The mutex proves no writer closure. Guard/transaction errors
+                    # after acquisition are never retried, even with this code.
+                    writer_guard()
+                    if _deadline is not None and _clock() >= _deadline:
+                        raise IntakeError("target_busy")
+                    return self.intake.claim(self._build_claim)
+            except IntakeError as exc:
+                if acquired or exc.code != "target_busy" or _deadline is None:
+                    raise
+                remaining = _deadline - _clock()
+                if remaining <= 0:
+                    raise
+                _sleep(min(0.05, remaining))
 
     def _build_claim(self, task: dict[str, object]) -> dict[str, object]:
         task_id = str(task["task_id"])

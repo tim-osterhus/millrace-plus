@@ -171,9 +171,119 @@ def test_join_history_survives_cache_expiry(fixture):
         rows = [
             row for row in saved["os_observations"] if row["request_id"] == request_id
         ]
-        assert [row["holder_joined"] for row in rows] == [True, None]
+        assert [row["holder_joined"] for row in rows] == (
+            [True] if operation == "create" else [True, None]
+        )
         assert rows[0] in before["os_observations"]
         assert helper.has_join_proof(saved, operation)
+
+
+def test_proven_create_expiry_does_not_block_unresolved_start(fixture):
+    client = FakeClient(fixture)
+    submit = client.submit
+
+    def live_start(envelope, *, deadline):
+        row = submit(envelope, deadline=deadline)
+        if envelope["operation"] == "create_instance":
+            client.joined = False
+        return row
+
+    client.submit = live_start
+    assert advance(fixture, client)["outcome"] == "CHILD_RUNNING"
+    before = journal(fixture).load()
+    assert helper.has_join_proof(before, "create")
+    assert not helper.has_join_proof(before, "start")
+    create_id = before["envelopes"]["create"]["request_id"]
+    start = before["envelopes"]["start"]
+    sends = copy.deepcopy(client.sent)
+    observed = []
+    observe = client.observe
+
+    def expired_create(envelope, *, deadline):
+        observed.append(envelope["request_id"])
+        if envelope["request_id"] == create_id:
+            raise SubworkflowError("os_http_404")
+        return observe(envelope, deadline=deadline)
+
+    client.observe = expired_create
+    client.status = "succeeded"
+    assert advance(fixture, client)["summary"] == "holder_unjoined"
+    held = journal(fixture).load()
+    assert held["observation"]["status"] == "succeeded"
+    assert not helper.has_join_proof(held, "start")
+    client.responses[start["request_id"]].update(
+        holder_joined=True, phase="call_returned"
+    )
+    assert advance(fixture, client)["outcome"] == "CHILD_SUCCEEDED"
+    saved = journal(fixture).load()
+    assert create_id not in observed and start["request_id"] in observed
+    assert client.sent == sends
+    assert [r for r in saved["os_observations"] if r["request_id"] == create_id] == [
+        r for r in before["os_observations"] if r["request_id"] == create_id
+    ]
+    assert [
+        r["holder_joined"]
+        for r in saved["os_observations"]
+        if r["request_id"] == start["request_id"]
+    ] == [False, True]
+    assert ("read", CHILD, RUN) in client.events
+
+
+@pytest.mark.parametrize("proof", ["missing", "false", "null"])
+def test_create_refresh_without_retained_true_still_observes(fixture, proof):
+    client = FakeClient(fixture)
+    advance(fixture, client)
+    storage = journal(fixture)
+    saved = storage.load()
+    create_id = saved["envelopes"]["create"]["request_id"]
+    for row in list(saved["os_observations"]):
+        if row["request_id"] != create_id:
+            continue
+        if proof == "missing":
+            saved["os_observations"].remove(row)
+        elif proof == "false":
+            row.update(holder_joined=False, phase="call_active")
+        else:
+            row.update(
+                source="core_receipt", holder_joined=None, phase="receipt_observed"
+            )
+    storage.save(saved)
+    before, sends = storage.path.read_bytes(), copy.deepcopy(client.sent)
+    client.fail_observe = "os_http_404"
+    timer = Clock()
+    with pytest.raises(SubworkflowError, match="os_http_404"):
+        helper._refresh(storage, storage.load(), client, 1, timer, timer.sleep)
+    assert client.events[-1][1]["request_id"] == create_id
+    assert storage.path.read_bytes() == before and client.sent == sends
+
+
+@pytest.mark.parametrize("status", ["queued", "refused"])
+def test_joined_create_without_applied_receipt_still_observes(fixture, status):
+    client = FakeClient(fixture)
+    submit = client.submit
+
+    def not_applied(envelope, *, deadline):
+        row = submit(envelope, deadline=deadline)
+        assert envelope["operation"] == "create_instance"
+        row["core_receipt"].update(status=status, instance_id=None)
+        row["instance_id"] = None
+        client.responses[envelope["request_id"]] = copy.deepcopy(row)
+        return row
+
+    client.submit = not_applied
+    advance(fixture, client)
+    storage = journal(fixture)
+    saved = storage.load()
+    assert saved["instance_id"] is None
+    assert saved["receipts"]["create"]["status"] == status
+    assert helper.has_join_proof(saved, "create")
+    before, sends = storage.path.read_bytes(), copy.deepcopy(client.sent)
+    client.fail_observe = "os_http_404"
+    timer = Clock()
+    with pytest.raises(SubworkflowError, match="os_http_404"):
+        helper._refresh(storage, saved, client, 1, timer, timer.sleep)
+    assert client.events[-1][1]["operation"] == "create_instance"
+    assert storage.path.read_bytes() == before and client.sent == sends
 
 
 def test_null_join_without_prior_true_holds(fixture):
@@ -660,6 +770,34 @@ def retained_cancel(fixture, client, identifier="a" * 32):
     )
 
 
+def test_proven_create_refresh_keeps_unresolved_cancel_fresh(fixture):
+    client = CancelClient(fixture)
+    advance(fixture, client)
+    client.joined = False
+    retained_cancel(fixture, client)
+    storage = journal(fixture)
+    saved = storage.load()
+    assert helper.has_join_proof(saved, "create")
+    assert not helper.has_join_proof(saved, "cancel")
+    sends = copy.deepcopy(client.sent)
+    observed = []
+    observe = client.observe
+
+    def expired_create(envelope, *, deadline):
+        observed.append(envelope["operation"])
+        if envelope["operation"] == "create_instance":
+            raise SubworkflowError("os_http_404")
+        return observe(envelope, deadline=deadline)
+
+    client.observe = expired_create
+    timer = Clock()
+    helper._refresh(storage, saved, client, 1, timer, timer.sleep)
+    assert "create_instance" not in observed and "cancel_run" in observed
+    assert not helper.has_join_proof(storage.load(), "cancel")
+    assert helper._outcome(saved) == ("CHILD_UNCERTAIN", "holder_unjoined")
+    assert client.sent == sends
+
+
 def test_cancel_ids_are_durable_and_replay_never_posts_again(fixture):
     client = CancelClient(fixture)
     advance(fixture, client)
@@ -962,6 +1100,64 @@ def test_known_false_join_tail_expires_uncertain_at_original_deadline(fixture):
     assert timer() == 12
     assert len(client.sent) == 2
     assert journal(fixture).load()["observation"]["status"] == "succeeded"
+
+
+@pytest.mark.parametrize("seconds", [1, 2, 5, 12])
+def test_repeated_join_windows_poll_before_cooldown_without_resending(fixture, seconds):
+    fixture["request"]["observe_seconds"] = seconds
+    write_request(fixture)
+    client, timer = FakeClient(fixture), Clock()
+    client.status, client.joined = "succeeded", False
+    assert advance(fixture, client, timer)["summary"] == "holder_unjoined"
+    before = journal(fixture).load()
+    assert helper._join_tail_eligible(before)
+    sends = copy.deepcopy(client.sent)
+    observed, retired = [], False
+    observe = client.observe
+
+    def peer(envelope, *, deadline):
+        observed.append((envelope["operation"], timer(), deadline))
+        row = observe(envelope, deadline=deadline)
+        if retired:
+            row.update(holder_joined=True, phase="call_returned")
+        return row
+
+    client.observe = peer
+    # These enter with already terminal Core facts and retained known-false
+    # holders, so each new window must observe before consuming its cooldown.
+    for _ in range(2):
+        window_start = timer()
+        observed.clear()
+        assert advance(fixture, client, timer)["summary"] == "holder_unjoined"
+        assert timer() == window_start + seconds
+        for operation in ("create_instance", "start_run"):
+            assert [
+                at - window_start for name, at, _ in observed if name == operation
+            ] == list(range(0, seconds, 5))
+        assert all(deadline == window_start + seconds for _, _, deadline in observed)
+        held = journal(fixture).load()
+        assert held["os_observations"] == before["os_observations"]
+        assert not helper.has_join_proof(held, "start")
+        assert client.sent == sends
+
+    retired = True
+    window_start = timer()
+    observed.clear()
+    assert advance(fixture, client, timer)["outcome"] == "CHILD_SUCCEEDED"
+    assert timer() == window_start
+    assert observed == [
+        ("create_instance", window_start, window_start + seconds),
+        ("start_run", window_start, window_start + seconds),
+    ]
+    saved = journal(fixture).load()
+    for operation in ("create", "start"):
+        identifier = saved["envelopes"][operation]["request_id"]
+        assert [
+            row["holder_joined"]
+            for row in saved["os_observations"]
+            if row["request_id"] == identifier
+        ] == [False, True]
+    assert client.sent == sends and set(saved) == set(before)
 
 
 @pytest.mark.parametrize(

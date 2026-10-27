@@ -229,9 +229,7 @@ def test_copy_path_refusals_and_cleanup(
         catalog.copy_workflow(source, dest, catalog_home=local)
     assert error.value.code == "io_error"
     assert not dest.exists() and source.is_dir()
-    assert {
-        name: (source / name).read_bytes() for name in source_files
-    } == source_files
+    assert {name: (source / name).read_bytes() for name in source_files} == source_files
     assert local_sentinel.read_bytes() == b"keep this catalog entry"
 
 
@@ -416,3 +414,32 @@ def test_catalog_copy_accepts_v3_and_v4_and_refuses_unknown_format(
             "bundled:optional", refused, catalog_home=tmp_path / "local"
         )
     assert not refused.exists()
+
+
+def test_persistent_service_catalog_is_independent_and_command_only(
+    tmp_path: Path,
+) -> None:
+    source = catalog.bundled_root() / "lad-service"
+    graph = json.loads((source / "workflow.json").read_bytes())
+    assert graph["format"] == "millrace-router/v4"
+    assert graph["limits"] == {"max_parallel_invocations": 1}
+    assert set(graph["planes"]) == {"service"}
+    nodes = graph["planes"]["service"]["nodes"]
+    assert set(nodes) == {
+        "reconcile",
+        "claim",
+        "wait_intake",
+        "advance",
+        "settle",
+        "hold",
+    }
+    assert nodes["wait_intake"]["invoke"]["timeout_seconds"] == 910
+    assert all(
+        binding["adapter"] == "command" for binding in graph["bindings"].values()
+    )
+    destination = tmp_path / "parent-copy"
+    catalog.init_template("bundled:lad-service", destination)
+    assert catalog.workflow_fingerprint(destination) == catalog.workflow_fingerprint(
+        source
+    )
+    assert not (destination / "service.json").exists()

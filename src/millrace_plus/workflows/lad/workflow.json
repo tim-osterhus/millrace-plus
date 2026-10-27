@@ -63,7 +63,7 @@
         "init_session": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/init_session.py",
               "args": [
@@ -117,7 +117,7 @@
         "setup_intake": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/setup_intake.py",
               "args": [
@@ -173,7 +173,7 @@
         "human_pause": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/boundaries.py",
               "args": [
@@ -216,7 +216,7 @@
         "terminal_failure": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/boundaries.py",
               "args": [
@@ -253,7 +253,7 @@
         "emit_learning_request": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -290,7 +290,7 @@
         "accept_learning_ack": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -343,7 +343,7 @@
         "finalize": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/boundaries.py",
               "args": [
@@ -384,7 +384,7 @@
         "prepare_recon": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -425,7 +425,7 @@
         "prepare_recon_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -510,7 +510,7 @@
         "accept_recon_pass": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -572,7 +572,7 @@
         "accept_recon_findings": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -630,7 +630,7 @@
         "accept_recon_error": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -692,7 +692,7 @@
         "accept_recon_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -754,7 +754,7 @@
         "prepare_planner": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -795,7 +795,7 @@
         "prepare_planner_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -880,7 +880,7 @@
         "accept_planner_pass": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -942,7 +942,7 @@
         "accept_planner_findings": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1000,7 +1000,7 @@
         "accept_planner_error": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1062,7 +1062,7 @@
         "accept_planner_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1124,7 +1124,7 @@
         "prepare_manager": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -1165,7 +1165,7 @@
         "prepare_manager_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -1250,7 +1250,7 @@
         "accept_manager_pass": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1316,7 +1316,7 @@
         "accept_manager_findings": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1374,7 +1374,7 @@
         "accept_manager_error": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1436,7 +1436,7 @@
         "accept_manager_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1498,7 +1498,7 @@
         "prepare_builder": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -1539,7 +1539,7 @@
         "prepare_builder_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -1628,7 +1628,7 @@
         "accept_builder_pass": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1690,7 +1690,7 @@
         "accept_builder_findings_inspectable": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1752,7 +1752,7 @@
         "accept_builder_findings_uninspectable": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1814,7 +1814,7 @@
         "accept_builder_error": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1876,7 +1876,7 @@
         "accept_builder_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -1938,7 +1938,7 @@
         "prepare_checker": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -1979,7 +1979,7 @@
         "prepare_checker_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -2068,7 +2068,7 @@
         "accept_checker_pass": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -2130,7 +2130,7 @@
         "accept_checker_findings_actionable": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -2192,7 +2192,7 @@
         "accept_checker_findings_contract": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -2250,7 +2250,7 @@
         "accept_checker_error": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -2312,7 +2312,7 @@
         "accept_checker_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -2374,7 +2374,7 @@
         "prepare_fixer": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -2415,7 +2415,7 @@
         "prepare_fixer_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -2504,7 +2504,7 @@
         "accept_fixer_pass": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -2566,7 +2566,7 @@
         "accept_fixer_findings_inspectable": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -2628,7 +2628,7 @@
         "accept_fixer_findings_uninspectable": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -2690,7 +2690,7 @@
         "accept_fixer_error": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -2752,7 +2752,7 @@
         "accept_fixer_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -2814,7 +2814,7 @@
         "prepare_doublechecker": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -2855,7 +2855,7 @@
         "prepare_doublechecker_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -2944,7 +2944,7 @@
         "accept_doublechecker_pass": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3010,7 +3010,7 @@
         "accept_doublechecker_findings_actionable": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3080,7 +3080,7 @@
         "accept_doublechecker_findings_contract": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3138,7 +3138,7 @@
         "accept_doublechecker_error": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3200,7 +3200,7 @@
         "accept_doublechecker_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3262,7 +3262,7 @@
         "prepare_troubleshooter": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -3303,7 +3303,7 @@
         "prepare_troubleshooter_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -3392,7 +3392,7 @@
         "accept_troubleshooter_pass_review_repaired": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3454,7 +3454,7 @@
         "accept_troubleshooter_pass_prerequisite_repaired": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3552,7 +3552,7 @@
         "accept_troubleshooter_findings": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3610,7 +3610,7 @@
         "accept_troubleshooter_error": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3668,7 +3668,7 @@
         "accept_troubleshooter_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3730,7 +3730,7 @@
         "prepare_consultant": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -3771,7 +3771,7 @@
         "prepare_consultant_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -3868,7 +3868,7 @@
         "accept_consultant_repair_spec": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -3934,7 +3934,7 @@
         "accept_consultant_repair_packets": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4000,7 +4000,7 @@
         "accept_consultant_repair_execution": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4066,7 +4066,7 @@
         "accept_consultant_no_safe_route": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4132,7 +4132,7 @@
         "accept_consultant_error_repairable": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4198,7 +4198,7 @@
         "accept_consultant_error_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4264,7 +4264,7 @@
         "accept_consultant_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4330,7 +4330,7 @@
         "prepare_updater": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -4371,7 +4371,7 @@
         "prepare_updater_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -4464,7 +4464,7 @@
         "accept_updater_pass": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4530,7 +4530,7 @@
         "accept_updater_review_invalidated_new_baseline": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4592,7 +4592,7 @@
         "accept_updater_review_invalidated_same_baseline": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4654,7 +4654,7 @@
         "accept_updater_findings_contract": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4712,7 +4712,7 @@
         "accept_updater_error": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4774,7 +4774,7 @@
         "accept_updater_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -4836,7 +4836,7 @@
         "prepare_arbiter": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -4877,7 +4877,7 @@
         "prepare_arbiter_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/prepare_role.py",
               "args": [
@@ -4966,7 +4966,7 @@
         "accept_arbiter_pass": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -5028,7 +5028,7 @@
         "accept_arbiter_findings": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -5090,7 +5090,7 @@
         "accept_arbiter_error_repairable": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -5152,7 +5152,7 @@
         "accept_arbiter_error_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -5214,7 +5214,7 @@
         "accept_arbiter_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/accept_role.py",
               "args": [
@@ -5282,7 +5282,7 @@
         "receive_request": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -5323,7 +5323,7 @@
         "prepare_learning": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -5360,7 +5360,7 @@
         "prepare_learning_replacement": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -5401,7 +5401,7 @@
         "emit_ack": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -5438,7 +5438,7 @@
         "after_ack": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -5522,7 +5522,7 @@
         "accept_learning_pass": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -5568,7 +5568,7 @@
         "accept_learning_findings": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -5614,7 +5614,7 @@
         "accept_learning_error_transient_resolved": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -5664,7 +5664,7 @@
         "accept_learning_error": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
@@ -5710,7 +5710,7 @@
         "accept_learning_human_blocked": {
           "invoke": {
             "binding": "command",
-            "timeout_seconds": 10,
+            "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [

@@ -595,6 +595,24 @@ def target_root(foreground: Path) -> Path:
     )
 
 
+def _prepare_source(
+    foreground: Path, selected_target: dict | None
+) -> tuple[dict, dict]:
+    """Collect one operation's source/context from its already validated root.
+
+    The caller must fully revalidate shared authority before returning the
+    observation or publishing an occurrence. No locator survives the operation.
+    """
+    target = (
+        Path(selected_target["target_root"])
+        if selected_target is not None
+        else safe(foreground, "target", missing=True)
+    )
+    snapshot = _source_at(foreground, target)
+    context = _source_context_at(target, _outside_source_at(foreground, target))
+    return snapshot, context
+
+
 def _owned_marker(foreground: Path, target: Path, relative: str) -> bool:
     # The resolver already verified the exact owner marker and active claim.
     return (
@@ -605,7 +623,10 @@ def _owned_marker(foreground: Path, target: Path, relative: str) -> bool:
 
 def outside_source(foreground: Path) -> dict:
     """Retain outside-path identities without hashing all target content."""
-    target = target_root(foreground)
+    return _outside_source_at(foreground, target_root(foreground))
+
+
+def _outside_source_at(foreground: Path, target: Path) -> dict:
     if not target.exists():
         return {}
     session = foreground / "lad-state/session.json"
@@ -669,8 +690,12 @@ def outside_source(foreground: Path) -> dict:
 
 def source_context(foreground: Path) -> dict:
     """Record the Git base/index without reading Git storage as source files."""
+    # Preserve the public helper's fresh authority checks for other callers.
     outside = outside_source(foreground)
-    target = target_root(foreground)
+    return _source_context_at(target_root(foreground), outside)
+
+
+def _source_context_at(target: Path, outside: dict) -> dict:
     if not target.exists():
         return {"git": None, "outside": outside}
     command = [
@@ -721,7 +746,12 @@ def source_context(foreground: Path) -> dict:
 
 def source(foreground: Path, paths: list[str] | None = None) -> dict[str, str]:
     """Stream scoped source identities; do not follow links or parse artifacts."""
-    target = target_root(foreground)
+    return _source_at(foreground, target_root(foreground), paths)
+
+
+def _source_at(
+    foreground: Path, target: Path, paths: list[str] | None = None
+) -> dict[str, str]:
     if not target.exists():
         return {}
     if not target.is_dir():

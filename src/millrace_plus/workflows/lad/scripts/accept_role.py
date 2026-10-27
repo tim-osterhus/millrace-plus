@@ -10,6 +10,7 @@ from lad_state import (
     ARTIFACTS,
     ROLES,
     LadError,
+    _prepare_source,
     _validate_state,
     assert_foreground,
     atomic,
@@ -27,8 +28,7 @@ from lad_state import (
     run,
     safe,
     save,
-    source,
-    source_context,
+    shared_target,
     text,
 )
 
@@ -173,16 +173,20 @@ def current_source(
     foreground: Path, occurrence: dict, *, current_contract: bool = True
 ) -> dict:
     if current_contract:
+        try:
+            selected_target = shared_target(foreground)
+        except LadError as exc:
+            raise LadError("shared_target_" + str(exc)) from exc
+        current, context = _prepare_source(foreground, selected_target)
         if (occurrence["source_context"]["outside"]
-            != source_context(foreground)["outside"]):
+            != context["outside"]):
             raise LadError("out_of_scope_source_change")
         previous = occurrence["source_context"]["git"]
-        observed = source_context(foreground)["git"]
+        observed = context["git"]
         if (previous is None) != (observed is None) or (previous is not None and any(
             previous[key] != observed[key] for key in ("base", "index")
         )):
             raise LadError("source_git_base_or_index_changed")
-        current = source(foreground)
     else:
         from session_compat import source_v1
 
@@ -208,6 +212,13 @@ def current_source(
         for name in changed
     ):
         raise LadError("out_of_scope_source_change")
+    if current_contract:
+        try:
+            observed_target = shared_target(foreground)
+        except LadError as exc:
+            raise LadError("shared_target_" + str(exc)) from exc
+        if observed_target != selected_target:
+            raise LadError("shared_target_changed")
     return current
 
 
@@ -535,6 +546,8 @@ def accept_checked(foreground: Path, workspace: Path, role: str, expected: str) 
         return accept(foreground, workspace, role, expected)
     except (LadError, ValueError, KeyError, TypeError, UnicodeError) as exc:
         code = str(exc) if isinstance(exc, LadError) else type(exc).__name__
+        if code.startswith("shared_target_"):
+            raise
         state = load(foreground)
         plane = "learning" if role == "learning" else "foreground"
         occurrence = state["occurrences"].get(state["active"].get(plane))

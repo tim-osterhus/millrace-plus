@@ -259,7 +259,7 @@ def test_lad_local_commands_without_core(
     assert not (service.home / "calls").exists()
 
 
-def test_lad_cli_refuses_active_cancel_and_unavailable_activation(
+def test_lad_cli_refuses_foundation_activation_without_lifecycle(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -280,7 +280,7 @@ def test_lad_cli_refuses_active_cancel_and_unavailable_activation(
                 "--request-id",
                 "35fc1b35786c442ba6b633b3a38e84c7",
             ],
-            "task_not_queued",
+            "lifecycle_missing",
         ),
         (["init"], "usage_error"),
         (["decide"], "usage_error"),
@@ -394,3 +394,207 @@ def test_subworkflow_cancel_valid_v2_skips_core(tmp_path, monkeypatch, capsys):
     )
     assert calls == [(root.parent, "child", "a" * 32)]
     assert json.loads(capsys.readouterr().out)["format"].endswith("/v2")
+
+
+def test_lad_init_and_decision_cli_are_thin_public_dispatch(
+    tmp_path, monkeypatch, capsys
+):
+    from millrace_plus import lad_service_runtime
+
+    calls = []
+
+    def initialize(*args):
+        calls.append(args)
+        return {"activation_ready": True, "instance_id": "a" * 32}
+
+    monkeypatch.setattr(lad_service_runtime, "initialize", initialize)
+    values = [
+        tmp_path / name
+        for name in ("service", "target", "profile", "definition", "core")
+    ]
+    argv = ["millrace-plus", "lad", "init"]
+    for name, value in zip(
+        (
+            "service-home",
+            "target",
+            "os-profile",
+            "worker-definition",
+            "core-state-home",
+        ),
+        values,
+    ):
+        argv.extend(["--" + name, str(value)])
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit) as result:
+        cli.cli()
+    assert result.value.code == 0
+    assert calls == [tuple(values)]
+    output = capsys.readouterr()
+    assert json.loads(output.out)["activation_ready"] is True and output.err == ""
+
+
+@pytest.mark.parametrize("plane", [None, "foreground", "learning"])
+def test_continue_cli_forwards_explicit_plane_without_reading_opaque_notes(
+    tmp_path, monkeypatch, capsys, plane
+):
+    from millrace_plus import lad_service, lad_service_runtime
+
+    calls = []
+    evidence = tmp_path / "notes.txt"
+    evidence.write_text('{"operation":"resume_plane","plane_id":"notes-only"}')
+    service = object()
+    monkeypatch.setattr(lad_service, "Service", lambda home: service)
+
+    class Runtime:
+        def __init__(self, given):
+            assert given is service
+
+        def decide(self, *args, **kwargs):
+            calls.append((args, kwargs))
+            return {"disposition": "continuation-requested"}
+
+    monkeypatch.setattr(lad_service_runtime, "Runtime", Runtime)
+    argv = [
+        "millrace-plus",
+        "lad",
+        "decide",
+        "--service-home",
+        str(tmp_path),
+        "--task",
+        "a" * 32,
+        "--decision",
+        "continue",
+        "--request-id",
+        "b" * 32,
+        "--evidence",
+        str(evidence),
+    ]
+    if plane is not None:
+        argv.extend(["--resume-plane", plane])
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit) as result:
+        cli.cli()
+    assert result.value.code == 0
+    assert calls == [
+        (("a" * 32, "continue", "b" * 32, evidence), {"resume_plane": plane})
+    ]
+    assert (
+        json.loads(capsys.readouterr().out)["disposition"] == "continuation-requested"
+    )
+
+
+@pytest.mark.parametrize(
+    "decision,plane", [("close-failed", "foreground"), ("continue", "foreign")]
+)
+def test_resume_plane_cli_invalid_selection_refuses_before_service(
+    tmp_path, monkeypatch, capsys, decision, plane
+):
+    from millrace_plus import lad_service
+
+    monkeypatch.setattr(
+        lad_service,
+        "Service",
+        lambda _: pytest.fail("invalid selection loaded service"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "millrace-plus",
+            "lad",
+            "decide",
+            "--service-home",
+            str(tmp_path),
+            "--task",
+            "a" * 32,
+            "--decision",
+            decision,
+            "--request-id",
+            "b" * 32,
+            "--evidence",
+            str(tmp_path / "notes.txt"),
+            "--resume-plane",
+            plane,
+        ],
+    )
+    with pytest.raises(SystemExit) as result:
+        cli.cli()
+    assert result.value.code == 2
+    assert capsys.readouterr().out == ""
+
+
+def test_generic_subworkflow_persistent_marker_refuses_before_core(
+    tmp_path, monkeypatch, capsys
+):
+    from millrace_plus.subworkflow_records import canonical
+
+    home = tmp_path / "calls"
+    root = home / "task"
+    root.mkdir(parents=True)
+    (root / "call.json").write_bytes(
+        canonical({"format": "millrace-plus-lad-subworkflow-call/v1"})
+    )
+    monkeypatch.setattr(
+        cli,
+        "require_core",
+        lambda: pytest.fail("generic persistent marker imported Core"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "millrace-plus",
+            "subworkflow",
+            "inspect",
+            "--call-home",
+            str(home),
+            "--call-key",
+            "task",
+        ],
+    )
+    with pytest.raises(SystemExit) as result:
+        cli.cli()
+    assert result.value.code == 2
+    assert (
+        json.loads(capsys.readouterr().err)["code"]
+        == "persistent_service_authority_required"
+    )
+
+
+def test_lad_parent_control_cli_forwards_one_request_file(
+    tmp_path, monkeypatch, capsys
+):
+    from test_lad_service import make_service
+
+    from millrace_plus import lad_service_runtime
+
+    service = make_service(tmp_path)
+    calls = []
+
+    class Runtime:
+        def __init__(self, selected):
+            assert selected.home == service.home
+
+        def parent_control(self, path):
+            calls.append(path)
+            return {"request_id": "a" * 32, "status": "pending", "holder_joined": False}
+
+    monkeypatch.setattr(lad_service_runtime, "Runtime", Runtime)
+    path = tmp_path / "parent-request.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "millrace-plus",
+            "lad",
+            "parent-control",
+            "--service-home",
+            str(service.home),
+            "--request",
+            str(path),
+        ],
+    )
+    with pytest.raises(SystemExit) as result:
+        cli.cli()
+    assert result.value.code == 0 and calls == [path]
+    assert json.loads(capsys.readouterr().out)["holder_joined"] is False

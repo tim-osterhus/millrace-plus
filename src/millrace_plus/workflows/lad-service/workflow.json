@@ -1,0 +1,311 @@
+{
+  "format": "millrace-router/v4",
+  "limits": {
+    "max_parallel_invocations": 1
+  },
+  "defaults": {
+    "timeout_seconds": 90
+  },
+  "bindings": {
+    "command": {
+      "adapter": "command",
+      "contract": "millrace-command/v1",
+      "executable": "python3",
+      "config": {}
+    }
+  },
+  "control_files": [
+    "scripts/service.py"
+  ],
+  "planes": {
+    "service": {
+      "workspace": "service",
+      "start": "reconcile",
+      "nodes": {
+        "reconcile": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/service.py",
+              "args": [
+                "reconcile"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "ACTIVE",
+            "HOLD"
+          ],
+          "on": {
+            "READY": {
+              "goto": "claim"
+            },
+            "ACTIVE": {
+              "goto": "advance"
+            },
+            "HOLD": {
+              "pause": {
+                "reason": "lad_service_hold",
+                "resume": "reconcile"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "claim": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/service.py",
+              "args": [
+                "claim"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CLAIMED",
+            "EMPTY",
+            "HOLD"
+          ],
+          "on": {
+            "CLAIMED": {
+              "goto": "advance"
+            },
+            "EMPTY": {
+              "goto": "wait_intake"
+            },
+            "HOLD": {
+              "pause": {
+                "reason": "lad_service_hold",
+                "resume": "reconcile"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "wait_intake": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 910,
+            "config": {
+              "script": "scripts/service.py",
+              "args": [
+                "wait_intake"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "WAKE",
+            "IDLE",
+            "HOLD"
+          ],
+          "on": {
+            "WAKE": {
+              "goto": "claim"
+            },
+            "IDLE": {
+              "goto": "claim"
+            },
+            "HOLD": {
+              "pause": {
+                "reason": "lad_service_hold",
+                "resume": "reconcile"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "advance": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/service.py",
+              "args": [
+                "advance"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CHILD_RUNNING",
+            "CHILD_SUCCEEDED",
+            "CHILD_FAILED",
+            "CHILD_CANCELLED",
+            "CHILD_ATTENTION",
+            "CHILD_REFUSED",
+            "CHILD_UNCERTAIN",
+            "CHILD_OBSERVATION_LOST",
+            "HOLD"
+          ],
+          "on": {
+            "CHILD_RUNNING": {
+              "goto": "advance"
+            },
+            "CHILD_SUCCEEDED": {
+              "goto": "settle"
+            },
+            "CHILD_FAILED": {
+              "goto": "hold"
+            },
+            "CHILD_CANCELLED": {
+              "goto": "hold"
+            },
+            "CHILD_ATTENTION": {
+              "goto": "hold"
+            },
+            "CHILD_REFUSED": {
+              "goto": "hold"
+            },
+            "CHILD_UNCERTAIN": {
+              "goto": "hold"
+            },
+            "CHILD_OBSERVATION_LOST": {
+              "goto": "hold"
+            },
+            "HOLD": {
+              "pause": {
+                "reason": "lad_service_hold",
+                "resume": "reconcile"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "settle": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/service.py",
+              "args": [
+                "settle"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "SETTLED",
+            "HOLD"
+          ],
+          "on": {
+            "SETTLED": {
+              "goto": "claim"
+            },
+            "HOLD": {
+              "pause": {
+                "reason": "lad_service_hold",
+                "resume": "reconcile"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "hold": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/service.py",
+              "args": [
+                "hold"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "WAIT_OPERATOR",
+            "HOLD"
+          ],
+          "on": {
+            "WAIT_OPERATOR": {
+              "pause": {
+                "reason": "lad_service_hold",
+                "resume": "reconcile"
+              }
+            },
+            "HOLD": {
+              "pause": {
+                "reason": "lad_service_hold",
+                "resume": "reconcile"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_service_hold",
+              "resume": "reconcile"
+            }
+          }
+        }
+      }
+    }
+  }
+}

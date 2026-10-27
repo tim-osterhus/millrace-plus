@@ -238,7 +238,7 @@ def validate_receipt(value: object, envelope: dict[str, object]) -> dict[str, ob
         or not _one_of(row.get("status"), {"queued", "applied", "refused"})
     ):
         raise SubworkflowError("invalid_core_receipt")
-    if row.get("plane_id") is not None:
+    if row.get("plane_id") != envelope["plane_id"]:
         raise SubworkflowError("wrong_core_target")
     if envelope["operation"] == "create_instance" and row.get("run_id") is not None:
         raise SubworkflowError("wrong_core_target")

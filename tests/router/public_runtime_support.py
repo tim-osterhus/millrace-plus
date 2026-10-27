@@ -13,9 +13,9 @@ from pathlib import Path
 import pytest
 
 from millrace_plus import catalog, subworkflows
-from millrace_plus.subworkflow_records import canonical
+from millrace_plus.subworkflow_records import SubworkflowError, canonical
 from millrace_plus.subworkflow_v2 import closed, has_join_proof
-from millrace_plus.workflow_os_client import WorkflowOSClient
+from millrace_plus.workflow_os_client import WorkflowOSClient, validate_call
 
 
 def write_json(path: Path, value: object) -> None:
@@ -83,6 +83,7 @@ class PublicRuntime:
         self.parent: str | None = None
         self.parent_run: str | None = None
         self.parent_calls: list[dict] = []
+        self.parent_join_proofs: dict[str, str] = {}
         self.children: list[tuple[Path, str]] = []
         self.service = None
         self.started_at = time.monotonic()
@@ -160,6 +161,7 @@ class PublicRuntime:
             value = value or self.client.observe(
                 envelope, deadline=time.monotonic() + 2
             )
+            value = validate_call(value, self.client.home, envelope)
             receipt = value["core_receipt"]
             if receipt and receipt["status"] != "queued":
                 if not joined or value["holder_joined"] is True:
@@ -169,6 +171,13 @@ class PublicRuntime:
                         / (envelope["request_id"] + ".json"),
                         value,
                     )
+                    if (
+                        value["source"] == "os_owned_call"
+                        and value["holder_joined"] is True
+                    ):
+                        self.parent_join_proofs[envelope["request_id"]] = (
+                            hashlib.sha256(canonical(value) + b"\n").hexdigest()
+                        )
                     return receipt
             return None
 
@@ -302,6 +311,47 @@ class PublicRuntime:
         )
         return saved, run
 
+    def retain_parent_joins(self) -> None:
+        """Retain only actual exact owned true observations before OS cache expiry."""
+        for envelope in self.parent_calls:
+            path = (
+                self.root / "parent-observations" / (envelope["request_id"] + ".json")
+            )
+            owned_sha = self.parent_join_proofs.get(envelope["request_id"])
+            if path.exists():
+                raw = path.read_bytes()
+                saved = validate_call(
+                    catalog.strict_json(raw), self.client.home, envelope
+                )
+                if owned_sha is not None:
+                    if hashlib.sha256(raw).hexdigest() != owned_sha:
+                        raise SubworkflowError("fixture_join_proof_changed")
+                    if (
+                        saved["source"] == "os_owned_call"
+                        and saved["holder_joined"] is True
+                    ):
+                        continue
+                    raise SubworkflowError("fixture_join_proof_invalid")
+            elif owned_sha is not None:
+                raise SubworkflowError("fixture_join_proof_missing")
+
+            def joined(envelope=envelope):
+                value = validate_call(
+                    self.client.observe(envelope, deadline=time.monotonic() + 2),
+                    self.client.home,
+                    envelope,
+                )
+                return value if (
+                    value["source"] == "os_owned_call"
+                    and value["holder_joined"] is True
+                ) else None
+
+            value = self.until(joined)
+            write_json(path, value)
+            self.parent_join_proofs[envelope["request_id"]] = hashlib.sha256(
+                canonical(value) + b"\n"
+            ).hexdigest()
+
     def close(self) -> None:
         if self.service is None:
             return
@@ -328,21 +378,7 @@ class PublicRuntime:
                     return view if closed(view) else None
 
                 self.until(settled)
-                for envelope in self.parent_calls:
-
-                    def joined(envelope=envelope):
-                        value = self.client.observe(
-                            envelope, deadline=time.monotonic() + 2
-                        )
-                        return value if value["holder_joined"] is True else None
-
-                    value = self.until(joined)
-                    write_json(
-                        self.root
-                        / "parent-observations"
-                        / (envelope["request_id"] + ".json"),
-                        value,
-                    )
+                self.retain_parent_joins()
             except Exception as exc:
                 errors.append(
                     {

@@ -195,6 +195,7 @@ def test_official_package_data_declares_selected_vendor_selection_assets() -> No
     assert sorted(p.name for p in root.iterdir() if p.is_dir()) == [
         "document-review",
         "lad",
+        "lad-service",
         "software-change",
     ]
     for name in ("document-review", "software-change"):
@@ -245,7 +246,7 @@ def test_lad_package_inventory_matches_admitted_workflow_assets() -> None:
     for plane in graph["planes"].values():
         for node in plane["nodes"].values():
             assert node["invoke"]["timeout_seconds"] == (
-                1800 if node["invoke"]["binding"] == "claude" else 10
+                1800 if node["invoke"]["binding"] == "claude" else 90
             )
     assert all((root / asset).is_file() for asset in graph["control_files"])
     license_text = (root / "licenses/lad-factory-Apache-2.0.txt").read_text()
@@ -278,8 +279,20 @@ def test_plus_candidate_targets_reviewed_core_minimum_and_defers_experiment() ->
         "millrace-router-execution/v2"
         in (PROJECT_ROOT / "src/millrace_plus/router/__init__.py").read_text()
     )
-    for folder in (PROJECT_ROOT / "src/millrace_plus/workflows").iterdir():
+    workflows = PROJECT_ROOT / "src/millrace_plus/workflows"
+    for folder in workflows.iterdir():
         if folder.is_dir():
+            if folder.name == "lad-service":
+                graph = json.loads((folder / "workflow.json").read_text())
+                assert graph["format"] == "millrace-router/v4"
+                assert set(graph["planes"]) == {"service"}
+                bindings = {
+                    node["invoke"]["binding"]
+                    for node in graph["planes"]["service"]["nodes"].values()
+                }
+                assert bindings == {"command"}
+                assert not (folder / "profiles").exists()
+                continue
             profile = json.loads((folder / "profiles/claude.json").read_text())
             assert profile == {
                 "format": "millrace-claude-print-profile/v1",

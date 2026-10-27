@@ -158,6 +158,62 @@ def test_journal_replay_rejects_authority_or_identity_mutation(fixture, mutation
     assert storage.path.read_bytes() == original
 
 
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("home", "other"),
+        ("request_id", "f" * 32),
+        ("request_digest", "f" * 64),
+        ("instance_id", "f" * 32),
+        ("contract", "millrace-os-router-call/v1"),
+        ("holder_joined", 1),
+        ("source", "core_receipt"),
+        ("phase", "invented_join"),
+    ],
+)
+def test_proven_create_reuse_rejects_invalid_retained_authority(fixture, field, value):
+    advance(fixture, FakeClient(fixture))
+    storage = journal(fixture)
+    original = storage.path.read_bytes()
+    saved = storage.load()
+    create_id = saved["envelopes"]["create"]["request_id"]
+    proof = next(
+        row for row in saved["os_observations"] if row["request_id"] == create_id
+    )
+    proof[field] = value
+    with pytest.raises(SubworkflowError):
+        storage.save(saved)
+    assert storage.path.read_bytes() == original
+
+
+def test_proven_create_history_keeps_later_null_in_journal_and_result(fixture):
+    advance(fixture, FakeClient(fixture))
+    storage = journal(fixture)
+    saved = storage.load()
+    create_id = saved["envelopes"]["create"]["request_id"]
+    original = copy.deepcopy(saved["os_observations"])
+    later = copy.deepcopy(
+        next(row for row in original if row["request_id"] == create_id)
+    )
+    later.update(
+        source="core_receipt",
+        phase="receipt_observed",
+        holder_joined=None,
+        observed_at="2026-10-26T00:01:00Z",
+    )
+    saved["os_observations"].append(later)
+    storage.save(saved)
+    reloaded = storage.load()
+    assert reloaded["os_observations"] == original + [later]
+    manifest = records.result_manifest(reloaded, "CHILD_RUNNING", None)
+    assert [
+        row["holder_joined"]
+        for row in manifest["os_observations"]
+        if row["request_id"] == create_id
+    ] == [True, None]
+    assert records.validate_result(manifest) == manifest
+
+
 def test_record_hash_and_encoded_journal_bound(fixture):
     advance(fixture, FakeClient(fixture))
     storage = journal(fixture)

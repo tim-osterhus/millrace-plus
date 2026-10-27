@@ -11,13 +11,22 @@ import time
 import uuid
 from pathlib import Path
 
-from public_runtime_support import command_node, graph, instance_hashes, write_json
-from public_runtime_support import runtime as runtime
+import pytest
+from public_runtime_support import (
+    command_node,
+    graph,
+    instance_hashes,
+    write_json,
+)
+from public_runtime_support import (
+    runtime as runtime,
+)
 
 from millrace_plus import catalog, subworkflows
 from millrace_plus.lad_service import Service, claim_target
-from millrace_plus.subworkflow_records import canonical, digest
-from millrace_plus.subworkflow_v2 import SETTINGS
+from millrace_plus.subworkflow_records import SubworkflowError, canonical, digest
+from millrace_plus.subworkflow_v2 import SETTINGS, has_join_proof
+from millrace_plus.workflow_os_client import WorkflowOSClient
 
 
 def test_v2_public_os_two_children_share_home_and_preserve_sibling(runtime):
@@ -74,6 +83,123 @@ def test_v2_public_os_two_children_share_home_and_preserve_sibling(runtime):
     assert instance_hashes(runtime.home, first["instance_id"]) == before
     assert first_output.read_bytes() == b"A\r\n"
     assert catalog.workflow_fingerprint(definition) == original
+
+
+def test_public_proven_create_expiry_preserves_live_start_join(runtime, monkeypatch):
+    definition = runtime.catalog / "expire-create"
+    definition.mkdir()
+    (definition / "step.py").write_text(
+        "import json,time\nfrom pathlib import Path\n"
+        "Path('started').write_text('live')\n"
+        "deadline=time.monotonic()+45\n"
+        "while not Path('release').exists():\n"
+        "    assert time.monotonic()<deadline\n"
+        "    time.sleep(0.05)\n"
+        "print(json.dumps({'outcome':'DONE','summary':'released','refs':[]}))\n"
+    )
+    value = graph(
+        {"step": command_node("step.py", "DONE", {"finish": "succeeded"}, timeout=60)}
+    )
+    value["control_files"] = ["step.py"]
+    write_json(definition / "workflow.json", value)
+    request = runtime.call_request(definition, key="expired-create", text="Release.")
+    request["observe_seconds"] = 2
+    path = runtime.project / "expired-create-request.json"
+    write_json(path, request)
+    pair = (Path(request["call_home"]), request["call_key"])
+    runtime.children.append(pair)
+    release = pair[0] / pair[1] / "project/release"
+    posted, observed = [], []
+    submit, observe = WorkflowOSClient.submit, WorkflowOSClient.observe
+
+    def track_submit(client, envelope, *, deadline):
+        posted.append(copy.deepcopy(envelope))
+        return submit(client, envelope, deadline=deadline)
+
+    def track_observe(client, envelope, *, deadline):
+        observed.append(copy.deepcopy(envelope))
+        return observe(client, envelope, deadline=deadline)
+
+    monkeypatch.setattr(WorkflowOSClient, "submit", track_submit)
+    monkeypatch.setattr(WorkflowOSClient, "observe", track_observe)
+    try:
+
+        def live():
+            assert subworkflows.advance(path)["outcome"] == "CHILD_RUNNING"
+            saved = subworkflows.inspect(*pair)
+            return (
+                saved
+                if saved["run_id"] is not None
+                and (release.parent / "started").is_file()
+                and has_join_proof(saved, "create")
+                else None
+            )
+
+        before = runtime.until(live, seconds=15)
+        create, start = before["envelopes"]["create"], before["envelopes"]["start"]
+        assert create["instance_id"] is create["run_id"] is None
+        assert not has_join_proof(before, "start")
+        active = runtime.client.observe(start, deadline=time.monotonic() + 2)
+        assert active["source"] == "os_owned_call"
+        assert active["holder_joined"] is False
+        assert active["core_receipt"]["status"] == "applied"
+        workers = runtime.service.router_workers
+        assert workers.observation_ttl == 300
+        with workers._lock:
+            call = workers._calls[workers._key("proof", create["request_id"])]
+            assert call.request == create and call.joined
+            assert call.finished_at is not None
+            start_call = workers._calls[workers._key("proof", start["request_id"])]
+            assert not start_call.joined
+            # Age only this fixture's already joined call past its real TTL.
+            # OS's ordinary retirement path performs eviction on the next GET.
+            call.finished_at -= workers.observation_ttl + 1
+        with pytest.raises(SubworkflowError, match="os_http_404"):
+            runtime.client.observe(create, deadline=time.monotonic() + 2)
+        after_expiry = len(observed)
+        assert subworkflows.advance(path)["outcome"] == "CHILD_RUNNING"
+        held = subworkflows.inspect(*pair)
+        assert not has_join_proof(held, "start")
+        still_active = runtime.client.observe(start, deadline=time.monotonic() + 2)
+        assert still_active["holder_joined"] is False
+        create_history = [
+            r for r in held["os_observations"]
+            if r["request_id"] == create["request_id"]
+        ]
+        assert create_history == [
+            r
+            for r in before["os_observations"]
+            if r["request_id"] == create["request_id"]
+        ]
+        release.touch()
+
+        def joined():
+            row = runtime.client.observe(start, deadline=time.monotonic() + 2)
+            return row if row["holder_joined"] is True else None
+
+        actual_join = runtime.until(joined, seconds=15)
+        assert not has_join_proof(subworkflows.inspect(*pair), "start")
+        assert subworkflows.advance(path)["outcome"] == "CHILD_SUCCEEDED"
+        saved, run = runtime.assert_child_closed(*pair)
+        assert has_join_proof(saved, "start") and run["status"] == "succeeded"
+        assert all(row["operation"] == "start_run" for row in observed[after_expiry:])
+        assert [row["operation"] for row in posted] == ["create_instance", "start_run"]
+        assert len({row["request_id"] for row in posted}) == 2
+        assert workers.observation_ttl == 300
+        write_json(
+            runtime.root / "child-proof/proven-create-expiry.json",
+            {
+                "create_proof_before_expiry": before["os_observations"],
+                "start_false_before_expiry": active,
+                "start_false_after_expiry": still_active,
+                "actual_start_join_after_release": actual_join,
+                "final_history": saved["os_observations"],
+                "posted": posted,
+            },
+        )
+    finally:
+        if release.parent.is_dir():
+            release.touch()
 
 
 def test_shared_lad_initializer_runs_from_core_capture_and_uses_pinned_target(runtime):

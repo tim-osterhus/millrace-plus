@@ -21,12 +21,16 @@ ID = re.compile(r"[0-9a-f]{32}\Z")
 ACTIVE = frozenset({"claimed", "running", "held"})
 STATES = ACTIVE | {"queued", "succeeded", "failed", "cancelled"}
 RECEIPT = "millrace-plus-intake-receipt/v1"
-_SCHEMA = """
+_SCHEMA = (
+    """
 CREATE TABLE metadata (
  service_id TEXT NOT NULL, schema_version INTEGER NOT NULL,
  authority_sha256 TEXT NOT NULL
 );
-CREATE TABLE tasks (
+"""
+    "CREATE TABLE lifecycle (singleton INTEGER PRIMARY KEY CHECK(singleton=1), "
+    "intent TEXT NOT NULL, record TEXT NOT NULL);\n"
+    """CREATE TABLE tasks (
  sequence INTEGER PRIMARY KEY AUTOINCREMENT,
  task_id TEXT NOT NULL UNIQUE, intake_key TEXT NOT NULL UNIQUE,
  request_bytes BLOB NOT NULL, request_sha256 TEXT NOT NULL,
@@ -45,6 +49,7 @@ CREATE TABLE decisions (
  intent TEXT NOT NULL, receipt TEXT NOT NULL
 );
 """
+)
 
 
 class IntakeError(Exception):
@@ -70,7 +75,10 @@ def identity(value: object) -> str:
 def canonical(value: object) -> bytes:
     try:
         return json.dumps(
-            value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
             allow_nan=False,
         ).encode("utf-8")
     except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
@@ -116,7 +124,10 @@ class Intake:
     """One local database, immutable payloads, and a transaction per operation."""
 
     def __init__(
-        self, path: Path, service_id: str, *,
+        self,
+        path: Path,
+        service_id: str,
+        *,
         validate_payload: Callable[[bytes], None],
         validate_claim: Callable[[dict[str, object]], None],
         validate_decision: Callable[[dict[str, object]], None],
@@ -184,7 +195,9 @@ class Intake:
         try:
             mode = "rw" if write else "ro"
             connection = sqlite3.connect(
-                self.path.as_uri() + "?mode=" + mode, uri=True, timeout=10,
+                self.path.as_uri() + "?mode=" + mode,
+                uri=True,
+                timeout=10,
                 isolation_level=None,
             )
             connection.row_factory = sqlite3.Row
@@ -213,8 +226,10 @@ class Intake:
             not KEY.fullmatch(row["intake_key"])
             or row["task_id"] != expected
             or row["request_sha256"] != hashlib.sha256(payload).hexdigest()
-            or type(row["sequence"]) is not int or row["sequence"] < 1
-            or type(row["version"]) is not int or row["version"] < 1
+            or type(row["sequence"]) is not int
+            or row["sequence"] < 1
+            or type(row["version"]) is not int
+            or row["version"] < 1
             or row["status"] not in STATES
         ):
             raise IntakeError("invalid_intake")
@@ -230,7 +245,8 @@ class Intake:
         if row["status"] in ACTIVE and claim is None:
             raise IntakeError("invalid_intake")
         terminal = (
-            None if row["terminal_receipt"] is None
+            None
+            if row["terminal_receipt"] is None
             else strict_json(row["terminal_receipt"].encode())
         )
         if row["status"] in ACTIVE and terminal is not None:
@@ -239,15 +255,25 @@ class Intake:
             raise IntakeError("invalid_intake")
         if row["status"] == "queued" and (claim is not None or terminal is not None):
             raise IntakeError("invalid_intake")
-        receipt = fields(strict_json(row["submission_receipt"].encode()), {
-            "format", "service_id", "task_id", "sequence", "intake_key",
-            "payload_sha256", "disposition", "accepted_at",
-        })
+        receipt = fields(
+            strict_json(row["submission_receipt"].encode()),
+            {
+                "format",
+                "service_id",
+                "task_id",
+                "sequence",
+                "intake_key",
+                "payload_sha256",
+                "disposition",
+                "accepted_at",
+            },
+        )
         expected_receipt = self._receipt(dict(row))
         if receipt != expected_receipt:
             raise IntakeError("invalid_intake")
         return {
-            key: value for key, value in dict(row).items()
+            key: value
+            for key, value in dict(row).items()
             if key not in {"submission_receipt", "claim", "terminal_receipt"}
         } | {"claim": claim, "terminal_receipt": terminal}
 
@@ -256,7 +282,9 @@ class Intake:
             raise IntakeError("invalid_intake")
         metadata = connection.execute("SELECT * FROM metadata").fetchall()
         if len(metadata) != 1 or tuple(metadata[0]) != (
-            self.service_id, 1, self.authority_sha256
+            self.service_id,
+            1,
+            self.authority_sha256,
         ):
             raise IntakeError("invalid_intake")
         active = 0
@@ -282,20 +310,21 @@ class Intake:
             )
             decision_receipts.setdefault(row["task_id"], []).append(receipt)
         for task in tasks.values():
-            if (
-                task["terminal_receipt"] is not None
-                and task["terminal_receipt"] not in decision_receipts.get(
-                    str(task["task_id"]), []
-                )
-            ):
+            if task["terminal_receipt"] is not None and task[
+                "terminal_receipt"
+            ] not in decision_receipts.get(str(task["task_id"]), []):
                 raise IntakeError("invalid_intake")
 
     def _receipt(self, row: dict[str, object]) -> dict[str, object]:
         return {
-            "format": RECEIPT, "service_id": self.service_id,
-            "task_id": row["task_id"], "sequence": row["sequence"],
-            "intake_key": row["intake_key"], "payload_sha256": row["request_sha256"],
-            "disposition": "accepted", "accepted_at": row["submitted_at"],
+            "format": RECEIPT,
+            "service_id": self.service_id,
+            "task_id": row["task_id"],
+            "sequence": row["sequence"],
+            "intake_key": row["intake_key"],
+            "payload_sha256": row["request_sha256"],
+            "disposition": "accepted",
+            "accepted_at": row["submitted_at"],
         }
 
     def submit(self, key: str, payload: bytes) -> dict[str, object]:
@@ -319,10 +348,15 @@ class Intake:
                 "VALUES (?,?,?,?,?,'queued',1,'')",
                 (task_id, key, payload, digest, submitted),
             )
-            receipt = self._receipt({
-                "task_id": task_id, "sequence": cursor.lastrowid, "intake_key": key,
-                "request_sha256": digest, "submitted_at": submitted,
-            })
+            receipt = self._receipt(
+                {
+                    "task_id": task_id,
+                    "sequence": cursor.lastrowid,
+                    "intake_key": key,
+                    "request_sha256": digest,
+                    "submitted_at": submitted,
+                }
+            )
             connection.execute(
                 "UPDATE tasks SET submission_receipt=? WHERE task_id=?",
                 (canonical(receipt).decode(), task_id),
@@ -347,13 +381,11 @@ class Intake:
         """Commit the FIFO claim before the caller may materialize or dispatch."""
         with self._connection(write=True) as connection:
             if connection.execute(
-                "SELECT 1 FROM tasks "
-                "WHERE status IN ('claimed','running','held')"
+                "SELECT 1 FROM tasks WHERE status IN ('claimed','running','held')"
             ).fetchone():
                 raise IntakeError("active_task")
             row = connection.execute(
-                "SELECT * FROM tasks WHERE status='queued' "
-                "ORDER BY sequence LIMIT 1"
+                "SELECT * FROM tasks WHERE status='queued' ORDER BY sequence LIMIT 1"
             ).fetchone()
             if row is None:
                 return None
@@ -373,8 +405,15 @@ class Intake:
             return claim
 
     def decide(
-        self, request_id: str, intent: dict[str, object], *,
-        check: Callable[[dict[str, object]], None], cancel_queued: bool = False,
+        self,
+        request_id: str,
+        intent: dict[str, object],
+        *,
+        check: Callable[[dict[str, object]], None],
+        cancel_queued: bool = False,
+        terminal_status: str | None = None,
+        expected_version: int | None = None,
+        expected_claim: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """Save exact intent and receipt atomically after domain checks."""
         identity(request_id)
@@ -397,7 +436,29 @@ class Intake:
             task = self._task(row)
             check(task)
             receipt = self.decision_receipt(request_id, intent)
-            if cancel_queued:
+            if terminal_status is not None:
+                if (
+                    terminal_status not in {"succeeded", "failed", "cancelled"}
+                    or task["status"] not in ACTIVE
+                    or task["version"] != expected_version
+                    or task["claim"] != expected_claim
+                ):
+                    raise IntakeError("stale_task")
+                changed = connection.execute(
+                    "UPDATE tasks SET status=?,terminal_receipt=?,version=version+1 "
+                    "WHERE task_id=? AND version=? AND claim=? "
+                    "AND status IN ('claimed','running','held')",
+                    (
+                        terminal_status,
+                        canonical(receipt).decode(),
+                        task["task_id"],
+                        expected_version,
+                        canonical(expected_claim).decode(),
+                    ),
+                )
+                if changed.rowcount != 1:
+                    raise IntakeError("stale_task")
+            elif cancel_queued:
                 if task["status"] != "queued":
                     raise IntakeError("task_not_queued")
                 connection.execute(
@@ -405,12 +466,107 @@ class Intake:
                     "version=version+1 WHERE task_id=?",
                     (canonical(receipt).decode(), task["task_id"]),
                 )
-            connection.execute("INSERT INTO decisions VALUES (?,?,?,?)", (
-                request_id, intent["task_id"],
-                canonical(intent).decode(), canonical(receipt).decode(),
-            ))
+            connection.execute(
+                "INSERT INTO decisions VALUES (?,?,?,?)",
+                (
+                    request_id,
+                    intent["task_id"],
+                    canonical(intent).decode(),
+                    canonical(receipt).decode(),
+                ),
+            )
             updated = connection.execute(
                 "SELECT * FROM tasks WHERE task_id=?", (intent["task_id"],)
             ).fetchone()
             self.validate_decision_aftermath(self._task(updated), intent, receipt)
             return receipt
+
+    def lifecycle(self) -> tuple[dict[str, object], dict[str, object]]:
+        """Read the new-service singleton.
+
+        Retained foundation stores are not migrated.
+        """
+        with self._connection() as connection:
+            return self._read_lifecycle(connection)
+
+    def _read_lifecycle(
+        self, connection: sqlite3.Connection
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        if not connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='lifecycle'"
+        ).fetchone():
+            raise IntakeError("lifecycle_missing")
+        rows = connection.execute("SELECT intent,record FROM lifecycle").fetchall()
+        if len(rows) != 1:
+            raise IntakeError("lifecycle_missing")
+        return tuple(strict_json(row.encode()) for row in rows[0])
+
+    def _lifecycle_tasks(
+        self,
+    ) -> tuple[dict[str, object], dict[str, object], list[dict[str, object]]]:
+        """Read one fully validated lifecycle/task pair; retain no connection."""
+        with self._connection() as connection:
+            intent, record = self._read_lifecycle(connection)
+            rows = connection.execute(
+                "SELECT * FROM tasks ORDER BY sequence"
+            ).fetchall()
+            return intent, record, [self._task(row) for row in rows]
+
+    def initialize_lifecycle(
+        self, intent: dict[str, object], record: dict[str, object]
+    ) -> None:
+        with self._connection(write=True) as connection:
+            if connection.execute("SELECT 1 FROM lifecycle").fetchone():
+                raise IntakeError("lifecycle_exists")
+            connection.execute(
+                "INSERT INTO lifecycle VALUES (1,?,?)",
+                (
+                    canonical(intent).decode(),
+                    canonical(record).decode(),
+                ),
+            )
+
+    def save_lifecycle(
+        self,
+        intent: dict[str, object],
+        before: dict[str, object],
+        record: dict[str, object],
+    ) -> None:
+        """Compare-and-swap mutable facts without rebinding immutable init authority."""
+        with self._connection(write=True) as connection:
+            changed = connection.execute(
+                "UPDATE lifecycle SET record=? WHERE singleton=1 "
+                "AND intent=? AND record=?",
+                (
+                    canonical(record).decode(),
+                    canonical(intent).decode(),
+                    canonical(before).decode(),
+                ),
+            )
+            if changed.rowcount != 1:
+                raise IntakeError("lifecycle_conflict")
+
+    def transition(
+        self, task_id: str, *, version: int, claim: dict[str, object], status: str
+    ) -> None:
+        """Advance only occupied states; terminal release goes through decide()."""
+        if status not in ACTIVE:
+            raise IntakeError("invalid_transition")
+        with self._connection(write=True) as connection:
+            changed = connection.execute(
+                "UPDATE tasks SET status=?,version=version+1 "
+                "WHERE task_id=? AND version=? "
+                "AND claim=? AND status IN ('claimed','running','held') AND status<>?",
+                (status, identity(task_id), version, canonical(claim).decode(), status),
+            )
+            if not changed.rowcount:
+                row = connection.execute(
+                    "SELECT * FROM tasks WHERE task_id=?", (task_id,)
+                ).fetchone()
+                if (
+                    row is None
+                    or row["version"] != version
+                    or row["status"] != status
+                    or self._task(row)["claim"] != claim
+                ):
+                    raise IntakeError("stale_task")

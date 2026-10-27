@@ -32,3 +32,15 @@ For router commands the override is an exact optional prefix: `millrace-plus rou
 The Plus facade and both router CLI forms check create/envelopes/replay and dispatch-capable mutations. Unsafe instances created directly through Core can still be inspected and have holds released. Run/plane pause/cancel must target their sole nonterminal run; reconcile additionally requires that same run paused. Wrong-target or nonpaused reconciliation refuses before Core state mutation. The sixteen guarded facade functions accept trailing keyword-only `catalog_home`; all other controls keep their Core signatures without the resolver argument.
 
 This is a client ownership check, not a security boundary. Public lookup and Core execution are not atomic. Pre-existing queued controls or concurrent direct-Core mutators/controllers on unsafe instances are unsupported; no universal dispatch barrier is claimed. Core remains catalog-agnostic. Use independent copies for supported operation.
+
+
+## Persistent LAD candidate
+
+`bundled:lad-service` is the single-plane persistent intake graph. Initialize it
+with `millrace-plus lad init`, which pins an existing matching local Core home,
+registers the parent through OS and verifies exact local/OS identity before
+returning its saved start envelope. Each task receives an automatically initialized
+pinned `bundled:lad` child. Ordinary catalog and intake commands remain Core-free;
+standalone `bundled:lad` remains supported. See `persistent-lad.md` for activation,
+immutable task/target authority, finite stop, explicit acknowledgement and the
+separate retained-history/platform qualification requirements.

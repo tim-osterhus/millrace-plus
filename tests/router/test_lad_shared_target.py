@@ -9,6 +9,7 @@ import importlib.util
 import json
 import os
 import shutil
+import sqlite3
 import sys
 import time
 import uuid
@@ -434,3 +435,241 @@ def test_bootstrap_requires_actual_captured_controls(shared, change):
         bootstrap(shared)
     assert not (shared["project"] / "lad-target.json").exists()
     assert len(shared["client"].sent) == 2
+
+
+def _prepared_shared_worker(shared, monkeypatch, capsys):
+    scripts = shared["script"].parent
+    monkeypatch.syspath_prepend(str(scripts))
+    monkeypatch.chdir(shared["project"] / "foreground")
+    from millrace_plus import workflow_os_client
+
+    monkeypatch.setattr(
+        workflow_os_client, "WorkflowOSClient", lambda *args, **kwargs: shared["client"]
+    )
+    state = load_script(scripts / "lad_state.py", monkeypatch)
+    initialize = load_script(scripts / "init_session.py", monkeypatch)
+    monkeypatch.setattr(sys, "argv", [str(shared["script"]), "--project-root", ".."])
+    initialize.main()
+    assert json.loads(capsys.readouterr().out)["outcome"] == "NEW_SESSION"
+    load_script(scripts / "setup_intake.py", monkeypatch).main()
+    capsys.readouterr()
+    load_script(scripts / "boundaries.py", monkeypatch)
+    load_script(scripts / "accept_role.py", monkeypatch)
+    return state, load_script(scripts / "prepare_role.py", monkeypatch)
+
+
+def test_prepare_collects_one_root_and_fully_validates_both_boundaries(
+    shared, monkeypatch, capsys
+):
+    state, prepare = _prepared_shared_worker(shared, monkeypatch, capsys)
+    foreground = shared["project"] / "foreground"
+    expected_source = state.source(foreground)
+    expected_context = state.source_context(foreground)
+    validate = lad_service.validate_shared_target
+    checks = []
+
+    def checked(*args, **kwargs):
+        result = validate(*args, **kwargs)
+        checks.append(copy.deepcopy(result))
+        return result
+
+    monkeypatch.setattr(lad_service, "validate_shared_target", checked)
+    occurrence = prepare.prepare(foreground, foreground, "recon")
+    assert checks == [shared["record"], shared["record"]]
+    assert occurrence["source_files"] == expected_source
+    assert occurrence["source_context"] == expected_context
+    assert occurrence["target_root"] == str(shared["target"])
+    assert (
+        state.load(foreground)["occurrences"][occurrence["occurrence_id"]] == occurrence
+    )
+
+
+@pytest.mark.parametrize(
+    "changed", ["owner", "request", "claim", "manifest", "inactive"]
+)
+def test_prepare_rejects_authority_corrupted_during_collection_before_save(
+    shared, monkeypatch, capsys, changed
+):
+    state, prepare = _prepared_shared_worker(shared, monkeypatch, capsys)
+    foreground = shared["project"] / "foreground"
+    before = (foreground / "lad-state/session.json").read_bytes()
+    collect = prepare._prepare_source
+    task_root = shared["service"].home / "tasks" / shared["record"]["task_id"]
+    paths = {
+        "owner": shared["target"] / lad_service.OWNER,
+        "request": task_root / "request.md",
+        "claim": task_root / "claim.json",
+        "manifest": shared["project"] / "lad-target.json",
+    }
+
+    def corrupt_after_collection(*args):
+        result = collect(*args)
+        if changed == "inactive":
+            # Isolated test-owned corruption removes the active claim between
+            # collection and publication; no running service/daemon is involved.
+            with sqlite3.connect(shared["service"].intake.path) as connection:
+                connection.execute(
+                    "UPDATE tasks SET status='queued',claim=NULL WHERE task_id=?",
+                    (shared["record"]["task_id"],),
+                )
+        else:
+            paths[changed].write_bytes(b"{}\n")
+        return result
+
+    monkeypatch.setattr(prepare, "_prepare_source", corrupt_after_collection)
+    with pytest.raises(state.LadError):
+        prepare.prepare(foreground, foreground, "recon")
+    assert (foreground / "lad-state/session.json").read_bytes() == before
+    assert not (foreground / "lad-state/occurrences").exists()
+    assert not (foreground / "lad-state/active-role.json").exists()
+
+
+def test_prepare_revalidates_on_each_operation_without_retained_authority(
+    shared, monkeypatch, capsys
+):
+    state, prepare = _prepared_shared_worker(shared, monkeypatch, capsys)
+    foreground = shared["project"] / "foreground"
+    prepare.prepare(foreground, foreground, "recon")
+    before = (foreground / "lad-state/session.json").read_bytes()
+    (shared["target"] / lad_service.OWNER).write_bytes(b"{}\n")
+    with pytest.raises(state.LadError):
+        prepare.prepare(foreground, foreground, "recon")
+    assert (foreground / "lad-state/session.json").read_bytes() == before
+
+
+def test_accept_collects_one_root_and_fully_validates_both_boundaries(
+    shared, monkeypatch, capsys
+):
+    state, prepare = _prepared_shared_worker(shared, monkeypatch, capsys)
+    foreground = shared["project"] / "foreground"
+    occurrence = prepare.prepare(foreground, foreground, "recon")
+    expected_source = state.source(foreground)
+    expected_context = state.source_context(foreground)
+    acceptor = sys.modules["accept_role"]
+    validate = lad_service.validate_shared_target
+    collect = acceptor._prepare_source
+    checks, collections = [], []
+
+    def checked(*args, **kwargs):
+        result = validate(*args, **kwargs)
+        checks.append(copy.deepcopy(result))
+        return result
+
+    def collected(*args):
+        result = collect(*args)
+        collections.append(copy.deepcopy(result))
+        return result
+
+    monkeypatch.setattr(lad_service, "validate_shared_target", checked)
+    monkeypatch.setattr(acceptor, "_prepare_source", collected)
+    assert acceptor.current_source(foreground, occurrence) == expected_source
+    assert collections == [(expected_source, expected_context)]
+    assert checks == [shared["record"], shared["record"]]
+
+
+@pytest.mark.parametrize(
+    "changed", ["owner", "request", "claim", "manifest", "inactive"]
+)
+def test_accept_rejects_authority_corrupted_during_collection_without_publication(
+    shared, monkeypatch, capsys, changed
+):
+    state, prepare = _prepared_shared_worker(shared, monkeypatch, capsys)
+    foreground = shared["project"] / "foreground"
+    prepare.prepare(foreground, foreground, "recon")
+    peer = load_script(
+        Path(__file__).parent / "fixtures/lad_peer.py",
+        monkeypatch,
+        name="shared_lad_peer",
+    )
+    assert peer.result_for(foreground, "recon")["outcome"] == "PASS"
+    before = {
+        str(path.relative_to(foreground)): path.read_bytes()
+        for path in foreground.rglob("*") if path.is_file()
+    }
+    acceptor = sys.modules["accept_role"]
+    collect = acceptor._prepare_source
+    task_root = shared["service"].home / "tasks" / shared["record"]["task_id"]
+    paths = {
+        "owner": shared["target"] / lad_service.OWNER,
+        "request": task_root / "request.md",
+        "claim": task_root / "claim.json",
+        "manifest": shared["project"] / "lad-target.json",
+    }
+
+    def corrupt_after_collection(*args):
+        result = collect(*args)
+        if changed == "inactive":
+            with sqlite3.connect(shared["service"].intake.path) as connection:
+                connection.execute(
+                    "UPDATE tasks SET status='queued',claim=NULL WHERE task_id=?",
+                    (shared["record"]["task_id"],),
+                )
+        else:
+            paths[changed].write_bytes(b"{}\n")
+        return result
+
+    monkeypatch.setattr(acceptor, "_prepare_source", corrupt_after_collection)
+    with pytest.raises(state.LadError, match="^shared_target_"):
+        acceptor.accept_checked(foreground, foreground, "recon", "PASS")
+    assert {
+        str(path.relative_to(foreground)): path.read_bytes()
+        for path in foreground.rglob("*") if path.is_file()
+    } == before
+
+
+def test_accept_revalidates_each_operation_without_retained_authority(
+    shared, monkeypatch, capsys
+):
+    state, prepare = _prepared_shared_worker(shared, monkeypatch, capsys)
+    foreground = shared["project"] / "foreground"
+    occurrence = prepare.prepare(foreground, foreground, "recon")
+    acceptor = sys.modules["accept_role"]
+    assert acceptor.current_source(foreground, occurrence) == state.source(foreground)
+    before = (foreground / "lad-state/session.json").read_bytes()
+    (shared["target"] / lad_service.OWNER).write_bytes(b"{}\n")
+    with pytest.raises(state.LadError, match="^shared_target_"):
+        acceptor.current_source(foreground, occurrence)
+    assert (foreground / "lad-state/session.json").read_bytes() == before
+
+
+def test_accept_transient_final_authority_refusal_never_records_invalid_result(
+    shared, monkeypatch, capsys
+):
+    state, prepare = _prepared_shared_worker(shared, monkeypatch, capsys)
+    foreground = shared["project"] / "foreground"
+    prepare.prepare(foreground, foreground, "recon")
+    peer = load_script(
+        Path(__file__).parent / "fixtures/lad_peer.py",
+        monkeypatch,
+        name="shared_lad_peer",
+    )
+    assert peer.result_for(foreground, "recon")["outcome"] == "PASS"
+    before = {
+        str(path.relative_to(foreground)): path.read_bytes()
+        for path in foreground.rglob("*") if path.is_file()
+    }
+    acceptor = sys.modules["accept_role"]
+    validate = acceptor.shared_target
+    checks = []
+
+    def transient_refusal(*args):
+        result = validate(*args)
+        checks.append(result)
+        if len(checks) == 2:
+            raise state.LadError("invalid_fields")
+        return result  # A later check would find the original clean authority.
+
+    def forbidden_invalid_result(*args):
+        pytest.fail("shared authority refusal reached invalid-result bookkeeping")
+
+    monkeypatch.setattr(acceptor, "shared_target", transient_refusal)
+    monkeypatch.setattr(acceptor, "record_invalid", forbidden_invalid_result)
+    with pytest.raises(state.LadError, match="^shared_target_invalid_fields$") as error:
+        acceptor.accept_checked(foreground, foreground, "recon", "PASS")
+    assert str(error.value.__cause__) == "invalid_fields"
+    assert checks == [shared["record"], shared["record"]]
+    assert validate(foreground) == shared["record"]
+    assert {
+        str(path.relative_to(foreground)): path.read_bytes()
+        for path in foreground.rglob("*") if path.is_file()
+    } == before

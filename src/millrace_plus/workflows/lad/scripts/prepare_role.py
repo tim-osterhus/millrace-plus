@@ -10,6 +10,7 @@ from pathlib import Path
 from lad_state import (
     ROLES,
     LadError,
+    _prepare_source,
     assert_foreground,
     atomic,
     canonical,
@@ -27,7 +28,6 @@ from lad_state import (
     scope,
     shared_target,
     source,
-    source_context,
 )
 
 
@@ -307,7 +307,7 @@ def prepare(
         raise LadError("passing_review_required")
     oid = str(uuid.uuid4())
     record_event(state, oid, "role")
-    snapshot = source(foreground)
+    snapshot, snapshot_context = _prepare_source(foreground, selected_target)
     if role in {"builder", "fixer", "troubleshooter", "updater"} and packet(state):
         owned = packet(state)["paths"]
         if any(
@@ -371,7 +371,7 @@ def prepare(
         "replacement_intent": replacement_intent,
         "request_sha256": state["intake"]["sha256"],
         "source_files": snapshot,
-        "source_context": source_context(foreground),
+        "source_context": snapshot_context,
         "created_at": datetime.now(UTC).isoformat(),
         "helper_mode": helper_mode,
         "helper_qualification": helper_ref,
@@ -410,6 +410,10 @@ def prepare(
         "pending": None if role == "checker" else state["pending"],
         "learning_request": state["request"] if role == "learning" else None,
     }
+    # Collection does no dispatch or target writes. Refresh full immutable and
+    # mutable shared authority after it, immediately before durable publication.
+    if shared_target(foreground) != selected_target:
+        raise LadError("shared_target_changed")
     if selected_target is not None:
         occurrence["target_root"] = selected_target["target_root"]
         occurrence["target_record"] = {

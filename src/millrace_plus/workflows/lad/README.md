@@ -10,7 +10,7 @@ Use the same public controls as other workflow graphs. Standalone contained-targ
 
 ## Run limits and saved state
 
-The graph is v4 and declares `max_parallel_invocations: 2`. It adds no total invocation cap, elapsed-time cap, or per-role quota. Finite Core limits selected at startup remain effective. Command nodes use a 10-second timeout. Native role nodes use 1,800 seconds. Capacity two is a ceiling, not evidence that foreground and Learning work overlapped.
+The graph is v4 and declares `max_parallel_invocations: 2`. It adds no total invocation cap, elapsed-time cap, or per-role quota. Finite Core limits selected at startup remain effective. The 94 deterministic command nodes use an explicit 90-second timeout for new stock copies. Native role nodes use 1,800 seconds. Capacity two is a ceiling, not evidence that foreground and Learning work overlapped. The command deadline is a finite operating allowance; it does not establish performance or retained-history fit. Existing copies keep their captured settings.
 
 New sessions use `millrace-lad-session/v2`. Their unique `{id, kind}` events record history. They do not grant allowance. The session keeps the original request, criteria, packet lineage, occurrence inputs, accepted-result digests, and pending route. A used copy does not reset or automatically resume. Recover a pending Learning wait in its original Core run.
 

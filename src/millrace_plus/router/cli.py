@@ -97,10 +97,20 @@ def _subworkflow_main(argv: Sequence[str]) -> int:
     try:
         if args.operation == "cancel":
             _id(args.request_id)
-        if args.operation == "call" or (
-            args.operation in {"inspect", "cancel", "reconcile"}
-            and not subworkflows._uses_v2(args.call_home, args.call_key)
-        ):
+        ordinary_v1 = False
+        if args.operation in {"inspect", "cancel", "reconcile"}:
+            ordinary_v1 = not subworkflows._uses_v2(args.call_home, args.call_key)
+            if ordinary_v1:
+                path = subworkflows.Journal(args.call_home, args.call_key).path
+                with path.open("rb") as stream:
+                    retained = catalog.strict_json(stream.read(2097153))
+                if (
+                    isinstance(retained, dict)
+                    and retained.get("format")
+                    == "millrace-plus-lad-subworkflow-call/v1"
+                ):
+                    raise SubworkflowError("persistent_service_authority_required")
+        if args.operation == "call" or ordinary_v1:
             require_core()
             from millrace.router.execution import RouterError
 
@@ -131,32 +141,104 @@ def _lad_main(argv: Sequence[str]) -> int:
 
     parser = _CatalogParser(prog="millrace-plus lad")
     commands = parser.add_subparsers(dest="operation", required=True)
-    for name in ("submit", "status", "cancel"):
+    for name in (
+        "init",
+        "submit",
+        "status",
+        "cancel",
+        "decide",
+        "stop",
+        "parent-control",
+    ):
         child = commands.add_parser(name)
         child.add_argument("--service-home", required=True, type=Path)
-        if name == "submit":
+        if name == "init":
+            for option in (
+                "target",
+                "os-profile",
+                "worker-definition",
+                "core-state-home",
+            ):
+                child.add_argument("--" + option, required=True, type=Path)
+        elif name == "parent-control":
+            child.add_argument("--request", required=True, type=Path)
+        elif name == "submit":
             child.add_argument("--key", required=True)
             child.add_argument("--request", required=True, type=Path)
-        else:
-            child.add_argument("--task", required=name == "cancel")
-        if name == "cancel":
+        elif name in {"status", "cancel", "decide"}:
+            child.add_argument("--task", required=name != "status")
+        if name in {"cancel", "decide", "stop"}:
             child.add_argument("--request-id", required=True)
+        if name == "decide":
+            child.add_argument(
+                "--decision",
+                required=True,
+                choices=(
+                    "retry-observation",
+                    "continue",
+                    "close-failed",
+                    "acknowledge-failed",
+                    "acknowledge-cancelled",
+                ),
+            )
+            child.add_argument("--evidence", required=True, type=Path)
+            child.add_argument("--resume-plane", choices=("foreground", "learning"))
     args = parser.parse_args(argv)
+    if (
+        args.operation == "decide"
+        and args.resume_plane is not None
+        and args.decision != "continue"
+    ):
+        parser.error("--resume-plane requires --decision continue")
     try:
-        service = Service(args.service_home)
-        if args.operation == "submit":
+        if args.operation == "init":
+            from millrace_plus.lad_service_runtime import initialize
+
+            result = initialize(
+                args.service_home,
+                args.target,
+                args.os_profile,
+                args.worker_definition,
+                args.core_state_home,
+            )
+        else:
+            service = Service(args.service_home)
+        if args.operation == "init":
+            pass
+        elif args.operation == "submit":
             result = service.submit(args.key, args.request)
         elif args.operation == "cancel":
             result = service.cancel(args.task, args.request_id)
+        elif args.operation in {"decide", "stop", "parent-control"}:
+            from millrace_plus.lad_service_runtime import Runtime
+
+            runtime = Runtime(service)
+            if args.operation == "parent-control":
+                result = runtime.parent_control(args.request)
+            elif args.operation == "stop":
+                result = runtime.stop(args.request_id)
+            else:
+                result = runtime.decide(
+                    args.task,
+                    args.decision,
+                    args.request_id,
+                    args.evidence,
+                    resume_plane=args.resume_plane,
+                )
         else:
             result = service.status(args.task)
         print(json.dumps(result, ensure_ascii=False))
         return 0
-    except IntakeError as exc:
+    except (IntakeError, CoreContractError) as exc:
         print(json.dumps({"code": exc.code, "message": exc.code}), file=sys.stderr)
         return 2
     except OSError:
         print(json.dumps({"code": "io_error", "message": "io_error"}), file=sys.stderr)
+        return 2
+    except Exception as exc:
+        if not isinstance(getattr(exc, "code", None), str):
+            raise
+        print(json.dumps({"code": exc.code, "message": exc.code}), file=sys.stderr)
         return 2
 
 

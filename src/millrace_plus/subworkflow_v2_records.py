@@ -216,7 +216,9 @@ def write_inputs(path: Path, request: dict[str, object]) -> None:
 
 
 def authority(record: dict[str, object]) -> dict[str, object]:
-    return {name: record[name] for name in AUTHORITY_FIELDS}
+    return {name: record[name] for name in AUTHORITY_FIELDS} | (
+        {"local_source": record["local_source"]} if "local_source" in record else {}
+    )
 
 
 def preflight(record: dict[str, object]) -> None:
@@ -321,10 +323,25 @@ def validate_projection(
     return row
 
 
-def validate_journal(value: object, home: Path, key: str) -> dict[str, object]:
-    row = _fields(value, JOURNAL_FIELDS)
+def validate_journal(
+    value: object,
+    home: Path,
+    key: str,
+    *,
+    _local_source: dict[str, object] | None = None,
+) -> dict[str, object]:
+    persistent = _local_source is not None
+    row = _fields(value, JOURNAL_FIELDS | ({"local_source"} if persistent else set()))
+    marker = JOURNAL_FORMAT
+    if persistent:
+        from .subworkflow_persistent_records import JOURNAL_FORMAT as marker
+        from .subworkflow_persistent_records import validate_local_source
+
+        validate_local_source(row["local_source"], expected=_local_source)
+        if row["claim_sha256"] is None:
+            raise SubworkflowError("persistent_claim_required")
     if (
-        row["format"] != JOURNAL_FORMAT
+        row["format"] != marker
         or row["record_sha256"]
         != digest({k: v for k, v in row.items() if k != "record_sha256"})
         or row["authority_sha256"] != digest(authority(row))
@@ -348,6 +365,16 @@ def validate_journal(value: object, home: Path, key: str) -> dict[str, object]:
     ):
         raise SubworkflowError("invalid_journal")
     _home(row["os_home"])
+    if persistent:
+        source = mapping(row["local_source"])
+        parent = mapping(req["parent"])
+        if (
+            source["parent_instance_id"] != parent["instance_id"]
+            or source["parent_run_id"] != parent.get("run_id")
+            or source["os_home"] != row["os_home"]
+            or source["os_profile_sha256"] != mapping(row["os_profile"])["sha256"]
+        ):
+            raise SubworkflowError("persistent_source_mismatch")
     from .integrations.paperclip_records import BridgeError, _origin
 
     try:
@@ -500,11 +527,23 @@ def validate_journal(value: object, home: Path, key: str) -> dict[str, object]:
         validate_call(observed, str(row["os_home"]), sent)
         if reservation == "unsent":
             raise SubworkflowError("invalid_reservation")
-    projection = validate_projection(
-        row["observation"],
-        row["instance_id"],
-        row["run_id"],
-    )
+    if persistent:
+        from .subworkflow_persistent_records import validate_observation
+
+        projection = validate_observation(
+            row["observation"],
+            row["instance_id"],
+            row["run_id"],
+            expected_start_request_id=request_id(req, "start_run"),
+            expected_paths=paths,
+            expected_settings=settings,
+        )
+    else:
+        projection = validate_projection(
+            row["observation"],
+            row["instance_id"],
+            row["run_id"],
+        )
     if projection and projection["start_request_id"] != request_id(req, "start_run"):
         raise SubworkflowError("wrong_start_identity")
     if (
@@ -543,14 +582,21 @@ def parse_journal(raw: bytes, *, home: Path, key: str) -> dict[str, object]:
 class Journal(V1Journal):
     """Reuse v1 short locks and atomic writes, with separate v2 validation/bounds."""
 
+    def __init__(
+        self, home: Path, key: str, *, _local_source: dict[str, object] | None = None
+    ) -> None:
+        super().__init__(home, key)
+        self.local_source = _local_source
+
     def load(self) -> dict[str, object]:
         canonical_path(str(self.path))
         try:
             with self.path.open("rb") as stream:
-                return parse_journal(
-                    stream.read(JOURNAL_LIMIT + 1),
-                    home=self.home,
-                    key=self.key,
+                return validate_journal(
+                    _utf8_json(stream.read(JOURNAL_LIMIT + 1), JOURNAL_LIMIT),
+                    self.home,
+                    self.key,
+                    _local_source=self.local_source,
                 )
         except OSError as exc:
             raise SubworkflowError("call_missing") from exc
@@ -561,7 +607,7 @@ class Journal(V1Journal):
         value["record_sha256"] = digest(
             {k: v for k, v in value.items() if k != "record_sha256"}
         )
-        validate_journal(value, self.home, self.key)
+        validate_journal(value, self.home, self.key, _local_source=self.local_source)
         atomic_json(self.path, value, limit=JOURNAL_LIMIT)
 
 
@@ -571,20 +617,30 @@ def result_manifest(
     diagnostic: str | None,
 ) -> dict[str, object]:
     req = mapping(record["request"])
-    observation = {
-        key: value
-        for key, value in mapping(record["observation"]).items()
-        if key != "draft_revision"
-    }
+    persistent = "local_source" in record
+    observation = (
+        record["observation"]
+        if persistent
+        else {
+            key: value
+            for key, value in mapping(record["observation"]).items()
+            if key != "draft_revision"
+        }
+    )
+    marker = RESULT_FORMAT
+    if persistent:
+        from .subworkflow_persistent_records import RESULT_FORMAT as marker
     return {
-        "format": RESULT_FORMAT,
+        "format": marker,
         "call_identity": record["request_sha256"],
         "call_key": req["call_key"],
         "definition": req["definition"],
         "instance_id": record["instance_id"],
         "run_id": record["run_id"],
         "dispatch": "started" if record["run_id"] is not None else "not_started",
-        "status": observation.get("status"),
+        "status": mapping(observation).get("status")
+        if observation is not None
+        else None,
         "observation": observation,
         "receipts": record["receipts"],
         "os_observations": [
@@ -593,10 +649,21 @@ def result_manifest(
         ],
         "outcome": outcome,
         "diagnostic": diagnostic,
-    }
+    } | ({"local_source": record["local_source"]} if persistent else {})
 
 
-def validate_result(value: object) -> dict[str, object]:
+def validate_result(
+    value: object, *, _local_source: dict[str, object] | None = None
+) -> dict[str, object]:
+    persistent = _local_source is not None
+    marker = RESULT_FORMAT
+    if persistent:
+        from .subworkflow_persistent_records import RESULT_FORMAT as marker
+        from .subworkflow_persistent_records import validate_local_source
+
+        validate_local_source(
+            mapping(value).get("local_source"), expected=_local_source
+        )
     row = _fields(
         value,
         {
@@ -613,10 +680,11 @@ def validate_result(value: object) -> dict[str, object]:
             "os_observations",
             "outcome",
             "diagnostic",
-        },
+        }
+        | ({"local_source"} if persistent else set()),
     )
     if (
-        row["format"] != RESULT_FORMAT
+        row["format"] != marker
         or not _one_of(row["outcome"], OUTCOMES)
         or not SHA.fullmatch(_string(row["call_identity"], maximum=64))
         or not KEY.fullmatch(_string(row["call_key"], maximum=64))
@@ -628,9 +696,20 @@ def validate_result(value: object) -> dict[str, object]:
     _nullable_id(row["instance_id"])
     _nullable_id(row["run_id"])
     _definition(row["definition"])
-    projection = validate_projection(
-        row["observation"], row["instance_id"], row["run_id"]
-    )
+    if persistent:
+        from .subworkflow_persistent_records import validate_observation
+
+        projection = validate_observation(
+            row["observation"],
+            row["instance_id"],
+            row["run_id"],
+        )
+        if (projection is None) != (row["status"] is None):
+            raise SubworkflowError("invalid_result")
+    else:
+        projection = validate_projection(
+            row["observation"], row["instance_id"], row["run_id"]
+        )
     if projection and projection["status"] != row["status"]:
         raise SubworkflowError("invalid_result")
     receipts = mapping(row["receipts"])

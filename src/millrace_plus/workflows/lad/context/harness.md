@@ -8,7 +8,7 @@ The stock graph selects Plus `claude_print` with profile `millrace-claude-print-
 
 The adapter appends an instruction to use Claude Code’s StructuredOutput tool with the schema for that invocation. The `outcome` enum comes from the exact runtime-selected markers. The schema also requires string `summary` and an array of project-relative `refs`, with no extra fields. The generated `claude-prompt.txt` and `claude-result-schema.json` live in the invocation root. These are adapter files, not workflow workspace authority. Do not infer or access a temporary invocation path.
 
-The graph’s native role timeout is 1,800 seconds. Deterministic command nodes use 10 seconds. The workflow adds no total invocation or elapsed-time cap. Finite Core limits explicitly selected at startup remain in force. This documents existing settings. It grants no additional provider allowance.
+The graph’s native role timeout is 1,800 seconds. The 94 deterministic command nodes use an explicit 90-second timeout for new stock copies. The workflow adds no total invocation or elapsed-time cap. Finite Core limits explicitly selected at startup remain in force. This finite operating allowance establishes no performance or retained-history fit; existing copies keep their captured settings. It grants no additional provider allowance.
 
 ## Direct work and optional helper evidence
 
