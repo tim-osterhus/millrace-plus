@@ -71,7 +71,7 @@ The second actual Fixer–Doublechecker pair enters Learning, including a passin
 
 The following names are guard outcomes, not role-authored markers:
 
-- `INVALID_RESULT` records a recoverable malformed or incomplete result and its rejected bytes. It then selects guarded same-role replacement. If the result is valid and only its required history log is missing, the guard can restore that file from the retained result. It does not rerun the native task or check.
+- `INVALID_RESULT` records a recoverable malformed or incomplete result with a digest/reference to result bytes at their original path. It creates no immutable rejected-byte copy and does not recheck that path as immutable retained evidence. It then selects guarded same-role replacement. If the result is valid and only its required history log is missing, the guard can restore that file from the retained result. It does not rerun the native task or check.
 - `INVALID_REPEAT` indicates an unchanged invalid-result fingerprint. The graph selects Troubleshooter.
 - `INVALID_CONSULT` selects Consultant when the recorded recovery requires diagnosis beyond the current role.
 - `INVALID_HOLD` selects the human hold when the same invalid condition persists at Consultant.

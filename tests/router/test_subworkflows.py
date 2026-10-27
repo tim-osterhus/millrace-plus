@@ -557,3 +557,35 @@ def test_preexisting_child_project_is_never_adopted(helper: dict[str, object]) -
         subworkflows.call(Path(str(helper["file"])))
     assert sentinel.read_text() == "preserve"
     assert not Path(saved["paths"]["state"]).exists()
+
+
+def test_public_facade_dispatches_v2_without_v1_controller(tmp_path, monkeypatch):
+    from millrace_plus import subworkflow_v2
+    from millrace_plus.subworkflow_records import canonical
+
+    home, key = tmp_path / "calls", "child"
+    root = home / key
+    root.mkdir(parents=True)
+    (root / "call.json").write_bytes(
+        canonical({"format": "millrace-plus-subworkflow-call/v2"})
+    )
+    monkeypatch.setattr(
+        subworkflows, "_control", lambda: pytest.fail("v1 controller used")
+    )
+    monkeypatch.setattr(subworkflow_v2, "inspect", lambda *args: {"read": "v2"})
+    monkeypatch.setattr(subworkflow_v2, "cancel", lambda *args: {"cancel": "v2"})
+    monkeypatch.setattr(subworkflow_v2, "reconcile", lambda *args: {"refresh": "v2"})
+    monkeypatch.setattr(
+        subworkflow_v2, "advance", lambda *args: {"outcome": "CHILD_RUNNING"}
+    )
+    assert subworkflows.inspect(home, key) == {"read": "v2"}
+    assert subworkflows.cancel(home, key, "a" * 32) == {"cancel": "v2"}
+    assert subworkflows.reconcile(home, key) == {"refresh": "v2"}
+    assert subworkflows.advance(tmp_path / "request.json")["outcome"] == "CHILD_RUNNING"
+
+
+@pytest.mark.parametrize("request_id", ["bad", "f" * 31, "G" * 32])
+def test_cancel_invalid_id_precedes_missing_journal(tmp_path, request_id):
+    with pytest.raises(records.SubworkflowError, match="invalid_id"):
+        subworkflows.cancel(tmp_path / "missing", "child", request_id)
+    assert not (tmp_path / "missing").exists()

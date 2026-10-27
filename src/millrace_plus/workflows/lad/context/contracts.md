@@ -6,9 +6,9 @@ Modified from LAD Factory contracts and instruction-revision guidance at the com
 
 This package is graph v4. Its only graph-level limit is `max_parallel_invocations: 2`. The graph adds no total invocation or elapsed-time limit and no per-role quota. Keep finite Core invocation or elapsed limits selected at startup. Command nodes use a 10-second timeout. Native role nodes use 1,800 seconds. Capacity is a ceiling, not proof of actual overlap.
 
-Copied-workflow commands use Python’s standard library with `python3 -S`. They run without importing Plus or OS. Only the explicit legacy-session upgrade lazily uses the installed Plus facade. `context/harness.md` defines its exact operator contract.
+Standalone contained-target commands use Python’s standard library with `python3 -S`. They run without importing Plus or OS. Explicit shared-target mode and explicit legacy-session upgrade lazily use the installed Plus facade. `context/harness.md` defines its exact operator contract.
 
-The project root contains sibling `foreground/` and `learning/` workspaces. Foreground owns `request.md`, `target/`, the session ledger, role results, accepted artifacts, and recovery evidence. Copy an existing target under `foreground/target/` before starting and preserve its dirty work. Learning has a separate result and candidate area and cannot edit the target, control files, ledger, or active guidance. For greenfield work, add `--greenfield` to the setup node’s args. Planning and implementation packets remain sequential.
+The project root contains sibling `foreground/` and `learning/` workspaces. Foreground owns `request.md`, `target/`, the session ledger, role results, accepted artifacts, and recovery evidence. For standalone work, copy an existing target under `foreground/target/` before starting and preserve its dirty work. Learning has a separate result and candidate area and cannot edit the target, control files, ledger, or active guidance. For greenfield work, add `--greenfield` to the setup node’s args. Planning and implementation packets remain sequential.
 
 A strict `millrace-plus-subworkflow-inputs/v1` manifest has exactly `format`, nonempty object `identity`, and object `inputs`. Its identity is compact sorted-key UTF-8 JSON hashed with SHA-256. `inputs.request_markdown` must be nonblank UTF-8 text. Its exact bytes become root `request.md` without trimming or adding a newline. Direct launch reads the exact server-local `request.md`. No upload or pre-start hook is selected. The initializer refuses conflicting or malformed inputs without overwriting files.
 
@@ -60,8 +60,29 @@ After the second actual Fixer–Doublechecker pair, including a passing pair, fo
 
 Each new v2 occurrence writes the v2 LAD result envelope and its role-specific Markdown evidence before returning one Core json-v1 completion object. The Core object’s outcome must match the LAD envelope. A result reference identifies a candidate artifact. Only the deterministic acceptance guard can accept it. The result contract, history filename, byte limit, and role data are in `context/role-contracts.md`.
 
-Native outcomes are accepted only by the matching graph guard. The graph records a recoverable invalid result with its rejected bytes and diagnostic before fresh guarded preparation. Repeated identical failures, unchanged technical prerequisites, and Learning ACK errors use their dedicated graph observations. Restoring a missing history file from an exact retained result restores bookkeeping only. It does not rerun a native task or check. Unknown writers, changed source authority, and unresolved external effects remain holds.
+Native outcomes are accepted only by the matching graph guard. The graph records a recoverable invalid result with a digest and reference to result bytes at their original path, plus its diagnostic. It creates no immutable rejected-byte copy and does not recheck that original path as retained immutable evidence before fresh guarded preparation. Repeated identical failures, unchanged technical prerequisites, and Learning ACK errors use their dedicated graph observations. Restoring a missing history file from an exact retained result restores bookkeeping only. It does not rerun a native task or check. Unknown writers, changed source authority, and unresolved external effects remain holds.
 
 A new run or reinitialized copy cannot continue a pending seam. Inspect the exact run, plane, invocation, and retained occurrence through public controls. Reconcile unknown writers before any replacement. A held or paused state does not prove that OS or helper callers have joined. No role can resume, retry, close, or change canonical state by recommendation.
 
 Every authored terminal choice uses the existing CLOSE/ACK seam. If a hard Core limit, cancellation, or unknown writer prevents closure, preserve cleanup-required state and inspect exact public writer evidence. A terminal projection alone does not prove external writer closure.
+
+
+Explicit shared mode requires `inputs.lad_target`, a complete
+`millrace-lad-target/v1` record. The initializer validates exclusive ownership,
+the current immutable claim, exact request bytes, inherited `host_paths.lad_target`,
+parent identity and saved child start authority. It correlates its live PID,
+cwd, script and launch to the active foreground initializer invocation. Reserved
+PID publication permits only bounded exact-read retries within the command
+deadline. PID correlation never proves holder or writer closure.
+
+The initializer materializes immutable project `lad-target.json`. Shared source,
+outside-path and Git observations use its validated root. Prepared occurrences
+add `target_root` and `target_record:{path,sha256}` only in shared mode. They pin
+the same root in assignment text. Invalid or missing shared authority never
+falls back to `foreground/target/`. Only the exact validated owner marker is
+excluded from domain source snapshots. User files remain preserved.
+
+Without an active packet, source observation hashes all nonexcluded target
+content. With a packet, it hashes scoped content and retains outside-path
+identities. Large or unreadable files can refuse or reach the finite command
+timeout. Observation does not promise a metadata-only scan of every target.

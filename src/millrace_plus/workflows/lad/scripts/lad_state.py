@@ -98,34 +98,36 @@ ARTIFACTS = {
     "learning": ["assessment.md"],
     "arbiter": ["verdict.md"],
 }
-SESSION_KEYS = {'accepted',
- 'active',
- 'baselines',
- 'continuation',
- 'criteria',
- 'events',
- 'findings',
- 'format',
- 'identity_sha256',
- 'inputs_sha256',
- 'intake',
- 'integrity_sha256',
- 'last_fixer',
- 'learning',
- 'legacy',
- 'migration',
- 'occurrences',
- 'packet_index',
- 'pairs',
- 'pending',
- 'plan',
- 'replacement_intents',
- 'request',
- 'reviews',
- 'seam_seen',
- 'session_id',
- 'specification',
- 'terminal'}
+SESSION_KEYS = {
+    "accepted",
+    "active",
+    "baselines",
+    "continuation",
+    "criteria",
+    "events",
+    "findings",
+    "format",
+    "identity_sha256",
+    "inputs_sha256",
+    "intake",
+    "integrity_sha256",
+    "last_fixer",
+    "learning",
+    "legacy",
+    "migration",
+    "occurrences",
+    "packet_index",
+    "pairs",
+    "pending",
+    "plan",
+    "replacement_intents",
+    "request",
+    "reviews",
+    "seam_seen",
+    "session_id",
+    "specification",
+    "terminal",
+}
 
 SESSION_ROLES = {"recon", "planner", "manager", "consultant", "arbiter"}
 SHA = re.compile(r"[0-9a-f]{64}\Z")
@@ -351,7 +353,10 @@ def load(foreground: Path) -> dict:
 
 
 def _validate_state(
-    foreground: Path, state: dict, *, migration_data: tuple[bytes, bytes] | None = None,
+    foreground: Path,
+    state: dict,
+    *,
+    migration_data: tuple[bytes, bytes] | None = None,
     baseline_projection: tuple[str, bytes] | None = None,
 ) -> dict:
     if state.get("format") == "millrace-lad-session/v1":
@@ -492,10 +497,13 @@ def _validate_state(
             raise LadError("accepted_output_changed")
         for artifact in raw["artifacts"]:
             if (
-                digest(_baseline_read(
-                    workspace, f"lad-results/{oid}/" + artifact["path"],
-                    baseline_projection,
-                ))
+                digest(
+                    _baseline_read(
+                        workspace,
+                        f"lad-results/{oid}/" + artifact["path"],
+                        baseline_projection,
+                    )
+                )
                 != artifact["sha256"]
             ):
                 raise LadError("accepted_artifact_changed")
@@ -503,7 +511,9 @@ def _validate_state(
         raise LadError("missing_continuation")
     validate_migration(foreground, state, migration_data=migration_data)
     validate_baselines(
-        foreground, state, legacy_raw=migration_data[0] if migration_data else None,
+        foreground,
+        state,
+        legacy_raw=migration_data[0] if migration_data else None,
         baseline_projection=baseline_projection,
     )
     return state
@@ -532,20 +542,78 @@ def scope(state: dict) -> str:
 
 
 _SOURCE_EXCLUDES = {
-    ".git", "node_modules", ".venv", "venv", "__pycache__", "build", "dist",
-    ".cache", ".pytest_cache", ".ruff_cache",
+    ".git",
+    "node_modules",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "build",
+    "dist",
+    ".cache",
+    ".pytest_cache",
+    ".ruff_cache",
 }
 _PROTECTED_NAMES = {".env", ".env.local", "credentials.json", "secrets.json"}
 
 
+def shared_target(
+    foreground: Path, *, bootstrap: bool = False, **kwargs
+) -> dict | None:
+    """Only an explicit shared input can select an external implementation root."""
+    project = foreground.parent
+    captured, _, _ = manifest(project)
+    supplied = captured is not None and "lad_target" in captured["inputs"]
+    saved = project / "lad-target.json"
+    if not supplied:
+        if saved.exists() or saved.is_symlink():
+            raise LadError("shared_input_missing")
+        return None
+    # Standalone copied scripts remain stdlib-only; shared mode requires Plus.
+    try:
+        from millrace_plus.lad_service import validate_shared_target
+        from millrace_plus.local_intake import IntakeError
+        from millrace_plus.subworkflow_records import SubworkflowError
+    except ImportError as exc:
+        raise LadError("shared_target_requires_plus") from exc
+    try:
+        return validate_shared_target(
+            captured["inputs"]["lad_target"],
+            project=project,
+            bootstrap=bootstrap,
+            **kwargs,
+        )
+    except (IntakeError, SubworkflowError) as exc:
+        raise LadError(exc.code) from exc
+
+
+def target_root(foreground: Path) -> Path:
+    selected = shared_target(foreground)
+    return (
+        Path(selected["target_root"])
+        if selected is not None
+        else safe(foreground, "target", missing=True)
+    )
+
+
+def _owned_marker(foreground: Path, target: Path, relative: str) -> bool:
+    # The resolver already verified the exact owner marker and active claim.
+    return (
+        relative == ".millrace-plus-target-owner.json"
+        and target != foreground / "target"
+    )
+
+
 def outside_source(foreground: Path) -> dict:
     """Retain outside-path identities without hashing all target content."""
-    target = safe(foreground, "target", missing=True)
+    target = target_root(foreground)
     if not target.exists():
         return {}
     session = foreground / "lad-state/session.json"
-    state = (load_json(read(foreground, "lad-state/session.json"))
-             if session.exists() else None)
+    state = (
+        load_json(read(foreground, "lad-state/session.json"))
+        if session.exists()
+        else None
+    )
     current = packet(state) if state is not None else None
     paths = current["paths"] if current else []
     if not paths:
@@ -558,8 +626,12 @@ def outside_source(foreground: Path) -> dict:
                 files.append(name)
                 dirs.remove(name)
         dirs[:] = [
-            name for name in dirs if name != ".git" and (
-                name not in _SOURCE_EXCLUDES or any(
+            name
+            for name in dirs
+            if name != ".git"
+            and (
+                name not in _SOURCE_EXCLUDES
+                or any(
                     scope == str((root / name).relative_to(target))
                     or scope.startswith(str((root / name).relative_to(target)) + "/")
                     or str((root / name).relative_to(target)).startswith(
@@ -572,14 +644,21 @@ def outside_source(foreground: Path) -> dict:
         for name in files:
             path = root / name
             relative = str(path.relative_to(target))
+            if _owned_marker(foreground, target, relative):
+                continue
             if name not in _PROTECTED_NAMES and any(
                 relative == scope or relative.startswith(scope.rstrip("/") + "/")
                 for scope in paths
             ):
                 continue
             info = path.lstat()
-            identity = [info.st_mode, info.st_size, info.st_mtime_ns,
-                        info.st_ctime_ns, info.st_ino]
+            identity = [
+                info.st_mode,
+                info.st_size,
+                info.st_mtime_ns,
+                info.st_ctime_ns,
+                info.st_ino,
+            ]
             if stat.S_ISLNK(info.st_mode):
                 identity.append(os.readlink(path))
             elif not stat.S_ISREG(info.st_mode):
@@ -591,16 +670,31 @@ def outside_source(foreground: Path) -> dict:
 def source_context(foreground: Path) -> dict:
     """Record the Git base/index without reading Git storage as source files."""
     outside = outside_source(foreground)
-    target = safe(foreground, "target", missing=True)
+    target = target_root(foreground)
     if not target.exists():
         return {"git": None, "outside": outside}
-    command = ["git", "-c", "core.fsmonitor=false", "-c",
-               "core.hooksPath=" + os.devnull, "-C", str(target)]
-    environment = {"PATH": os.defpath, "GIT_CONFIG_NOSYSTEM": "1",
-                   "GIT_CONFIG_GLOBAL": os.devnull, "GIT_OPTIONAL_LOCKS": "0"}
+    command = [
+        "git",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.hooksPath=" + os.devnull,
+        "-C",
+        str(target),
+    ]
+    environment = {
+        "PATH": os.defpath,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_OPTIONAL_LOCKS": "0",
+    }
     try:
-        top = subprocess.run(command + ["rev-parse", "--show-toplevel"],
-                             env=environment, capture_output=True, timeout=10)
+        top = subprocess.run(
+            command + ["rev-parse", "--show-toplevel"],
+            env=environment,
+            capture_output=True,
+            timeout=10,
+        )
     except FileNotFoundError:
         return {"git": None, "outside": outside}
     if top.returncode != 0 or Path(os.fsdecode(top.stdout).strip()).resolve() != target:
@@ -612,26 +706,33 @@ def source_context(foreground: Path) -> dict:
         "worktree": ["diff", "--name-only", "-z", "--no-ext-diff", "--no-textconv"],
         "untracked": ["ls-files", "--others", "--exclude-standard", "-z"],
     }.items():
-        result = subprocess.run(command + args, env=environment,
-                                capture_output=True, timeout=10)
+        result = subprocess.run(
+            command + args, env=environment, capture_output=True, timeout=10
+        )
         if result.returncode != 0:
             raise LadError("source_git_observation_failed")
-        facts[key] = (os.fsdecode(result.stdout).strip() if key == "base"
-                      else digest(result.stdout))
+        facts[key] = (
+            os.fsdecode(result.stdout).strip()
+            if key == "base"
+            else digest(result.stdout)
+        )
     return {"git": facts, "outside": outside}
 
 
 def source(foreground: Path, paths: list[str] | None = None) -> dict[str, str]:
     """Stream scoped source identities; do not follow links or parse artifacts."""
-    target = safe(foreground, "target", missing=True)
+    target = target_root(foreground)
     if not target.exists():
         return {}
     if not target.is_dir():
         raise LadError("target_directory_required")
     if paths is None:
         file = foreground / "lad-state/session.json"
-        state = (load_json(read(foreground, "lad-state/session.json"))
-                 if file.exists() else None)
+        state = (
+            load_json(read(foreground, "lad-state/session.json"))
+            if file.exists()
+            else None
+        )
         current = packet(state) if state is not None else None
         paths = current["paths"] if current else []
     if any(Path(name).is_absolute() or ".." in Path(name).parts for name in paths):
@@ -644,8 +745,12 @@ def source(foreground: Path, paths: list[str] | None = None) -> dict[str, str]:
                 files.append(name)
                 dirs.remove(name)
         dirs[:] = [
-            name for name in dirs if name != ".git" and (
-                name not in _SOURCE_EXCLUDES or any(
+            name
+            for name in dirs
+            if name != ".git"
+            and (
+                name not in _SOURCE_EXCLUDES
+                or any(
                     scope == str((root / name).relative_to(target))
                     or scope.startswith(str((root / name).relative_to(target)) + "/")
                     or str((root / name).relative_to(target)).startswith(
@@ -658,9 +763,15 @@ def source(foreground: Path, paths: list[str] | None = None) -> dict[str, str]:
         for name in files:
             path = root / name
             relative = str(path.relative_to(target))
-            if paths and name not in _PROTECTED_NAMES and not any(
-                relative == scope or relative.startswith(scope.rstrip("/") + "/")
-                for scope in paths
+            if _owned_marker(foreground, target, relative):
+                continue
+            if (
+                paths
+                and name not in _PROTECTED_NAMES
+                and not any(
+                    relative == scope or relative.startswith(scope.rstrip("/") + "/")
+                    for scope in paths
+                )
             ):
                 continue
             mode = path.lstat().st_mode
@@ -681,7 +792,9 @@ def source(foreground: Path, paths: list[str] | None = None) -> dict[str, str]:
                     checksum.update(block)
                 after = os.fstat(stream.fileno())
                 if (before.st_size, before.st_mtime_ns, before.st_ino) != (
-                    after.st_size, after.st_mtime_ns, after.st_ino
+                    after.st_size,
+                    after.st_mtime_ns,
+                    after.st_ino,
                 ):
                     raise LadError("source_changed_during_observation")
             observed[relative] = checksum.hexdigest()
@@ -724,52 +837,87 @@ def validate_migration(
     else:
         fields(legacy, {"path", "sha256", "format"})
         fields(migration, {"path", "sha256"})
-        if legacy["format"] != "millrace-lad-session/v1" or legacy["path"] != (
-            "lad-state/legacy/" + legacy["sha256"] + ".json"
-        ) or migration["path"] != "lad-state/migrations/v1-to-v2.json":
+        if (
+            legacy["format"] != "millrace-lad-session/v1"
+            or legacy["path"] != ("lad-state/legacy/" + legacy["sha256"] + ".json")
+            or migration["path"] != "lad-state/migrations/v1-to-v2.json"
+        ):
             raise LadError("migration_locator")
         old_raw, record_raw = (
-            migration_data if migration_data is not None else (
-                read(foreground, legacy["path"]), read(foreground, migration["path"])
-            )
+            migration_data
+            if migration_data is not None
+            else (read(foreground, legacy["path"]), read(foreground, migration["path"]))
         )
-        if (digest(old_raw) != legacy["sha256"]
-            or digest(record_raw) != migration["sha256"]):
+        if (
+            digest(old_raw) != legacy["sha256"]
+            or digest(record_raw) != migration["sha256"]
+        ):
             raise LadError("migration_digest")
         from session_compat import validate_v1
 
         old = validate_v1(foreground, load_json(old_raw), active_projection=False)
-        record = fields(load_json(record_raw), {
-            "format", "session_id", "source", "destination_format",
-            "preserved_occurrence_ids", "source_mappings",
-        })
+        record = fields(
+            load_json(record_raw),
+            {
+                "format",
+                "session_id",
+                "source",
+                "destination_format",
+                "preserved_occurrence_ids",
+                "source_mappings",
+            },
+        )
         old_ids = set(old["occurrences"])
         old_events = [{"id": row["id"], "kind": row["kind"]} for row in old["events"]]
-        if state["events"][:len(old_events)] != old_events or any(
+        if state["events"][: len(old_events)] != old_events or any(
             state["accepted"].get(oid) != accepted
             for oid, accepted in old["accepted"].items()
         ):
             raise LadError("legacy_history_or_accepted_changed")
-        if record["format"] != "millrace-lad-migration/v1" or (
-            record["session_id"] != old["session_id"]
-            or old["session_id"] != state["session_id"]
-        ) or record["source"] != legacy or (
-            record["destination_format"] != "millrace-lad-session/v2"
-        ) or record["preserved_occurrence_ids"] != sorted(old_ids):
+        if (
+            record["format"] != "millrace-lad-migration/v1"
+            or (
+                record["session_id"] != old["session_id"]
+                or old["session_id"] != state["session_id"]
+            )
+            or record["source"] != legacy
+            or (record["destination_format"] != "millrace-lad-session/v2")
+            or record["preserved_occurrence_ids"] != sorted(old_ids)
+        ):
             raise LadError("migration_identity")
         mappings = record["source_mappings"]
         if not isinstance(mappings, list) or len(mappings) != len(old_ids):
             raise LadError("migration_mappings")
         for row in mappings:
-            fields(row, {"occurrence_id", "input_sha256", "source_sha256",
-                         "guidance_sha256", "guidance_root", "requires_revalidation"})
+            fields(
+                row,
+                {
+                    "occurrence_id",
+                    "input_sha256",
+                    "source_sha256",
+                    "guidance_sha256",
+                    "guidance_root",
+                    "requires_revalidation",
+                },
+            )
             oid = row["occurrence_id"]
-            if (oid not in old_ids
-                or state["occurrences"].get(oid) != old["occurrences"][oid]):
+            if (
+                oid not in old_ids
+                or state["occurrences"].get(oid) != old["occurrences"][oid]
+            ):
                 raise LadError("legacy_occurrence_changed")
-            if any(row[k] != old["occurrences"][oid][k] for k in (
-                "input_sha256", "source_sha256", "guidance_sha256", "guidance_root"
-            )) or row["requires_revalidation"] is not True:
+            if (
+                any(
+                    row[k] != old["occurrences"][oid][k]
+                    for k in (
+                        "input_sha256",
+                        "source_sha256",
+                        "guidance_sha256",
+                        "guidance_root",
+                    )
+                )
+                or row["requires_revalidation"] is not True
+            ):
                 raise LadError("legacy_source_reinterpreted")
         if len({row["occurrence_id"] for row in mappings}) != len(old_ids):
             raise LadError("migration_duplicate_mapping")
@@ -779,8 +927,10 @@ def validate_migration(
         if occurrence.get("format") != "millrace-lad-input/v2":
             raise LadError("occurrence_contract")
         if occurrence.get("helper_mode") == "direct":
-            if ("helper_qualification" not in occurrence
-                or occurrence["helper_qualification"] is not None):
+            if (
+                "helper_qualification" not in occurrence
+                or occurrence["helper_qualification"] is not None
+            ):
                 raise LadError("direct_helper_qualification")
         elif occurrence.get("helper_mode") != "native_helpers":
             raise LadError("helper_mode")
@@ -803,7 +953,10 @@ def _baseline_read(
 
 
 def validate_baselines(
-    foreground: Path, state: dict, *, legacy_raw: bytes | None = None,
+    foreground: Path,
+    state: dict,
+    *,
+    legacy_raw: bytes | None = None,
     baseline_projection: tuple[str, bytes] | None = None,
 ) -> None:
     pending_records = [state["pending"]] + [
@@ -815,10 +968,12 @@ def validate_baselines(
         ref = fields(pending["restoration"], {"path", "sha256"})
         raw = read(foreground, ref["path"])
         record = load_json(raw)
-        if (digest(raw) != ref["sha256"]
+        if (
+            digest(raw) != ref["sha256"]
             or digest(canonical(record)) != pending["cause_id"]
             or record["session_id"] != state["session_id"]
-            or record["owner"] != pending["occurrence_id"]):
+            or record["owner"] != pending["occurrence_id"]
+        ):
             raise LadError("baseline_observation_changed")
         observed = record["observed"]
         if observed is not None and (
@@ -829,8 +984,11 @@ def validate_baselines(
         if "parent_pin" not in baseline:
             if state["migration"] is None:
                 raise LadError("baseline_parent_pin_required")
-            old = load_json(legacy_raw if legacy_raw is not None
-                            else read(foreground, state["legacy"]["path"]))
+            old = load_json(
+                legacy_raw
+                if legacy_raw is not None
+                else read(foreground, state["legacy"]["path"])
+            )
             if baseline not in old["baselines"].values() or (
                 digest(read(foreground, baseline["path"])) != baseline["sha256"]
             ):
@@ -841,10 +999,11 @@ def validate_baselines(
         if digest(raw) != pin["sha256"]:
             raise LadError("baseline_parent_pin_changed")
         expected = {k: v for k, v in baseline.items() if k != "parent_pin"}
-        if (load_json(raw) != expected
-            or digest(_baseline_read(
-                foreground, baseline["path"], baseline_projection
-            )) != baseline["sha256"]):
+        if (
+            load_json(raw) != expected
+            or digest(_baseline_read(foreground, baseline["path"], baseline_projection))
+            != baseline["sha256"]
+        ):
             raise LadError("baseline_changed")
 
         backup = "lad-state/baseline-pins/" + baseline["occurrence_id"] + ".md"

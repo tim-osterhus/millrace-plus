@@ -1109,13 +1109,26 @@ def test_catalog_copy_and_stdlib_only_scripts(tmp_path: Path) -> None:
             else:
                 continue
             if set(names) == {"millrace_plus"}:
-                assert script.name == "session_compat.py"
                 parent = parents.get(node)
                 while parent is not None and not isinstance(parent, ast.FunctionDef):
                     parent = parents.get(parent)
-                assert parent is not None and parent.name == "upgrade_session"
                 assert isinstance(node, ast.ImportFrom)
-                assert node.module == "millrace_plus.router"
+                if script.name == "session_compat.py":
+                    assert parent is not None and parent.name == "upgrade_session"
+                    assert node.module == "millrace_plus.router"
+                else:
+                    assert script.name == "lad_state.py"
+                    assert parent is not None and parent.name == "shared_target"
+                    assert len(node.names) == 1
+                    assert node.names[0].asname is None
+                    assert (
+                        node.module,
+                        node.names[0].name,
+                    ) in {
+                        ("millrace_plus.lad_service", "validate_shared_target"),
+                        ("millrace_plus.local_intake", "IntakeError"),
+                        ("millrace_plus.subworkflow_records", "SubworkflowError"),
+                    }
             else:
                 assert set(names) <= sys.stdlib_module_names | {
                     "lad_state", "boundaries", "prepare_role", "accept_role",

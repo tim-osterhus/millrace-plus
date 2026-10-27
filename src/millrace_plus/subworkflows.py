@@ -18,6 +18,7 @@ from .subworkflow_records import (
     Journal,
     SubworkflowError,
     _date,
+    _id,
     atomic_json,
     canonical,
     canonical_path,
@@ -32,7 +33,7 @@ from .subworkflow_records import (
     timestamp,
 )
 
-__all__ = ["prepare", "call", "inspect", "cancel", "reconcile", "closed"]
+__all__ = ["prepare", "call", "advance", "inspect", "cancel", "reconcile", "closed"]
 TERMINAL = {"succeeded", "failed", "cancelled"}
 OUTCOMES = {
     "succeeded": "CHILD_SUCCEEDED",
@@ -206,8 +207,35 @@ def prepare(request_file: Path) -> dict[str, object]:
         return record
 
 
+def advance(request_file: Path) -> dict[str, object]:
+    """Advance only the additive OS-backed v2 format for one finite window."""
+    from .subworkflow_v2 import advance as advance_v2
+
+    return advance_v2(request_file)
+
+
+def _uses_v2(call_home: Path, call_key: str) -> bool:
+    path = Journal(call_home, call_key).path
+    canonical_path(str(path))
+    try:
+        with path.open("rb") as stream:
+            raw = stream.read(2097153)
+        if len(raw) > 2097152:
+            raise SubworkflowError("record_too_large")
+        row = mapping(catalog.strict_json(raw))
+    except OSError as exc:
+        raise SubworkflowError("call_missing") from exc
+    except catalog.CatalogError as exc:
+        raise SubworkflowError(exc.code) from exc
+    return row.get("format") == "millrace-plus-subworkflow-call/v2"
+
+
 def inspect(call_home: Path, call_key: str) -> dict[str, object]:
     """Read retained evidence only, without controller launch or public mutation."""
+    if _uses_v2(call_home, call_key):
+        from .subworkflow_v2 import inspect as inspect_v2
+
+        return inspect_v2(call_home, call_key)
     return Journal(call_home, call_key).load()
 
 
@@ -553,8 +581,11 @@ def _intent(journal: Journal, identifier: str) -> dict[str, object]:
 
 def cancel(call_home: Path, call_key: str, request_id: str) -> dict[str, object]:
     """Persist a caller UUID and send its exact public cancellation."""
-    # Validate the caller UUID even when the child has not been dispatched.
-    envelope("cancel_run", {}, instance_id=None, explicit_id=request_id)
+    _id(request_id)
+    if _uses_v2(call_home, call_key):
+        from .subworkflow_v2 import cancel as cancel_v2
+
+        return cancel_v2(call_home, call_key, request_id)
     journal = Journal(call_home, call_key)
     saved = _intent(journal, request_id)
     if saved["run_id"] is None:
@@ -580,6 +611,10 @@ def cancel(call_home: Path, call_key: str, request_id: str) -> dict[str, object]
 
 def reconcile(call_home: Path, call_key: str) -> dict[str, object]:
     """Refresh exact public observations only; never resume/recover/assert stopped."""
+    if _uses_v2(call_home, call_key):
+        from .subworkflow_v2 import reconcile as reconcile_v2
+
+        return reconcile_v2(call_home, call_key)
     journal = Journal(call_home, call_key)
     saved = _refresh(journal)
     view = mapping(saved["observation"])

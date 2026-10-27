@@ -606,33 +606,33 @@
     "destination_hashes": [
       {
         "path": "README.md",
-        "sha256": "8a0e80358afc6f574c8d154afa7bc8bb56fdb2dabe7964dda548670df8748603",
-        "bytes": 2806
+        "sha256": "dd6bf6a07a61c05c35943488bdfa32cbe41d6720aa869ffd7da8a11e7bbd33ac",
+        "bytes": 3534
       },
       {
         "path": "context/contracts.md",
-        "sha256": "e664b71f12ee7e72329b7f33f8bd034ce6962fd842f65dbdd92a666eb02a2d28",
-        "bytes": 9734
+        "sha256": "4208ec2c9715e6aa9a6850f965d8876c88a79e2a8d4319a20f7da8d4d43b7991",
+        "bytes": 11247
       },
       {
         "path": "context/harness.md",
-        "sha256": "287000008e99acdf8884bc6bff8b9925fdd6880e4f27aaef1a384c75f3e59084",
-        "bytes": 4753
+        "sha256": "0f2d8257b07a9cec1ee58b1a3eb15fc3a05d547a87805dcd9b1fb32661a1aa2d",
+        "bytes": 5183
       },
       {
         "path": "context/role-contracts.md",
-        "sha256": "7b372e501deb8bf209d2a2f81525806881925865381df89e4098581ccb1675ed",
-        "bytes": 14322
+        "sha256": "d4f36c43069418a18b597fd6811495f5895bb41c6f1580658ab4d2f46a125a35",
+        "bytes": 14925
       },
       {
         "path": "context/routes.md",
-        "sha256": "864ea1b3354a13bf72f0cbc01dbdae4829269879e29bfd84e46c9bd5f5834559",
-        "bytes": 4711
+        "sha256": "119716cd4776b7e3066b3e6fca2133cde7209305ce16d21bd5021898427ce981",
+        "bytes": 4857
       },
       {
         "path": "foreground/README.md",
-        "sha256": "cc29e216418ec2119dbac163b5d64ba0332e25ce574c0bdb9a20973e94bf2764",
-        "bytes": 317
+        "sha256": "bb58c0cfdfad88210181949153ea64a8d75b177c47b6f8012e5c9b4f21a7d0d5",
+        "bytes": 631
       },
       {
         "path": "learning/README.md",
@@ -721,13 +721,13 @@
       },
       {
         "path": "scripts/init_session.py",
-        "sha256": "10521ce2e0cd02ef327a14e7f0780f61cc9d2f43ddbf88caaa99f0f3e9477fab",
-        "bytes": 5385
+        "sha256": "dd7eb6a1804791cd85e96fc3d5ede79300c777ec8310bc5c476b2d6aac29c451",
+        "bytes": 6006
       },
       {
         "path": "scripts/lad_state.py",
-        "sha256": "a0f2ac3ebf339ba0128c086bf4101e572de29c4fa79f434ed779fa2958a2cf28",
-        "bytes": 31742
+        "sha256": "970c5cae33f763224f45baba28ddd1aad53023587db4b013c35dd93b6d47b9da",
+        "bytes": 34908
       },
       {
         "path": "scripts/learning_seam.py",
@@ -736,8 +736,8 @@
       },
       {
         "path": "scripts/prepare_role.py",
-        "sha256": "e7012696011ca3fa3fc4a687a796afd99eb8a06b0cd5a8295934826a07cbac13",
-        "bytes": 16978
+        "sha256": "fe368c1af2ff20af29f56e75f6673bbaf70726dc47570d1f86d869eecb2e7dce",
+        "bytes": 18195
       },
       {
         "path": "scripts/session_compat.py",

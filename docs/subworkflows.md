@@ -183,3 +183,90 @@ Retain journals, envelopes, receipts and outputs through unresolved/nonterminal
 aftermath. Explicit local deletion is appropriate only after exact public
 terminal/writer closure proof. Moving call homes, recursive reuse of the same
 roots and automatic compensation/recovery are unsupported.
+
+
+## Additive OS-backed v2 calls
+
+`millrace-plus subworkflow advance --request FILE` advances one v2 call for a
+finite observation window. The request marker is
+`millrace-plus-subworkflow-request/v2`. It requires `call_key`, `call_home`,
+`parent`, `definition`, `output_ref`, `os_profile`, `observe_seconds` and
+`cleanup_seconds`. Only `inputs` is optional. Parent contains an exact instance
+ID and optional run/plane/node IDs. It contains no local state-home path.
+`os_profile` pins an absolute profile path and its exact SHA-256. The strict
+`millrace-plus-workflow-os-profile/v1` profile contains `format`, `os_origin`,
+`os_home` and `os_credential_file`. The existing owner-only credential file is
+read afresh for each bounded request. No token enters retained call records.
+
+V2 uses one preconfigured OS named Core home. Each child has its own instance,
+run, workflow copy and project. V2 reads and controls that exact child through
+public OS routes. It does not create a per-call Core state home. Keep the OS
+name-to-home mapping stable. Rebinding, live-store copying and remote path
+mapping are unsupported. Capability negotiation requires call-v2 and explicit
+holder-join support. Browser use is optional.
+
+Observation windows last 1–300 seconds. Cleanup windows last 5–60 seconds.
+Expiry returns `CHILD_RUNNING` while a known child or call remains active.
+Expiry does not cancel the child. V2 request/input files permit 1,048,576 bytes,
+journals 2,097,152 bytes and result manifests 262,144 bytes. The OS envelope
+body remains limited to 4,096 bytes. Task text stays in the local input manifest.
+V1 formats, limits, local process control and finite lifetime remain unchanged.
+
+The existing inspect/cancel/reconcile commands dispatch by retained journal
+format. Inspect only reads retained files. Reconcile performs one bounded
+public refresh and sends no control. Explicit cancel saves intent and the caller
+request ID before any send. All later starts are prevented. Distinct caller IDs
+remain separate controls; repeated IDs observe the same saved request. An
+ambiguous start or cancellation is never resent to discover its effect.
+Pending cancellation targets only the run recovered from the exact saved start
+receipt. No helper selects the newest run.
+
+V2 keeps every changed exact call observation. A retained matching
+`holder_joined:true` remains proof if a later receipt-only observation is null.
+Null never becomes true by inference. Every sent explicit cancellation requires
+its own closure evidence. Receipt-only observations with `holder_joined:null`
+and no earlier matching true return `CHILD_OBSERVATION_LOST`. Known false or
+still unobserved sent calls prevent terminal settlement and return
+`CHILD_UNCERTAIN/holder_unjoined`; a known active child can remain `CHILD_RUNNING`.
+Invalid identity or unresolved writers also returns `CHILD_UNCERTAIN`. Reconcile
+does not execute recovery or assert that a writer stopped.
+
+A proven prevented start may return `CHILD_CANCELLED/dispatch_prevented` with
+`run_id:null`, `status:null` and `dispatch:not_started`. This requires no possible
+child run and joined evidence for every sent call. It preserves actual refusal
+receipts without fabricating a Core cancelled run. Actual run cancellation
+requires exact terminal, quiescent and stopped-writer facts plus call closure.
+The other outcomes remain `CHILD_SUCCEEDED`, `CHILD_FAILED`, `CHILD_ATTENTION`
+and `CHILD_REFUSED`. Every advance result has exactly outcome, summary and one
+relative output ref. V2 result manifests retain actual OS references and omit
+local process-controller fields. Foreign output files are refused.
+
+Bound LAD calls retain their immutable claim digest. Public generic advance
+cannot adopt them as unbound calls. The finite LAD domain wrapper verifies and
+supplies the active claim and frozen OS home. These helper mechanics do not
+initialize or run a persistent service graph, settle tasks or release ownership.
+
+### V2 result observations and physical-join retirement
+
+The v2 result observation is a fresh top-level dictionary containing every field
+and value of the last saved public Core run view except `draft_revision`.
+Nested fields with that name remain unchanged. The journal retains the complete
+original view. Identity, status, writer, quiescence and control checks continue
+to use that full view. The result limit remains 262,144 bytes including its final
+LF. Genuine overflow after this single omission still returns the compact
+`CHILD_UNCERTAIN/result_limit` manifest. Output ownership rules remain unchanged.
+
+A terminal or paused child can briefly outlive its Core work while the exact OS
+call finishes joining. During advance or explicit cancel, the helper may wait
+only when every other closure prerequisite passes and every unproven sent call
+has an exact latest owned observation with `holder_joined:false`. This join tail
+only refreshes public reads at the existing polling interval. It sends no control,
+allocates no ID or run, and keeps the original observation or cleanup deadline.
+
+Exact true evidence permits the ordinary outcome for the actual Core status.
+If false remains at expiry, the result stays `CHILD_UNCERTAIN/holder_unjoined`.
+Unknown writers, queued controls, missing or mismatched observations and call
+failures remain holds. Null without retained true remains observation-lost.
+A retained exact true remains valid after later null. Reconcile still performs
+one bounded read-only refresh and gains no join-wait loop. These generic facts
+do not settle a LAD task or supply Learning CLOSE/ACK.

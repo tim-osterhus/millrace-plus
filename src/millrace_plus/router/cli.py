@@ -80,15 +80,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _subworkflow_main(argv: Sequence[str]) -> int:
     from millrace_plus import subworkflows
-    from millrace_plus.subworkflow_records import SubworkflowError
-
-    # Load the public error type only in the selected optional helper command.
-    require_core()
-    from millrace.router.execution import RouterError
+    from millrace_plus.subworkflow_records import SubworkflowError, _id
 
     parser = _CatalogParser(prog="millrace-plus subworkflow")
     commands = parser.add_subparsers(dest="operation", required=True)
-    commands.add_parser("call").add_argument("--request", required=True, type=Path)
+    for name in ("call", "advance"):
+        commands.add_parser(name).add_argument("--request", required=True, type=Path)
     for name in ("inspect", "cancel", "reconcile"):
         child = commands.add_parser(name)
         child.add_argument("--call-home", required=True, type=Path)
@@ -96,9 +93,22 @@ def _subworkflow_main(argv: Sequence[str]) -> int:
         if name == "cancel":
             child.add_argument("--request-id", required=True)
     args = parser.parse_args(argv)
+    errors = (SubworkflowError,)
     try:
+        if args.operation == "cancel":
+            _id(args.request_id)
+        if args.operation == "call" or (
+            args.operation in {"inspect", "cancel", "reconcile"}
+            and not subworkflows._uses_v2(args.call_home, args.call_key)
+        ):
+            require_core()
+            from millrace.router.execution import RouterError
+
+            errors = (SubworkflowError, RouterError)
         if args.operation == "call":
             result = subworkflows.call(args.request)
+        elif args.operation == "advance":
+            result = subworkflows.advance(args.request)
         elif args.operation == "inspect":
             result = subworkflows.inspect(args.call_home, args.call_key)
         elif args.operation == "cancel":
@@ -107,8 +117,43 @@ def _subworkflow_main(argv: Sequence[str]) -> int:
             result = subworkflows.reconcile(args.call_home, args.call_key)
         print(json.dumps(result, ensure_ascii=False))
         return 0
-    except (SubworkflowError, RouterError) as exc:
+    except errors as exc:
         print(json.dumps({"code": exc.code, "message": str(exc)}), file=sys.stderr)
+        return 2
+    except OSError:
+        print(json.dumps({"code": "io_error", "message": "io_error"}), file=sys.stderr)
+        return 2
+
+
+def _lad_main(argv: Sequence[str]) -> int:
+    from millrace_plus.lad_service import Service
+    from millrace_plus.local_intake import IntakeError
+
+    parser = _CatalogParser(prog="millrace-plus lad")
+    commands = parser.add_subparsers(dest="operation", required=True)
+    for name in ("submit", "status", "cancel"):
+        child = commands.add_parser(name)
+        child.add_argument("--service-home", required=True, type=Path)
+        if name == "submit":
+            child.add_argument("--key", required=True)
+            child.add_argument("--request", required=True, type=Path)
+        else:
+            child.add_argument("--task", required=name == "cancel")
+        if name == "cancel":
+            child.add_argument("--request-id", required=True)
+    args = parser.parse_args(argv)
+    try:
+        service = Service(args.service_home)
+        if args.operation == "submit":
+            result = service.submit(args.key, args.request)
+        elif args.operation == "cancel":
+            result = service.cancel(args.task, args.request_id)
+        else:
+            result = service.status(args.task)
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    except IntakeError as exc:
+        print(json.dumps({"code": exc.code, "message": exc.code}), file=sys.stderr)
         return 2
     except OSError:
         print(json.dumps({"code": "io_error", "message": "io_error"}), file=sys.stderr)
@@ -147,6 +192,13 @@ def _paperclip_main(argv: Sequence[str]) -> int:
 def cli() -> None:
     """Dispatch catalog without Core; retain the explicit router namespace."""
     args = sys.argv[1:]
+    if args and args[0] == "lad":
+        try:
+            code = _lad_main(args[1:])
+        except catalog.CatalogError as exc:
+            print(json.dumps({"code": exc.code, "message": str(exc)}), file=sys.stderr)
+            code = 2
+        raise SystemExit(code)
     if args and args[0] == "paperclip":
         try:
             code = _paperclip_main(args[1:])
@@ -171,7 +223,8 @@ def cli() -> None:
     if not args or args[0] != "router":
         print(
             "usage: millrace-plus router ... | millrace-plus catalog ... | "
-            "millrace-plus subworkflow ... | millrace-plus paperclip ...",
+            "millrace-plus subworkflow ... | millrace-plus paperclip ... | "
+            "millrace-plus lad ...",
             file=sys.stderr,
         )
         raise SystemExit(2)

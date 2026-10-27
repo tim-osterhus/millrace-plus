@@ -88,3 +88,14 @@ After exact restoration, record `BASELINE_TAMPER`. Route through Consultant to a
 | Arbiter | `verdict.md` | `verdict` covers each original criterion exactly with `pass`, `gap`, or `unavailable` plus evidence. PASS requires drained accepted work and every criterion passing at current source. A real original-criterion gap may recommend Manager. Do not invent a criterion ID. |
 
 `context/routes.md` and `workflow.json` define every role and accepted outcome. Role recommendations do not route work. Deterministic guards own invalid-result observations, transport recovery, acceptance, and state changes.
+
+
+Shared-mode input-v2 adds `target_root` and `target_record:{path,sha256}`.
+Verify that record's exact file digest before using the root. Assignment text
+names the same root. Implementation roles use only their assigned paths there.
+Learning keeps its existing separate workspace and write restrictions. Standalone
+and retained inputs keep their existing shapes.
+
+Rejected-result history retains a digest and reference to bytes at the original
+result path. It does not create or recheck an immutable rejected-byte backup.
+The independent immutable baseline backup and its original pin remain required.

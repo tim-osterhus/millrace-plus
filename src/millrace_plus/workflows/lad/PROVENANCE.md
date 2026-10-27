@@ -32,3 +32,10 @@ material remains attribution context only: its code, templates, text and figures
 are not imported, nor are their separate licenses represented as this package's
 license. This adaptation does not claim canonical ICM conformance or transfer
 native harness qualification.
+
+
+Shared-target support adds a validated service claim and immutable target record
+to fresh child bootstrap and prepared assignments. It preserves the twelve role
+prompts, standalone target contract, immutable baseline backup and Learning seam.
+Destination hashes cover the changed worker and contract files. Original and
+corrected-reference input lists, upstream commits and license remain unchanged.

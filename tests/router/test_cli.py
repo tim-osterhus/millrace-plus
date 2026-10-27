@@ -206,3 +206,191 @@ def test_cli_refuses_non_candidate_core_with_diagnostic(
     assert result.returncode == 2 and result.stdout == ""
     assert _lines(result.stderr)[-1]["code"] == code
     assert "Traceback" not in result.stderr
+
+
+def test_lad_local_commands_without_core(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from test_lad_service import make_service
+
+    service = make_service(tmp_path)
+    request = tmp_path / "request.md"
+    request.write_bytes(b"Original request\r\n")
+    monkeypatch.setattr(
+        cli, "require_core", lambda: pytest.fail("local intake imported Core")
+    )
+
+    def invoke(*args: str) -> tuple[int, object]:
+        monkeypatch.setattr(sys, "argv", ["millrace-plus", "lad", *args])
+        with pytest.raises(SystemExit) as result:
+            cli.cli()
+        output = capsys.readouterr()
+        assert output.err == ""
+        return result.value.code, json.loads(output.out)
+
+    code, receipt = invoke(
+        "submit",
+        "--service-home",
+        str(service.home),
+        "--key",
+        "first",
+        "--request",
+        str(request),
+    )
+    assert code == 0 and receipt["disposition"] == "accepted"
+    code, state = invoke(
+        "status", "--service-home", str(service.home), "--task", receipt["task_id"]
+    )
+    assert code == 0 and state["tasks"][0]["request_bytes"] == "Original request\r\n"
+    request_id = "35fc1b35786c442ba6b633b3a38e84c7"
+    code, cancelled = invoke(
+        "cancel",
+        "--service-home",
+        str(service.home),
+        "--task",
+        receipt["task_id"],
+        "--request-id",
+        request_id,
+    )
+    assert code == 0 and cancelled["disposition"] == "cancelled-before-start"
+    assert service.intake.tasks()[0]["claim"] is None
+    assert not (service.home / "calls").exists()
+
+
+def test_lad_cli_refuses_active_cancel_and_unavailable_activation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from test_lad_service import make_service, submit
+
+    service = make_service(tmp_path)
+    receipt = submit(service, "first")
+    service.claim_next(writer_guard=lambda: None)  # Fixture guard only, no dispatch.
+    for tail, expected in (
+        (
+            [
+                "cancel",
+                "--service-home",
+                str(service.home),
+                "--task",
+                receipt["task_id"],
+                "--request-id",
+                "35fc1b35786c442ba6b633b3a38e84c7",
+            ],
+            "task_not_queued",
+        ),
+        (["init"], "usage_error"),
+        (["decide"], "usage_error"),
+    ):
+        monkeypatch.setattr(sys, "argv", ["millrace-plus", "lad", *tail])
+        with pytest.raises(SystemExit) as result:
+            cli.cli()
+        assert result.value.code == 2
+        output = capsys.readouterr()
+        assert output.out == "" and json.loads(output.err)["code"] == expected
+        assert "Traceback" not in output.err
+    assert service.intake.tasks()[0]["status"] == "claimed"
+
+
+def test_lad_cli_missing_service_has_json_diagnostic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "millrace-plus",
+            "lad",
+            "status",
+            "--service-home",
+            str(tmp_path),
+        ],
+    )
+    with pytest.raises(SystemExit) as result:
+        cli.cli()
+    assert result.value.code == 2
+    output = capsys.readouterr()
+    assert output.out == "" and json.loads(output.err)["code"] == "io_error"
+
+
+def test_subworkflow_advance_cli_uses_exact_request_surface(
+    tmp_path, monkeypatch, capsys
+):
+    from millrace_plus import subworkflows
+
+    selected = tmp_path / "request.json"
+    calls = []
+
+    def advance(file):
+        calls.append(file)
+        return {
+            "outcome": "CHILD_RUNNING",
+            "summary": "CHILD_RUNNING",
+            "refs": ["result.json"],
+        }
+
+    monkeypatch.setattr(subworkflows, "advance", advance)
+    assert cli._subworkflow_main(["advance", "--request", str(selected)]) == 0
+    assert calls == [selected]
+    assert json.loads(capsys.readouterr().out)["outcome"] == "CHILD_RUNNING"
+
+
+@pytest.mark.parametrize("request_id", ["bad", "f" * 31, "G" * 32])
+def test_subworkflow_cancel_invalid_id_precedes_journal_and_core(
+    tmp_path, monkeypatch, capsys, request_id
+):
+    monkeypatch.setattr(cli, "require_core", lambda: pytest.fail("Core probed"))
+    assert (
+        cli._subworkflow_main(
+            [
+                "cancel",
+                "--call-home",
+                str(tmp_path / "missing"),
+                "--call-key",
+                "child",
+                "--request-id",
+                request_id,
+            ]
+        )
+        == 2
+    )
+    output = capsys.readouterr()
+    assert output.out == "" and json.loads(output.err)["code"] == "invalid_id"
+    assert not (tmp_path / "missing").exists()
+
+
+def test_subworkflow_cancel_valid_v2_skips_core(tmp_path, monkeypatch, capsys):
+    from millrace_plus import subworkflow_v2
+
+    root = tmp_path / "calls" / "child"
+    root.mkdir(parents=True)
+    (root / "call.json").write_text('{"format":"millrace-plus-subworkflow-call/v2"}')
+    monkeypatch.setattr(cli, "require_core", lambda: pytest.fail("Core probed"))
+    calls = []
+
+    def cancel(home, key, request_id):
+        calls.append((home, key, request_id))
+        return {"format": "millrace-plus-subworkflow-call/v2"}
+
+    monkeypatch.setattr(subworkflow_v2, "cancel", cancel)
+    assert (
+        cli._subworkflow_main(
+            [
+                "cancel",
+                "--call-home",
+                str(root.parent),
+                "--call-key",
+                "child",
+                "--request-id",
+                "a" * 32,
+            ]
+        )
+        == 0
+    )
+    assert calls == [(root.parent, "child", "a" * 32)]
+    assert json.loads(capsys.readouterr().out)["format"].endswith("/v2")

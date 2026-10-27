@@ -32,8 +32,14 @@ The caller owns and joins the exact caller lifecycles and excludes other writers
 
 ## Recovery and closure
 
-The adapter does not retry native outcomes. Deterministic acceptance and preparation guards retain rejected bytes, route, and source identity. Use the graph’s selected recovery outcome. Do not issue a raw retry or redirect to normal preparation. An unknown native effect needs exact writer inspection and closure before replacement. An artifact or elapsed time does not prove task closure.
+The adapter does not retry native outcomes. Deterministic acceptance and preparation guards retain a digest/reference to result bytes at their original path, route, and source identity. They do not create or recheck an immutable rejected-byte copy. Use the graph’s selected recovery outcome. Do not issue a raw retry or redirect to normal preparation. An unknown native effect needs exact writer inspection and closure before replacement. An artifact or elapsed time does not prove task closure.
 
 The graph acknowledges Learning’s saved route in the original Core run. A fresh run on a used copy does not resume the old seam. For a replacement, use the exact occurrence and source/guidance evidence selected by the guard. Do not change ledger or guidance files by hand.
 
 The terminal-failure intent and cleanup rules remain workflow-owned. If a hard limit, cancellation, or unknown writer prevents CLOSE, preserve cleanup-required state and inspect exact run and plane evidence through public controls. A terminal projection alone is not proof that native or OS writers have stopped. These instructions do not qualify native routes, OS joins, or actual used-copy operations.
+
+
+A shared-target occurrence names its validated external root and immutable target
+record in both input and assignment. Native roles must use those pinned locators.
+The initializer's live PID match is bootstrap correlation, not closure evidence.
+Native helper refusal and route qualification requirements remain unchanged.

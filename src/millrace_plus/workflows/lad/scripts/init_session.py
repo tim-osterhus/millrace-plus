@@ -16,6 +16,7 @@ from lad_state import (
     new_state,
     roots,
     run,
+    shared_target,
 )
 
 
@@ -32,20 +33,39 @@ def main() -> None:
     args = parser.parse_args()
     foreground, project = roots(args.project_root)
     if args.upgrade_session:
-        if any(value is None for value in (
-            args.session_id, args.instance_id, args.run_id, args.state_home,
-            args.expected_state_version,
-        )):
+        captured, _, _ = manifest(project)
+        if captured is not None and "lad_target" in captured["inputs"]:
+            raise LadError("shared_session_upgrade_unsupported")
+        if any(
+            value is None
+            for value in (
+                args.session_id,
+                args.instance_id,
+                args.run_id,
+                args.state_home,
+                args.expected_state_version,
+            )
+        ):
             raise LadError("upgrade_exact_identity_required")
         from session_compat import upgrade_session
 
-        emit(upgrade_session(
-            foreground, session_id=args.session_id, instance_id=args.instance_id,
-            run_id=args.run_id, state_home=args.state_home,
-            expected_state_version=args.expected_state_version,
-            catalog_home=args.catalog_home,
-        ))
+        emit(
+            upgrade_session(
+                foreground,
+                session_id=args.session_id,
+                instance_id=args.instance_id,
+                run_id=args.run_id,
+                state_home=args.state_home,
+                expected_state_version=args.expected_state_version,
+                catalog_home=args.catalog_home,
+            )
+        )
         return
+    selected = shared_target(
+        foreground, bootstrap=True, pid=os.getpid(), script=Path(__file__).resolve()
+    )
+    if selected is not None:
+        atomic(project, "lad-target.json", canonical(selected) + b"\n", immutable=True)
     _, identity, inputs = manifest(project)
     directory = foreground / "lad-state"
     if directory.exists() or directory.is_symlink():

@@ -6,7 +6,7 @@ LAD is an editable twelve-role graph in Millrace Plus for one software task. Rec
 
 Initialize an editable copy with `millrace-plus catalog init bundled:lad PATH`. Put the exact task in the project root’s `request.md` and the existing target in `foreground/target/`. Keep sibling `foreground/` and `learning/` workspaces. For greenfield work, add `--greenfield` to the setup node’s arguments before starting.
 
-Use the same public controls as other workflow graphs. Ordinary copied-workflow commands run with `python3 -S` and Python’s standard library. They do not import Plus or OS. Ordinary reads never upgrade a v1 session. The explicit upgrade path uses the installed Plus facade only when an operator selects it. See `context/harness.md`.
+Use the same public controls as other workflow graphs. Standalone contained-target commands run with `python3 -S` and Python’s standard library. They do not import Plus or OS. Explicit shared-target mode lazily imports installed Plus to validate its target and call authority. Ordinary reads never upgrade a v1 session. The explicit upgrade path uses the installed Plus facade only when an operator selects it. See `context/harness.md`.
 
 ## Run limits and saved state
 
@@ -19,3 +19,13 @@ New sessions use `millrace-lad-session/v2`. Their unique `{id, kind}` events rec
 The packaged graph selects Plus `claude_print` with profile `millrace-claude-print-profile/v1` and Claude Code 2.1.296. The profile omits model and effort so Claude keeps its native defaults. The adapter uses StructuredOutput with the runtime-supplied marker schema. It launches with `--dangerously-skip-permissions --permission-prompts none`. Use a disposable or version-controlled target. Inspect the requested scope before starting.
 
 The stock graph uses direct role calls. Planner always stays direct. The only accepted helper-qualification scope is `offline_validator_fixture`. This fixture validates evidence handling. It does not qualify a live helper facility or authorize helper tasks. No live helper facility is qualified. Offline peers and fixture records are not native-route evidence. See `context/role-contracts.md`, `context/routes.md`, and `context/harness.md` for artifact, recovery, migration, and adapter boundaries.
+
+
+A service-owned child may instead receive `inputs.lad_target` in its normal
+subworkflow input manifest. Its initializer validates the active service claim,
+owned target, saved call and exact public child invocation. It writes the
+immutable project `lad-target.json` before role preparation. Source checks and
+assignments then use that validated external root. Each task keeps its own
+request, session, artifacts and Learning seam. Missing or changed authority
+requires reconciliation. Standalone copies continue to use `foreground/target/`.
+This worker support does not supply persistent-service initialization or a loop.

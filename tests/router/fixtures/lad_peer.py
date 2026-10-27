@@ -6,7 +6,15 @@ import json
 import sys
 from pathlib import Path
 
-from lad_state import ARTIFACTS, canonical, digest, history_name, load, source
+from lad_state import (
+    ARTIFACTS,
+    canonical,
+    digest,
+    history_name,
+    load,
+    source,
+    target_root,
+)
 
 
 def result_for(
@@ -38,8 +46,11 @@ def result_for(
     lineage = item["lineage"]
     output = workspace / "lad-results" / oid
     output.mkdir(parents=True, exist_ok=True)
-    function = (item["packet"]["criteria"][0]
-                if scenario == "many_packets" and item["packet"] else "answer")
+    function = (
+        item["packet"]["criteria"][0]
+        if scenario == "many_packets" and item["packet"]
+        else "answer"
+    )
     if role == "checker":
         (output / "baseline.md").write_text(
             "# Frozen requirement-side expectations\n\n"
@@ -61,6 +72,13 @@ def result_for(
         selected_result = json.loads((selected_root / ref["path"]).read_bytes())
         assert selected_result["role"] == ref["role"]
         assert digest(canonical(selected_result)) == ref["sha256"]
+    target = target_root(foreground)
+    if "target_root" in item:
+        assert str(target) == item["target_root"]
+        assert (
+            digest(Path(item["target_record"]["path"]).read_bytes())
+            == item["target_record"]["sha256"]
+        )
     data = {}
     findings = []
     if role == "planner":
@@ -73,8 +91,14 @@ def result_for(
         ]
     if role == "planner" and scenario == "many_packets":
         names = ["answer"] + ["answer_" + str(index) for index in range(1, 61)]
-        data["criteria"] = [{"id": name, "text": name + "() returns 42",
-                             "request_quote": name + "() returns 42"} for name in names]
+        data["criteria"] = [
+            {
+                "id": name,
+                "text": name + "() returns 42",
+                "request_quote": name + "() returns 42",
+            }
+            for name in names
+        ]
     if role == "manager":
         original = [
             {
@@ -103,24 +127,34 @@ def result_for(
             }
         ]
         if scenario == "many_packets" and not original:
-            data["plan"] = [{
-                "id": criterion["id"], "lineage": criterion["id"],
-                "criteria": [criterion["id"]], "depends_on": [],
-                "paths": [criterion["id"] + ".py"], "input_refs": [],
-                "markdown": criterion["id"] + "-packet.md",
-            } for criterion in state["criteria"]]
+            data["plan"] = [
+                {
+                    "id": criterion["id"],
+                    "lineage": criterion["id"],
+                    "criteria": [criterion["id"]],
+                    "depends_on": [],
+                    "paths": [criterion["id"] + ".py"],
+                    "input_refs": [],
+                    "markdown": criterion["id"] + "-packet.md",
+                }
+                for criterion in state["criteria"]
+            ]
         data["affected_lineages"] = (
             ["answer"]
             if state["pending"] and state["pending"]["kind"] == "remediation"
             else []
         )
     if role == "builder":
-        (foreground / "target").mkdir(exist_ok=True)
-        function = (item["packet"]["criteria"][0]
-                    if scenario == "many_packets" else "answer")
-        (foreground / "target" / (function + ".py")).write_text(
-            "def " + function + "():\n    return "
-            + ("0" if scenario in {"repair", "gate", "unresolved"} else "42") + "\n"
+        target.mkdir(exist_ok=True)
+        function = (
+            item["packet"]["criteria"][0] if scenario == "many_packets" else "answer"
+        )
+        (target / (function + ".py")).write_text(
+            "def "
+            + function
+            + "():\n    return "
+            + ("0" if scenario in {"repair", "gate", "unresolved"} else "42")
+            + "\n"
         )
     if role == "fixer":
         data.update(baseline=item["baseline"], finding_ids=item["finding_ids"])
@@ -129,7 +163,7 @@ def result_for(
             for row in state["occurrences"].values()
         )
         fixed = scenario == "repair" or (scenario == "gate" and count >= 2)
-        (foreground / "target/answer.py").write_text(
+        (target / "answer.py").write_text(
             "def answer():\n    return 42\n"
             if fixed
             else "def answer():\n    return 0\n"
@@ -141,9 +175,10 @@ def result_for(
         if role == "doublechecker":
             data.update(baseline=item["baseline"], fixer=item["fixer"])
         namespace = {}
-        function = (item["packet"]["criteria"][0]
-                    if scenario == "many_packets" else "answer")
-        code = (foreground / "target" / (function + ".py")).read_text()
+        function = (
+            item["packet"]["criteria"][0] if scenario == "many_packets" else "answer"
+        )
+        code = (target / (function + ".py")).read_text()
         exec(compile(code, function + ".py", "exec"), namespace)
         observed = namespace[function]()
         data["observed_answer"] = observed
@@ -160,7 +195,8 @@ def result_for(
             ]
     if role == "troubleshooter":
         data.update(
-            resume_role=state["pending"]["target"], repair_verified=True,
+            resume_role=state["pending"]["target"],
+            repair_verified=True,
             trigger_occurrence_id=state["pending"]["occurrence_id"],
             cause_id=state["pending"].get("cause_id"),
         )
@@ -170,9 +206,7 @@ def result_for(
             else "PASS_PREREQUISITE_REPAIRED"
         )
         if state["pending"]["kind"] == "review":
-            (foreground / "target/answer.py").write_text(
-                "def answer():\n    return 42\n"
-            )
+            (target / "answer.py").write_text("def answer():\n    return 42\n")
     if role == "consultant":
         if scenario == "baseline_tamper":
             outcome = outcome or "REPAIR_EXECUTION"
@@ -186,7 +220,8 @@ def result_for(
             review=item["review"],
             criteria_evidence={
                 criterion: "Independent passing review and executable callable "
-                "check at current source." for criterion in item["packet"]["criteria"]
+                "check at current source."
+                for criterion in item["packet"]["criteria"]
             },
         )
     if role == "learning":
@@ -196,7 +231,8 @@ def result_for(
             criterion["id"]: {
                 "status": "gap" if outcome == "FINDINGS" else "pass",
                 "evidence": "Original request requires "
-                + criterion["id"] + "() == 42; "
+                + criterion["id"]
+                + "() == 42; "
                 "current target and accepted review agree.",
             }
             for criterion in state["criteria"]
@@ -263,7 +299,8 @@ def result_for(
         "An execution repair retains the exact interrupted role; no new scope or "
         "authority is invented here. Saved context: "
         + json.dumps(state["pending"], sort_keys=True)
-        + ". Concrete next step: " + data.get("next_step", ""),
+        + ". Concrete next step: "
+        + data.get("next_step", ""),
         "updater": "Completion indexes every packet criterion against the current "
         "passing review. Exact review and evidence: "
         + json.dumps(data, sort_keys=True),
@@ -306,7 +343,8 @@ def result_for(
         )
     if role == "checker":
         freeze = {
-            "format": "millrace-lad-baseline-freeze/v1", "occurrence_id": oid,
+            "format": "millrace-lad-baseline-freeze/v1",
+            "occurrence_id": oid,
             "criteria": item["packet"]["criteria"],
             "path": f"lad-results/{oid}/baseline.md",
             "sha256": digest((output / "baseline.md").read_bytes()),
@@ -314,7 +352,8 @@ def result_for(
         frozen = output / "baseline-freeze.json"
         frozen.write_bytes(canonical(freeze) + b"\n")
         data["baseline_freeze"] = {
-            "path": frozen.name, "sha256": digest(frozen.read_bytes())
+            "path": frozen.name,
+            "sha256": digest(frozen.read_bytes()),
         }
         artifacts.append(data["baseline_freeze"])
     history = output / "historylog" / history_name(item)
@@ -324,9 +363,9 @@ def result_for(
         f"## Evidence\nInert task: {oid}; no helper or provider started.\n"
         f"## Outcome\n{outcome}; exact role evidence collected for this occurrence.\n"
     )
-    artifacts.append({
-        "path": "historylog/" + history.name, "sha256": digest(history.read_bytes())
-    })
+    artifacts.append(
+        {"path": "historylog/" + history.name, "sha256": digest(history.read_bytes())}
+    )
     result = {
         "format": "millrace-lad-result/v2",
         "helper_mode": item["helper_mode"],
@@ -345,8 +384,12 @@ def result_for(
         "data": data,
     }
     (output / "result.json").write_bytes(canonical(result) + b"\n")
-    if role == "updater" and scenario == "baseline_tamper" and not list(
-        (foreground / "lad-state/baseline-pins").glob("*-restoration.json")
+    if (
+        role == "updater"
+        and scenario == "baseline_tamper"
+        and not list(
+            (foreground / "lad-state/baseline-pins").glob("*-restoration.json")
+        )
     ):
         baseline = foreground / state["baselines"][lineage]["path"]
         baseline.write_bytes(
