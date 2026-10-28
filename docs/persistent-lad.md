@@ -25,11 +25,21 @@ private caller absolute deadline. The original bound is carried through
 `parent_control`, `decide`, `_maintenance`, reads, reconciliation and settlement. Local
 Core inspections and snapshots are synchronous and non-preemptive; they, validation,
 lock acquisition and CAS can pass the nominal deadline until an existing guard or I/O
-boundary. This is not hard wall-clock cancellation. Each HTTP request remains capped at
-two seconds; initialization keeps its original two-second create/replay/join deadline,
-and existing stop and observation bounds remain unchanged. Expiry before unknown-send
+boundary. This is not hard wall-clock cancellation. Receipt observation GETs have a
+finite 30-second per-request ceiling clipped by the original caller deadline. OPTIONS,
+POST and full-state read GETs retain their two-second caps. Initialization keeps its
+original two-second create/replay/join deadline, and existing stop and observation
+bounds remain unchanged. Expiry before unknown-send
 reservation refuses without sending; expiry during CAS remains unknown, with same-ID
 replay GET-only. No schema, CLI flag or Core/OS change is selected.
+
+The retained active1440 transport diagnosis in
+`lab/tasks/v0232-transport-repair-b4/2026-10-27/` reproduced the old receipt GET's
+two-second `TimeoutError` while its exact server handler completed successfully after
+5.103 seconds. A separate fresh OS service returned the matching receipt after
+5.170 seconds under the explicit longer GET window. This demonstrates the receipt-read
+limit for that saved case. It does not qualify retained history, pass B4 or establish
+the cause of an earlier B4 failure; those acceptance gates remain separate.
 
 The source-scope check passed 335 Linux tests (223 runtime and 112 OS-client),
 three-file Ruff and one candidate build. This is not whole-suite or installed-smoke

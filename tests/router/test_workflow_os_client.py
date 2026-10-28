@@ -13,7 +13,15 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from persistent_lad_support import CHILD, RUN, capabilities, observation, receipt, setup
+from persistent_lad_support import (
+    CHILD,
+    RUN,
+    Clock,
+    capabilities,
+    observation,
+    receipt,
+    setup,
+)
 
 from millrace_plus import workflow_os_client as client
 from millrace_plus.subworkflow_records import SubworkflowError, canonical, envelope
@@ -391,6 +399,128 @@ def test_early_timeout_does_not_claim_window_expired(fixture, monkeypatch, wrapp
     connection = client.WorkflowOSClient(reference(fixture["profile"]), "local")
     with pytest.raises(SubworkflowError, match="os_unavailable"):
         connection.capabilities(deadline=time.monotonic() + 1)
+
+
+def test_receipt_observation_can_complete_after_two_seconds(fixture):
+    sent, value = plane_call(fixture, None)
+    raw = canonical(value)
+    methods = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            methods.append(self.command)
+            time.sleep(2.2)
+            try:
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    try:
+        path = fixture["profile"]
+        profile = json.loads(path.read_bytes())
+        profile["os_origin"] = f"http://127.0.0.1:{server.server_port}"
+        path.write_bytes(canonical(profile))
+        connection = client.WorkflowOSClient(reference(path), "local")
+        started = time.monotonic()
+        assert connection.observe(sent, deadline=started + 5) == value
+        assert time.monotonic() - started >= 2.2
+        assert methods == ["GET"]
+    finally:
+        server.shutdown()
+        thread.join(timeout=3)
+        server.server_close()
+
+
+@pytest.mark.parametrize(
+    ("window", "expected_timeout", "code"),
+    [(0.25, 0.25, "observation_window_expired"), (60, 30, "os_unavailable")],
+)
+def test_receipt_observation_deadline_and_finite_transport_cap(
+    fixture, monkeypatch, window, expected_timeout, code
+):
+    clock = Clock()
+    sent, _ = plane_call(fixture, None)
+
+    class ExpiringOpener(Opener):
+        def open(self, request, *, timeout):
+            self.requests.append((request, timeout))
+            clock.sleep(timeout)
+            raise TimeoutError
+
+    opener = ExpiringOpener([])
+    handlers = []
+
+    def build(*values):
+        handlers.extend(values)
+        return opener
+
+    monkeypatch.setattr(client, "build_opener", build)
+    connection = client.WorkflowOSClient(
+        reference(fixture["profile"]), "local", clock=clock
+    )
+    with pytest.raises(SubworkflowError, match=code):
+        connection.observe(sent, deadline=window)
+    requests = [(request.get_method(), timeout) for request, timeout in opener.requests]
+    assert requests == [("GET", expected_timeout)]
+    handler = next(h for h in handlers if isinstance(h, client._DeadlineHTTPHandler))
+    assert handler.deadline == expected_timeout
+    assert clock() == expected_timeout
+
+
+def test_expired_receipt_observation_deadline_never_sends(fixture, monkeypatch):
+    opener = Opener([])
+    monkeypatch.setattr(client, "build_opener", lambda *handlers: opener)
+    connection = client.WorkflowOSClient(
+        reference(fixture["profile"]), "local", clock=Clock()
+    )
+    sent, _ = plane_call(fixture, None)
+    with pytest.raises(SubworkflowError, match="observation_window_expired"):
+        connection.observe(sent, deadline=0)
+    assert not opener.requests
+
+
+@pytest.mark.parametrize("operation", ["capabilities", "submit", "read"])
+def test_non_observation_requests_keep_two_second_cap(fixture, monkeypatch, operation):
+    sent, value = plane_call(fixture, None)
+    read = {
+        "contract": "millrace-os-router-read/v1",
+        "home": "local",
+        "source_provider": "core",
+        "authority": "core-state-home",
+        "observed_at": "now",
+        "data": {"id": RUN, "instance_id": CHILD},
+    }
+    replies = {
+        "capabilities": [canonical(capabilities())],
+        "submit": [canonical(capabilities()), canonical(value)],
+        "read": [canonical(read)],
+    }
+    opener = Opener(replies[operation])
+    monkeypatch.setattr(client, "build_opener", lambda *handlers: opener)
+    connection = client.WorkflowOSClient(
+        reference(fixture["profile"]), "local", clock=Clock()
+    )
+    if operation == "read":
+        connection.read(CHILD, RUN, deadline=60)
+    elif operation == "submit":
+        connection.submit(sent, deadline=60)
+    else:
+        connection.capabilities(deadline=60)
+    methods = {
+        "capabilities": ["OPTIONS"], "submit": ["OPTIONS", "POST"], "read": ["GET"]
+    }
+    actual = [request.get_method() for request, _ in opener.requests]
+    assert actual == methods[operation]
+    assert all(timeout == 2 for _, timeout in opener.requests)
 
 
 @pytest.mark.parametrize(

@@ -369,7 +369,7 @@ class WorkflowOSClient:
         body: bytes | None = None,
         call: bool = False,
     ) -> dict[str, object]:
-        limit = min(deadline, self.clock() + 2)
+        limit = min(deadline, self.clock() + (30 if method == "GET" and call else 2))
         window_limited = limit == deadline
         if limit <= self.clock():
             raise SubworkflowError(

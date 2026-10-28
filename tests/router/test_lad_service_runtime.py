@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.error import HTTPError
+from urllib.parse import urlsplit
 
 import pytest
 from persistent_lad_support import Clock, capabilities, observation, receipt
@@ -1039,7 +1040,10 @@ def budgeted_http(setup, monkeypatch):
     def open_request(request, *, timeout):
         method = request.get_method()
         requests.append((method, clock.now, timeout))
-        assert 0 < timeout <= 2
+        receipt_get = method == "GET" and urlsplit(request.full_url).path.startswith(
+            "/api/v1/router/requests/"
+        )
+        assert 0 < timeout <= (30 if receipt_get else 2)
         if method == "OPTIONS":
             clock.sleep(0.15)
             value = capabilities()
@@ -1112,6 +1116,7 @@ def test_operation_expiry_during_cas_stays_unknown_and_replay_is_get_only(
     with pytest.raises(SubworkflowError, match="os_http_404"):
         active.parent_control(path, _deadline=clock.now + 5)
     assert [row[0] for row in budgeted_http.requests] == ["OPTIONS", "OPTIONS", "GET"]
+    assert budgeted_http.requests[-1][2] == pytest.approx(4.85)
     assert Service(setup.home).intake.lifecycle()[1]["maintenance"][
         "parent:" + sent["request_id"]
     ]["call"] == saved
