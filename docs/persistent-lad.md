@@ -62,15 +62,15 @@ The outer fixture's publicly proven cleanup covers separate fixture identities. 
 inner B4 cleanup stop expired; task 1 remains held and task 2 queued, with no terminal
 receipts or successful settlement. Physical unit/PID/cgroup closure is proven, but inner
 domain closure remains UNKNOWN and the v10/v11 stores remain held. The B4 test stays
-enabled and earlier failed states remain preserved. No further B4 or history attempt is
-selected. Full packet acceptance and the persistent-service release gate remain open.
+enabled and earlier failed states remain preserved. That packet selected no further B4
+or history attempt. Full packet acceptance and the persistent-service release gate remain open.
 See
 `lab/tasks/v0232-persistent-qualification/2026-10-27/b4-verification-v2/result.json`,
 `lab/tasks/v0232-persistent-qualification/2026-10-27/b4-verification-v3/result.json` and
 `lab/tasks/v0232-persistent-qualification/2026-10-27/b4-diagnostic-v3-disposition.md`.
 No B4 pass, domain closure, native/macOS/used-copy qualification or release is claimed.
 
-The offline history attempt is complete as PARTIAL / UNQUALIFIED. The 96-idle
+The earlier offline history attempt completed as PARTIAL / UNQUALIFIED. The 96-idle
 one-day target completed with one parking callback; active reached 878 of 1,440
 loops plus one parking callback under the unchanged 45-minute budget.
 Thirty-day targets of 2,880 idle waits and 43,200 active observations were NOT
@@ -312,4 +312,14 @@ publication. Generic outcomes and raw null/false facts remain unchanged.
 
 The source candidate's scoped evidence is Core 761 passed, 12 recorded skips and one approved deselection; Plus 335 passed with no skips; Ruff on two source modules and two test files; one Core wheel/sdist build; and passed installed smoke/origin checks. The selected Core repair is four-path, validation-local de-duplication within one complete snapshot. It adds no global/persistent cache, schema, API or timeout change. The profile pass was partial, with fresh producer/fixture and dependent Plus costs unmeasured; no throughput claim follows. Source-scope verification passed. OX returned APPROVED_WITH_NOTES for source and documentation only, with no Core correctness defect; commit status is recorded in `lab/tasks/v0232-b4-history-closeout/2026-10-27/final-status.json`. The review does not accept B4, P-L4, history or release.
 
-The single final stock B4 attempt failed after 1037.500 seconds. An actual >=60-second CHILD_RUNNING observation and normal first-task settlement passed; the later second advance returned CHILD_UNCERTAIN/os_unavailable -> WAIT_OPERATOR, with the underlying transport cause unisolated. A later postrun Core observation found the child terminal/quiescent with 30 stopped invocations; this is cleanup aftermath, not normal second-task settlement. Inner domain closure remains UNKNOWN despite exact physical closure. History was NOT RUN after STOP; helpers are static-only, and earlier 96/878 evidence belongs to the older candidate and is not transferable. No full packet, P-L4 or release acceptance is claimed. Full disposition and development evidence are retained in the Millrace-Dev workspace under `lab/tasks/v0232-b4-history-closeout/2026-10-27/final-status.json`; see `lab/tasks/v0232-b4-history-closeout/2026-10-27/ox-final-review.md` for the review scope.
+The later transport closeout left product code unchanged. Its instrumented diagnostic's 80-second live-boundary wait expired before the selected second-task context. Inner cleanup stop also expired after 90 seconds, leaving domain closure unknown. Ordinary recorder rows can drop. The cause remains unisolated. No source repair followed.
+
+The final stock B4 remains FAILED/UNQUALIFIED. The actual >=60-second CHILD_RUNNING observation passed. Task 1 reached succeeded with a terminal receipt in final state; canonical post-settlement assertions were not reached. The unchanged 600-second two-success observation expired with task 2 running without a terminal receipt. The cause of this B4 failure is not determined. Inner domain closure remains UNKNOWN despite proven physical process/cgroup closure. Earlier failed states and held v10/v11 stores remain preserved.
+
+Independent offline history is PARTIAL/UNQUALIFIED:
+
+- `idle96`: finite driver, local codec and cold OS receipt-read checks passed, with 97 invocations.
+- `active1440`: driver and local codec passed, with 1,441 invocations/completions. The codec reduced a 7,025,510-byte run view to 1,084 bytes. The aged OS check failed with `SubworkflowError/os_unavailable`, leaving the target unqualified.
+- `idle2880` and `active43200`: NOT RUN after that first negative result. No fit estimate was evaluated.
+
+History process/cgroup closure and checker OS shutdown are proven. No low-level cause or timeout attribution is established. These checks do not qualify whole-service history, elapsed-day or live-production operation. Full packet, P-L4 and release acceptance remain open. Current review scope and exact receipts are recorded in `lab/tasks/v0232-os-transport-closeout/2026-10-27/final-status.json`.
