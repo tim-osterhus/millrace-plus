@@ -2382,8 +2382,9 @@ def prepared_plane(f, monkeypatch, *, plane_joined=True):
     return active, task, call, evidence, decision
 
 
+@pytest.mark.parametrize("aftermath", ["child-terminal", "settled-task"])
 def test_gated_plane_attention_replay_then_new_default_reuses_exact_recovery(
-    setup, monkeypatch
+    setup, monkeypatch, aftermath
 ):
     active, task, call, evidence, decision = prepared_plane(setup, monkeypatch)
     run = setup.peer.runs[(call["instance_id"], call["run_id"])]
@@ -2432,6 +2433,48 @@ def test_gated_plane_attention_replay_then_new_default_reuses_exact_recovery(
     )
     _, saved = after.call(after.service.intake.tasks(task["task_id"])[0])
     assert any(row["holder_joined"] is None for row in saved["os_observations"])
+    # A newer decision may finish the child before this historical refusal is
+    # replayed. Its exact published attention needs no current Core/OS facts.
+    run["status"] = "succeeded"
+    setup.peer.instances[call["instance_id"]]["runs"][0]["status"] = "succeeded"
+    if aftermath == "settled-task":
+        # The fake worker has no CLOSE/ACK ledger. Use the existing guarded
+        # explicit-abandonment path for a real terminal task/proof aftermath.
+        run["status"] = "failed"
+        setup.peer.instances[call["instance_id"]]["runs"][0]["status"] = "failed"
+        for value in setup.peer.responses.values():
+            value.update(
+                source="os_owned_call", phase="call_returned", holder_joined=True,
+            )
+        current = after.service.intake.tasks(task["task_id"])[0]
+        acknowledgement = setup.home.parent / "acknowledge-failed.json"
+        acknowledgement.write_bytes(abandonment(current, version=run["state_version"]))
+        after.decide(
+            task["task_id"], "acknowledge-failed", uuid.uuid4().hex, acknowledgement,
+        )
+        terminal = after.service.intake.tasks(task["task_id"])[0]
+        assert terminal["status"] == "failed" and terminal["terminal_receipt"]
+    intake_before = (setup.home / "intake.sqlite3").read_bytes()
+    journal, _ = after.call(after.service.intake.tasks(task["task_id"])[0])
+    journal_before = journal.path.read_bytes()
+    lifecycle_before = copy.deepcopy(after.service.intake.lifecycle())
+
+    def no_observation(*args, **kwargs):
+        pytest.fail("fully published historical attention observed Core/OS")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(runtime, "_core", no_observation)
+        for name in ("read", "capabilities", "observe", "submit"):
+            patch.setattr(setup.peer, name, no_observation)
+        with pytest.raises(IntakeError, match="^separate_run_resume_required$"):
+            after.decide(
+                task["task_id"], "continue", decision, evidence,
+                resume_plane="foreground",
+            )
+    assert len(setup.peer.sent) == posted
+    assert (setup.home / "intake.sqlite3").read_bytes() == intake_before
+    assert journal.path.read_bytes() == journal_before
+    assert after.service.intake.lifecycle() == lifecycle_before
 
 
 @pytest.mark.parametrize("fault", ["enum", "receipt", "selector", "operation"])
@@ -2502,11 +2545,14 @@ def test_attention_publication_failure_stays_held_and_replay_never_posts(
     assert active.service.intake.tasks(task["task_id"])[0]["status"] == "held"
     posted = len(setup.peer.sent)
     reopened = runtime.Runtime(Service(setup.home), client=setup.peer)
+    observed = len(setup.peer.observed)
     with pytest.raises(IntakeError, match="separate_run_resume_required"):
         reopened.decide(
             task["task_id"], "continue", decision, evidence, resume_plane="foreground"
         )
     assert len(setup.peer.sent) == posted
+    assert len(setup.peer.observed) > observed
+    assert reopened.service.intake.lifecycle()[1]["maintenance"][decision]["attention"]
 
 
 @pytest.mark.parametrize(
@@ -2589,6 +2635,7 @@ def test_pending_plane_receipt_replay_cannot_plan_recovery_at_next_graph_pause(
     setup.peer.responses[final["envelope"]["request_id"]] = final["observation"]
     posted = len(setup.peer.sent)
     reopened = runtime.Runtime(Service(setup.home), client=setup.peer)
+    observed = len(setup.peer.observed)
     reopened.decide(
         task["task_id"],
         "continue",
@@ -2597,6 +2644,7 @@ def test_pending_plane_receipt_replay_cannot_plan_recovery_at_next_graph_pause(
         resume_plane="foreground",
     )
     assert len(setup.peer.sent) == posted
+    assert len(setup.peer.observed) > observed
     item = reopened.service.intake.lifecycle()[1]["maintenance"][request_id]
     assert item["pause"]["envelope"] is None and item["recover"]["envelope"] is None
     assert item["resume"]["envelope"] == final["envelope"]
@@ -3771,3 +3819,232 @@ def test_explicit_proven_parent_create_replay_is_not_skipped(setup, monkeypatch)
     assert setup.peer.sent == sends + [create["envelope"]]
     assert setup.peer.allocations == allocations and active.record == before
     assert active.service.intake.lifecycle()[1] == before
+
+
+@pytest.mark.parametrize(
+    "phase", ["closed_parent", "partial_parent", "retain_parent_joins"]
+)
+def test_public_fixture_cleanup_records_exact_parent_failure_phase(
+    tmp_path, monkeypatch, phase
+):
+    from public_runtime_support import PublicRuntime
+
+    owned = PublicRuntime(tmp_path / "cleanup-facts")
+    owned.parent, owned.parent_run = uuid.uuid4().hex, uuid.uuid4().hex
+    sent = owned.request("start_run", instance=owned.parent, expected=1)
+    owned.parent_calls = [sent]
+    core = receipt(sent, instance=owned.parent, run=owned.parent_run)
+    joined = observation(sent, joined=False, core=core)
+    view = {
+        "status": "running" if phase == "closed_parent" else "succeeded",
+        "quiescent": phase != "closed_parent",
+        "inflight_invocations": [], "invocations": [], "completions": [],
+        "controls": [],
+    }
+    if phase == "partial_parent":
+        view.pop("status")
+        view.pop("quiescent")
+    failure_phase = "closed_parent" if phase == "partial_parent" else phase
+    requests, shutdown = [], []
+
+    def read(instance, run, *, deadline):
+        requests.append((instance, run))
+        return copy.deepcopy(view)
+
+    owned.client = SimpleNamespace(
+        home="local", read=read,
+        observe=lambda envelope, **kwargs: copy.deepcopy(joined),
+    )
+    owned.service = SimpleNamespace(
+        request_shutdown=lambda: shutdown.append("request_shutdown"),
+        wait_for_stop=lambda seconds: shutdown.append(("wait_for_stop", seconds)),
+        stop=lambda: pytest.fail("unknown cleanup reported success"),
+    )
+
+    def until(callback):
+        value = callback()
+        assert value is not None, "private exception detail must not be copied"
+        return value
+
+    monkeypatch.setattr(owned, "until", until)
+    with pytest.raises(AssertionError, match="Unknown fixture cleanup"):
+        owned.close()
+    raw = (owned.root / "cleanup.json").read_bytes()
+    saved = runtime.strict_json(raw)
+    assert saved["closure"] == "unknown"
+    assert saved["parent_instance_id"] == owned.parent
+    assert saved["parent_run_id"] == owned.parent_run
+    assert saved["errors"] == [{
+        "parent": owned.parent, "parent_run": owned.parent_run,
+        "phase": failure_phase, "error": "AssertionError",
+    }]
+    facts = saved["parent_cleanup"]
+    assert facts["phase"] == failure_phase
+    assert facts["last_closure"] == {
+        "status": view.get("status"), "quiescent": view.get("quiescent"),
+        "closed": phase == "retain_parent_joins",
+    }
+    if phase == "retain_parent_joins":
+        assert facts["join_request_id"] == sent["request_id"]
+        assert facts["join_instance_id"] == sent["instance_id"]
+        assert facts["join_run_id"] == sent["run_id"]
+        assert facts["last_join"] == {
+            "source": "os_owned_call", "phase": "call_active",
+            "holder_joined": False,
+        }
+    else:
+        assert "last_join" not in facts
+    assert requests == [(owned.parent, owned.parent_run)]
+    assert shutdown == ["request_shutdown", ("wait_for_stop", 10)]
+    assert b"private exception detail" not in raw
+
+
+@pytest.mark.parametrize("change", ["task", "kind", "selector", "evidence"])
+def test_published_attention_changed_intent_refuses_without_observation(
+    setup, monkeypatch, change
+):
+    active, task, _, evidence, decision = prepared_plane(setup, monkeypatch)
+    task_id, kind, selector = task["task_id"], "continue", "foreground"
+    if change == "task":
+        task_id = uuid.uuid4().hex
+    elif change == "kind":
+        kind, selector = "close-failed", None
+    elif change == "selector":
+        selector = "learning"
+    else:
+        evidence.write_bytes(evidence.read_bytes() + b" ")
+    before = active.service.intake.path.read_bytes()
+
+    def no_observation(*args, **kwargs):
+        pytest.fail("changed historical intent observed Core/OS")
+
+    monkeypatch.setattr(runtime, "_core", no_observation)
+    for name in ("read", "capabilities", "observe", "submit"):
+        monkeypatch.setattr(setup.peer, name, no_observation)
+    with pytest.raises(IntakeError, match="^decision_conflict$"):
+        active.decide(task_id, kind, decision, evidence, resume_plane=selector)
+    assert active.service.intake.path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "fault", [
+        "request.md", "claim.json", "request.json", "operator", "receipt",
+        "service", "init", "stored-claim", "journal",
+    ]
+)
+def test_published_attention_revalidates_local_authority_on_existing_runtime(
+    setup, monkeypatch, fault
+):
+    active, task, _, evidence, decision = prepared_plane(setup, monkeypatch)
+    if fault in {"request.md", "claim.json", "request.json"}:
+        path = setup.home / "tasks" / task["task_id"] / fault
+        path.write_bytes(path.read_bytes() + b" ")
+    elif fault == "operator":
+        item = active.service.intake.lifecycle()[1]["maintenance"][decision]
+        path = Path(item["operator"]["path"])
+        path.write_bytes(path.read_bytes() + b" ")
+    elif fault == "service":
+        path = setup.home / "service.json"
+        path.write_bytes(path.read_bytes() + b" ")
+    elif fault in {"init", "stored-claim"}:
+        with active.service.intake._connection(write=True) as db:
+            if fault == "init":
+                intent = copy.deepcopy(active.intent)
+                intent["settings"]["runtime_defaults"] = {"changed": True}
+                db.execute(
+                    "UPDATE lifecycle SET intent=?", (canonical(intent).decode(),)
+                )
+            else:
+                claim = copy.deepcopy(task["claim"])
+                claim["request_sha256"] = "0" * 64
+                db.execute(
+                    "UPDATE tasks SET claim=? WHERE task_id=?",
+                    (canonical(claim).decode(), task["task_id"]),
+                )
+    elif fault == "journal":
+        journal, saved = active.call(active.service.intake.tasks(task["task_id"])[0])
+        saved["instance_id"] = uuid.uuid4().hex
+        saved["record_sha256"] = runtime.digest({
+            name: value for name, value in saved.items() if name != "record_sha256"
+        })
+        journal.path.write_bytes(canonical(saved) + b"\n")
+    else:
+        before = copy.deepcopy(active.record)
+        saved = active.record["maintenance"][decision]["resume"]["receipt"]
+        saved["status"] = "refused"
+        active.service.intake.save_lifecycle(active.intent, before, active.record)
+    database = active.service.intake.path.read_bytes()
+
+    def no_observation(*args, **kwargs):
+        pytest.fail("corrupt historical authority observed Core/OS")
+
+    monkeypatch.setattr(runtime, "_core", no_observation)
+    for name in ("read", "capabilities", "observe", "submit"):
+        monkeypatch.setattr(setup.peer, name, no_observation)
+    with pytest.raises((IntakeError, SubworkflowError)) as caught:
+        active.decide(
+            task["task_id"], "continue", decision, evidence, resume_plane="foreground",
+        )
+    assert caught.value.code != "separate_run_resume_required"
+    assert active.service.intake.path.read_bytes() == database
+
+
+@pytest.mark.parametrize("expiry", ["before", "during-local-validation"])
+def test_published_attention_preserves_original_caller_expiry(
+    setup, monkeypatch, expiry
+):
+    active, task, _, evidence, decision = prepared_plane(setup, monkeypatch)
+    clock = Clock()
+    monkeypatch.setattr(runtime.time, "monotonic", clock)
+    if expiry == "during-local-validation":
+        load = runtime._load_lifecycle
+
+        def expires(service):
+            result = load(service)
+            clock.sleep(2)
+            return result
+
+        monkeypatch.setattr(runtime, "_load_lifecycle", expires)
+    before = active.service.intake.path.read_bytes()
+
+    def no_observation(*args, **kwargs):
+        pytest.fail("expired historical replay observed Core/OS")
+
+    monkeypatch.setattr(runtime, "_core", no_observation)
+    for name in ("read", "capabilities", "observe", "submit"):
+        monkeypatch.setattr(setup.peer, name, no_observation)
+    with pytest.raises(SubworkflowError, match="^observation_window_expired$"):
+        active.decide(
+            task["task_id"], "continue", decision, evidence,
+            resume_plane="foreground", _deadline=0 if expiry == "before" else 1,
+        )
+    assert active.service.intake.path.read_bytes() == before
+
+
+@pytest.mark.parametrize("lock", ["target", "journal"])
+def test_published_attention_preserves_nonblocking_ownership_locks(
+    setup, monkeypatch, lock
+):
+    active, task, _, evidence, decision = prepared_plane(setup, monkeypatch)
+    journal, _ = active.call(active.service.intake.tasks(task["task_id"])[0])
+    guard = (
+        runtime.target_lock(active.service.config, protected_roots=(setup.home,))
+        if lock == "target" else journal.lock(observer=True)
+    )
+    before = active.service.intake.path.read_bytes()
+
+    def no_observation(*args, **kwargs):
+        pytest.fail("busy historical replay observed Core/OS")
+
+    monkeypatch.setattr(runtime, "_core", no_observation)
+    for name in ("read", "capabilities", "observe", "submit"):
+        monkeypatch.setattr(setup.peer, name, no_observation)
+    error, code = (
+        (IntakeError, "target_busy") if lock == "target"
+        else (SubworkflowError, "call_busy")
+    )
+    with guard, pytest.raises(error, match="^" + code + "$"):
+        active.decide(
+            task["task_id"], "continue", decision, evidence, resume_plane="foreground",
+        )
+    assert active.service.intake.path.read_bytes() == before

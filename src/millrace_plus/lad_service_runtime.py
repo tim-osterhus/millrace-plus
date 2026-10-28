@@ -268,6 +268,49 @@ def _source_descriptor(
     }
 
 
+def _local_call(
+    service: Service,
+    intent: dict[str, object],
+    lifecycle: dict[str, object],
+    task: dict[str, object],
+) -> tuple[Journal, dict[str, object]]:
+    """Validate exact local task/journal bindings without observing Core or OS."""
+    claim = mapping(task["claim"])
+    journal = Journal(
+        Path(str(claim["call_home"])),
+        str(claim["call_key"]),
+        _local_source=_source_descriptor(service, intent, lifecycle),
+    )
+    record = journal.load()
+    inputs = mapping(mapping(record["request"])["inputs"])
+    target = mapping(inputs.get("lad_target"))
+    expected_target = {
+        "format": "millrace-lad-target/v1",
+        "service_id": service.service_id,
+        "task_id": task["task_id"],
+        "request_sha256": task["request_sha256"],
+        "target_root": service.config["target_root"],
+        "target_identity": service.config["target_identity"],
+        "claim_sha256": digest(claim),
+        "parent_instance_id": lifecycle["instance_id"],
+        "parent_run_id": lifecycle["run_id"],
+        "worker_definition_sha256": mapping(claim["definition"])["sha256"],
+    }
+    task_root = service.home / "tasks" / str(task["task_id"])
+    if (
+        record["claim_sha256"] != digest(claim)
+        or record["definition"] != claim["definition"]
+        or target != expected_target
+        or inputs["request_markdown"] != cast(bytes, task["request_bytes"]).decode()
+        or _read_exact(task_root / "request.md", limit=65536)
+        != task["request_bytes"]
+        or _read_exact(task_root / "claim.json") != canonical(claim) + b"\n"
+        or _read_exact(task_root / "request.json").decode() != record["request_raw"]
+    ):
+        raise IntakeError("shared_call_conflict")
+    return journal, record
+
+
 def _load_lifecycle(service: Service) -> tuple[dict[str, object], dict[str, object]]:
     intent, record, tasks = service.intake._lifecycle_tasks()
     return _validate_lifecycle(service, intent, record, _tasks=tasks)
@@ -1122,44 +1165,11 @@ class Runtime:
     def call(
         self, task: dict[str, object], *, _deadline: float | None = None
     ) -> tuple[Journal, dict[str, object]]:
-        claim = mapping(task["claim"])
-        journal = Journal(
-            Path(str(claim["call_home"])),
-            str(claim["call_key"]),
-            _local_source=(
-                self.source()
-                if _deadline is None
-                else self.source(_deadline=_deadline)
-            ),
-        )
-        record = journal.load()
-        inputs = mapping(mapping(record["request"])["inputs"])
-        target = mapping(inputs.get("lad_target"))
-        expected_target = {
-            "format": "millrace-lad-target/v1",
-            "service_id": self.service.service_id,
-            "task_id": task["task_id"],
-            "request_sha256": task["request_sha256"],
-            "target_root": self.service.config["target_root"],
-            "target_identity": self.service.config["target_identity"],
-            "claim_sha256": digest(claim),
-            "parent_instance_id": self.record["instance_id"],
-            "parent_run_id": self.record["run_id"],
-            "worker_definition_sha256": mapping(claim["definition"])["sha256"],
-        }
-        task_root = self.service.home / "tasks" / str(task["task_id"])
-        if (
-            record["claim_sha256"] != digest(claim)
-            or record["definition"] != claim["definition"]
-            or target != expected_target
-            or inputs["request_markdown"] != cast(bytes, task["request_bytes"]).decode()
-            or _read_exact(task_root / "request.md", limit=65536)
-            != task["request_bytes"]
-            or _read_exact(task_root / "claim.json") != canonical(claim) + b"\n"
-            or _read_exact(task_root / "request.json").decode() != record["request_raw"]
-        ):
-            raise IntakeError("shared_call_conflict")
-        return journal, record
+        if _deadline is None:
+            self.source()
+        else:
+            self.source(_deadline=_deadline)
+        return _local_call(self.service, self.intent, self.record, task)
 
     def request(self, task: dict[str, object]) -> Path:
         self.service.materialize_task(str(task["task_id"]))
@@ -1925,6 +1935,66 @@ class Runtime:
             "status": "maintenance-retained",
         }
 
+    def _refuse_historical_attention(
+        self,
+        task_id: str,
+        decision: str,
+        request_id: str,
+        raw: bytes,
+        resume_plane: str | None,
+        *,
+        deadline: float,
+    ) -> None:
+        """Refuse only a fully published exact historical decision, without effects."""
+        with target_lock(self.service.config, protected_roots=(self.service.home,)):
+            self.verify()
+            intent, record = _load_lifecycle(self.service)
+            previous = mapping(record["maintenance"]).get(request_id)
+            if time.monotonic() >= deadline:
+                raise SubworkflowError("observation_window_expired")
+            if previous is None or mapping(previous).get("attention") is None:
+                return
+            task = self.service.intake.tasks(str(mapping(previous)["task_id"]))[0]
+            journal, _ = _local_call(self.service, intent, record, task)
+            with journal.lock(observer=True):
+                # Re-read the published authority while both existing locks are held.
+                intent, record = _load_lifecycle(self.service)
+                if intent != self.intent:
+                    raise IntakeError("lifecycle_authority_changed")
+                previous = mapping(record["maintenance"]).get(request_id)
+                if previous is None or mapping(previous).get("attention") is None:
+                    return
+                task = self.service.intake.tasks(str(mapping(previous)["task_id"]))[0]
+                _local_call(self.service, intent, record, task)
+                sha = hashlib.sha256(raw).hexdigest()
+                operator = {
+                    "path": str(
+                        self.service.home / "evidence" / ("operator-" + sha + ".json")
+                    ),
+                    "sha256": sha,
+                }
+                requested = {
+                    "task_id": task_id, "decision": decision, "evidence": operator,
+                }
+                if resume_plane is not None:
+                    requested["evidence"] = {
+                        "operator_evidence": operator, "resume_plane": resume_plane,
+                    }
+                with self.service.intake._connection() as connection:
+                    saved = connection.execute(
+                        "SELECT intent FROM decisions WHERE request_id=?",
+                        (request_id,),
+                    ).fetchone()
+                if saved is None or saved["intent"] != canonical(requested).decode():
+                    raise IntakeError("decision_conflict")
+                from .lad_service_disposition import read_ref
+
+                if read_ref(self.service, mapping(previous)["operator"]) != raw:
+                    raise IntakeError("decision_conflict")
+                if time.monotonic() >= deadline:
+                    raise SubworkflowError("observation_window_expired")
+                raise IntakeError("separate_run_resume_required")
+
     def decide(
         self,
         task_id: str,
@@ -1957,7 +2027,12 @@ class Runtime:
             or resume_plane not in {"foreground", "learning"}
         ):
             raise IntakeError("invalid_resume_plane")
-        task = self.service.intake.tasks(identity(task_id))[0]
+        task_id, request_id = identity(task_id), identity(request_id)
+        raw = _read_exact(evidence_file)
+        self._refuse_historical_attention(
+            task_id, decision, request_id, raw, resume_plane, deadline=deadline,
+        )
+        task = self.service.intake.tasks(task_id)[0]
         if resume_plane is not None:
             _, selected_call = self.call(task, _deadline=deadline)
             if selected_call["run_id"] is None:
@@ -1969,7 +2044,6 @@ class Runtime:
             )
             if resume_plane not in mapping(selected_run["planes"]):
                 raise IntakeError("invalid_resume_plane")
-        raw = _read_exact(evidence_file)
         if decision.startswith("acknowledge-"):
             # Refresh only original saved calls before entering a fresh local guard.
             if task["status"] in {"claimed", "running", "held"}:

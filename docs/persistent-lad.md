@@ -13,7 +13,7 @@ authorized offline workload-equivalent study is not actual elapsed-day or
 live-production qualification; its partial result and limits are recorded below.
 Synthetic codec checks do not establish runtime history fit.
 
-## Qualification status
+## Historical qualification evidence
 
 The earlier candidate passed 201 runtime cases, seven unaffected corrective
 checks and two installed integration cases with public cleanup. Its independent
@@ -271,8 +271,13 @@ no work dispatches behind that gate. The command then leaves the task held with
 `separate_run_resume_required`, durably retaining its intent, opaque note ref,
 explicit selector, applied Core receipt and observations. A continuation-requested
 local intent receipt is not a completed continuation or closure proof. Its
-historical attention is never cleared: old-ID replay remains GET-only and reports
-the same reason even after a newer decision progresses. Use a new request UUID
+historical attention is never cleared. Exact old-ID replay of a fully published
+attention decision revalidates local service/init/task/claim/journal authority,
+decision kind, selector, exact evidence bytes and the matching applied plane
+receipt under the existing ownership locks, then reports the same reason before
+Core/OS observation. This refusal changes no records or ownership and proves no
+closure. Fresh decisions, pending calls and incomplete attention publication keep
+live reconciliation; caller expiry and nonblocking lock checks still apply. Use a new request UUID
 for a separate explicit
 `lad decide --decision continue` without `--resume-plane` to request run resume.
 This second action revalidates the accepted recovery proof and exact known plane
@@ -318,7 +323,7 @@ actual true for every original call; it cannot borrow recovery as physical join.
 Pending saved child-maintenance observations refresh using GET before proof
 publication. Generic outcomes and raw null/false facts remain unchanged.
 
-## Current closeout disposition (2026-10-27)
+## Historical transport closeout disposition (2026-10-27)
 
 The source candidate's scoped evidence is Core 761 passed, 12 recorded skips and one approved deselection; Plus 335 passed with no skips; Ruff on two source modules and two test files; one Core wheel/sdist build; and passed installed smoke/origin checks. The selected Core repair is four-path, validation-local de-duplication within one complete snapshot. It adds no global/persistent cache, schema, API or timeout change. The profile pass was partial, with fresh producer/fixture and dependent Plus costs unmeasured; no throughput claim follows. Source-scope verification passed. OX returned APPROVED_WITH_NOTES for source and documentation only, with no Core correctness defect; commit status is recorded in `lab/tasks/v0232-b4-history-closeout/2026-10-27/final-status.json`. The review does not accept B4, P-L4, history or release.
 
@@ -332,4 +337,31 @@ Independent offline history is PARTIAL/UNQUALIFIED:
 - `active1440`: driver and local codec passed, with 1,441 invocations/completions. The codec reduced a 7,025,510-byte run view to 1,084 bytes. The aged OS check failed with `SubworkflowError/os_unavailable`, leaving the target unqualified.
 - `idle2880` and `active43200`: NOT RUN after that first negative result. No fit estimate was evaluated.
 
-History process/cgroup closure and checker OS shutdown are proven. No low-level cause or timeout attribution is established. These checks do not qualify whole-service history, elapsed-day or live-production operation. Full packet, P-L4 and release acceptance remain open. Current review scope and exact receipts are recorded in `lab/tasks/v0232-os-transport-closeout/2026-10-27/final-status.json`.
+History process/cgroup closure and checker OS shutdown are proven. No low-level cause or timeout attribution is established. These checks do not qualify whole-service history, elapsed-day or live-production operation. Full packet, P-L4 and release acceptance remain open. That packet's review scope and exact receipts are recorded in `lab/tasks/v0232-os-transport-closeout/2026-10-27/final-status.json`.
+
+
+## Current replay and B4 packet (2026-10-28)
+
+The completed predecessor receipt-transport correction passed 440 focused tests,
+Ruff, the package build and installed identity checks. Its repaired saved-case
+receipt GET passed in 5.487 seconds. The predecessor stock B4 remained
+FAILED/UNQUALIFIED: the real >=60-second running boundary and both normal task
+settlements passed, then historical attention replay exhausted its caller window.
+Matching callback costs were not captured. Outer fixture cleanup was unknown
+despite physical closure. These results do not establish the cost of that failure
+or retained-history qualification. Exact evidence remains in
+`lab/tasks/v0232-transport-repair-b4/2026-10-27/`.
+
+The selected successor is
+`lab/tasks/v0232-b4-replay-guard/2026-10-28/contract.md`. It permits the narrow local
+historical refusal described above, cleanup phase/identity diagnostics, focused
+remote checks and one fresh unchanged installed stock B4 journey followed by
+independent review. Cleanup diagnostics record whether closed-parent waiting or
+exact parent-join retention failed and the last already observed public facts;
+they change no cleanup actions, deadlines or assertions. Receipt GETs may occupy
+a caller window between two and thirty seconds before reporting expiry; the
+original caller deadline still bounds that request and no liveness beyond it is
+promised. Live `decide` / `_maintenance` may hold the existing target and journal
+locks through a receipt GET for up to the remaining 30-second operator budget;
+no new or larger locks are selected. Earlier failed results and held stores remain preserved. History and
+full packet/P-L4/release acceptance remain separate and open.

@@ -442,7 +442,11 @@ def test_receipt_observation_can_complete_after_two_seconds(fixture):
 
 @pytest.mark.parametrize(
     ("window", "expected_timeout", "code"),
-    [(0.25, 0.25, "observation_window_expired"), (60, 30, "os_unavailable")],
+    [
+        (0.25, 0.25, "observation_window_expired"),
+        (5, 5, "observation_window_expired"),
+        (60, 30, "os_unavailable"),
+    ],
 )
 def test_receipt_observation_deadline_and_finite_transport_cap(
     fixture, monkeypatch, window, expected_timeout, code

@@ -84,6 +84,7 @@ class PublicRuntime:
         self.parent_run: str | None = None
         self.parent_calls: list[dict] = []
         self.parent_join_proofs: dict[str, str] = {}
+        self.parent_cleanup: dict[str, object] = {}
         self.children: list[tuple[Path, str]] = []
         self.service = None
         self.started_at = time.monotonic()
@@ -314,6 +315,12 @@ class PublicRuntime:
     def retain_parent_joins(self) -> None:
         """Retain only actual exact owned true observations before OS cache expiry."""
         for envelope in self.parent_calls:
+            self.parent_cleanup.update(
+                join_request_id=envelope["request_id"],
+                join_instance_id=envelope["instance_id"],
+                join_run_id=envelope["run_id"],
+                last_join=None,
+            )
             path = (
                 self.root / "parent-observations" / (envelope["request_id"] + ".json")
             )
@@ -323,6 +330,9 @@ class PublicRuntime:
                 saved = validate_call(
                     catalog.strict_json(raw), self.client.home, envelope
                 )
+                self.parent_cleanup["last_join"] = {
+                    name: saved[name] for name in ("source", "phase", "holder_joined")
+                }
                 if owned_sha is not None:
                     if hashlib.sha256(raw).hexdigest() != owned_sha:
                         raise SubworkflowError("fixture_join_proof_changed")
@@ -341,6 +351,9 @@ class PublicRuntime:
                     self.client.home,
                     envelope,
                 )
+                self.parent_cleanup["last_join"] = {
+                    name: value[name] for name in ("source", "phase", "holder_joined")
+                }
                 return value if (
                     value["source"] == "os_owned_call"
                     and value["holder_joined"] is True
@@ -369,20 +382,31 @@ class PublicRuntime:
                     {"call_key": key, "error": getattr(exc, "code", type(exc).__name__)}
                 )
         if self.parent and self.parent_run:
+            self.parent_cleanup = {"phase": "closed_parent", "last_closure": None}
             try:
 
                 def settled():
                     view = self.client.read(
                         self.parent, self.parent_run, deadline=time.monotonic() + 2
                     )
-                    return view if closed(view) else None
+                    is_closed = closed(view)
+                    self.parent_cleanup["last_closure"] = {
+                        "status": view.get("status"),
+                        "quiescent": view.get("quiescent"),
+                        "closed": is_closed,
+                    }
+                    return view if is_closed else None
 
                 self.until(settled)
+                self.parent_cleanup["phase"] = "retain_parent_joins"
                 self.retain_parent_joins()
+                self.parent_cleanup["phase"] = "complete"
             except Exception as exc:
                 errors.append(
                     {
                         "parent": self.parent,
+                        "parent_run": self.parent_run,
+                        "phase": self.parent_cleanup["phase"],
                         "error": getattr(exc, "code", type(exc).__name__),
                     }
                 )
@@ -395,6 +419,7 @@ class PublicRuntime:
                 "errors": errors,
                 "parent_instance_id": self.parent,
                 "parent_run_id": self.parent_run,
+                "parent_cleanup": self.parent_cleanup,
             },
         )
         if errors:
