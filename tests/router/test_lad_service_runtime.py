@@ -8,6 +8,7 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.error import HTTPError
 
 import pytest
 from persistent_lad_support import Clock, capabilities, observation, receipt
@@ -560,6 +561,43 @@ def test_proven_no_run_cancel_preserves_no_synthetic_run_or_view_proof(setup):
     )
 
 
+def test_acknowledge_no_run_settlement_preserves_short_operation_deadline(
+    setup, monkeypatch
+):
+    from millrace_plus import subworkflow_v2 as helper
+
+    active, task = claimed(setup)
+    journal, record = active.call(task)
+    helper._copy(journal, record)
+    created = setup.peer.submit(record["envelopes"]["create"], deadline=0)
+    helper._observe(record, "create", created)
+    journal.save(record)
+    child = record["instance_id"]
+    evidence = setup.home.parent / "no-run-budget.txt"
+    evidence.write_text("acknowledge failed before start")
+    clock, reads = Clock(), []
+    clock.now = 10
+    monkeypatch.setattr(runtime.time, "monotonic", clock)
+    original_read = active.client.read
+
+    def read(instance, run=None, *, deadline):
+        reads.append((instance, deadline))
+        assert deadline == 10.5
+        return original_read(instance, run, deadline=deadline)
+
+    monkeypatch.setattr(active.client, "read", read)
+    result = active.decide(
+        task["task_id"],
+        "acknowledge-failed",
+        uuid.uuid4().hex,
+        evidence,
+        _deadline=10.5,
+    )
+    assert result["disposition"] == "failed-before-start"
+    assert (child, 10.5) in reads
+    assert active.service.intake.tasks(task["task_id"])[0]["status"] == "failed"
+
+
 def test_current_snapshot_exclusion_spans_proof_and_cas(setup, monkeypatch):
     from millrace_plus import lad_service_disposition as disposition
 
@@ -963,6 +1001,122 @@ def test_send_capability_failure_preserves_unsent_lifecycle(setup, monkeypatch):
     assert row["reservation"] == "unsent" and setup.peer.sent == posted
 
 
+@pytest.fixture
+def budgeted_http(setup, monkeypatch):
+    from millrace_plus import workflow_os_client
+
+    active, clock, requests = activate(setup), Clock(), []
+    credential = setup.profile.parent / "credentials.json"
+    credential.write_bytes(canonical({"token": "a" * 32}))
+    credential.chmod(0o600)
+    connection = runtime.WorkflowOSClient(
+        active.service.config["os_profile"], "local", clock=clock
+    )
+    active.connection = connection
+    active.client = runtime.LocalClient(active, connection)
+    monkeypatch.setattr(runtime.time, "monotonic", clock)
+    inspect_run, save = setup.peer.inspect_run, runtime._save
+
+    def inspect_slow(instance, run, *, state_home):
+        if any(
+            item.get("scope") == "parent" and item["call"]["reservation"] == "unsent"
+            for item in active.record["maintenance"].values()
+        ):
+            clock.sleep(1.7)
+        return inspect_run(instance, run, state_home=state_home)
+
+    def save_slow(service, intent, before, record):
+        save(service, intent, before, record)
+        if any(
+            item.get("scope") == "parent"
+            and item["call"]["reservation"] == "unknown"
+            and before["maintenance"][key]["call"]["reservation"] == "unsent"
+            for key, item in record["maintenance"].items()
+        ):
+            clock.sleep(1.62)
+
+    @contextmanager
+    def open_request(request, *, timeout):
+        method = request.get_method()
+        requests.append((method, clock.now, timeout))
+        assert 0 < timeout <= 2
+        if method == "OPTIONS":
+            clock.sleep(0.15)
+            value = capabilities()
+        elif method == "POST":
+            sent = runtime.strict_json(request.data)["request"]
+            value = setup.peer.submit(sent, deadline=clock.now + timeout)
+        else:
+            raise HTTPError(request.full_url, 404, "", {}, None)
+        yield SimpleNamespace(status=200, read=lambda _size: canonical(value))
+
+    monkeypatch.setattr(setup.peer, "inspect_run", inspect_slow)
+    monkeypatch.setattr(runtime, "_save", save_slow)
+    monkeypatch.setattr(
+        workflow_os_client,
+        "build_opener",
+        lambda *_handlers: SimpleNamespace(open=open_request),
+    )
+    return SimpleNamespace(active=active, clock=clock, requests=requests)
+
+
+@pytest.mark.parametrize("caller_deadline", [None, 4.0, 60.0])
+def test_parent_control_local_work_uses_operation_budget_with_two_second_http_cap(
+    setup, budgeted_http, caller_deadline
+):
+    active, clock = budgeted_http.active, budgeted_http.clock
+    path, sent = parent_request(active, setup)
+    kwargs = {} if caller_deadline is None else {"_deadline": caller_deadline}
+    result = active.parent_control(path, **kwargs)
+    assert result["holder_joined"] is True and clock.now == pytest.approx(3.47)
+    assert [row[0] for row in budgeted_http.requests] == ["OPTIONS", "POST"]
+    bound = 30 if caller_deadline is None else min(30, caller_deadline)
+    assert budgeted_http.requests[-1][2] == pytest.approx(min(2, bound - clock.now))
+    saved = Service(setup.home).intake.lifecycle()[1]["maintenance"][
+        "parent:" + sent["request_id"]
+    ]["call"]
+    assert saved["reservation"] == "observed" and saved["envelope"] == sent
+
+
+def test_expired_send_refuses_before_unknown_reservation(setup, monkeypatch):
+    active = activate(setup)
+    row = saved_stop(active, uuid.uuid4().hex)
+    before, posted, clock = copy.deepcopy(active.record), len(setup.peer.sent), Clock()
+    monkeypatch.setattr(runtime.time, "monotonic", clock)
+
+    def capabilities_at_expiry(*, deadline):
+        clock.now = deadline
+        return capabilities()
+
+    monkeypatch.setattr(setup.peer, "capabilities", capabilities_at_expiry)
+    with pytest.raises(SubworkflowError, match="observation_window_expired"):
+        runtime._send(
+            active.service, active.intent, active.record, row, setup.peer, 2.0
+        )
+    assert row["reservation"] == "unsent" and len(setup.peer.sent) == posted
+    assert Service(setup.home).intake.lifecycle()[1] == before
+
+
+def test_operation_expiry_during_cas_stays_unknown_and_replay_is_get_only(
+    setup, budgeted_http
+):
+    active, clock = budgeted_http.active, budgeted_http.clock
+    path, sent = parent_request(active, setup)
+    with pytest.raises(SubworkflowError, match="observation_window_expired"):
+        active.parent_control(path, _deadline=2.5)
+    saved = Service(setup.home).intake.lifecycle()[1]["maintenance"][
+        "parent:" + sent["request_id"]
+    ]["call"]
+    assert saved["reservation"] == "unknown" and saved["envelope"] == sent
+    assert [row[0] for row in budgeted_http.requests] == ["OPTIONS"]
+    with pytest.raises(SubworkflowError, match="os_http_404"):
+        active.parent_control(path, _deadline=clock.now + 5)
+    assert [row[0] for row in budgeted_http.requests] == ["OPTIONS", "OPTIONS", "GET"]
+    assert Service(setup.home).intake.lifecycle()[1]["maintenance"][
+        "parent:" + sent["request_id"]
+    ]["call"] == saved
+
+
 def test_send_preserves_http_subclass_submit_override(setup, monkeypatch):
     active = activate(setup)
     stop_id = uuid.uuid4().hex
@@ -985,10 +1139,11 @@ def test_send_preserves_http_subclass_submit_override(setup, monkeypatch):
         "_submit_prevalidated",
         lambda *args, **kwargs: pytest.fail("subclass submit bypassed"),
     )
+    deadline = runtime.time.monotonic() + 30
     runtime._send(
-        active.service, active.intent, active.record, row, connection, 12345.0
+        active.service, active.intent, active.record, row, connection, deadline
     )
-    assert submitted == [(row["envelope"], 12345.0)]
+    assert submitted == [(row["envelope"], deadline)]
     assert runtime._joined(active.service, row)
 
 
@@ -1226,6 +1381,71 @@ def test_real_full_gate_precedes_fresh_recovery_and_reopen(setup, monkeypatch):
     )
     assert proof["run_id"] == record["run_id"]
     assert saved["os_observations"][-1]["holder_joined"] is None
+
+
+def test_call_source_forwards_short_caller_deadline_and_preserves_default_windows(
+    setup, monkeypatch
+):
+    active, task, _, _ = closed_child(setup, status="paused")
+    clock, deadlines = Clock(), []
+    clock.now = 10
+    monkeypatch.setattr(runtime.time, "monotonic", clock)
+    original_read = active.client.read
+
+    def read(instance, run=None, *, deadline):
+        deadlines.append(deadline)
+        return original_read(instance, run, deadline=deadline)
+
+    monkeypatch.setattr(active.client, "read", read)
+    active.call(task, _deadline=10.5)
+    assert deadlines == [10.5, 10.5]
+    deadlines.clear()
+    active.call(task)
+    assert deadlines == [12, 12]
+
+
+@pytest.mark.parametrize("caller_deadline", [None, 20.0, 60.0])
+def test_decide_maintenance_and_reconcile_share_original_operation_deadline(
+    setup, monkeypatch, caller_deadline
+):
+    active, task, journal, record = closed_child(setup, status="paused")
+    paused_parent(active, setup)
+    lost_start(active, journal, record, setup)
+    recovery_peer(setup, monkeypatch)
+    evidence = setup.home.parent / "operation-budget.txt"
+    evidence.write_text("same child recovery")
+    clock, deadlines = Clock(), []
+    clock.now = 10
+    bound = 40 if caller_deadline is None else min(40, caller_deadline)
+    monkeypatch.setattr(runtime.time, "monotonic", clock)
+    original_read, original_caps = active.client.read, setup.peer.capabilities
+    original_file = runtime._read_exact
+
+    def delayed_evidence(path, *args, **kwargs):
+        value = original_file(path, *args, **kwargs)
+        if path == evidence:
+            clock.sleep(3)
+        return value
+
+    def read(instance, run=None, *, deadline):
+        deadlines.append(deadline)
+        assert deadline == bound
+        return original_read(instance, run, deadline=deadline)
+
+    def caps(*, deadline):
+        deadlines.append(deadline)
+        assert deadline == bound
+        clock.sleep(0.1)
+        return original_caps(deadline=deadline)
+
+    monkeypatch.setattr(runtime, "_read_exact", delayed_evidence)
+    monkeypatch.setattr(active.client, "read", read)
+    monkeypatch.setattr(setup.peer, "capabilities", caps)
+    kwargs = {} if caller_deadline is None else {"_deadline": caller_deadline}
+    active.decide(task["task_id"], "continue", uuid.uuid4().hex, evidence, **kwargs)
+    assert deadlines and all(deadline == bound for deadline in deadlines)
+    assert 13 < clock.now < bound
+    assert active.service.intake.tasks(task["task_id"])[0]["status"] == "running"
 
 
 @pytest.mark.parametrize(

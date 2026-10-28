@@ -1207,6 +1207,7 @@ def settle(
     decision: str,
     request_id: str,
     operator_raw: bytes | None = None,
+    _deadline: float | None = None,
 ) -> dict[str, object]:
     """Publish fresh full evidence and terminal CAS without releasing Core exclusion."""
     service = runtime.service
@@ -1214,12 +1215,23 @@ def settle(
     if previous is not None:
         return previous
     with target_lock(service.config, protected_roots=(service.home,)):
-        journal, record = runtime.call(task)
+        journal, record = (
+            runtime.call(task)
+            if _deadline is None
+            else runtime.call(task, _deadline=_deadline)
+        )
         with journal.lock(observer=True):
             record = journal.load()
             if record["run_id"] is None:
                 return _no_run(
-                    runtime, task, journal, record, decision, request_id, operator_raw
+                    runtime,
+                    task,
+                    journal,
+                    record,
+                    decision,
+                    request_id,
+                    operator_raw,
+                    **({} if _deadline is None else {"_deadline": _deadline}),
                 )
             from .lad_service_runtime import _core
 
@@ -1404,6 +1416,8 @@ def _no_run(
     decision: str,
     request_id: str,
     operator_raw: bytes | None,
+    *,
+    _deadline: float | None = None,
 ) -> dict[str, object]:
     """Exact no-run authority never enters a Core run guard or invents a run."""
     if _abandonment_intent(operator_raw) is not None:
@@ -1425,7 +1439,12 @@ def _no_run(
     instance_view = None
     if record["instance_id"] is not None:
         view = runtime.client.read(
-            str(record["instance_id"]), deadline=__import__("time").monotonic() + 2
+            str(record["instance_id"]),
+            deadline=(
+                __import__("time").monotonic() + 2
+                if _deadline is None
+                else _deadline
+            ),
         )
         _unused_instance(runtime, record, view)
         instance_view = view

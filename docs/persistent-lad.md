@@ -8,27 +8,81 @@ and run identities remain separate. `bundled:lad` remains the standalone per-tas
 workflow.
 
 This is a development candidate with bounded Linux offline evidence. Native
-provider, macOS and actual used-copy qualification remain separate. An offline
-one-day/thirty-day workload-equivalent study is selected after child-dispatch
-closeout; it is not actual elapsed-day or live-production qualification. Existing
-synthetic codec checks do not establish runtime history fit.
+provider, macOS and actual used-copy qualification remain separate. A separately
+authorized offline workload-equivalent study is not actual elapsed-day or
+live-production qualification; its partial result and limits are recorded below.
+Synthetic codec checks do not establish runtime history fit.
 
 ## Qualification status
 
-The candidate passed 201 runtime cases, seven unaffected corrective checks and
-two installed integration cases with public cleanup. Independent source review
-found no blockers.
+The earlier candidate passed 201 runtime cases, seven unaffected corrective
+checks and two installed integration cases with public cleanup. Its independent
+source review found no blockers.
 
-The complete public fault-recovery journey (B4) remains FAILED/UNQUALIFIED. A
-separate B4 requalification follows the child-dispatch closeout. Full packet
-acceptance and the persistent-service release gate remain open. The B4 test
-stays enabled; earlier failed run states remain preserved without a claim of
-domain closure.
+The bounded Plus runtime correction is implemented in the Plus source candidate. Normal
+operator operations, including `decide`, use a 30-second budget, clipped by an optional
+private caller absolute deadline. The original bound is carried through
+`parent_control`, `decide`, `_maintenance`, reads, reconciliation and settlement. Local
+Core inspections and snapshots are synchronous and non-preemptive; they, validation,
+lock acquisition and CAS can pass the nominal deadline until an existing guard or I/O
+boundary. This is not hard wall-clock cancellation. Each HTTP request remains capped at
+two seconds; initialization keeps its original two-second create/replay/join deadline,
+and existing stop and observation bounds remain unchanged. Expiry before unknown-send
+reservation refuses without sending; expiry during CAS remains unknown, with same-ID
+replay GET-only. No schema, CLI flag or Core/OS change is selected.
 
-An offline one-day/thirty-day workload-equivalent history study is selected as a
-separate follow-up. Its driver and bounded execution recipe are pending; results
-will not establish actual elapsed-day, live-production, native-provider, macOS
-or used-copy qualification. Neither B4 nor history has a new result yet.
+The source-scope check passed 335 Linux tests (223 runtime and 112 OS-client),
+three-file Ruff and one candidate build. This is not whole-suite or installed-smoke
+evidence. OX source review returned APPROVED_WITH_NOTES with no blockers.
+`lab/tasks/v0232-persistent-qualification/2026-10-27/runtime-budget-fix/final-status.json`
+records source QA and local commit status.
+
+The complete public fault-recovery journey (B4) remains FAILED/UNQUALIFIED. The first
+requalification attempt failed after 519.276 seconds when an artificial two-second
+whole-send deadline expired before POST; exact GET 404 kept the request safely held as
+unknown. Physical group closure was observed, but domain closure remains unknown.
+
+The B4 v2 attempt FAILED/UNQUALIFIED after 588.464 seconds. One unique selected journey
+produced two JUnit entries for the same identity: a primary failure and teardown error.
+Its bounded public observation expired; the saved parent resume was applied, but the
+immutable advance later returned CHILD_UNCERTAIN with summary `os_unavailable`. The
+cause was not isolated.
+
+The final diagnostic B4 v3 attempt also FAILED/UNQUALIFIED after 486.637 seconds: one
+unique selected journey failed, with no teardown error or skip. Its 90-second
+`recover_and_continue` window ended at 99.514 seconds after three non-preemptive
+callbacks of 28.666, 39.389 and 29.421 seconds. The later child foreground-plane
+resume—not the earlier parent resume—reached the operation send after its deadline; the
+capability guard refused before a network request or unknown-send reservation, leaving
+the request UNSENT. This attempt did not reach v2's `os_unavailable` branch. All 29
+recorded service HTTP requests across seven buffers succeeded (maximum about 0.165
+seconds); that does not explain the v2 failure.
+
+The outer fixture's publicly proven cleanup covers separate fixture identities. The
+inner B4 cleanup stop expired; task 1 remains held and task 2 queued, with no terminal
+receipts or successful settlement. Physical unit/PID/cgroup closure is proven, but inner
+domain closure remains UNKNOWN and the v10/v11 stores remain held. The B4 test stays
+enabled and earlier failed states remain preserved. No further B4 or history attempt is
+selected. Full packet acceptance and the persistent-service release gate remain open.
+See
+`lab/tasks/v0232-persistent-qualification/2026-10-27/b4-verification-v2/result.json`,
+`lab/tasks/v0232-persistent-qualification/2026-10-27/b4-verification-v3/result.json` and
+`lab/tasks/v0232-persistent-qualification/2026-10-27/b4-diagnostic-v3-disposition.md`.
+No B4 pass, domain closure, native/macOS/used-copy qualification or release is claimed.
+
+The offline history attempt is complete as PARTIAL / UNQUALIFIED. The 96-idle
+one-day target completed with one parking callback; active reached 878 of 1,440
+loops plus one parking callback under the unchanged 45-minute budget.
+Thirty-day targets of 2,880 idle waits and 43,200 active observations were NOT
+RUN. Active generation took 2,366 seconds, including postrun inspection and
+copy verification, so costs were not apportioned. A raw Core inspect-run read was
+4,281,128 bytes, above the existing 2 MiB response cap; the aged OS/LAD bridge
+was not exercised, so this does not establish stock transport overflow or
+intrinsic Core unfitness. No runtime performance change is selected. These
+results do not qualify actual elapsed-day, live-production, native-provider,
+macOS or used-copy operation, and do not establish retained-history fit.
+`lab/tasks/v0232-persistent-qualification/2026-10-27/history-disposition.json`
+and `lab/tasks/v0232-persistent-qualification/2026-10-27/history-interpretation-review.md` own the detailed evidence and limits.
 
 ## Setup and activation
 

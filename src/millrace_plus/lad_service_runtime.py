@@ -717,6 +717,8 @@ def _send(
         return
     before = copy.deepcopy(record)
     if row["reservation"] == "unsent" or replay_create:
+        if time.monotonic() >= deadline:
+            raise SubworkflowError("observation_window_expired")
         row["reservation"] = "unknown"
         _save(service, intent, before, record)
         before = copy.deepcopy(record)
@@ -1025,9 +1027,14 @@ class Runtime:
         # Do not replace in-progress row objects: the next lifecycle CAS detects
         # a competing writer while immutable authority remains checked here.
 
-    def parent(self) -> tuple[dict[str, object], dict[str, object]]:
+    def parent(
+        self, *, _deadline: float | None = None
+    ) -> tuple[dict[str, object], dict[str, object]]:
         instance = identity(self.record["instance_id"])
-        view = self.client.read(instance, deadline=time.monotonic() + 2)
+        view = self.client.read(
+            instance,
+            deadline=time.monotonic() + 2 if _deadline is None else _deadline,
+        )
         sent = mapping(mapping(self.record["start"])["envelope"])
         controls = view.get("controls")
         if not isinstance(controls, list):
@@ -1043,7 +1050,9 @@ class Runtime:
         if receipt["status"] != "applied" or receipt.get("run_id") is None:
             raise IntakeError("parent_start_unresolved")
         run = self.client.read(
-            instance, identity(receipt["run_id"]), deadline=time.monotonic() + 2
+            instance,
+            identity(receipt["run_id"]),
+            deadline=time.monotonic() + 2 if _deadline is None else _deadline,
         )
         expected = mapping(mapping(self.intent["create"])["payload"])
         if (
@@ -1093,8 +1102,11 @@ class Runtime:
                 # its newer stop/maintenance facts; never overwrite their state.
         return view, run
 
-    def source(self) -> dict[str, object]:
-        self.parent()
+    def source(self, *, _deadline: float | None = None) -> dict[str, object]:
+        if _deadline is None:
+            self.parent()
+        else:
+            self.parent(_deadline=_deadline)
         return _source_descriptor(self.service, self.intent, self.record)
 
     def active(self) -> dict[str, object] | None:
@@ -1107,12 +1119,18 @@ class Runtime:
             raise IntakeError("multiple_active_tasks")
         return rows[0] if rows else None
 
-    def call(self, task: dict[str, object]) -> tuple[Journal, dict[str, object]]:
+    def call(
+        self, task: dict[str, object], *, _deadline: float | None = None
+    ) -> tuple[Journal, dict[str, object]]:
         claim = mapping(task["claim"])
         journal = Journal(
             Path(str(claim["call_home"])),
             str(claim["call_key"]),
-            _local_source=self.source(),
+            _local_source=(
+                self.source()
+                if _deadline is None
+                else self.source(_deadline=_deadline)
+            ),
         )
         record = journal.load()
         inputs = mapping(mapping(record["request"])["inputs"])
@@ -1445,13 +1463,14 @@ class Runtime:
         request_id: str,
         operator: dict[str, object],
         *,
+        deadline: float,
         decision: str = "continue",
         resume_plane: str | None = None,
     ) -> dict[str, object]:
         """One saved same-run maintenance sequence, with every OS call retained."""
         from . import subworkflow_v2
 
-        journal, call = self.call(task)
+        journal, call = self.call(task, _deadline=deadline)
         if call["run_id"] is None:
             raise IntakeError("child_run_required")
         instance, run_id = str(call["instance_id"]), str(call["run_id"])
@@ -1469,13 +1488,13 @@ class Runtime:
                         self.record,
                         row,
                         self.connection,
-                        time.monotonic() + 2,
+                        deadline,
                     )
             raise IntakeError("separate_run_resume_required")
-        _, parent = self.parent()
+        _, parent = self.parent(_deadline=deadline)
         if parent["status"] != "paused" or parent.get("quiescent") is not True:
             raise IntakeError("pause_parent_before_maintenance")
-        run = self.client.read(instance, run_id, deadline=time.monotonic() + 2)
+        run = self.client.read(instance, run_id, deadline=deadline)
         if resume_plane is not None and resume_plane not in mapping(run["planes"]):
             raise IntakeError("invalid_resume_plane")
         if request_id not in entries:
@@ -1515,11 +1534,11 @@ class Runtime:
         def stopped(
             *, require_gate: bool = False, guarded: dict[str, object] | None = None
         ) -> tuple[dict[str, object], dict[str, object]]:
-            instance_view = self.client.read(instance, deadline=time.monotonic() + 2)
+            instance_view = self.client.read(instance, deadline=deadline)
             run_view = (
                 guarded
                 if guarded is not None
-                else self.client.read(instance, run_id, deadline=time.monotonic() + 2)
+                else self.client.read(instance, run_id, deadline=deadline)
             )
             observed = reduce_full_views(
                 instance_view,
@@ -1552,9 +1571,7 @@ class Runtime:
                 applied = validate_receipt(row["receipt"], mapping(row["envelope"]))
                 if applied["status"] != "applied" or applied.get("action") != "resumed":
                     raise IntakeError("child_resume_refused")
-                current = self.client.read(
-                    instance, run_id, deadline=time.monotonic() + 2
-                )
+                current = self.client.read(instance, run_id, deadline=deadline)
                 if current.get("run_gate") is not None:
                     _, current = stopped()
                     if current["state_version"] != applied.get("state_version"):
@@ -1588,7 +1605,7 @@ class Runtime:
                         self.record,
                         row,
                         self.connection,
-                        time.monotonic() + 2,
+                        deadline,
                     )
             finish_resume()
             return {
@@ -1597,7 +1614,6 @@ class Runtime:
                 "status": "maintenance-retained",
             }
 
-        deadline = time.monotonic() + 30
         subworkflow_v2._refresh(journal, call, self.client, deadline, time.monotonic)
         call = journal.load()
         self._observe_child_maintenance(str(task["task_id"]), deadline)
@@ -1622,7 +1638,7 @@ class Runtime:
                 self.record,
                 mapping(item["pause"]),
                 self.connection,
-                time.monotonic() + 2,
+                deadline,
             )
         # Refresh only already-sent envelopes. These bounded network reads finish
         # before the current Core snapshot scope; no maintenance call is invented.
@@ -1696,7 +1712,7 @@ class Runtime:
                 self.record,
                 row,
                 self.connection,
-                time.monotonic() + 2,
+                deadline,
             )
             if row["receipt"] is None:
                 raise IntakeError("fresh_recovery_unresolved")
@@ -1809,7 +1825,7 @@ class Runtime:
                     self.service, canonical(proof) + b"\n", "holder-recovery"
                 )
                 _save(self.service, self.intent, before, self.record)
-        run = self.client.read(instance, run_id, deadline=time.monotonic() + 2)
+        run = self.client.read(instance, run_id, deadline=deadline)
         resume_row = mapping(item["resume"])
         if run["status"] == "paused" or resume_row["envelope"] is not None:
             # The worker's declared pending route remains authoritative; no redirect.
@@ -1900,7 +1916,7 @@ class Runtime:
                 self.record,
                 mapping(item["resume"]),
                 self.connection,
-                time.monotonic() + 2,
+                deadline,
             )
             finish_resume()
         return {
@@ -1917,9 +1933,16 @@ class Runtime:
         evidence_file: Path,
         *,
         resume_plane: str | None = None,
+        _deadline: float | None = None,
     ) -> dict[str, object]:
+        """Use one 30-second operator budget, clipped by an earlier caller deadline."""
         from .lad_service_disposition import retain, settle
 
+        deadline = time.monotonic() + 30
+        if _deadline is not None:
+            deadline = min(deadline, _deadline)
+        if time.monotonic() >= deadline:
+            raise SubworkflowError("observation_window_expired")
         if decision not in {
             "retry-observation",
             "continue",
@@ -1936,13 +1959,13 @@ class Runtime:
             raise IntakeError("invalid_resume_plane")
         task = self.service.intake.tasks(identity(task_id))[0]
         if resume_plane is not None:
-            _, selected_call = self.call(task)
+            _, selected_call = self.call(task, _deadline=deadline)
             if selected_call["run_id"] is None:
                 raise IntakeError("child_run_required")
             selected_run = self.client.read(
                 str(selected_call["instance_id"]),
                 str(selected_call["run_id"]),
-                deadline=time.monotonic() + 2,
+                deadline=deadline,
             )
             if resume_plane not in mapping(selected_run["planes"]):
                 raise IntakeError("invalid_resume_plane")
@@ -1957,15 +1980,18 @@ class Runtime:
                     Path(str(claim["call_home"])),
                     str(claim["call_key"]),
                     client=self.client,
-                    _local_source=self.source(),
+                    _local_source=self.source(_deadline=deadline),
+                    _deadline=deadline,
+                    clock=time.monotonic,
                 )
-                self._observe_child_maintenance(task_id, time.monotonic() + 30)
+                self._observe_child_maintenance(task_id, deadline)
             return settle(
                 self,
                 task,
                 decision=decision,
                 request_id=identity(request_id),
                 operator_raw=raw,
+                _deadline=deadline,
             )
         operator = retain(self.service, raw, "operator")
         intent = {"task_id": task_id, "decision": decision, "evidence": operator}
@@ -1981,13 +2007,14 @@ class Runtime:
                 check=lambda row: self._require_active(row),
             )
         if decision in {"continue", "close-failed"}:
-            journal, _ = self.call(task)
+            journal, _ = self.call(task, _deadline=deadline)
             with target_lock(self.service.config, protected_roots=(self.service.home,)):
                 with journal.lock(observer=True):
                     self._maintenance(
                         task,
                         request_id,
                         operator,
+                        deadline=deadline,
                         decision=decision,
                         resume_plane=resume_plane,
                     )
@@ -2001,7 +2028,9 @@ class Runtime:
                 Path(str(claim["call_home"])),
                 str(claim["call_key"]),
                 client=self.client,
-                _local_source=self.source(),
+                _local_source=self.source(_deadline=deadline),
+                _deadline=deadline,
+                clock=time.monotonic,
             )
             current = self.service.intake.tasks(task_id)[0]
             call = journal.load()
@@ -2009,7 +2038,7 @@ class Runtime:
                 run = self.client.read(
                     str(call["instance_id"]),
                     str(call["run_id"]),
-                    deadline=time.monotonic() + 2,
+                    deadline=deadline,
                 )
                 if run["status"] in {"ready", "running", "waiting", "succeeded"}:
                     self.service.intake.transition(
@@ -2026,7 +2055,9 @@ class Runtime:
                 Path(str(claim["call_home"])),
                 str(claim["call_key"]),
                 client=self.client,
-                _local_source=self.source(),
+                _local_source=self.source(_deadline=deadline),
+                _deadline=deadline,
+                clock=time.monotonic,
             )
         return receipt
 
@@ -2035,15 +2066,22 @@ class Runtime:
         if task["status"] not in {"claimed", "running", "held"}:
             raise IntakeError("task_not_active")
 
-    def parent_control(self, request_file: Path) -> dict[str, object]:
-        """Record/forward one existing exact parent control, never create a run."""
+    def parent_control(
+        self, request_file: Path, *, _deadline: float | None = None
+    ) -> dict[str, object]:
+        """Forward one exact parent control within a clipped 30-second budget."""
+        deadline = time.monotonic() + 30
+        if _deadline is not None:
+            deadline = min(deadline, _deadline)
+        if time.monotonic() >= deadline:
+            raise SubworkflowError("observation_window_expired")
         raw = _read_exact(request_file)
         sent = _parent_envelope(strict_json(raw))
         identifier = identity(sent["request_id"])
         expected = sent["expected_state_version"]
         request_body(str(self.service.config["os_home"]), sent)
         with target_lock(self.service.config, protected_roots=(self.service.home,)):
-            instance, run = self.parent()
+            instance, run = self.parent(_deadline=deadline)
             if (
                 sent["instance_id"] != self.record["instance_id"]
                 or sent["run_id"] != self.record["run_id"]
@@ -2114,7 +2152,7 @@ class Runtime:
             self.record,
             row,
             self.connection,
-            time.monotonic() + 2,
+            deadline,
         )
         if sent["operation"] == "pause_run" and row["receipt"] is not None:
             if mapping(row["receipt"])["status"] in {"queued", "applied"}:
