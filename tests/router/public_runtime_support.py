@@ -316,6 +316,7 @@ class PublicRuntime:
         """Retain only actual exact owned true observations before OS cache expiry."""
         for envelope in self.parent_calls:
             self.parent_cleanup.update(
+                join_operation=envelope["operation"],
                 join_request_id=envelope["request_id"],
                 join_instance_id=envelope["instance_id"],
                 join_run_id=envelope["run_id"],
@@ -402,31 +403,68 @@ class PublicRuntime:
                 self.retain_parent_joins()
                 self.parent_cleanup["phase"] = "complete"
             except Exception as exc:
+                identity = {"parent": self.parent, "parent_run": self.parent_run}
+                if self.parent_cleanup["phase"] == "retain_parent_joins":
+                    identity = {
+                        name: self.parent_cleanup["join_" + name]
+                        for name in ("operation", "request_id", "instance_id", "run_id")
+                    }
                 errors.append(
-                    {
-                        "parent": self.parent,
-                        "parent_run": self.parent_run,
+                    identity | {
                         "phase": self.parent_cleanup["phase"],
                         "error": getattr(exc, "code", type(exc).__name__),
                     }
                 )
         elif self.parent_calls:
             errors.append({"parent": "unknown_start_or_create_identity"})
-        write_json(
-            self.root / "cleanup.json",
-            {
-                "closure": "unknown" if errors else "publicly_proven",
-                "errors": errors,
-                "parent_instance_id": self.parent,
-                "parent_run_id": self.parent_run,
-                "parent_cleanup": self.parent_cleanup,
-            },
-        )
-        if errors:
-            self.service.request_shutdown()
-            self.service.wait_for_stop(10)
-        else:
-            self.service.stop()
+        # Keep the actual objects: _finish_stop clears the server-thread field.
+        server_thread = getattr(self.service, "_server_thread", None)
+        drain_thread = None
+        shutdown = {
+            "stop_event_observed": None,
+            "error_type": None,
+            "elapsed_seconds": None,
+            "server_thread_alive": None,
+            "drain_thread_alive": None,
+        }
+        shutdown_started = time.monotonic()
+        try:
+            if errors:
+                self.service.request_shutdown()
+                drain_thread = getattr(self.service, "_shutdown_thread", None)
+                observed = self.service.wait_for_stop(10)
+            else:
+                self.service.stop()
+                drain_thread = getattr(self.service, "_shutdown_thread", None)
+                observed = self.service.wait_for_stop(0)
+            # Missing/non-Boolean mock results are unknown, never false proof.
+            if type(observed) is bool:
+                shutdown["stop_event_observed"] = observed
+        except Exception as exc:
+            shutdown["error_type"] = type(exc).__name__
+            if not errors:
+                raise
+        finally:
+            shutdown["elapsed_seconds"] = time.monotonic() - shutdown_started
+            shutdown["server_thread_alive"] = (
+                None if server_thread is None else server_thread.is_alive()
+            )
+            shutdown["drain_thread_alive"] = (
+                None if drain_thread is None else drain_thread.is_alive()
+            )
+            write_json(
+                self.root / "cleanup.json",
+                {
+                    "closure": "unknown" if errors else "publicly_proven",
+                    "closure_scope": "fixture_outer_parent_and_parent_call_joins",
+                    "errors": errors,
+                    "parent_instance_id": self.parent,
+                    "parent_run_id": self.parent_run,
+                    "parent_cleanup": self.parent_cleanup,
+                    # Event/thread facts establish no graceful or domain closure.
+                    "os_shutdown": shutdown,
+                },
+            )
         assert not errors, "Unknown fixture cleanup; retain owned cleanup.json/state"
 
 

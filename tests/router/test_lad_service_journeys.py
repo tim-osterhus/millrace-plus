@@ -924,6 +924,11 @@ def test_public_two_lad_command_tasks_close_ack_settle_and_continue(
             raise
 
 
+# Launch-to-release allows 90s continuation + 10s marker + 80s boundary.
+# Another finite 180s covers synchronous reads/validation; outer B4 stays 1800s.
+_B4_WAIT_LIFETIME_SECONDS = 360
+
+
 def _b4_command_lad_pin(runtime):
     from public_runtime_support import command_node, write_json
 
@@ -966,7 +971,7 @@ def _b4_command_lad_pin(runtime):
         {"finish": "succeeded"},
         args=["wait"],
         # Only the owned release completes normally; the invocation stays finite.
-        timeout=155,
+        timeout=_B4_WAIT_LIFETIME_SECONDS,
     )
     write_json(definition / "workflow.json", graph)
     sha = catalog.workflow_fingerprint(definition)
@@ -990,8 +995,12 @@ def _b4_server_lost_join(runtime, monkeypatch, lost_request, held_request):
     original_run = workers._run
     posts, withheld, false_after_return = [], [], []
     core_returned, release_join = threading.Event(), threading.Event()
+    mask_lost_join, held_thread = True, None
 
     def run(call, operation):
+        nonlocal held_thread
+        if call.request["request_id"] == held_request:
+            held_thread = threading.current_thread()
         original_run(call, operation)
         if call.request["request_id"] == held_request:
             # Core has actually returned, but this real OS-owned worker has not.
@@ -1013,7 +1022,11 @@ def _b4_server_lost_join(runtime, monkeypatch, lost_request, held_request):
             and value.holder_joined is False
         ):
             false_after_return.append(copy.deepcopy(value.model_dump()))
-        if version != 2 or call.request["request_id"] != lost_request:
+        if (
+            not mask_lost_join
+            or version != 2
+            or call.request["request_id"] != lost_request
+        ):
             return value
         # Fault model: only ownership/join metadata for this exact envelope is
         # unavailable. POST call_observation and GET observe share this seam.
@@ -1028,13 +1041,27 @@ def _b4_server_lost_join(runtime, monkeypatch, lost_request, held_request):
     monkeypatch.setattr(workers, "submit", submit)
     monkeypatch.setattr(workers, "_observation", observation)
     monkeypatch.setattr(workers, "_run", run)
-    return posts, withheld, core_returned, release_join, false_after_return
+
+    def restore_for_cleanup(*, deadline):
+        nonlocal mask_lost_join
+        release_join.set()
+        assert held_thread is not None, "actual B4 held worker return is unknown"
+        held_thread.join(timeout=min(10, max(0, deadline - time.monotonic())))
+        assert not held_thread.is_alive(), "actual B4 held worker still active"
+        # No true is authored; subsequent GETs use the actual OS observation.
+        mask_lost_join = False
+
+    return (
+        posts, withheld, core_returned, release_join, false_after_return,
+        restore_for_cleanup,
+    )
 
 
-def _b4_until(predicate, *, seconds):
+def _b4_until(predicate, *, seconds, interval=1):
     from millrace_plus.subworkflow_records import SubworkflowError
 
     # Public full-view reads at 1-second cadence, including the >60-second case.
+    # A passive wait may opt into a slower cadence inside the same finite window.
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         try:
@@ -1045,8 +1072,78 @@ def _b4_until(predicate, *, seconds):
             value = None
         if value:
             return value
-        time.sleep(min(1, max(0, deadline - time.monotonic())))
+        time.sleep(min(interval, max(0, deadline - time.monotonic())))
     raise AssertionError("bounded B4 public observation expired")
+
+
+def _b4_cleanup_stop(engine, root, stop_id, facts, *, deadline):
+    """One failure-cleanup step; product guards own acknowledgement/closure."""
+    from public_runtime_support import write_json
+
+    from millrace_plus.subworkflow_records import SubworkflowError
+
+    def guard():
+        if time.monotonic() >= deadline:
+            raise SubworkflowError("observation_window_expired")
+
+    guard()
+    active = engine()
+    guard()
+    pending = facts.get("acknowledgement")
+    if pending is not None and pending.get("receipt") is None:
+        # Replay the same evidence/decision before another stop can change task
+        # versions. Missing physical/domain proof must fail and preserve the hold.
+        pending["receipt"] = active.decide(
+            pending["task_id"], pending["decision"], pending["request_id"],
+            Path(pending["evidence_file"]), _deadline=deadline,
+        )
+        guard()
+    active = engine()
+    guard()
+    # stop has no caller-deadline parameter and remains non-preemptive. Never
+    # start another operation after it consumes the original cleanup window.
+    answer = active.stop(stop_id)
+    facts["last_stop"] = answer
+    if answer["status"] == "stopped":
+        return answer
+    guard()
+    if answer.get("reason") != "child_disposition_required":
+        return None
+    active = engine()
+    guard()
+    row = active.active()
+    guard()
+    if row is None:
+        return None
+    _, record = active.call(row)
+    guard()
+    view = active.client.read(
+        record["instance_id"], record["run_id"],
+        deadline=min(deadline, time.monotonic() + 2),
+    )
+    facts["last_child"] = {
+        "task_id": row["task_id"], "instance_id": record["instance_id"],
+        "run_id": record["run_id"], "status": view.get("status"),
+        "quiescent": view.get("quiescent"),
+    }
+    guard()
+    if view.get("status") not in {"cancelled", "failed"} or not closed(view):
+        return None
+    evidence = root / "b4-cleanup-acknowledgement.json"
+    write_json(evidence, {
+        "format": "millrace-plus-lad-abandonment-intent/v1",
+        "acknowledge_abandonment": True,
+        "expected_task_version": row["version"],
+        "expected_state_version": view["state_version"],
+    })
+    facts["acknowledgement"] = {
+        "task_id": row["task_id"], "decision": "acknowledge-" + view["status"],
+        "request_id": uuid.uuid4().hex, "evidence_file": str(evidence),
+        "receipt": None,
+    }
+    # The next bounded step calls decide(), which reconciles the actual saved
+    # calls and lets domain_evidence select ordinary recovery or abandonment.
+    return None
 
 
 def test_public_lost_maintenance_join_recovers_live_window_then_normal_settlement(
@@ -1088,9 +1185,10 @@ def test_public_lost_maintenance_join_recovers_live_window_then_normal_settlemen
     first_decision, second_decision, run_decision = (uuid.uuid4().hex for _ in range(3))
     lost_id = service_runtime._operation_id(first_decision, "child-resume")
     held_id = service_runtime._operation_id(run_decision, "child-resume")
-    posts, withheld, core_returned, release_join, false_after_return = (
-        _b4_server_lost_join(runtime, monkeypatch, lost_id, held_id)
-    )
+    (
+        posts, withheld, core_returned, release_join, false_after_return,
+        restore_for_cleanup,
+    ) = _b4_server_lost_join(runtime, monkeypatch, lost_id, held_id)
     started = runtime.send_parent(initialized["start_request"])
     assert started["status"] == "applied", started
     parent, parent_run = initialized["instance_id"], started["run_id"]
@@ -1166,6 +1264,7 @@ def test_public_lost_maintenance_join_recovers_live_window_then_normal_settlemen
             return service_runtime._joined(active.service, row)
 
         _b4_until(remember_parent_start, seconds=10)
+        runtime.retain_parent_joins()
         operator = runtime.root / "b4-continue.txt"
         operator.write_text(
             "Continue only this exact child and preserved LAD continuation.\n"
@@ -1432,7 +1531,9 @@ def test_public_lost_maintenance_join_recovers_live_window_then_normal_settlemen
                 result if all(row["status"] == "succeeded" for row in result) else None
             )
 
-        rows = _b4_until(succeeded_tasks, seconds=600)
+        # Each passive read revalidates retained terminal proofs; fewer starts
+        # reduce fixture-generated work. Window and full validation are unchanged.
+        rows = _b4_until(succeeded_tasks, seconds=600, interval=10)
         assert len(rows) == 2 and [row["request_bytes"] for row in rows] == requests
         assert all(
             row["terminal_receipt"]["disposition"] == "succeeded" for row in rows
@@ -1553,21 +1654,36 @@ def test_public_lost_maintenance_join_recovers_live_window_then_normal_settlemen
         assert Service(home).intake.tasks() == rows and closed(parent_view())
     finally:
         primary_error = sys.exc_info()[1]
+        cleanup_deadline = time.monotonic() + 90
+        cleanup = {"stop_id": stop_id, "last_stop": None, "outcome": "not_needed"}
         release_join.set()
-        if live_workspace is not None:
-            (live_workspace / "b4-release").write_text("owned failure cleanup release")
         try:
             try:
+                if live_workspace is not None:
+                    (live_workspace / "b4-release").write_text(
+                        "owned failure cleanup release"
+                    )
+                restore_for_cleanup(deadline=cleanup_deadline)
                 if not stopped:
-
-                    def cleanup_stop():
-                        answer = engine().stop(stop_id)
-                        return answer if answer["status"] == "stopped" else None
-
-                    _b4_until(cleanup_stop, seconds=90)
+                    cleanup["outcome"] = "pending"
+                    _b4_until(
+                        lambda: _b4_cleanup_stop(
+                            engine, runtime.root, stop_id, cleanup,
+                            deadline=cleanup_deadline,
+                        ),
+                        seconds=max(0, cleanup_deadline - time.monotonic()),
+                    )
+                    cleanup["outcome"] = "stopped"
+            except BaseException as cleanup_error:
+                cleanup["outcome"] = "unknown"
+                cleanup["error"] = getattr(
+                    cleanup_error, "code", type(cleanup_error).__name__
+                )
+                raise
             finally:
                 write_json(
-                    runtime.root / "b4-recovery-aftermath.json", Service(home).status()
+                    runtime.root / "b4-recovery-aftermath.json",
+                    Service(home).status() | {"fixture_cleanup": cleanup},
                 )
         except BaseException as cleanup_error:
             if primary_error is not None:

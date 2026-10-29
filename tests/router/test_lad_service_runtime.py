@@ -3357,7 +3357,7 @@ def test_claim_guard_consuming_original_budget_cannot_write_fifo(setup, monkeypa
     [
         "owned-true", "false", "null", "missing", "unowned-true",
         "wrong-digest", "wrong-home", "wrong-request", "wrong-target",
-        "changed-bytes", "owned-file-missing", "current-live",
+        "changed-bytes", "owned-file-missing", "current-live", "service-start",
     ],
 )
 def test_public_fixture_ttl_reuses_only_owned_exact_true_and_fresh_closure(
@@ -3455,11 +3455,21 @@ def test_public_fixture_ttl_reuses_only_owned_exact_true_and_fresh_closure(
     elif proof == "current-live":
         view["status"] = "running"
 
+    if proof == "service-start":
+        inner = owned.request("start_run", instance=uuid.uuid4().hex, expected=1)
+        responses[inner["request_id"]] = observation(
+            inner, home="proof", core=receipt(
+                inner, instance=inner["instance_id"], run=uuid.uuid4().hex
+            )
+        )
+        owned.parent_calls.append(inner)
+        owned.retain_parent_joins()
+        assert inner["request_id"] in owned.parent_join_proofs
     expired[0] = True
     before = len(observed)
-    if proof == "owned-true":
+    if proof in {"owned-true", "service-start"}:
         owned.close()
-        assert shutdown == ["stop"]
+        assert shutdown == ["stop", ("wait_for_stop", 0)]
         assert len(observed) == before
     else:
         with pytest.raises(AssertionError, match="Unknown fixture cleanup"):
@@ -3467,10 +3477,11 @@ def test_public_fixture_ttl_reuses_only_owned_exact_true_and_fresh_closure(
         assert shutdown == ["request_shutdown", ("wait_for_stop", 10)]
     cleanup = json.loads((owned.root / "cleanup.json").read_bytes())
     assert cleanup["closure"] == (
-        "publicly_proven" if proof == "owned-true" else "unknown"
+        "publicly_proven" if proof in {"owned-true", "service-start"} else "unknown"
     )
     assert reads == [(owned.parent, owned.parent_run)]
-    assert owned.parent_calls == [create, start] and start["run_id"] is None
+    assert owned.parent_calls[:2] == [create, start] and start["run_id"] is None
+    assert cleanup["closure_scope"] == "fixture_outer_parent_and_parent_call_joins"
 
 
 def test_combined_lifecycle_connection_closes_before_runtime_and_public_reads(
@@ -3831,9 +3842,9 @@ def test_public_fixture_cleanup_records_exact_parent_failure_phase(
 
     owned = PublicRuntime(tmp_path / "cleanup-facts")
     owned.parent, owned.parent_run = uuid.uuid4().hex, uuid.uuid4().hex
-    sent = owned.request("start_run", instance=owned.parent, expected=1)
+    sent = owned.request("start_run", instance=uuid.uuid4().hex, expected=1)
     owned.parent_calls = [sent]
-    core = receipt(sent, instance=owned.parent, run=owned.parent_run)
+    core = receipt(sent, instance=sent["instance_id"], run=owned.parent_run)
     joined = observation(sent, joined=False, core=core)
     view = {
         "status": "running" if phase == "closed_parent" else "succeeded",
@@ -3874,10 +3885,17 @@ def test_public_fixture_cleanup_records_exact_parent_failure_phase(
     assert saved["closure"] == "unknown"
     assert saved["parent_instance_id"] == owned.parent
     assert saved["parent_run_id"] == owned.parent_run
-    assert saved["errors"] == [{
+    expected_error = {
         "parent": owned.parent, "parent_run": owned.parent_run,
         "phase": failure_phase, "error": "AssertionError",
-    }]
+    }
+    if phase == "retain_parent_joins":
+        expected_error = {
+            "operation": sent["operation"], "request_id": sent["request_id"],
+            "instance_id": sent["instance_id"], "run_id": sent["run_id"],
+            "phase": failure_phase, "error": "AssertionError",
+        }
+    assert saved["errors"] == [expected_error]
     facts = saved["parent_cleanup"]
     assert facts["phase"] == failure_phase
     assert facts["last_closure"] == {
@@ -4048,3 +4066,347 @@ def test_published_attention_preserves_nonblocking_ownership_locks(
             task["task_id"], "continue", decision, evidence, resume_plane="foreground",
         )
     assert active.service.intake.path.read_bytes() == before
+
+
+@pytest.mark.parametrize("event", [True, False, "raises"])
+@pytest.mark.parametrize("threads", ["ended", "alive", "missing"])
+def test_public_fixture_shutdown_records_event_and_retained_thread_facts(
+    tmp_path, event, threads
+):
+    from public_runtime_support import PublicRuntime
+
+    owned = PublicRuntime(tmp_path / "shutdown-facts")
+    owned.parent_calls = [owned.request("create_instance", expected=0)]
+    server = None if threads == "missing" else SimpleNamespace(
+        is_alive=lambda: threads == "alive"
+    )
+    drain = None if threads == "missing" else SimpleNamespace(
+        is_alive=lambda: threads == "alive"
+    )
+    calls = []
+
+    def request_shutdown():
+        calls.append("request_shutdown")
+        owned.service._server_thread = None
+        owned.service._shutdown_thread = drain
+
+    def wait(seconds):
+        calls.append(("wait_for_stop", seconds))
+        if event == "raises":
+            raise RuntimeError("private shutdown details")
+        return event
+
+    owned.service = SimpleNamespace(
+        _server_thread=server, _shutdown_thread=None,
+        request_shutdown=request_shutdown, wait_for_stop=wait,
+    )
+    with pytest.raises(AssertionError, match="Unknown fixture cleanup"):
+        owned.close()
+    raw = (owned.root / "cleanup.json").read_bytes()
+    saved = runtime.strict_json(raw)
+    assert "os_shutdown" in saved, "fixture omitted actual shutdown completion facts"
+    facts = saved["os_shutdown"]
+    assert facts["stop_event_observed"] == (None if event == "raises" else event)
+    assert facts["error_type"] == ("RuntimeError" if event == "raises" else None)
+    assert facts["elapsed_seconds"] >= 0
+    assert facts["server_thread_alive"] == (
+        None if threads == "missing" else threads == "alive"
+    )
+    assert facts["drain_thread_alive"] == (
+        None if threads == "missing" else threads == "alive"
+    )
+    assert calls == ["request_shutdown", ("wait_for_stop", 10)]
+    assert b"private shutdown details" not in raw
+
+
+@pytest.mark.parametrize("status", ["cancelled", "failed", "running"])
+def test_b4_failure_cleanup_acknowledges_actual_terminal_then_replays_saved_stop(
+    tmp_path, status
+):
+    from test_lad_service_journeys import _b4_cleanup_stop
+
+    stop_id, task_id = uuid.uuid4().hex, uuid.uuid4().hex
+    task = {"task_id": task_id, "version": 7}
+    record = {"instance_id": uuid.uuid4().hex, "run_id": uuid.uuid4().hex}
+    view = {
+        "status": status, "state_version": 31, "quiescent": status != "running",
+        "inflight_invocations": [], "invocations": [], "completions": [],
+        "controls": [],
+    }
+    acknowledged, calls = [], []
+
+    def stop(identifier):
+        calls.append(("stop", identifier))
+        return {"status": "stopped"} if acknowledged else {
+            "status": "pending", "reason": "child_disposition_required"
+        }
+
+    def decide(task_id_arg, decision, identifier, evidence, *, _deadline):
+        calls.append(("decide", identifier))
+        assert task_id_arg == task_id and decision == "acknowledge-" + status
+        assert runtime.strict_json(evidence.read_bytes()) == {
+            "format": "millrace-plus-lad-abandonment-intent/v1",
+            "acknowledge_abandonment": True,
+            "expected_task_version": 7, "expected_state_version": 31,
+        }
+        acknowledged.append(identifier)
+        return {"disposition": status}
+
+    active = SimpleNamespace(
+        stop=stop, decide=decide, active=lambda: task,
+        call=lambda row: (None, record),
+        client=SimpleNamespace(read=lambda *args, **kwargs: view),
+    )
+    facts = {}
+    deadline = runtime.time.monotonic() + 60
+    assert _b4_cleanup_stop(
+        lambda: active, tmp_path, stop_id, facts, deadline=deadline
+    ) is None
+    assert facts["last_stop"]["reason"] == "child_disposition_required"
+    assert facts["last_child"]["status"] == status
+    if status == "running":
+        assert "acknowledgement" not in facts and not acknowledged
+    else:
+        saved_id = facts["acknowledgement"]["request_id"]
+        assert _b4_cleanup_stop(
+            lambda: active, tmp_path, stop_id, facts, deadline=deadline
+        ) == {
+            "status": "stopped"
+        }
+        assert calls == [("stop", stop_id), ("decide", saved_id), ("stop", stop_id)]
+
+
+def test_b4_failure_cleanup_missing_proof_retains_same_acknowledgement_and_hold(
+    tmp_path
+):
+    from test_lad_service_journeys import _b4_cleanup_stop
+
+    identifier = uuid.uuid4().hex
+    evidence = tmp_path / "exact-evidence.json"
+    evidence.write_bytes(b"original exact evidence")
+    facts = {"acknowledgement": {
+        "task_id": uuid.uuid4().hex, "decision": "acknowledge-cancelled",
+        "request_id": identifier, "evidence_file": str(evidence), "receipt": None,
+    }}
+    calls = []
+
+    def decide(task, decision, request, path, *, _deadline):
+        calls.append((request, path.read_bytes()))
+        raise IntakeError("holder_unjoined")
+
+    active = SimpleNamespace(
+        decide=decide, stop=lambda identifier: pytest.fail("stop before disposition")
+    )
+    for _ in range(2):
+        with pytest.raises(IntakeError, match="holder_unjoined"):
+            _b4_cleanup_stop(
+                lambda: active, tmp_path, uuid.uuid4().hex, facts,
+                deadline=runtime.time.monotonic() + 60,
+            )
+    assert calls == [(identifier, b"original exact evidence")] * 2
+    assert facts["acknowledgement"]["receipt"] is None
+
+
+
+def test_b4_cleanup_restores_truth_only_after_actual_held_thread_returns(
+    tmp_path, monkeypatch
+):
+    import threading
+    import time
+
+    from test_lad_service_journeys import _b4_server_lost_join
+
+    class Observation(SimpleNamespace):
+        def model_dump(self):
+            return vars(self).copy()
+
+    lost, held = uuid.uuid4().hex, uuid.uuid4().hex
+    workers = SimpleNamespace(
+        _run=lambda call, operation: None,
+        submit=lambda *args, **kwargs: None,
+        _observation=lambda call, **kwargs: Observation(
+            source="os_owned_call", phase="call_returned", holder_joined=True
+        ),
+    )
+    fixture = SimpleNamespace(service=SimpleNamespace(router_workers=workers))
+    _, withheld, returned, release, _, restore = _b4_server_lost_join(
+        fixture, monkeypatch, lost, held
+    )
+    held_call, lost_call = (
+        SimpleNamespace(request={"request_id": identifier})
+        for identifier in (held, lost)
+    )
+    worker = threading.Thread(target=workers._run, args=(held_call, None))
+    worker.start()
+    try:
+        assert returned.wait(2) and worker.is_alive() and not release.is_set()
+        assert workers._observation(lost_call, version=2).holder_joined is None
+        restore(deadline=time.monotonic() + 2)
+        assert not worker.is_alive()
+        assert workers._observation(lost_call, version=2).holder_joined is True
+        assert withheld and all(row["holder_joined"] is None for row in withheld)
+    finally:
+        release.set()
+        worker.join(timeout=2)
+
+
+@pytest.mark.parametrize("holder", ["missing", "still-active"])
+def test_b4_cleanup_missing_or_active_holder_keeps_lost_join_mask(
+    monkeypatch, holder
+):
+    import threading
+    import time
+
+    from test_lad_service_journeys import _b4_server_lost_join
+
+    class Observation(SimpleNamespace):
+        def model_dump(self):
+            return vars(self).copy()
+
+    entered, finish = threading.Event(), threading.Event()
+
+    def original_run(call, operation):
+        entered.set()
+        finish.wait()
+
+    lost, held = uuid.uuid4().hex, uuid.uuid4().hex
+    workers = SimpleNamespace(
+        _run=original_run, submit=lambda *args, **kwargs: None,
+        _observation=lambda call, **kwargs: Observation(
+            source="os_owned_call", phase="call_returned", holder_joined=True
+        ),
+    )
+    fixture = SimpleNamespace(service=SimpleNamespace(router_workers=workers))
+    _, withheld, _, release, _, restore = _b4_server_lost_join(
+        fixture, monkeypatch, lost, held
+    )
+    lost_call = SimpleNamespace(request={"request_id": lost})
+    worker = None
+    try:
+        if holder == "still-active":
+            worker = threading.Thread(
+                target=workers._run,
+                args=(SimpleNamespace(request={"request_id": held}), None),
+            )
+            worker.start()
+            assert entered.wait(2)
+        assert workers._observation(lost_call, version=2).holder_joined is None
+        message = "return is unknown" if holder == "missing" else "still active"
+        with pytest.raises(AssertionError, match=message):
+            restore(deadline=time.monotonic())
+        assert workers._observation(lost_call, version=2).holder_joined is None
+        assert withheld and all(row["holder_joined"] is None for row in withheld)
+    finally:
+        release.set()
+        finish.set()
+        if worker is not None:
+            worker.join(timeout=2)
+
+
+@pytest.mark.parametrize("expires_in", ["construction", "decide", "stop", "read"])
+def test_b4_failure_cleanup_keeps_original_deadline_across_callbacks(
+    tmp_path, monkeypatch, expires_in
+):
+    from test_lad_service_journeys import _b4_cleanup_stop
+
+    clock, calls = Clock(), []
+    task = {"task_id": uuid.uuid4().hex, "version": 7}
+    record = {"instance_id": uuid.uuid4().hex, "run_id": uuid.uuid4().hex}
+    facts = {}
+    if expires_in == "decide":
+        facts["acknowledgement"] = {
+            "task_id": task["task_id"], "decision": "acknowledge-cancelled",
+            "request_id": uuid.uuid4().hex,
+            "evidence_file": str(tmp_path / "existing.json"), "receipt": None,
+        }
+
+    def expire(name):
+        calls.append(name)
+        if expires_in == name:
+            clock.now = 2
+
+    def decide(*args, _deadline):
+        assert _deadline == 1
+        expire("decide")
+        return {"disposition": "cancelled"}
+
+    def stop(identifier):
+        expire("stop")
+        return {"status": "pending", "reason": "child_disposition_required"}
+
+    def read(*args, deadline):
+        assert deadline == 1
+        expire("read")
+        return {
+            "status": "cancelled", "quiescent": True, "state_version": 31,
+            "inflight_invocations": [], "invocations": [], "completions": [],
+            "controls": [],
+        }
+
+    active = SimpleNamespace(
+        decide=decide, stop=stop, active=lambda: task,
+        call=lambda row: (None, record), client=SimpleNamespace(read=read),
+    )
+
+    def engine():
+        expire("construction")
+        return active
+
+    monkeypatch.setattr(runtime.time, "monotonic", clock)
+    with pytest.raises(SubworkflowError, match="observation_window_expired"):
+        _b4_cleanup_stop(engine, tmp_path, uuid.uuid4().hex, facts, deadline=1)
+    assert calls[-1] == expires_in
+    assert not (tmp_path / "b4-cleanup-acknowledgement.json").exists()
+
+
+@pytest.mark.parametrize("interval", [None, 10])
+def test_b4_until_default_and_passive_cadence_return_actual_ready_value(
+    monkeypatch, interval
+):
+    from test_lad_service_journeys import _b4_until
+
+    clock, sleeps, starts = Clock(), [], []
+    ready = {"rows": ["actual"]}
+    answers = [SubworkflowError("observation_window_expired"), None, [], ready]
+
+    def predicate():
+        starts.append(clock.now)
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        clock.now += seconds
+
+    monkeypatch.setattr(runtime.time, "monotonic", clock)
+    monkeypatch.setattr(runtime.time, "sleep", sleep)
+    options = {} if interval is None else {"interval": interval}
+    assert _b4_until(predicate, seconds=600, **options) is ready
+    step = 1 if interval is None else 10
+    assert starts == [0, step, 2 * step, 3 * step] and sleeps == [step] * 3
+    assert not answers
+
+
+def test_b4_until_clips_passive_sleep_and_starts_no_predicate_after_expiry(
+    monkeypatch,
+):
+    from test_lad_service_journeys import _b4_until
+
+    clock, sleeps, starts = Clock(), [], []
+
+    def predicate():
+        starts.append(clock.now)
+        clock.now += 3  # Non-preemptive read cost consumes the same window.
+        return None
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        clock.now += seconds
+
+    monkeypatch.setattr(runtime.time, "monotonic", clock)
+    monkeypatch.setattr(runtime.time, "sleep", sleep)
+    with pytest.raises(AssertionError, match="bounded B4 public observation expired"):
+        _b4_until(predicate, seconds=25, interval=10)
+    assert starts == [0, 13] and sleeps == [10, 9] and clock.now == 25
