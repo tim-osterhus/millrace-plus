@@ -6,11 +6,11 @@ Session/occurrence: `<Manager assignment>`
 Packet ID: `<exact ID>`
 Original lineage: `<stable lineage retained through rename or replan>`
 Original criteria: `<IDs>`
-Earlier dependencies: `<ordered packet IDs>`
+Earlier dependencies: `<ordered earlier lineage IDs>`
 Accepted input digests: `<exact digests for the handoff>`
 Behavior/constraints: `<concrete scoped change>`
 Writable target paths: `<owned packet paths>`
-Checks/evidence: `<meaningful verification and honest limits>`
+Development check: `<meaningful verification and honest limits>`
 Applicable operator-selected Core limits: `<if any, and do not add workflow caps>`
 
 ## Evidence

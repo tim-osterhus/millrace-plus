@@ -14,6 +14,8 @@ For Checker, write requirement-side `baseline.md` before reading implementation.
 
 Every v2 result includes its required history log as an ordinary `artifacts` path/hash entry: `historylog/<RoleTitle>_HHMM-MMDDYY.md` using the UTC `created_at` timestamp. Keep it below 5,120 UTF-8 bytes, include retained identities, and omit transcripts and secrets. Do not add a top-level `historylog` field.
 
+The history log is evidence Markdown too: include substantive `## Evidence` and `## Outcome` sections and at least 100 characters after stripping surrounding whitespace. Include the exact occurrence, session, and role identities. Compute its `artifacts` SHA-256 from the final file bytes after all edits; the history-specific identity and size rules do not replace the other artifact requirements.
+
 ## Outcome
 
 State one declared semantic outcome and evidence. Return one matching Core json-v1 completion marker. Recommendations do not authorize routing, acceptance, allowance, publication, or completion.

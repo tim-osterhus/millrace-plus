@@ -1176,7 +1176,7 @@ def test_interrupted_preparation_reuses_only_its_committed_reservation(
     assert command(project, "prepare_role.py", "recon")["outcome"] == "REFUSED"
 
 
-@pytest.mark.parametrize("role", ["planner", "learning"])
+@pytest.mark.parametrize("role", ["planner", "manager", "learning"])
 def test_role_resolves_durable_guidance_and_refs_from_cwd_only(
     tmp_path: Path, role: str
 ) -> None:
@@ -1185,8 +1185,8 @@ def test_role_resolves_durable_guidance_and_refs_from_cwd_only(
         learning_ready(project)
         workspace = project / "learning"
     else:
-        before_role(project, "planner")
-        assert command(project, "prepare_role.py", "planner")["outcome"] == "READY"
+        before_role(project, role)
+        assert command(project, "prepare_role.py", role)["outcome"] == "READY"
         workspace = project / "foreground"
     # A later invocation cannot depend on the preparation's controls directory.
     # Remove original instruction paths; the child receives only its cwd/input.
@@ -1214,6 +1214,9 @@ for name,checksum in manifest["files"].items():
     assert digest((root/name).read_bytes())==checksum
 assert "context/role-contracts.md" in manifest["files"]
 assert "templates/result.md" in manifest["files"]
+if item["role"]=="manager":
+    packet_template=(root/"templates/packet.md").read_bytes()
+    assert digest(packet_template)==item["guidance_files"]["templates/packet.md"]
 assert not any(name.startswith("prompts/") and name!="prompts/"+item["role"]+".md"
                for name in manifest["files"])
 assert "Inputs from dispatch:" in (root/("prompts/"+item["role"]+".md")).read_text()
@@ -1238,18 +1241,21 @@ print("durable guidance and accepted refs verified from cwd/input only")
 
 
 @pytest.mark.parametrize("mutation", ["file", "manifest"])
+@pytest.mark.parametrize("role", ["recon", "manager"])
 def test_corrupt_durable_guidance_refuses_without_new_occurrence(
-    tmp_path: Path, mutation: str
+    tmp_path: Path, mutation: str, role: str
 ) -> None:
     project = copied(tmp_path)
-    bootstrap(project)
-    command(project, "prepare_role.py", "recon")
-    command(project, "lad_peer.py", "recon", "clean")
+    before_role(project, role)
+    command(project, "prepare_role.py", role)
+    command(project, "lad_peer.py", role, "clean")
     state = ledger(project)
     oid = state["active"]["foreground"]
     root = Path(state["occurrences"][oid]["guidance_root"])
     if mutation == "file":
-        file = root / "context/contracts.md"
+        file = root / (
+            "templates/packet.md" if role == "manager" else "context/contracts.md"
+        )
         file.write_text(file.read_text() + "Conflicting guidance change.\n")
     else:
         file = root / "manifest.json"
@@ -1257,13 +1263,13 @@ def test_corrupt_durable_guidance_refuses_without_new_occurrence(
         manifest["guidance_sha256"] = "0" * 64
         file.write_text(json.dumps(manifest))
     before = (project / "foreground/lad-state/session.json").read_bytes()
-    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "REFUSED"
+    assert command(project, "accept_role.py", role, "PASS")["outcome"] == "REFUSED"
     assert (
         command(project, "init_session.py", "--project-root", "..")["outcome"]
         == "RECONCILE"
     )
     assert (project / "foreground/lad-state/session.json").read_bytes() == before
-    assert len(role_occurrences(ledger(project), "recon")) == 1
+    assert len(role_occurrences(ledger(project), role)) == 1
 
 
 def test_native_error_follows_replacement_preparation(tmp_path: Path) -> None:

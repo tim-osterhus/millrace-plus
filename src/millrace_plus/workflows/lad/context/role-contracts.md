@@ -10,9 +10,11 @@ Input-v2 retains the v1 identity, request, source-file, guidance, criteria, spec
 
 Valid helper modes are `direct` and `native_helpers`. Direct is the default, with null qualification. Native mode uses a `{path, sha256}` qualification ref. In result-v2, direct mode requires null `helper_evidence`. Native helper evidence is a digest-pinned ref. Planner must stay direct. Resolve accepted refs by pinned workspace, result path, and digest.
 
+For accepted RESULT refs, each `accepted_inputs` digest and `accepted_input_refs` `sha256` hashes the entire parsed `result.json` object. Re-encode that full object as canonical JSON with sorted keys, compact separators, UTF-8, `ensure_ascii=False`, and `allow_nan=False`, without removing fields or appending a newline, then compute SHA-256. Hashing the raw result-file bytes can produce a different digest solely because of formatting; that difference alone does not establish changed accepted content. Artifact, original-request, and guidance-file refs retain their existing exact-byte hash rules.
+
 The prepared `input_sha256` is SHA-256 of the canonical input object with its own digest field removed. Canonical JSON uses sorted keys, compact separators, UTF-8, `ensure_ascii=False`, and `allow_nan=False`. `source_sha256` hashes the canonical target path-to-file-digest map. `source_context` separately binds Git base/index and identities outside assigned packet paths. The immutable `guidance_files` map and `guidance_snapshot_sha256` pin the occurrence snapshot.
 
-The workflow fixes the materialized set. Every role receives `prompts/<role>.md`, `context/contracts.md`, `context/role-contracts.md`, `templates/result.md`, and `templates/assignment.md`. Planner, Manager, Checker, Arbiter, and Consultant also receive `context/routes.md`. Every role except Planner also receives `context/harness.md`. Do not assume another package asset is present or add a new common filename.
+The workflow fixes the materialized set. Every role receives `prompts/<role>.md`, `context/contracts.md`, `context/role-contracts.md`, `templates/result.md`, and `templates/assignment.md`. Manager also receives `templates/packet.md`. Planner, Manager, Checker, Arbiter, and Consultant also receive `context/routes.md`. Every role except Planner also receives `context/harness.md`. Do not assume another package asset is present or add a new common filename.
 
 Input-v2 retains its existing keys. For a pre-freeze Checker occurrence, `request_sha256` binds the original bytes in `request.md`, and `criteria` keeps the canonical `{id, text, request_quote}` rows. The `packet` is null or contains only `id`, `lineage`, `criteria`, `depends_on`, and `paths`. The `baseline` is null or the original `state.baselines[lineage]` metadata: `occurrence_id`, `sha256`, `path`, `criteria`, and `finding_ids`, with `parent_pin: {path, sha256}` when present. A retained legacy baseline may lack `parent_pin`.
 
@@ -32,11 +34,17 @@ Every new v2 occurrence returns a `millrace-lad-result/v2` object with exactly t
 
 The required identity and artifact fields remain: `format`, `session_id`, `occurrence_id`, `role`, `outcome`, `lineage`, `input_sha256`, `source_sha256`, `guidance_sha256`, `artifacts`, `findings`, `human_evidence`, and `data`. V2 adds only `helper_mode` and `helper_evidence`. Direct mode requires null helper evidence. The Core completion object is separate: one `{"outcome":"...","summary":"...","refs":["lad-results/<occurrence_id>/result.json"]}` matching the exact runtime-selected marker schema.
 
+The input's `source_files` map and `source_sha256` describe the prepared pre-work snapshot. The result has no `source_files` field. Its `source_sha256` must hash the current target map after the role's work, using the same canonical JSON algorithm above; do not echo the prepared digest after target edits. This applies to every role, including Checker, Doublechecker, and Fixer, without changing baseline read order or permitted writes.
+
+Build that map with target-relative path keys and SHA-256 of each regular file's exact bytes. Select current packet paths and their descendants, or the whole target when no packet paths are selected. Within traversed directories, `.env`, `.env.local`, `credentials.json`, and `secrets.json` remain included even outside packet paths. Never traverse `.git`. Skip directories named `node_modules`, `.venv`, `venv`, `__pycache__`, `build`, `dist`, `.cache`, `.pytest_cache`, or `.ruff_cache` unless a packet path selects that directory, a descendant, or an ancestor. Exclude the validated owner marker `.millrace-plus-target-owner.json` when the target is external to `foreground_root/target`. Do not follow symlinks: their map value is `symlink:` plus SHA-256 of the filesystem-encoded link target. Canonicalize the resulting path-to-digest map, then hash those JSON bytes. Existing source-scope, link-change, and `source_context` guards still apply.
+
 Each artifact ref has only `path` and `sha256`. Paths are relative to the occurrence result directory, regular, contained, unique, and normally `.md`. Checker may also include `baseline-freeze.json`. Evidence Markdown must echo the occurrence and contain substantive `## Evidence` and `## Outcome` sections, observed checks, exact identities, and honest limitations. Accepted artifacts are immutable.
 
 Every result includes the occurrence history log as an ordinary `artifacts` path/hash ref: `historylog/<StageName_HHMM-MMDDYY.md>`. The timestamp comes from v2 `created_at` in UTC. Keep each history log below 5,120 UTF-8 bytes and include retained occurrence, session, and role identities. Do not put a transcript, credential, or secret in it. There is no top-level `historylog` field.
 
-`findings` contains exact `{id, criterion, path, reproduction, evidence}` rows. Actionable findings use stable IDs and original criterion IDs. `human_evidence` is null except for blocked outcomes that require exact `{type, obstacle, attempted, required_resolution}` fields. Its `type` is `unavailable_input`, `human_choice`, `protected_work`, `budget_exhausted`, or `diagnosis_exhausted`. A recoverable issue is not a human hold. Every ERROR outcome records `data.failure` with `{operation, attempted, evidence, prerequisite_resolved}`. The first three fields are nonblank strings. The last is boolean.
+The history log is evidence Markdown too: include substantive `## Evidence` and `## Outcome` sections and at least 100 characters after stripping surrounding whitespace. Include the exact occurrence, session, and role identities. Compute its `artifacts` SHA-256 from the final file bytes after all edits; the history-specific identity and size rules do not replace the other artifact requirements.
+
+`findings` contains exact `{id, criterion, path, reproduction, evidence}` rows. Actionable findings use stable IDs and original criterion IDs. `human_evidence` is null except for blocked outcomes that require exact `{type, obstacle, attempted, required_resolution}` fields. Its `type` is `unavailable_input`, `human_choice`, `protected_work`, `budget_exhausted`, or `diagnosis_exhausted`. A recoverable issue is not a human hold. Every ERROR outcome records `data.failure` with `{operation, attempted, evidence, prerequisite_resolved}`. The first three fields are nonblank strings. The last is boolean. For `ERROR_REPLACEMENT` and `ERROR_TRANSIENT_RESOLVED`, `data.failure.prerequisite_resolved` must be true; other ERROR markers keep the boolean rule.
 
 ## Optional helper record shapes
 
@@ -60,7 +68,13 @@ Checker writes requirement-side `baseline.md` before examining implementation. I
 {"format":"millrace-lad-baseline-freeze/v1","occurrence_id":"<checker occurrence UUID>","criteria":["<original criterion ID>"],"path":"lad-results/<checker occurrence UUID>/baseline.md","sha256":"<exact baseline.md byte digest>"}
 ```
 
-The result’s `data.baseline_freeze` is a `{path, sha256}` ref to that file. The JSON file is also listed in `artifacts`. It has no self-digest.
+Set both the result's `data.baseline_freeze` and the freeze file's `artifacts` entry to this exact ref shape:
+
+```json
+{"path":"baseline-freeze.json","sha256":"<SHA-256 of final baseline-freeze.json file bytes>"}
+```
+
+Both outer paths are relative to this occurrence's result directory, `lad-results/<checker occurrence UUID>/`; do not repeat that directory in either ref. Their digest hashes the final raw JSON file bytes, not canonicalized JSON. Inside that JSON file, `path` remains `lad-results/<checker occurrence UUID>/baseline.md`, relative to `foreground_root`, and `sha256` hashes the exact baseline Markdown bytes. The freeze JSON has no self-digest. These byte hashes differ from the canonical accepted-result digest described above.
 
 Before downstream dispatch, the accepting boundary independently writes and pins the accepted freeze record under `lad-state/baseline-pins/`. It keeps one immutable backup of the exact original baseline bytes beside that pin. The pin remains tied to the original freeze identity and expected SHA-256. The backup never replaces or changes the pin. Do not change the original pin or backup. Do not invent another pin or replace either with a worker-controlled hash. Only an explicit new-baseline invalidation permits a new requirement freeze.
 
@@ -76,16 +90,69 @@ After exact restoration, record `BASELINE_TAMPER`. Route through Consultant to a
 | --- | --- | --- |
 | Recon | `intake.md` | Map architecture, entrypoints, instructions, checks, integration boundaries, dirty ownership, and reproduction. PASS recommends Planner. Findings recommend Consultant. Execution errors recommend Troubleshooter. |
 | Planner | `specification.md` | PASS supplies `criteria:[{id,text,request_quote}]`. IDs are unique and stable. Every quote is exact, nonblank, and present in the original request. Keep a sufficient original specification unchanged. Planner stays direct and works alone. |
-| Manager | `plan-check.md` plus each packet draft | PASS supplies `plan:[{id,lineage,criteria,depends_on,paths,input_refs,markdown}]`. Cover each original criterion. Dependencies point to earlier lineages. Paths stay under target. Refs pin accepted occurrence results. Preserve unaffected accepted packets. |
+| Manager | `plan-check.md` plus each packet draft | PASS supplies `plan:[{id,lineage,criteria,depends_on,paths,input_refs,markdown}]`. Each `markdown` value is a packet draft path relative to this occurrence's result directory, such as `packets/packet-1.md`, matching an exact listed `artifacts[].path` and its final-byte SHA-256. Write that draft using the captured `templates/packet.md`, including the literal `Development check:` label and meaningful verification. Cover each original criterion. Dependencies point to earlier lineages. Target `paths` stay under the target root. `input_refs` pin accepted occurrence results. Preserve unaffected accepted packets. |
 | Builder | `implementation.md` | Edit only assigned packet paths. Report current source and actual checks. Findings must be inspectable to pass the selected inspection route. |
 | Checker | `baseline.md`, `baseline-freeze.json`, and `review.md` | Freeze before implementation exposure. PASS lists every packet criterion in `criteria_checked` and a valid `data.baseline_freeze` ref. Errors or human holds before freeze may omit baseline artifacts. |
-| Fixer | `repair.md` | `baseline` echoes the pinned baseline. `finding_ids` preserves assigned stable IDs. Do not redefine success to fit code. |
-| Doublechecker | `review.md` | Echo the pinned baseline and exact Fixer input. PASS checks all packet criteria. The second actual Fixer–Doublechecker pair opens Learning, including after a pass. The graph saves the next route before the ACK wait. A repeated same-criterion gap needs a material new basis. |
-| Troubleshooter | `diagnosis.md` | `data` links `trigger_occurrence_id`, `cause_id`, `resume_role`, and `repair_verified`. A verified repaired review recommends Doublechecker. A verified repaired prerequisite names the exact resume role. If the same repaired cause recurs, the graph selects Consultant. An unrelated execution cause may select Troubleshooter again. A same-criterion gap needs a material new basis. Do not rotate roles to evade an unchanged problem. |
+| Fixer | `repair.md` | Set `data.baseline` equal to the entire prepared `input.baseline`, preserving nested metadata. `data.finding_ids` is a list whose set equals the prepared `input.finding_ids` set; no additional order or uniqueness rule applies. Do not substitute a baseline digest/ref or a subset of findings. Do not redefine success to fit code. |
+| Doublechecker | `review.md` | Set `data.baseline` equal to the entire prepared `input.baseline` and `data.fixer` equal to the entire prepared `input.fixer`, preserving nested metadata. PASS supplies `data.criteria_checked` as a list whose set equals the `input.packet.criteria` set; no additional order or uniqueness rule applies. The second actual Fixer–Doublechecker pair opens Learning, including after a pass. The graph saves the next route before the ACK wait. A repeated same-criterion gap needs a material new basis. |
+| Troubleshooter | `diagnosis.md` | Successful repair supplies `data.trigger_occurrence_id=input.pending.occurrence_id`, `data.cause_id=input.pending.cause_id` (null when absent), `data.resume_role=input.pending.target`, and boolean `data.repair_verified=true`. `PASS_REVIEW_REPAIRED` also requires the prepared inspectable Fixer; do not fabricate one. A verified repaired review recommends Doublechecker. A verified repaired prerequisite names the exact resume role. If the same repaired cause recurs, the graph selects Consultant. An unrelated execution cause may select Troubleshooter again. A same-criterion gap needs a material new basis. Do not rotate roles to evade an unchanged problem. |
 | Consultant | `diagnosis.md` | Echo the pending `trigger_occurrence_id` and `cause_id`. Provide a nonblank `next_step` and a `next_evidence` `{path, sha256}` ref listed in this occurrence’s artifacts. The artifact must contain the literal step. The graph refuses a repeated proposal when `cause_id`, `next_step`, and `source_sha256` match an accepted Consultant result. No fixed repair counter applies. Select only a supported specification, packet, or execution repair. NO_SAFE_ROUTE needs human evidence. Do not approve a scope expansion or create a self-loop. |
-| Updater | `completion.md` | PASS echoes the current passing review and maps every packet criterion to observed evidence. Current source must still match that review. Do not commit or publish. |
-| Learning | `assessment.md` and optional `candidate.md` | `pending_route` exactly echoes the saved request. Assess two actual review pairs. Distinguish missing or unclear guidance from noncompliance and unrelated failure. Candidates stay separate and inactive. |
-| Arbiter | `verdict.md` | `verdict` covers each original criterion exactly with `pass`, `gap`, or `unavailable` plus evidence. PASS requires drained accepted work and every criterion passing at current source. A real original-criterion gap may recommend Manager. Do not invent a criterion ID. |
+| Updater | `completion.md` | PASS copies `input.review` unchanged into `data.review` and supplies `data.criteria_evidence` for exactly the current packet criterion IDs, with nonblank evidence strings. Current source must still match that review. See the exact fields below. Do not commit or publish. |
+| Learning | `assessment.md` and optional `candidate.md` | `data.pending_route` exactly equals the entire prepared `input.pending`, also `input.learning_request.payload.pending_route`. Copy that nested route value, not the whole `learning_request` or only its target. Assess two actual review pairs. Distinguish missing or unclear guidance from noncompliance and unrelated failure. Candidates stay separate and inactive. |
+| Arbiter | `verdict.md` | `data.verdict` is an object keyed by exactly every original `input.criteria[].id`. Each value has exactly `{status,evidence}`, with `status` equal to `pass`, `gap`, or `unavailable` and nonblank text `evidence`. PASS requires drained accepted work and every criterion passing at current source. FINDINGS requires an actual `gap`; a real original-criterion gap may recommend Manager. Do not invent a criterion ID. |
+
+### Updater PASS fields
+
+Set `data.review` to a deep-equal copy of the prepared `input.review` object,
+with exactly its three keys: `occurrence_id`, `source_sha256`, and `baseline`.
+Copy the nested baseline unchanged too; do not expand the review into a summary
+or an accepted-result/artifact ref. `result.source_sha256` must still match that
+passing review and the current target map.
+
+`data.criteria_evidence` is a mapping whose keys are exactly the IDs in
+`input.packet.criteria`. Each value is a nonblank UTF-8 evidence string without
+NUL characters, describing observed evidence for that criterion. Use actual
+checks and limitations; `criteria_completed` does not supply this mapping.
+For example, construct the role's `data` using the prepared identities and
+replace each evidence string with the actual observation:
+
+```python
+data = {
+    "review": input_record["review"],
+    "criteria_evidence": {
+        criterion: "Observed check and evidence for this criterion"
+        for criterion in input_record["packet"]["criteria"]
+    },
+}
+```
+
+### Manager plan fields
+
+For Manager PASS, `data.plan` is a nonempty ordered list covering the accepted
+original criteria. Each row has exactly these seven fields; use the prepared
+criterion IDs and accepted-input identities in the example below:
+
+```json
+{"plan":[{"id":"PKT-01","lineage":"labels_impl","criteria":["C1"],"depends_on":[],"paths":["labels.py","test_labels.py"],"input_refs":[{"occurrence_id":"<accepted occurrence UUID>","sha256":"<accepted canonical result SHA-256>"}],"markdown":"packets/PKT-01.md"}]}
+```
+
+| Field | Existing acceptance rule |
+| --- | --- |
+| `id`, `lineage` | Each matches `[A-Za-z][A-Za-z0-9_-]{0,63}`: 1–64 characters, starting with an ASCII letter. Lineages are unique within the plan and remain stable across replanning. |
+| `criteria` | Nonempty list of accepted original criterion IDs. The complete plan must cover every original criterion and introduce none. |
+| `depends_on` | List of distinct lineage IDs from earlier rows; use an empty list when none are required. These values name earlier `lineage` fields. |
+| `paths` | Nonempty list of nonblank canonical relative target paths. Absolute paths, `..` components, `.`, empty paths and non-normalized spellings refuse. No component may be `.git`, `.env`, `.env.local`, `credentials.json`, `secrets.json`, `lad-state` or `lad-results`. |
+| `input_refs` | List, which may be empty. Every entry has exactly `{occurrence_id,sha256}`: an already accepted occurrence ID and that accepted full-result canonical JSON SHA-256. Set `occurrence_id` to a key from the prepared `accepted_input_refs` mapping and `sha256` to that entry's digest, also recorded in `accepted_inputs` for the same key. Copy only these two fields; artifact-file paths and byte hashes belong in `artifacts`. |
+| `markdown` | Nonblank packet draft path relative to this occurrence's result directory, exactly matching one listed `artifacts[].path` with its final-byte hash. Its UTF-8 draft must contain the literal `Development check:` label and meet the common evidence Markdown rules. Use the captured `templates/packet.md`. |
+
+When a plan already exists, retain its complete lineage set. Keep all seven
+fields of each unaffected accepted packet equal to its accepted values.
+Optional `data.affected_lineages` is a list and defaults to empty. Nonempty values
+may name only existing lineages during an actual saved remediation; every named
+lineage must cover at least one of that remediation's pending original criteria.
+Only that eligible remediation permits reopening an affected accepted packet.
+Runtime owns accepted-plan metadata and the packet cursor; author only the seven
+row fields.
 
 `context/routes.md` and `workflow.json` define every role and accepted outcome. Role recommendations do not route work. Deterministic guards own invalid-result observations, transport recovery, acceptance, and state changes.
 

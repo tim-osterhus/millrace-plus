@@ -621,8 +621,8 @@
       },
       {
         "path": "context/role-contracts.md",
-        "sha256": "d4f36c43069418a18b597fd6811495f5895bb41c6f1580658ab4d2f46a125a35",
-        "bytes": 14925
+        "sha256": "8f6725879835314a99a54e099ab45f5458f4877beb5147bf954d12d4f597c70f",
+        "bytes": 23242
       },
       {
         "path": "context/routes.md",
@@ -736,8 +736,8 @@
       },
       {
         "path": "scripts/prepare_role.py",
-        "sha256": "c4edbc252269680867e8f6a82eb277e827f70fff0a658ac7b482e1b38c8842a4",
-        "bytes": 18491
+        "sha256": "2af632d363b85cd80eef748156a6e8012211846f49704e9f6ee7244757b33baf",
+        "bytes": 18570
       },
       {
         "path": "scripts/session_compat.py",
@@ -766,13 +766,13 @@
       },
       {
         "path": "templates/packet.md",
-        "sha256": "6b405674ce8d1ba743de5727e1f75b414e21eb07ecbf889503310a8bebf9db7d",
-        "bytes": 885
+        "sha256": "a009aa3d3887a26109548aaea5f1be452b549bf4f43e67704c7d1a36fd5c505b",
+        "bytes": 896
       },
       {
         "path": "templates/result.md",
-        "sha256": "f3734a2b8de62487371b8833e8354cd2d5de8d52d7cf536dbd76c0cc0c77894e",
-        "bytes": 1365
+        "sha256": "6d7f083473047443fdbcda25bc211b6edfe85ae941d7b1694b17b55cf3324e30",
+        "bytes": 1764
       },
       {
         "path": "templates/state.md",

@@ -327,6 +327,8 @@ def prepare(
         "templates/result.md",
         "templates/assignment.md",
     ]
+    if role == "manager":
+        guidance_names.append("templates/packet.md")
     if role in {"planner", "manager", "checker", "arbiter", "consultant"}:
         guidance_names.append("context/routes.md")
     if role != "planner":
