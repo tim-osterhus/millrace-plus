@@ -2370,6 +2370,111 @@ def test_explicit_plane_without_run_gate_does_not_emit_run_resume(setup, monkeyp
     assert len(setup.peer.sent) == before + 1
 
 
+def unfinished_worker(next_node="next"):
+    occurrence = uuid.uuid4().hex
+    return {
+        "terminal": None,
+        "request": None,
+        "occurrences": {occurrence: {"role": "planner"}},
+        "continuation": {
+            "node": next_node,
+            "occurrence_id": occurrence,
+            "lineage": "unpacketized",
+            "cleanup_required": True,
+        },
+    }
+
+
+@pytest.mark.parametrize("run_gate", [False, True])
+def test_unfinished_accepted_boundary_continues_exact_plane_without_clearing_cleanup(
+    setup, monkeypatch, run_gate
+):
+    from millrace_plus import lad_service_disposition as disposition
+
+    active, task, call, evidence = plane_child(setup, monkeypatch)
+    run = setup.peer.runs[(call["instance_id"], call["run_id"])]
+    if run_gate:
+        run["run_gate"] = {"reason": "operator_pause", "request_id": uuid.uuid4().hex}
+    state = unfinished_worker()
+    monkeypatch.setattr(disposition, "_load_worker", lambda _: copy.deepcopy(state))
+    decision = uuid.uuid4().hex
+    before = len(setup.peer.sent)
+    if run_gate:
+        with pytest.raises(IntakeError, match="separate_run_resume_required"):
+            active.decide(
+                task["task_id"], "continue", decision, evidence,
+                resume_plane="foreground",
+            )
+        assert [r["operation"] for r in setup.peer.sent[before:]] == ["resume_plane"]
+        # Core's resume-plane moves the cursor to its saved resume target.
+        run["planes"]["foreground"]["cursor"] = "next"
+        active.decide(task["task_id"], "continue", uuid.uuid4().hex, evidence)
+        assert [r["operation"] for r in setup.peer.sent[before:]] == [
+            "resume_plane", "resume_run"
+        ]
+    else:
+        active.decide(
+            task["task_id"], "continue", decision, evidence,
+            resume_plane="foreground",
+        )
+        assert [r["operation"] for r in setup.peer.sent[before:]] == ["resume_plane"]
+    assert state["continuation"]["cleanup_required"] is True
+    assert active.service.intake.tasks(task["task_id"])[0]["terminal_receipt"] is None
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "wrong-node", "missing-continuation", "missing-node", "unknown-occurrence",
+        "missing-occurrence", "terminal", "learning-request", "wrong-plane",
+        "default-with-paused-plane", "live-writer", "not-quiescent",
+    ],
+)
+def test_unfinished_continuation_refuses_wrong_or_unclosed_authority(
+    setup, monkeypatch, mutation
+):
+    from millrace_plus import lad_service_disposition as disposition
+
+    active, task, call, evidence = plane_child(setup, monkeypatch)
+    run = setup.peer.runs[(call["instance_id"], call["run_id"])]
+    state = unfinished_worker()
+    selector = "foreground"
+    if mutation == "wrong-node":
+        state["continuation"]["node"] = "prepare_other_role"
+    elif mutation == "missing-continuation":
+        state.pop("continuation")
+    elif mutation == "missing-node":
+        state["continuation"].pop("node")
+    elif mutation == "unknown-occurrence":
+        state["continuation"]["occurrence_id"] = uuid.uuid4().hex
+    elif mutation == "missing-occurrence":
+        state["continuation"]["occurrence_id"] = None
+    elif mutation == "terminal":
+        state["terminal"] = "succeeded"
+    elif mutation == "learning-request":
+        state["request"] = {"kind": "CLOSE"}
+    elif mutation == "wrong-plane":
+        run["planes"]["learning"] = copy.deepcopy(run["planes"]["foreground"])
+        selector = "learning"
+    elif mutation == "default-with-paused-plane":
+        run["run_gate"] = {"reason": "operator_pause", "request_id": uuid.uuid4().hex}
+        selector = None
+    elif mutation == "live-writer":
+        run["planes"]["foreground"]["active_invocation"] = uuid.uuid4().hex
+    elif mutation == "not-quiescent":
+        run["quiescent"] = False
+    monkeypatch.setattr(disposition, "_load_worker", lambda _: copy.deepcopy(state))
+    before = len(setup.peer.sent)
+    with pytest.raises((IntakeError, SubworkflowError)):
+        active.decide(
+            task["task_id"], "continue", uuid.uuid4().hex, evidence,
+            resume_plane=selector,
+        )
+    assert "resume_plane" not in [r["operation"] for r in setup.peer.sent[before:]]
+    assert "resume_run" not in [r["operation"] for r in setup.peer.sent[before:]]
+    assert active.service.intake.tasks(task["task_id"])[0]["terminal_receipt"] is None
+
+
 def prepared_plane(f, monkeypatch, *, plane_joined=True):
     active, task, call, evidence = plane_child(
         f, monkeypatch, lost=True, plane_joined=plane_joined

@@ -102,6 +102,53 @@ def _settings(target: Path) -> dict[str, object]:
     }
 
 
+def _unfinished_continuation_ready(
+    state: dict[str, object], run: dict[str, object], resume_plane: str | None
+) -> bool:
+    """Match unfinished LAD work to Core's exact already-selected next node."""
+    continuation = state.get("continuation")
+    if (
+        not isinstance(continuation, dict)
+        or set(continuation) != {
+            "node", "occurrence_id", "lineage", "cleanup_required"
+        }
+        or continuation["cleanup_required"] is not True
+        or not {"terminal", "request", "occurrences"} <= state.keys()
+        or state.get("terminal") is not None
+        or state.get("request") is not None
+        or not isinstance(continuation["node"], str)
+        or not continuation["node"]
+        or not isinstance(continuation["lineage"], str)
+        or not continuation["lineage"]
+        or run.get("status") != "paused"
+        or run.get("quiescent") is not True
+    ):
+        return False
+    planes = run.get("planes")
+    plane = planes.get("foreground") if isinstance(planes, dict) else None
+    if not isinstance(plane, dict) or plane.get("active_invocation") is not None:
+        return False
+    occurrence = continuation["occurrence_id"]
+    occurrences = state["occurrences"]
+    if (
+        not isinstance(occurrence, str)
+        or not isinstance(occurrences, dict)
+        or occurrence not in occurrences
+    ):
+        return False
+    if resume_plane == "foreground" and plane.get("status") == "paused":
+        selected = plane.get("resume_target") or plane.get("cursor")
+    elif (
+        resume_plane is None
+        and run.get("run_gate") is not None
+        and plane.get("status") == "ready"
+    ):
+        selected = plane.get("cursor")
+    else:
+        return False
+    return continuation["node"] == selected
+
+
 def _capacity(
     config: dict[str, object],
     settings: dict[str, object],
@@ -1889,8 +1936,24 @@ class Runtime:
                         / "operator-intent.json",
                         read_ref(self.service, operator),
                     )
-            elif mapping(state["continuation"]).get("cleanup_required") is not False:
-                raise IntakeError("lad_cleanup_required")
+            elif (
+                not isinstance(state.get("continuation"), dict)
+                or state["continuation"].get("cleanup_required") is not False
+            ):
+                # Unfinished CLOSE/ACK is not permission to skip cleanup, and
+                # does not prohibit continuing the exact saved work. Recheck
+                # ledger/cursor agreement under the original Core version;
+                # network operations remain outside this snapshot scope.
+                with _core().exclusive_run_snapshot(
+                    instance,
+                    run_id,
+                    state_home=Path(str(self.intent["core_state_home"])),
+                    expected_state_version=int(run["state_version"]),
+                ) as guarded:
+                    state = _load_worker(call)
+                    if not _unfinished_continuation_ready(state, guarded, resume_plane):
+                        raise IntakeError("lad_cleanup_required")
+                    run = guarded
             before = copy.deepcopy(self.record)
             if mapping(item["resume"])["envelope"] is None:
                 if resume_plane is not None:
