@@ -46,9 +46,10 @@ def result_for(
     lineage = item["lineage"]
     output = workspace / "lad-results" / oid
     output.mkdir(parents=True, exist_ok=True)
+    multi = scenario == "many_packets" or scenario.startswith("two_gates")
     function = (
         item["packet"]["criteria"][0]
-        if scenario == "many_packets" and item["packet"]
+        if multi and item["packet"]
         else "answer"
     )
     if role == "checker":
@@ -89,8 +90,11 @@ def result_for(
                 "request_quote": "answer() returns 42",
             }
         ]
-    if role == "planner" and scenario == "many_packets":
-        names = ["answer"] + ["answer_" + str(index) for index in range(1, 61)]
+    if role == "planner" and multi:
+        names = ["answer"] + [
+            "answer_" + str(index)
+            for index in range(1, 61 if scenario == "many_packets" else 2)
+        ]
         data["criteria"] = [
             {
                 "id": name,
@@ -126,7 +130,7 @@ def result_for(
                 "markdown": "packet.md",
             }
         ]
-        if scenario == "many_packets" and not original:
+        if multi and not original:
             data["plan"] = [
                 {
                     "id": criterion["id"],
@@ -146,14 +150,14 @@ def result_for(
         )
     if role == "builder":
         target.mkdir(exist_ok=True)
-        function = (
-            item["packet"]["criteria"][0] if scenario == "many_packets" else "answer"
+        gated = scenario in {"repair", "gate", "unresolved"} or (
+            scenario.startswith("two_gates")
         )
         (target / (function + ".py")).write_text(
             "def "
             + function
             + "():\n    return "
-            + ("0" if scenario in {"repair", "gate", "unresolved"} else "42")
+            + ("0" if gated else "42")
             + "\n"
         )
     if role == "fixer":
@@ -162,11 +166,11 @@ def result_for(
             row["role"] == "fixer" and row["lineage"] == lineage
             for row in state["occurrences"].values()
         )
-        fixed = scenario == "repair" or (scenario == "gate" and count >= 2)
-        (target / "answer.py").write_text(
-            "def answer():\n    return 42\n"
-            if fixed
-            else "def answer():\n    return 0\n"
+        fixed = scenario == "repair" or (
+            (scenario == "gate" or scenario.startswith("two_gates")) and count >= 2
+        )
+        (target / (function + ".py")).write_text(
+            "def " + function + "():\n    return " + ("42" if fixed else "0") + "\n"
         )
     if role in {"checker", "doublechecker"}:
         data["criteria_checked"] = list(item["packet"]["criteria"])
@@ -175,9 +179,6 @@ def result_for(
         if role == "doublechecker":
             data.update(baseline=item["baseline"], fixer=item["fixer"])
         namespace = {}
-        function = (
-            item["packet"]["criteria"][0] if scenario == "many_packets" else "answer"
-        )
         code = (target / (function + ".py")).read_text()
         exec(compile(code, function + ".py", "exec"), namespace)
         observed = namespace[function]()
@@ -187,9 +188,9 @@ def result_for(
             findings = [
                 {
                     "id": "wrong-answer",
-                    "criterion": "answer",
-                    "path": "answer.py",
-                    "reproduction": "answer() == 0",
+                    "criterion": function,
+                    "path": function + ".py",
+                    "reproduction": function + "() == 0",
                     "evidence": "Independent execution found zero rather than 42.",
                 }
             ]
@@ -270,7 +271,7 @@ def result_for(
         "42. Original criterion quote and stable rubric: "
         + json.dumps(data.get("criteria")),
         "manager": "Whole-plan check: all original criteria are owned, packet paths "
-        "are explicit, dependencies precede consumers, and execution is sequential. "
+        "are explicit, dependencies precede consumers, and execution is sequential.\n"
         "Development check: load this packet's callable; assert its result is 42. "
         "This check needs only the file created in this packet, not future work. "
         "Draft plan: " + json.dumps(data.get("plan"), sort_keys=True),
@@ -316,6 +317,9 @@ def result_for(
         "alone is insufficient. Per-criterion current-source verdict: "
         + json.dumps(data.get("verdict"), sort_keys=True),
     }
+    invalid = role == "learning" and scenario == "two_gates_invalid" and (
+        not state["learning"]
+    )
     for name in names:
         content = (
             f"# {role} observed evidence\n\nSession: {state['session_id']}\n"
@@ -329,7 +333,9 @@ def result_for(
             + details[role]
             + "\n\n"
             + f"Source: {digest(canonical(source(foreground)))}\n"
-            f"Input: {item['input_sha256']}\n\n## Outcome\n{outcome}; "
+            f"Input: {item['input_sha256']}\n\n"
+            + ("" if invalid else "## Outcome\n")
+            + f"{outcome}; "
             "the occurrence result contains exact identities and structured evidence.\n"
         )
         path = output / name
@@ -400,6 +406,19 @@ def result_for(
 
 if __name__ == "__main__":
     role, scenario = sys.argv[1:3]
+    first_learning = scenario.startswith("two_gates_") and role in {
+        "learning", "prepare_learning"
+    } and not load(Path.cwd().parent / "foreground")["learning"]
+    if role == "prepare_learning":
+        # Test graph slice: fail before any reservation on the first REQUEST only.
+        if first_learning and scenario == "two_gates_prepare":
+            raise SystemExit(7)
+        import learning_seam
+
+        learning_seam.run(learning_seam.learning_prepare)
+        raise SystemExit(0)
+    if role == "learning" and first_learning and scenario == "two_gates_native":
+        raise SystemExit(7)  # A stopped native error without a valid result.
     if scenario == "technical_once":
         selected = json.loads(Path("lad-state/active-role.json").read_bytes())
         if selected["replacement_of"] is None:

@@ -27,6 +27,7 @@
     "context/harness.md",
     "context/role-contracts.md",
     "context/routes.md",
+    "context/routing-policy.json",
     "profiles/claude.json",
     "prompts/arbiter.md",
     "prompts/builder.md",
@@ -46,6 +47,7 @@
     "scripts/lad_state.py",
     "scripts/learning_seam.py",
     "scripts/prepare_role.py",
+    "scripts/presentation.py",
     "scripts/setup_intake.py",
     "templates/assignment.md",
     "templates/bootstrap.md",
@@ -5347,37 +5349,31 @@
             }
           },
           "on_error": {
-            "pause": {
-              "reason": "lad_deterministic_failure"
-            }
+            "goto": "record_learning_prepare_failure"
           },
           "on_unknown": {
-            "pause": {
-              "reason": "lad_unknown_deterministic_outcome"
-            }
+            "goto": "record_learning_prepare_failure"
           }
         },
-        "prepare_learning_replacement": {
+        "record_learning_prepare_failure": {
           "invoke": {
             "binding": "command",
             "timeout_seconds": 90,
             "config": {
               "script": "scripts/learning_seam.py",
               "args": [
-                "replace"
+                "fail",
+                "--diagnostic",
+                "preparation_failed"
               ]
             }
           },
           "result": "json-v1",
           "outcomes": [
-            "READY",
             "ACK",
             "REFUSED"
           ],
           "on": {
-            "READY": {
-              "goto": "learning"
-            },
             "ACK": {
               "goto": "emit_ack"
             },
@@ -5513,10 +5509,49 @@
             }
           },
           "on_error": {
-            "goto": "prepare_learning_replacement"
+            "goto": "record_learning_failure"
           },
           "on_unknown": {
-            "goto": "prepare_learning_replacement"
+            "goto": "record_learning_failure"
+          }
+        },
+        "record_learning_failure": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "fail",
+                "--diagnostic",
+                "native_completion_failed"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACK",
+            "REFUSED"
+          ],
+          "on": {
+            "ACK": {
+              "goto": "emit_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_learning_pass": {
@@ -5535,8 +5570,7 @@
           "outcomes": [
             "ACK",
             "REFUSED",
-            "INVALID_RESULT",
-            "INVALID_ACK"
+            "INVALID_RESULT"
           ],
           "on": {
             "ACK": {
@@ -5548,10 +5582,7 @@
               }
             },
             "INVALID_RESULT": {
-              "goto": "prepare_learning_replacement"
-            },
-            "INVALID_ACK": {
-              "goto": "emit_ack"
+              "goto": "record_learning_invalid"
             }
           },
           "on_error": {
@@ -5581,8 +5612,7 @@
           "outcomes": [
             "ACK",
             "REFUSED",
-            "INVALID_RESULT",
-            "INVALID_ACK"
+            "INVALID_RESULT"
           ],
           "on": {
             "ACK": {
@@ -5594,10 +5624,7 @@
               }
             },
             "INVALID_RESULT": {
-              "goto": "prepare_learning_replacement"
-            },
-            "INVALID_ACK": {
-              "goto": "emit_ack"
+              "goto": "record_learning_invalid"
             }
           },
           "on_error": {
@@ -5625,16 +5652,11 @@
           },
           "result": "json-v1",
           "outcomes": [
-            "REPLACE_LEARNING",
             "ACK",
             "REFUSED",
-            "INVALID_RESULT",
-            "INVALID_ACK"
+            "INVALID_RESULT"
           ],
           "on": {
-            "REPLACE_LEARNING": {
-              "goto": "prepare_learning_replacement"
-            },
             "ACK": {
               "goto": "emit_ack"
             },
@@ -5644,10 +5666,7 @@
               }
             },
             "INVALID_RESULT": {
-              "goto": "prepare_learning_replacement"
-            },
-            "INVALID_ACK": {
-              "goto": "emit_ack"
+              "goto": "record_learning_invalid"
             }
           },
           "on_error": {
@@ -5677,8 +5696,7 @@
           "outcomes": [
             "ACK",
             "REFUSED",
-            "INVALID_RESULT",
-            "INVALID_ACK"
+            "INVALID_RESULT"
           ],
           "on": {
             "ACK": {
@@ -5690,10 +5708,7 @@
               }
             },
             "INVALID_RESULT": {
-              "goto": "prepare_learning_replacement"
-            },
-            "INVALID_ACK": {
-              "goto": "emit_ack"
+              "goto": "record_learning_invalid"
             }
           },
           "on_error": {
@@ -5723,8 +5738,7 @@
           "outcomes": [
             "ACK",
             "REFUSED",
-            "INVALID_RESULT",
-            "INVALID_ACK"
+            "INVALID_RESULT"
           ],
           "on": {
             "ACK": {
@@ -5736,10 +5750,46 @@
               }
             },
             "INVALID_RESULT": {
-              "goto": "prepare_learning_replacement"
-            },
-            "INVALID_ACK": {
+              "goto": "record_learning_invalid"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "record_learning_invalid": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/learning_seam.py",
+              "args": [
+                "fail",
+                "--diagnostic",
+                "invalid_assessment"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACK",
+            "REFUSED"
+          ],
+          "on": {
+            "ACK": {
               "goto": "emit_ack"
+            },
+            "REFUSED": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
             }
           },
           "on_error": {

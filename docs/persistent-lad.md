@@ -13,6 +13,57 @@ used-copy qualification remain separate. The earlier offline workload-equivalent
 history study remains partial/unqualified and is not elapsed-day or
 live-production qualification.
 
+## New-copy routing policy (L-R1)
+
+New `bundled:lad` copies capture `context/routing-policy.json`
+(`millrace-lad-routing-policy/v1`). The initializer and role preparation refuse a
+missing, unknown or edited-to-unsupported policy before any role runs. Because the
+policy is under `context/`, any edit changes the captured guidance identity and
+stales in-flight occurrences and a pending Learning request.
+
+Acceptance validates raw result identity, authority and every raw artifact
+SHA-256 first. Only then does it check one finite presentation view: BOM, CRLF and
+outer blank lines, canonical Evidence/Outcome label spelling and a generated
+identity header when identities are missing. Raw bytes and accepted digests are
+unchanged; an immutable `lad-state/presentation/<occurrence>/<raw-digest>.json`
+record pins raw and view hashes. Every ordinary load recomputes the complete
+record for each accepted current-contract result from its raw bytes, prepared
+input and the occurrence's captured policy, and refuses a missing or different
+record. The history log's raw identity and
+below-5,120-byte rules are unchanged; the 100-character floor is removed.
+
+Intentional new-copy tightenings, compared with the older substring checks:
+
+- a label must begin a line; mid-line `## Evidence`, `Evidence:` or
+  `Development check:` text is not a section;
+- labels that appear only in fenced code or blockquotes refuse, including fences
+  or quotes opened inside a list item;
+- empty Evidence, Outcome or development-check bodies refuse;
+- duplicate sections or checks with different bodies refuse, including a later
+  heading whose title merely starts with `Evidence` or `Outcome`;
+- explicit self-identity labels (`Session:`, `Occurrence:`, `Role:`, `Lineage:`
+  and the combined labels) that name another occurrence, conflict with each other
+  or carry malformed values refuse.
+
+These refusals use existing invalid-result recovery. Copies captured before this
+policy, retained v1 occurrences and their accepted results keep their original
+interpretation; nothing is converted or reclassified. An explicit legacy upgrade
+must install `context/routing-policy.json` together with the candidate scripts
+and declare `scripts/presentation.py` and `context/routing-policy.json` (with
+`scripts/session_compat.py`) in the resubmitted graph's `control_files`. Core runs
+scripts from the captured control snapshot, so an omitted file makes preparation
+refuse with `routing_policy_invalid` before any Learning dispatch.
+
+Learning assesses once per packet after the second evaluated Fixer–Doublechecker
+pair. A native Learning error or unknown result (Core's stopped-writer error
+edge), an invalid assessment, an error marker including
+`ERROR_TRANSIENT_RESOLVED`, or a failed preparation records one failed disposition
+and returns the original REQUEST's ACK and saved route. There is no replacement
+Learning, retry or later reentry for that packet. Unknown writers, changed
+source/guidance/route and conflicting records hold. L-R1 changes no service
+continuation, ownership, join, FIFO or terminal CLOSE/ACK behavior; Native14
+acceptance remains evidence for its original artifacts only.
+
 ## Historical qualification evidence
 
 The earlier candidate passed 201 runtime cases, seven unaffected corrective

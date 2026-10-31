@@ -15,6 +15,7 @@ from lad_state import (
     manifest,
     new_state,
     roots,
+    routing_policy,
     run,
     shared_target,
 )
@@ -32,6 +33,7 @@ def main() -> None:
     parser.add_argument("--catalog-home", type=Path)
     args = parser.parse_args()
     foreground, project = roots(args.project_root)
+    routing_policy()  # Refuse unknown or missing captured policy before any role.
     if args.upgrade_session:
         captured, _, _ = manifest(project)
         if captured is not None and "lad_target" in captured["inputs"]:

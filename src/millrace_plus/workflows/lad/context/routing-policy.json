@@ -1,0 +1,7 @@
+{
+  "format": "millrace-lad-routing-policy/v1",
+  "revision": 1,
+  "presentation_revision": "millrace-lad-presentation/v1",
+  "learning": "once-per-packet",
+  "provider_recovery": "disabled"
+}

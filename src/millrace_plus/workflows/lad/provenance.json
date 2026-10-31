@@ -606,28 +606,33 @@
     "destination_hashes": [
       {
         "path": "README.md",
-        "sha256": "3cd51962f28f0fd4e2c6091079d88de6f2f268bfa27f7dbd519353197395bc03",
-        "bytes": 3745
+        "sha256": "7d63efb251e7517b3407b1949bfc5bc8789b112bf7fb5a971167375335defa0f",
+        "bytes": 4032
       },
       {
         "path": "context/contracts.md",
-        "sha256": "4208ec2c9715e6aa9a6850f965d8876c88a79e2a8d4319a20f7da8d4d43b7991",
-        "bytes": 11247
+        "sha256": "fcb65e202783b952e5c54ecdff2d3e8c10e34aa8c495a379809c4bcfe6f83650",
+        "bytes": 11861
       },
       {
         "path": "context/harness.md",
-        "sha256": "d848679b95d00d7e14d4890ed3bd6f28842d59d5cbe5cbaa6a5d817667d16f5d",
-        "bytes": 5326
+        "sha256": "398c9a7e25547c8bb2d7e3345fabd969711cd836b040d3ed7d5dbdb277e9f096",
+        "bytes": 5412
       },
       {
         "path": "context/role-contracts.md",
-        "sha256": "8f6725879835314a99a54e099ab45f5458f4877beb5147bf954d12d4f597c70f",
-        "bytes": 23242
+        "sha256": "7453e6c7f7465d708a6e2c808e48cff6242bd7944ea45d66978ad2b16d6211a1",
+        "bytes": 26419
       },
       {
         "path": "context/routes.md",
-        "sha256": "119716cd4776b7e3066b3e6fca2133cde7209305ce16d21bd5021898427ce981",
-        "bytes": 4857
+        "sha256": "84399e91591361f1e7e4f31ca5fd2131316f1e35f2a4e5288fa2bf84242a23ff",
+        "bytes": 5119
+      },
+      {
+        "path": "context/routing-policy.json",
+        "sha256": "430433a3fca296d11d4a57136c8b8f9ac4cda6c5867ad93da26157d723c83036",
+        "bytes": 193
       },
       {
         "path": "foreground/README.md",
@@ -681,8 +686,8 @@
       },
       {
         "path": "prompts/learning.md",
-        "sha256": "8ed77919527cf9aa3073bbbcba24bd25269e13d74319cf9ee35f0efaab5a13c4",
-        "bytes": 3564
+        "sha256": "86a965d71297675e7fc13532c0658c80e46e11095a54418bf9d527ffa4945aa3",
+        "bytes": 3874
       },
       {
         "path": "prompts/manager.md",
@@ -711,33 +716,38 @@
       },
       {
         "path": "scripts/accept_role.py",
-        "sha256": "4fe82f97e9ccb19bc3dd6d3317461cde31d46a9ed308acbd22d56ab099e7c9b8",
-        "bytes": 30996
+        "sha256": "d0a5a56baa2cdd7c82a6dcc09417e7623d61af1b5409fa89da71fda525ec9018",
+        "bytes": 33025
       },
       {
         "path": "scripts/boundaries.py",
-        "sha256": "165468b2285896b8410c5643224d0fb5eee4cf48b574ea4e5524cb7e407c95fb",
-        "bytes": 27110
+        "sha256": "cd4828ec1d9975f794afc00e834df7397b30da7b8601eef3c711a0b2b600b573",
+        "bytes": 26537
       },
       {
         "path": "scripts/init_session.py",
-        "sha256": "dd7eb6a1804791cd85e96fc3d5ede79300c777ec8310bc5c476b2d6aac29c451",
-        "bytes": 6006
+        "sha256": "a6557ee92438ca9640cf8da812abb0914525d910aef4bf8bde5e5104708c7241",
+        "bytes": 6109
       },
       {
         "path": "scripts/lad_state.py",
-        "sha256": "953bd530bf66f36d549e4daec5738bb1c515619adedcea738010f20adda9ae9a",
-        "bytes": 35962
+        "sha256": "a2ffec607c7dc6978704c528607852812f259313a8ddae61d23993ebac136341",
+        "bytes": 40578
       },
       {
         "path": "scripts/learning_seam.py",
-        "sha256": "b8a9b2f79836eb9b2b89b7913d6214fe288555150ac1fa6f83b23374784b43a4",
-        "bytes": 13866
+        "sha256": "4a2b14365a8dce7eaeadad79e06977de400955acf054ce741c8f4e8049dd1695",
+        "bytes": 17452
       },
       {
         "path": "scripts/prepare_role.py",
-        "sha256": "2af632d363b85cd80eef748156a6e8012211846f49704e9f6ee7244757b33baf",
-        "bytes": 18570
+        "sha256": "e295da4317bdd60a7171ff53f31a667b374032f7d1a6932dd37419e51c7928de",
+        "bytes": 19004
+      },
+      {
+        "path": "scripts/presentation.py",
+        "sha256": "86056d92a6a6b9ae9b78aa4f7f3e8dbd1deaa8c8f29645c65ea0f86a6bbca2dd",
+        "bytes": 15410
       },
       {
         "path": "scripts/session_compat.py",
@@ -766,13 +776,13 @@
       },
       {
         "path": "templates/packet.md",
-        "sha256": "a009aa3d3887a26109548aaea5f1be452b549bf4f43e67704c7d1a36fd5c505b",
-        "bytes": 896
+        "sha256": "4ff409bcbbd221f70e0e2b3070524a1fa33df731cb924f58cf5d4ee7d5700ae0",
+        "bytes": 987
       },
       {
         "path": "templates/result.md",
-        "sha256": "6d7f083473047443fdbcda25bc211b6edfe85ae941d7b1694b17b55cf3324e30",
-        "bytes": 1764
+        "sha256": "aa0a315622ebbf110d985fd37a7cbbac88f30512fbfcb532543e9ebf6cb71b12",
+        "bytes": 1947
       },
       {
         "path": "templates/state.md",
@@ -781,8 +791,52 @@
       },
       {
         "path": "workflow.json",
-        "sha256": "c5c81e5ea9eafebe0a162fa2c49f87563a35e3924c271a1e9ae7fdc0f1b071b2",
-        "bytes": 155009
+        "sha256": "43f0b3b9e7c4f3ec707c2558279c4929c2a0c17557c08ed70456c27ea3dfc964",
+        "bytes": 156254
+      }
+    ]
+  },
+  "routing_followup_reference": {
+    "repository": "https://github.com/tim-osterhus/lad-factory",
+    "commit": "e4d587290ceeaa886c6486ae03bd9a15831cf691",
+    "compared_from": "a7e5a19a319786fb3138fb938764c5d77607b7b0",
+    "selection": "L-R1 finite presentation tolerance and one nonrecursive Learning assessment per packet",
+    "inputs": [
+      {
+        "original_path": "context/transitions.md",
+        "sha256": "959d8043ab3440d67a35f51aa9e12da1ac987e0d41b60e0f974ce8df95834326",
+        "bytes": 14378,
+        "source_url": "https://github.com/tim-osterhus/lad-factory/blob/e4d587290ceeaa886c6486ae03bd9a15831cf691/context/transitions.md",
+        "destinations": [
+          "scripts/learning_seam.py",
+          "scripts/boundaries.py",
+          "context/routes.md",
+          "workflow.json"
+        ],
+        "disposition": "Semantic input for once-per-packet Learning and failure-to-saved-route; Orchestrator and provider waiting not adopted"
+      },
+      {
+        "original_path": "context/contracts.md",
+        "sha256": "cc49b52b85c5062a777144b77ed753c081ceaf2d3cc6ccd36d910e698146253c",
+        "bytes": 8653,
+        "source_url": "https://github.com/tim-osterhus/lad-factory/blob/e4d587290ceeaa886c6486ae03bd9a15831cf691/context/contracts.md",
+        "destinations": [
+          "scripts/presentation.py",
+          "scripts/accept_role.py",
+          "context/role-contracts.md",
+          "context/contracts.md"
+        ],
+        "disposition": "Semantic input for presentation tolerance; Factory prose interpretation replaced by a finite deterministic label view"
+      },
+      {
+        "original_path": "prompts/learning.md",
+        "sha256": "81603f88554624397ac4a314d49e9153d448500388aacc43877710c4a1cdde00",
+        "bytes": 1871,
+        "source_url": "https://github.com/tim-osterhus/lad-factory/blob/e4d587290ceeaa886c6486ae03bd9a15831cf691/prompts/learning.md",
+        "destinations": [
+          "prompts/learning.md"
+        ],
+        "disposition": "Adapted no-reentry and failures-are-not-pairs guidance; Factory result markers not adopted"
       }
     ]
   }

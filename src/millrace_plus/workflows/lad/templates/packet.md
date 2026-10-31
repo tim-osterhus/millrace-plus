@@ -15,7 +15,7 @@ Applicable operator-selected Core limits: `<if any, and do not add workflow caps
 
 ## Evidence
 
-Explain whole-plan consistency, sufficiency, dependencies, and preserved accepted work. Manager drafts packets. Deterministic guards accept the canonical ordered plan.
+Keep exactly one development-check label at the start of a line, with nonblank check text. Explain whole-plan consistency, sufficiency, dependencies, and preserved accepted work. Manager drafts packets. Deterministic guards accept the canonical ordered plan.
 
 ## Outcome
 

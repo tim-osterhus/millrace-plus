@@ -56,7 +56,7 @@ Modified from the pinned Orchestrator and transition policy. See `PROVENANCE.md`
 - `updater:HUMAN_BLOCKED` → `PAUSE`
 - `learning:PASS` → `ACK`
 - `learning:FINDINGS` → `ACK`
-- `learning:ERROR_TRANSIENT_RESOLVED` → `REPLACE_LEARNING`, `ACK`
+- `learning:ERROR_TRANSIENT_RESOLVED` → `ACK`
 - `learning:ERROR` → `ACK`
 - `learning:HUMAN_BLOCKED` → `ACK`
 - `arbiter:PASS` → `CLOSE`
@@ -65,7 +65,7 @@ Modified from the pinned Orchestrator and transition policy. See `PROVENANCE.md`
 - `arbiter:ERROR_REPLACEMENT` → `REPLACE_ARBITER`
 - `arbiter:HUMAN_BLOCKED` → `PAUSE`
 
-The second actual Fixer–Doublechecker pair enters Learning, including a passing review. Learning preserves the saved pending route and emits ACK in the original Core run.
+The second actual Fixer–Doublechecker pair enters Learning once, including a passing review. Learning preserves the saved pending route and emits ACK in the original Core run. Its native error or unknown result goes to `record_learning_failure`; a failed preparation goes to `record_learning_prepare_failure`. Both record a failed assessment and then emit the original ACK.
 
 ## Deterministic result observations
 
@@ -75,7 +75,7 @@ The following names are guard outcomes, not role-authored markers:
 - `INVALID_REPEAT` indicates an unchanged invalid-result fingerprint. The graph selects Troubleshooter.
 - `INVALID_CONSULT` selects Consultant when the recorded recovery requires diagnosis beyond the current role.
 - `INVALID_HOLD` selects the human hold when the same invalid condition persists at Consultant.
-- Learning’s `INVALID_ACK` emits the saved ACK without changing the saved route.
+- Learning’s `INVALID_RESULT` selects `record_learning_invalid`, which records a failed assessment and emits the saved ACK. It creates no replacement Learning.
 - `TECHNICAL_RECOVERY` from replacement preparation means the failed prerequisite is unchanged. The graph selects Troubleshooter. A Troubleshooter replacement selects Consultant. A Consultant replacement selects human hold.
 
 `REFUSED`, deterministic command errors, and unknown command outcomes pause for reconciliation. Only a new source or technical observation can change the failure cause. These observations do not count attempts or grant new allowance. Existing Core writer barriers and source/guidance authority still govern all acceptance and continuation.

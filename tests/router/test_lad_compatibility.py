@@ -144,6 +144,12 @@ def install_candidate_scripts(project: Path) -> None:
 
     for script in (catalog.bundled_root() / "lad/scripts").glob("*.py"):
         shutil.copyfile(script, project / "scripts" / script.name)
+    # Candidate scripts require their explicit captured routing policy; it is
+    # installed with them, never inferred for a retained copy.
+    shutil.copyfile(
+        catalog.bundled_root() / "lad/context/routing-policy.json",
+        project / "context/routing-policy.json",
+    )
 
 
 def explicit_upgrade(
@@ -228,7 +234,13 @@ def test_explicit_upgrade_preserves_genuine_original_v7_seams(
     )
     graph_file = project / "workflow.json"
     graph = json.loads(graph_file.read_bytes())
-    graph["control_files"].append("scripts/session_compat.py")
+    # Explicit adoption declares every candidate control file the scripts read.
+    # Without the captured policy/presentation files, preparation refuses with
+    # routing_policy_invalid before Learning runs (no silent adoption).
+    graph["control_files"].extend([
+        "scripts/session_compat.py", "scripts/presentation.py",
+        "context/routing-policy.json",
+    ])
     assert graph["format"] == "millrace-router/v3"
     assert graph["limits"]["max_invocations"] == 40
     graph_file.write_text(json.dumps(graph))

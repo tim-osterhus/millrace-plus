@@ -223,28 +223,89 @@ def selected() -> tuple[Path, dict, dict]:
     return foreground, state, request
 
 
-def learning_prepare(replacement: bool) -> None:
+def learning_prepare() -> None:
     from prepare_role import prepare
 
-    foreground, state, request = selected()
-    try:
-        occurrence = prepare(
-            foreground, Path.cwd(), "learning", replacement=replacement
-        )
-    except LadError as exc:
-        if str(exc) != "unchanged_execution_prerequisite":
-            raise
-        current = load(foreground)
-        current["pending"] = request["payload"]["pending_route"]
-        current["learning"][request["lineage"]] = {
-            "disposition": "failed", "occurrence_id": current["active"].get("learning"),
-            "diagnostic": "unchanged_execution_prerequisite",
-        }
-        mark(current, "emit_ack")
-        save(foreground, current)
-        emit("ACK", "Recorded failed assessment; original pending route retained.")
-        return
+    foreground, _, _ = selected()
+    occurrence = prepare(foreground, Path.cwd(), "learning")
     emit("READY", "Reserved Learning=" + occurrence["occurrence_id"])
+
+
+def _prepared_for(occurrence: dict | None, request: dict) -> bool:
+    """True only for a Learning occurrence reserved for this exact REQUEST."""
+    prepared = occurrence and occurrence.get("learning_request")
+    return bool(prepared) and occurrence["role"] == "learning" and (
+        occurrence["lineage"] == request["lineage"]
+        and {k: v for k, v in prepared.items() if k != "stage"}
+        == {k: v for k, v in request.items() if k != "stage"}
+    )
+
+
+def fail(diagnostic: str) -> None:
+    """Record the one failed assessment for the selected REQUEST, then its ACK.
+
+    Core selects the graph error/unknown edge only after a durable completion
+    with a stopped writer; this helper still requires the exact selected
+    occurrence, unchanged saved route/source/guidance and direct helper mode.
+    It never reserves, replaces or redispatches Learning.
+    """
+    foreground, state, request = selected()
+    if request["kind"] != "ASSESS":
+        raise LadError("learning_failure_requires_assessment")
+    legal_pending(state, request, foreground)
+    lineage, continuation = request["lineage"], state["continuation"]
+    recorded = state["learning"].get(lineage)
+    if continuation["node"] == "emit_ack":
+        if recorded != {"disposition": "failed", "diagnostic": diagnostic,
+                        "occurrence_id": continuation["occurrence_id"]}:
+            raise LadError("learning_disposition_conflict")
+        emit("ACK", "Exact recorded failed assessment; original route retained.")
+        return
+    if recorded is not None or request["stage"] != "received":
+        raise LadError("learning_disposition_conflict")
+    oid = state["active"].get("learning")
+    occurrence = state["occurrences"].get(oid)
+    prepared = _prepared_for(occurrence, request) and oid not in state["accepted"]
+    ready = prepared and (
+        Path.cwd() / f"lad-state/occurrences/{oid}/ready.json"
+    ).is_file()
+    if diagnostic == "preparation_failed":
+        if continuation["node"] == "prepare_learning" and not prepared and (
+            continuation["occurrence_id"] == request["payload"]["occurrence_id"]
+        ):
+            owner = None  # No Learning occurrence was reserved for this REQUEST.
+        elif (continuation["node"] == "learning" and prepared and not ready
+              and continuation["occurrence_id"] == oid):
+            owner = oid  # Reserved but never READY, so never dispatched.
+        else:
+            raise LadError("learning_preparation_owner_unresolved")
+    else:
+        node = ("learning" if diagnostic == "native_completion_failed"
+                else "record_learning_failure")
+        if (not ready or continuation["node"] != node
+                or continuation["occurrence_id"] != oid):
+            raise LadError("learning_failure_owner_mismatch")
+        if diagnostic == "invalid_assessment":
+            intent = state["replacement_intents"].get(oid)
+            if (not isinstance(intent, dict) or intent.get("role") != "learning"
+                    or intent.get("decision") != "INVALID_RESULT"
+                    or intent.get("reason") != "invalid_semantic_result"
+                    or read(foreground, "lad-state/rejections/" + oid + "/"
+                            + digest(canonical(intent)) + ".json")
+                    != canonical(intent) + b"\n"):
+                raise LadError("learning_rejection_required")
+        owner = oid
+    if owner is not None:
+        if occurrence["helper_mode"] != "direct":
+            raise LadError("learning_helper_effects_unresolved")
+        # The failed owner is closed; a later packet reserves a fresh occurrence.
+        state["active"].pop("learning")
+    state["learning"][lineage] = {
+        "disposition": "failed", "occurrence_id": owner, "diagnostic": diagnostic,
+    }
+    mark(state, "emit_ack", owner)
+    save(foreground, state)
+    emit("ACK", "Recorded failed assessment; original pending route retained.")
 
 
 def learning_accept(outcome: str) -> None:
@@ -384,19 +445,28 @@ def main() -> None:
             "emit_request",
             "receive",
             "prepare",
-            "replace",
             "accept",
+            "fail",
             "emit_ack",
             "accept_ack",
             "after_ack",
         ],
     )
     parser.add_argument("outcome", nargs="?")
+    parser.add_argument(
+        "--diagnostic",
+        choices=["native_completion_failed", "invalid_assessment",
+                 "preparation_failed"],
+    )
     args = parser.parse_args()
+    if (args.operation == "fail") != (args.diagnostic is not None):
+        raise LadError("failure_diagnostic_requires_fail")
     if args.operation == "accept":
         learning_accept(args.outcome)
-    elif args.operation in {"prepare", "replace"}:
-        learning_prepare(args.operation == "replace")
+    elif args.operation == "prepare":
+        learning_prepare()
+    elif args.operation == "fail":
+        fail(args.diagnostic)
     else:
         {
             "emit_request": emit_request,

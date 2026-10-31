@@ -52,3 +52,5 @@ Do not rewrite event history, change the specification, or churn the workflow.
 Return the assignment's pending route unchanged. This assessment follows the second actual pair, including when it passes.
 
 Report unavailable prerequisites or execution errors without starting another Learning invocation. The graph owns failure handling and route selection. Preserve the assigned pending route exactly.
+
+This is the packet's only assessment. ERROR, ERROR_TRANSIENT_RESOLVED, HUMAN_BLOCKED and any invalid result are recorded as a failed assessment that restores the saved route; none starts another Learning invocation or reenters Learning for this packet. Execution or provider failures are not evaluated pairs.

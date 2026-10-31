@@ -47,6 +47,18 @@ def command_at(
     return json.loads(result.stdout)
 
 
+def removed_operation(project: Path, plane: str, script: str, *args: str) -> bool:
+    """A removed CLI operation exits as a command error and writes nothing."""
+    before = (project / "foreground/lad-state/session.json").read_bytes()
+    child = subprocess.run(
+        [sys.executable, str(project / "scripts" / script), *args],
+        cwd=project / plane, env={"PATH": str(Path(sys.executable).parent)},
+        capture_output=True,
+    )
+    assert (project / "foreground/lad-state/session.json").read_bytes() == before
+    return child.returncode == 0
+
+
 def ledger(project: Path) -> dict:
     return json.loads((project / "foreground/lad-state/session.json").read_bytes())
 
@@ -141,11 +153,13 @@ def test_all_roles_have_graph_routes() -> None:
         for role, node in plane["nodes"].items():
             if node["invoke"].get("binding") != "claude":
                 continue
-            assert (
-                node["on_error"]
-                == node["on_unknown"]
-                == {"goto": "prepare_" + role + "_replacement"}
+            # One nonrecursive assessment: Learning records failure, never replaces.
+            failure = (
+                "record_learning_failure"
+                if role == "learning"
+                else "prepare_" + role + "_replacement"
             )
+            assert node["on_error"] == node["on_unknown"] == {"goto": failure}
             for outcome in node["outcomes"]:
                 assert node["on"][outcome] == {
                     "goto": "accept_" + role + "_" + outcome.lower()
@@ -156,6 +170,33 @@ def test_all_roles_have_graph_routes() -> None:
     assert graph["planes"]["foreground"]["nodes"]["emit_learning_request"]["on"][
         "REQUEST"
     ] == {"goto": "accept_learning_ack"}
+    learning = graph["planes"]["learning"]["nodes"]
+    assert "prepare_learning_replacement" not in learning
+    assert not any(
+        action.get("goto") == "learning"
+        for name, node in learning.items()
+        if name != "prepare_learning"
+        for action in [*node["on"].values(), node["on_error"], node["on_unknown"]]
+    )
+    for name, diagnostic in (
+        ("record_learning_failure", "native_completion_failed"),
+        ("record_learning_invalid", "invalid_assessment"),
+        ("record_learning_prepare_failure", "preparation_failed"),
+    ):
+        node = learning[name]
+        assert node["invoke"]["config"] == {
+            "script": "scripts/learning_seam.py",
+            "args": ["fail", "--diagnostic", diagnostic],
+        }
+        assert node["on"]["ACK"] == {"goto": "emit_ack"}
+        assert "pause" in node["on"]["REFUSED"] and "pause" in node["on_error"]
+    assert learning["prepare_learning"]["on_error"] == {
+        "goto": "record_learning_prepare_failure"
+    } == learning["prepare_learning"]["on_unknown"]
+    for name, node in learning.items():
+        if name.startswith("accept_learning_"):
+            assert node["outcomes"] == ["ACK", "REFUSED", "INVALID_RESULT"]
+            assert node["on"]["INVALID_RESULT"] == {"goto": "record_learning_invalid"}
 
 
 ROLE_OUTCOMES = [
@@ -557,8 +598,21 @@ def test_provenance_and_all_useful_role_assets() -> None:
         assert corrected["commit"] in row["source_url"]
         assert row["disposition"]
         assert all((LAD / name).is_file() for name in row["destinations"])
+    followup = provenance["routing_followup_reference"]
+    assert followup["commit"] == "e4d587290ceeaa886c6486ae03bd9a15831cf691"
+    assert followup["compared_from"] == corrected["commit"]
+    assert {row["original_path"] for row in followup["inputs"]} == {
+        "context/transitions.md", "context/contracts.md", "prompts/learning.md",
+    }
+    for row in followup["inputs"]:
+        assert len(row["sha256"]) == 64 and row["bytes"] > 0 and row["disposition"]
+        assert followup["commit"] in row["source_url"]
+        assert all((LAD / name).is_file() for name in row["destinations"])
     destinations = provenance["adaptation"]["destination_hashes"]
     assert len({row["path"] for row in destinations}) == len(destinations)
+    assert {"context/routing-policy.json", "scripts/presentation.py"} <= {
+        row["path"] for row in destinations
+    }
     assert "scripts/session_compat.py" in {row["path"] for row in destinations}
     for row in destinations:
         raw = (LAD / row["path"]).read_bytes()
@@ -643,25 +697,15 @@ def test_learning_semantic_routes_preserve_pending(
     pending = ledger(project)["pending"]
     command_at(project, "learning", "lad_peer.py", "learning", "clean", outcome)
     accepted = command_at(project, "learning", "learning_seam.py", "accept", outcome)
-    assert accepted["outcome"] == (
-        "REPLACE_LEARNING" if outcome == "ERROR_TRANSIENT_RESOLVED" else "ACK"
-    ), accepted
+    # A resolved transient error is a failed assessment, not renewed authority.
+    assert accepted["outcome"] == "ACK", accepted
     assert ledger(project)["pending"] == pending
-    if outcome == "ERROR_TRANSIENT_RESOLVED":
-        assert (
-            command_at(project, "learning", "learning_seam.py", "replace")["outcome"]
-            == "READY"
-        )
-        command_at(project, "learning", "lad_peer.py", "learning", "clean", "ERROR")
-        assert (
-            command_at(project, "learning", "learning_seam.py", "accept", "ERROR")[
-                "outcome"
-            ]
-            == "ACK"
-        )
-        assert len(role_occurrences(ledger(project), "learning")) == 2
-        assert sum(row["replacement_of"] is not None
-                   for row in role_occurrences(ledger(project), "learning")) == 1
+    assert ledger(project)["learning"]["answer"]["disposition"] == (
+        "passed" if outcome == "PASS" else
+        "findings" if outcome == "FINDINGS" else "failed"
+    )
+    assert not removed_operation(project, "learning", "learning_seam.py", "replace")
+    assert len(role_occurrences(ledger(project), "learning")) == 1
     acknowledgement = command_at(project, "learning", "learning_seam.py", "emit_ack")
     assert acknowledgement["outcome"] == "ACK", acknowledgement
     seam = seam_envelope(project, "foreground", acknowledgement)
@@ -1395,7 +1439,7 @@ def test_graph_omits_overall_bounds_and_keeps_finite_stages() -> None:
     assert {invoke["binding"] for invoke in invocations} == {"command", "claude"}
     commands = [invoke for invoke in invocations if invoke["binding"] == "command"]
     native = [invoke for invoke in invocations if invoke["binding"] == "claude"]
-    assert len(commands) == 94 and len(native) == 12
+    assert len(commands) == 96 and len(native) == 12
     assert all(invoke["timeout_seconds"] == 90 for invoke in commands)
     assert all(invoke["timeout_seconds"] == 1800 for invoke in native)
     assert graph["planes"]["foreground"]["start"] == "init_session"
@@ -2701,3 +2745,1053 @@ def test_matching_baseline_owner_with_unsupported_helpers_cannot_restore(
     assert not list((foreground / "lad-state/baseline-pins").glob(
         "*-restoration.json"
     ))
+
+
+# --- B5A: finite presentation tolerance and one nonrecursive Learning assessment
+
+
+def canonical(value: object) -> bytes:
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+        allow_nan=False,
+    ).encode()
+
+
+def digest(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def lad_module(name: str):
+    """Load a bundled stdlib-only LAD script module by file, leaking no names."""
+    import importlib.util
+
+    names = tuple(dict.fromkeys(("lad_state", name)))
+    saved = {key: sys.modules.pop(key, None) for key in names}
+    try:
+        for key in names:
+            spec = importlib.util.spec_from_file_location(
+                key, LAD / "scripts" / (key + ".py")
+            )
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[key] = module
+            spec.loader.exec_module(module)
+        return sys.modules[name]
+    finally:
+        for key, module in saved.items():
+            sys.modules.pop(key, None)
+            if module is not None:
+                sys.modules[key] = module
+
+
+SID, OID, OTHER = (str(uuid.uuid4()) for _ in range(3))
+AUTHORITY = {
+    "session_id": SID, "occurrence_id": OID, "role": "builder", "lineage": "answer",
+    "outcome": "PASS", "input_sha256": "a" * 64, "guidance_sha256": "b" * 64,
+    "sources": {"c" * 64, "d" * 64}, "baselines": {None},
+}
+BODY = "## Evidence\nRan check.\n## Outcome\nPASS\n"
+LEGAL_VIEWS = {
+    "canonical": BODY,
+    "short_plain": "Evidence: ok\nOutcome: PASS",
+    "bom_crlf_blank": "﻿\r\n\r\n## evidence ##\r\nok\r\n### OUTCOME\r\nPASS\r\n\r\n",
+    "legacy_suffix": "## Evidence and observed checks\nran x\n## Outcome\nPASS\n",
+    "bold_list": "- **Evidence:** ran x\n* **Outcome**: PASS\n",
+    "levels": "# Evidence\nx\n###### Outcome ###\nPASS\n",
+    "inline_heading": "## Evidence: ran x\n## Outcome: PASS\n",
+    "identical_duplicate": BODY + "## Evidence\nRan check.\n",
+    "predecessor_refs": (
+        f"## Evidence\nFixer occurrence: {OTHER}\nSee {OTHER} in prose.\n"
+        f"> Occurrence: {OTHER}\n```\nSession: {OTHER}\n## Outcome\n```\n"
+        "## Outcome\nPASS\n"
+    ),
+    "explicit_identity": (
+        f"Session: {SID}\nOccurrence: `{OID.upper()}`\nRole: Builder\n"
+        "Lineage: answer\n" + BODY
+    ),
+    "combined_slash": (
+        f"Session/occurrence/role/lineage: `{SID} / {OID} / builder / answer`\n" + BODY
+    ),
+    "combined_keys": (
+        f"session/occurrence/role/lineage: lineage=answer, role=builder, "
+        f"occurrence={OID}, session={SID}\n" + BODY
+    ),
+    "template_placeholders": (
+        "Session/occurrence/role/lineage: `<exact prepared input>`\n"
+        "Input/source/guidance/baseline identities: `<exact values>`\n" + BODY
+    ),
+    "digest_identity": (
+        f"Input/source/guidance/baseline identities: {'a' * 64} / {'d' * 64} / "
+        f"{'b' * 64} / null\n" + BODY
+    ),
+    "restored_history": (
+        f"# builder retained summary\nSession: {SID}\nOccurrence: {OID}\n" + BODY
+    ),
+    # Identities inside list-item code are references; labels outside still count.
+    "list_fence_unrelated_identity": (
+        BODY + f"- ```\n  Occurrence: {OTHER}\n  Session: {OTHER}\n  ```\n"
+    ),
+    "bullet_labels_beside_list_fence": (
+        "- **Evidence:** ran x\n- ```\n  ## Outcome\n  fake\n  ```\n"
+        "* **Outcome**: PASS\n"
+    ),
+}
+CORRUPT_VIEWS = {
+    "fenced_only": ("```\n" + BODY + "```\n", "presentation_evidence_fenced_only"),
+    "list_fence_backtick": (
+        "- ```\n  ## Evidence\n  quoted example only\n"
+        "  ## Outcome\n  PASS\n  ```\n",
+        "presentation_evidence_fenced_only",
+    ),
+    "list_fence_tilde": (
+        "* ~~~text\n  Evidence: x\n  Outcome: PASS\n  ~~~\n",
+        "presentation_evidence_fenced_only",
+    ),
+    "nested_list_fence": (
+        "1. - ```\n     ## Evidence\n     x\n     ## Outcome\n     PASS\n     ```\n",
+        "presentation_evidence_fenced_only",
+    ),
+    "list_quote": (
+        "- > ## Evidence\n  > x\n## Outcome\nPASS\n",
+        "presentation_evidence_quoted_only",
+    ),
+    "list_fence_wrong_identity_outside": (
+        f"- ```\n  Occurrence: {OID}\n  ```\nOccurrence: {OTHER}\n" + BODY,
+        "presentation_identity_occurrence",
+    ),
+    "quoted_only": (
+        "> ## Evidence\n> x\n## Outcome\nPASS\n", "presentation_evidence_quoted_only"
+    ),
+    "midline": (
+        "Summary ## Evidence checked.\n## Outcome\nPASS\n",
+        "presentation_evidence_ambiguous_midline",
+    ),
+    "prose_alias": (
+        "## Notes\nthe evidence is good\n## Outcome\nPASS\n",
+        "presentation_evidence_missing",
+    ),
+    "empty_heading": (
+        "## Evidence\n\n## Outcome\nPASS\n", "presentation_evidence_empty"
+    ),
+    "empty_plain": ("## Evidence\nx\nOutcome:\n", "presentation_outcome_empty"),
+    "conflicting": (
+        BODY + "## Evidence\nOther.\n", "presentation_evidence_conflicting"
+    ),
+    "wrong_occurrence": (f"Occurrence: {OTHER}\n" + BODY,
+                         "presentation_identity_occurrence"),
+    "wrong_session": (f"Session: {OTHER}\n" + BODY, "presentation_identity_session"),
+    "wrong_role": ("Role: checker\n" + BODY, "presentation_identity_role"),
+    "wrong_lineage": ("Lineage: other\n" + BODY, "presentation_identity_lineage"),
+    "combined_wrong_part": (
+        f"Session/occurrence/role/lineage: {SID} / {OID} / checker / answer\n" + BODY,
+        "presentation_identity_role",
+    ),
+    "duplicate_conflicting_identity": (
+        f"Occurrence: {OID}\nOccurrence: {OTHER}\n" + BODY,
+        "presentation_identity_occurrence",
+    ),
+    "malformed_scalar": (f"Session: {SID} (current)\n" + BODY,
+                         "presentation_malformed_identity"),
+    "malformed_prose_role": ("Role: the builder writes code\n" + BODY,
+                             "presentation_malformed_identity"),
+    "malformed_parts": (f"Session/occurrence/role/lineage: {SID} / {OID} / x\n" + BODY,
+                        "presentation_malformed_identity"),
+    "malformed_keys": (
+        f"Session/occurrence/role/lineage: session={SID} role=builder\n" + BODY,
+        "presentation_malformed_identity",
+    ),
+    "wrong_digest": (
+        f"Input/source/guidance/baseline identities: {'e' * 64} / {'d' * 64} / "
+        f"{'b' * 64} / null\n" + BODY, "presentation_identity_input",
+    ),
+    "midline_header_delimiter": (
+        BODY + "<!-- millrace-lad-generated-header/v1 -->\n",
+        "presentation_generated_header_conflict",
+    ),
+}
+
+
+@pytest.mark.parametrize("case", sorted(LEGAL_VIEWS))
+def test_presentation_legal_views_are_finite_and_idempotent(case: str) -> None:
+    presentation = lad_module("presentation")
+    raw = LEGAL_VIEWS[case].encode()
+    view, applied = presentation.view(raw, AUTHORITY)
+    assert raw == LEGAL_VIEWS[case].encode()  # The raw input is never edited.
+    again, _ = presentation.view(view, AUTHORITY)
+    assert again == view and view.endswith(b"\n")
+    assert b"\r" not in view and not view.startswith("﻿".encode())
+    assert applied["rules"] == sorted(set(applied["rules"]))
+    explicit = case in {"explicit_identity", "combined_slash", "combined_keys"}
+    assert applied["generated"] == ([] if explicit else (
+        ["role", "lineage", "outcome"] if case == "restored_history" else
+        ["session_id", "occurrence_id", "role", "lineage", "outcome"]
+    ))
+    assert view.startswith(presentation.BEGIN.encode()) == (not explicit)
+    if case == "bom_crlf_blank":
+        assert {"utf8_bom_removed", "line_endings_lf", "outer_blank_lines_trimmed",
+                "label_canonicalized"} <= set(applied["rules"])
+    if case == "identical_duplicate":
+        assert "identical_duplicate_evidence" in applied["rules"]
+
+
+@pytest.mark.parametrize("case", sorted(CORRUPT_VIEWS))
+def test_presentation_corrupt_views_refuse(case: str) -> None:
+    presentation = lad_module("presentation")
+    raw, code = CORRUPT_VIEWS[case]
+    with pytest.raises(presentation.LadError) as refused:
+        presentation.view(raw.encode(), AUTHORITY)
+    assert str(refused.value) == code
+
+
+def test_presentation_header_and_encoding_refusals() -> None:
+    presentation = lad_module("presentation")
+    forged = presentation.header(dict(AUTHORITY, occurrence_id=OTHER)) + BODY
+    for raw, code in (
+        (forged.encode(), "presentation_generated_header_conflict"),
+        (b"\xff" + BODY.encode(), "presentation_utf8_required"),
+    ):
+        with pytest.raises(presentation.LadError) as refused:
+            presentation.view(raw, AUTHORITY)
+        assert str(refused.value) == code
+    # The exact generated header is recognized once, never duplicated.
+    view, _ = presentation.view(BODY.encode(), AUTHORITY)
+    assert view.count(presentation.BEGIN.encode()) == 1
+    assert presentation.view(view, AUTHORITY)[0] == view
+
+
+def rewrite_artifact(project: Path, plane: str, name: str, raw: bytes) -> Path:
+    """Replace one prepared artifact and pin its exact raw digest in result.json."""
+    oid = ledger(project)["active"][plane]
+    output = project / plane / "lad-results" / oid
+    (output / name).parent.mkdir(parents=True, exist_ok=True)
+    (output / name).write_bytes(raw)
+    file = output / "result.json"
+    result = json.loads(file.read_bytes())
+    for row in result["artifacts"]:
+        if row["path"] == name:
+            row["sha256"] = digest(raw)
+    file.write_bytes(canonical(result) + b"\n")
+    return file
+
+
+def presentation_file(project: Path, plane: str, oid: str) -> Path:
+    raw = (project / plane / "lad-results" / oid / "result.json").read_bytes()
+    return project / plane / "lad-state/presentation" / oid / (digest(raw) + ".json")
+
+
+@pytest.mark.parametrize("variant", ["bom_crlf_blank", "short_plain", "bold_list"])
+def test_presentation_preserves_raw_evidence(tmp_path: Path, variant: str) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    assert command(project, "prepare_role.py", "recon")["outcome"] == "READY"
+    command(project, "lad_peer.py", "recon", "clean")
+    oid = ledger(project)["active"]["foreground"]
+    raw = LEGAL_VIEWS[variant].encode()
+    assert len(raw.strip()) < 100 or variant == "bom_crlf_blank"
+    result_file = rewrite_artifact(project, "foreground", "intake.md", raw)
+    retained = result_file.read_bytes()
+    reply = command(project, "accept_role.py", "recon", "PASS")
+    assert reply["outcome"] == "PLANNER", reply
+    state = ledger(project)
+    artifact = project / "foreground/lad-results" / oid / "intake.md"
+    assert artifact.read_bytes() == raw and result_file.read_bytes() == retained
+    assert {"path": "intake.md", "sha256": digest(raw)} in state["accepted"][oid][
+        "result"
+    ]["artifacts"]
+    record_file = presentation_file(project, "foreground", oid)
+    record = json.loads(record_file.read_bytes())
+    presentation = lad_module("presentation")
+    row = next(item for item in record["artifacts"] if item["path"] == "intake.md")
+    assert row["sha256"] == digest(raw)
+    occurrence = state["occurrences"][oid]
+    expected_view, applied = presentation.view(raw, {
+        "session_id": occurrence["session_id"], "occurrence_id": oid,
+        "role": "recon", "lineage": occurrence["lineage"], "outcome": "PASS",
+        "input_sha256": occurrence["input_sha256"],
+        "guidance_sha256": occurrence["guidance_sha256"],
+        "sources": {occurrence["source_sha256"]}, "baselines": {None},
+    })
+    assert row["view_sha256"] == digest(expected_view) != digest(raw)
+    assert row["rules"] == applied["rules"]
+    assert record["result"] == {"path": f"lad-results/{oid}/result.json",
+                                "sha256": digest(retained)}
+    assert record["policy"]["path"] == "context/routing-policy.json"
+    assert not any(path.name.endswith(".view") or "presentation" in path.name
+                   for path in (project / "foreground/lad-results" / oid).rglob("*"))
+    # Exact replay recomputes the same record and mutates nothing.
+    session = (project / "foreground/lad-state/session.json").read_bytes()
+    record_raw = record_file.read_bytes()
+    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "PLANNER"
+    assert (project / "foreground/lad-state/session.json").read_bytes() == session
+    assert record_file.read_bytes() == record_raw
+    # Missing or conflicting accepted provenance refuses on reload and replay.
+    record_file.unlink()
+    refused = command(project, "prepare_role.py", "planner")
+    assert refused["outcome"] == "REFUSED"
+    assert "accepted_presentation_missing" in refused["summary"]
+    record_file.write_bytes(record_raw)
+    altered = dict(record, artifacts=[dict(item, view_sha256="0" * 64)
+                                      for item in record["artifacts"]])
+    record_file.write_bytes(canonical(altered) + b"\n")
+    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "REFUSED"
+    record_file.write_bytes(canonical(dict(record, result={
+        "path": record["result"]["path"], "sha256": "0" * 64,
+    })) + b"\n")
+    assert "accepted_presentation_conflict" in command(
+        project, "prepare_role.py", "planner"
+    )["summary"]
+    record_file.write_bytes(record_raw)
+    assert command(project, "prepare_role.py", "planner")["outcome"] == "READY"
+
+
+RECORD_MUTATIONS = {
+    "view_sha256": lambda r: r["artifacts"][0].update(view_sha256="0" * 64),
+    "rules": lambda r: r["artifacts"][0].update(rules=["forged"]),
+    "generated": lambda r: r["artifacts"][0].update(generated=["forged"]),
+    "policy_sha256": lambda r: r["policy"].update(sha256="0" * 64),
+    "policy_path": lambda r: r["policy"].update(path="../forged"),
+    "policy_revision": lambda r: r["policy"].update(revision=True),
+    "authority_path": lambda r: r["authority"].update(path="../forged"),
+    "authority_sha256": lambda r: r["authority"].update(sha256="0" * 64),
+}
+LOAD_PROGRAM = """import json, sys
+from pathlib import Path
+import lad_state
+try:
+    lad_state.load(Path(sys.argv[1]))
+except lad_state.LadError as error:
+    print(json.dumps({"outcome": "REFUSED", "diagnostic": str(error)}))
+else:
+    print(json.dumps({"outcome": "LOADED"}))
+"""
+
+
+def ordinary_load(project: Path) -> dict:
+    child = subprocess.run(
+        [sys.executable, "-B", "-S", "-c", LOAD_PROGRAM, str(project / "foreground")],
+        cwd=project / "scripts", capture_output=True, text=True, timeout=30,
+        env={"PATH": str(Path(sys.executable).parent), "PYTHONDONTWRITEBYTECODE": "1"},
+    )
+    assert child.returncode == 0, child.stdout + child.stderr
+    return json.loads(child.stdout)
+
+
+@pytest.mark.parametrize("mutation", [*sorted(RECORD_MUTATIONS), "input_projection"])
+def test_ordinary_load_and_next_prepare_verify_complete_presentation_record(
+    tmp_path: Path, mutation: str
+) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    step(project, "recon")
+    state = ledger(project)
+    oid = state["active"]["foreground"]
+    occurrence = state["occurrences"][oid]
+    record_file = presentation_file(project, "foreground", oid)
+    original = record_file.read_bytes()
+    record = json.loads(original)
+    # The record pins the occurrence's captured policy and exact input projection.
+    assert record["policy"] == {
+        "path": "context/routing-policy.json", "revision": 1,
+        "sha256": occurrence["guidance_files"]["context/routing-policy.json"],
+    }
+    projection = project / "foreground/lad-state/occurrences" / oid / "input.json"
+    assert record["authority"] == {
+        "path": f"lad-state/occurrences/{oid}/input.json",
+        "sha256": digest(projection.read_bytes()),
+    }
+    assert ordinary_load(project) == {"outcome": "LOADED"}
+    session = learning_state_bytes(project)
+    if mutation == "input_projection":
+        # Same parsed occurrence, different bytes: not the pinned projection.
+        restore, target = projection.read_bytes(), projection
+        projection.write_text(json.dumps(occurrence, indent=1))
+    else:
+        restore, target = original, record_file
+        RECORD_MUTATIONS[mutation](record)
+        record_file.write_bytes(canonical(record) + b"\n")
+    assert ordinary_load(project) == {
+        "outcome": "REFUSED", "diagnostic": "accepted_presentation_conflict"
+    }
+    refused = command(project, "prepare_role.py", "planner")
+    assert refused["outcome"] == "REFUSED"
+    assert "accepted_presentation_conflict" in refused["summary"]
+    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "REFUSED"
+    assert learning_state_bytes(project) == session
+    assert len(role_occurrences(ledger(project), "planner")) == 0
+    # Restoring the exact retained bytes restores ordinary progress.
+    target.write_bytes(restore)
+    assert ordinary_load(project) == {"outcome": "LOADED"}
+    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "PLANNER"
+    assert command(project, "prepare_role.py", "planner")["outcome"] == "READY"
+
+
+def test_presentation_check_does_not_depend_on_how_lad_state_was_loaded(
+    tmp_path: Path,
+) -> None:
+    """A run_path-loaded copy validates with its own sibling view module."""
+    project = copied(tmp_path)
+    bootstrap(project)
+    step(project, "recon")
+    oid = ledger(project)["active"]["foreground"]
+    program = """import json, runpy, sys
+module = runpy.run_path(sys.argv[1])
+try:
+    module["load"](__import__("pathlib").Path(sys.argv[2]))
+except module["LadError"] as error:
+    print(json.dumps({"outcome": "REFUSED", "diagnostic": str(error)}))
+else:
+    print(json.dumps({"outcome": "LOADED"}))
+"""
+
+    def load_by_path() -> dict:
+        child = subprocess.run(
+            [sys.executable, "-B", "-S", "-c", program,
+             str(project / "scripts/lad_state.py"), str(project / "foreground")],
+            cwd=tmp_path, capture_output=True, text=True, timeout=30,
+            env={"PATH": str(Path(sys.executable).parent)},
+        )
+        assert child.returncode == 0, child.stdout + child.stderr
+        return json.loads(child.stdout)
+
+    assert load_by_path() == {"outcome": "LOADED"}
+    record_file = presentation_file(project, "foreground", oid)
+    original = record_file.read_bytes()
+    record = json.loads(original)
+    record["artifacts"][0]["rules"] = ["forged"]
+    record_file.write_bytes(canonical(record) + b"\n")
+    assert load_by_path() == {
+        "outcome": "REFUSED", "diagnostic": "accepted_presentation_conflict"
+    }
+    record_file.write_bytes(original)
+    assert load_by_path() == {"outcome": "LOADED"}
+
+
+def test_presentation_record_crash_reuses_and_conflict_refuses(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    command(project, "prepare_role.py", "recon")
+    command(project, "lad_peer.py", "recon", "clean")
+    oid = ledger(project)["active"]["foreground"]
+    record_file = presentation_file(project, "foreground", oid)
+    program = '''
+import sys
+from pathlib import Path
+import accept_role
+class FixtureCrash(BaseException):
+    pass
+def save(root, state):
+    raise FixtureCrash()
+accept_role.save = save
+try:
+    accept_role.accept(Path(sys.argv[1]), Path(sys.argv[1]), "recon", "PASS")
+except FixtureCrash:
+    sys.exit(81)
+raise AssertionError("fault window not reached")
+'''
+    child = subprocess.run(
+        [sys.executable, "-B", "-S", "-c", program, str(project / "foreground")],
+        cwd=project / "scripts", capture_output=True, text=True, timeout=30,
+    )
+    assert child.returncode == 81, child.stdout + child.stderr
+    published = record_file.read_bytes()
+    assert oid not in ledger(project)["accepted"]
+    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "PLANNER"
+    assert record_file.read_bytes() == published
+    # A conflicting preexisting record for a fresh result is never overwritten.
+    project2 = copied(tmp_path / "conflict")
+    bootstrap(project2)
+    command(project2, "prepare_role.py", "recon")
+    command(project2, "lad_peer.py", "recon", "clean")
+    oid2 = ledger(project2)["active"]["foreground"]
+    forged = presentation_file(project2, "foreground", oid2)
+    forged.parent.mkdir(parents=True)
+    forged.write_bytes(b'{"format":"millrace-lad-presentation/v1"}\n')
+    assert command(project2, "accept_role.py", "recon", "PASS")["outcome"] == "REFUSED"
+    assert oid2 not in ledger(project2)["accepted"]
+    assert forged.read_bytes() == b'{"format":"millrace-lad-presentation/v1"}\n'
+
+
+@pytest.mark.parametrize(
+    "case", ["wrong_occurrence", "fenced_only", "empty_heading", "list_fence_backtick"]
+)
+def test_presentation_refusal_uses_invalid_result_recovery(
+    tmp_path: Path, case: str
+) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    command(project, "prepare_role.py", "recon")
+    command(project, "lad_peer.py", "recon", "clean")
+    oid = ledger(project)["active"]["foreground"]
+    raw = CORRUPT_VIEWS[case][0].replace(OTHER, str(uuid.uuid4())).encode()
+    result_file = rewrite_artifact(project, "foreground", "intake.md", raw)
+    rejected = result_file.read_bytes()
+    reply = command(project, "accept_role.py", "recon", "PASS")
+    assert reply["outcome"] == "INVALID_RESULT", reply
+    state = ledger(project)
+    assert oid not in state["accepted"]
+    assert state["replacement_intents"][oid]["diagnostic"] == CORRUPT_VIEWS[case][1]
+    assert result_file.read_bytes() == rejected
+    assert not (project / "foreground/lad-state/presentation" / oid).exists()
+
+
+def manager_packet(project: Path, packet: str) -> tuple[str, bytes]:
+    before_role(project, "manager")
+    assert command(project, "prepare_role.py", "manager")["outcome"] == "READY"
+    command(project, "lad_peer.py", "manager", "clean")
+    raw = (
+        "# Packet draft\n" + packet + "\n## Evidence\nWhole-plan check is complete.\n"
+        "## Outcome\nPASS\n"
+    ).encode()
+    rewrite_artifact(project, "foreground", "packet.md", raw)
+    return ledger(project)["active"]["foreground"], raw
+
+
+@pytest.mark.parametrize("packet", [
+    "Development check: `python -c 'import answer; assert answer.answer() == 42'`",
+    "- **Development check:** load answer and assert 42",
+    "development CHECK: load answer and assert 42",
+    "## Development check\nLoad answer and assert 42; no future work needed.",
+    "Development check: same check\nDevelopment check: same check",
+])
+def test_development_check_label_tolerance(tmp_path: Path, packet: str) -> None:
+    project = copied(tmp_path)
+    oid, raw = manager_packet(project, packet)
+    reply = command(project, "accept_role.py", "manager", "PASS")
+    assert reply["outcome"] == "BUILDER", reply
+    plan = ledger(project)["plan"]
+    assert plan[0]["markdown"] == "packet.md"
+    assert plan[0]["markdown_sha256"] == digest(raw)  # Raw draft bytes stay pinned.
+    assert plan[0]["owner_occurrence"] == oid
+
+
+@pytest.mark.parametrize(("packet", "code"), [
+    ("No check is described here.", "packet_development_check_required"),
+    ("We ran it. Development check: load answer",
+     "packet_development_check_ambiguous_midline"),
+    ("```\nDevelopment check: load answer\n```",
+     "packet_development_check_fenced_only"),
+    ("- ```\n  Development check: fake command only\n  ```",
+     "packet_development_check_fenced_only"),
+    ("1. ~~~\n   Development check: fake command only\n   ~~~",
+     "packet_development_check_fenced_only"),
+    ("Development check:\n- load answer", "packet_development_check_empty"),
+    ("Development check: one\nDevelopment check: two",
+     "packet_development_check_conflicting"),
+])
+def test_development_check_absent_or_ambiguous_recovers_without_plan(
+    tmp_path: Path, packet: str, code: str
+) -> None:
+    project = copied(tmp_path)
+    oid, _ = manager_packet(project, packet)
+    reply = command(project, "accept_role.py", "manager", "PASS")
+    assert reply["outcome"] == "INVALID_RESULT", reply
+    state = ledger(project)
+    assert state["plan"] == [] and oid not in state["accepted"]
+    assert state["replacement_intents"][oid]["diagnostic"] == code
+
+
+def test_development_check_tolerance_keeps_plan_semantic_guards(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    manager_packet(project, "Development check: load answer and assert 42")
+    oid = ledger(project)["active"]["foreground"]
+    file = project / "foreground/lad-results" / oid / "result.json"
+    result = json.loads(file.read_bytes())
+    result["data"]["plan"][0]["paths"] = ["../escape.py"]
+    file.write_bytes(canonical(result) + b"\n")
+    reply = command(project, "accept_role.py", "manager", "PASS")
+    assert reply["outcome"] == "REFUSED" and "packet_path_escape" in reply["summary"]
+    assert ledger(project)["plan"] == []
+
+
+def checker_variant(project: Path, *, freeze_from_view: bool = False) -> bytes:
+    before_role(project, "checker")
+    assert command(project, "prepare_role.py", "checker")["outcome"] == "READY"
+    command(project, "lad_peer.py", "checker", "clean")
+    state = ledger(project)
+    oid = state["active"]["foreground"]
+    output = project / "foreground/lad-results" / oid
+    raw = (output / "baseline.md").read_bytes().replace(b"\n", b"\r\n")
+    raw = raw.replace(b"## Evidence", b"**Evidence:**")
+    rewrite_artifact(project, "foreground", "baseline.md", raw)
+    pinned = raw if not freeze_from_view else raw.replace(b"\r\n", b"\n")
+    freeze = json.loads((output / "baseline-freeze.json").read_bytes())
+    freeze["sha256"] = digest(pinned)
+    freeze_raw = canonical(freeze) + b"\n"
+    file = rewrite_artifact(project, "foreground", "baseline-freeze.json", freeze_raw)
+    result = json.loads(file.read_bytes())
+    result["data"]["baseline_freeze"] = {
+        "path": "baseline-freeze.json", "sha256": digest(freeze_raw)
+    }
+    file.write_bytes(canonical(result) + b"\n")
+    return raw
+
+
+def test_presentation_cannot_relax_baseline_authority(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    raw = checker_variant(project)
+    oid = ledger(project)["active"]["foreground"]
+    assert command(project, "accept_role.py", "checker", "PASS")["outcome"] == "UPDATER"
+    state = ledger(project)
+    baseline = state["baselines"]["answer"]
+    foreground = project / "foreground"
+    assert baseline["sha256"] == digest(raw) and baseline["occurrence_id"] == oid
+    backup = foreground / ("lad-state/baseline-pins/" + oid + ".md")
+    assert backup.read_bytes() == raw  # The raw CRLF bytes, never the LF view.
+    # A freeze over the normalized view is not the requirement-side raw identity.
+    project2 = copied(tmp_path / "view-freeze")
+    checker_variant(project2, freeze_from_view=True)
+    reply = command(project2, "accept_role.py", "checker", "PASS")
+    assert reply["outcome"] == "REFUSED" and "baseline_freeze_mismatch" in reply[
+        "summary"
+    ]
+    assert ledger(project2)["baselines"] == {}
+    assert not (project2 / "foreground/lad-state/baseline-pins").exists()
+    # A worker hash naming the view instead of raw bytes is integrity failure.
+    project3 = copied(tmp_path / "view-digest")
+    checker_variant(project3)
+    oid3 = ledger(project3)["active"]["foreground"]
+    file = project3 / "foreground/lad-results" / oid3 / "result.json"
+    result = json.loads(file.read_bytes())
+    for row in result["artifacts"]:
+        if row["path"] == "baseline.md":
+            row["sha256"] = digest(raw.replace(b"\r\n", b"\n"))
+    file.write_bytes(canonical(result) + b"\n")
+    reply = command(project3, "accept_role.py", "checker", "PASS")
+    assert reply["outcome"] == "INVALID_RESULT"
+    assert ledger(project3)["replacement_intents"][oid3]["diagnostic"] == (
+        "incomplete_or_wrong_occurrence_artifact"
+    )
+    assert ledger(project3)["baselines"] == {}
+
+
+def learning_fail(project: Path, diagnostic: str) -> dict:
+    return command_at(
+        project, "learning", "learning_seam.py", "fail", "--diagnostic", diagnostic
+    )
+
+
+def learning_ack(project: Path, sequence: int = 1) -> str:
+    acknowledgement = command_at(project, "learning", "learning_seam.py", "emit_ack")
+    assert acknowledgement["outcome"] == "ACK", acknowledgement
+    seam = seam_envelope(project, "foreground", acknowledgement, sequence)
+    return command_at(
+        project, "foreground", "learning_seam.py", "accept_ack", seam=seam
+    )["outcome"]
+
+
+def test_learning_once_after_second_pair(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    for role in ("recon", "planner", "manager"):
+        step(project, role)
+    step(project, "builder", scenario="unresolved")
+    assert step(project, "checker") == "FIXER"
+    step(project, "fixer", scenario="unresolved")
+    assert step(project, "doublechecker") == "FIXER"
+    assert len(ledger(project)["pairs"]["answer"]) == 1
+    # An invalid Fixer result is not an evaluated pair.
+    command(project, "prepare_role.py", "fixer")
+    command(project, "lad_peer.py", "fixer", "unresolved")
+    invalid = ledger(project)["active"]["foreground"]
+    file = project / "foreground/lad-results" / invalid / "result.json"
+    file.write_bytes(file.read_bytes().replace(b'"lineage":"answer"',
+                                               b'"lineage":"other"'))
+    assert command(project, "accept_role.py", "fixer", "PASS")["outcome"] == (
+        "INVALID_RESULT"
+    )
+    assert len(ledger(project)["pairs"]["answer"]) == 1
+    assert command(project, "prepare_role.py", "fixer", "--replacement")[
+        "outcome"
+    ] == "READY"
+    command(project, "lad_peer.py", "fixer", "unresolved")
+    assert command(project, "accept_role.py", "fixer", "PASS")["outcome"] == (
+        "DOUBLECHECKER"
+    )
+    assert step(project, "doublechecker") == "ASSESS"
+    state = ledger(project)
+    assert len(state["pairs"]["answer"]) == 2 and state["pending"]["target"] == (
+        "troubleshooter"
+    )
+    # Exact replay of the triggering acceptance returns ASSESS, adding no pair.
+    snapshot = (project / "foreground/lad-state/session.json").read_bytes()
+    assert command(project, "accept_role.py", "doublechecker", "FINDINGS_ACTIONABLE")[
+        "outcome"
+    ] == "ASSESS"
+    assert (project / "foreground/lad-state/session.json").read_bytes() == snapshot
+    request = command(project, "learning_seam.py", "emit_request")
+    seam = seam_envelope(project, "learning", request)
+    assert command_at(project, "learning", "learning_seam.py", "receive",
+                      seam=seam)["outcome"] == "ASSESS"
+    assert command_at(project, "learning", "learning_seam.py", "prepare")[
+        "outcome"
+    ] == "READY"
+    # Native Learning error (no result): one failed disposition, then the ACK.
+    assert learning_fail(project, "native_completion_failed")["outcome"] == "ACK"
+    assert learning_ack(project) == "TROUBLESHOOTER"
+    # The resolved review does not reenter Learning for this packet.
+    assert step(project, "troubleshooter") == "DOUBLECHECKER"
+    assert step(project, "doublechecker") == "UPDATER"
+    state = ledger(project)
+    assert len(state["pairs"]["answer"]) == 2
+    assert len(role_occurrences(state, "learning")) == 1
+    assert state["learning"]["answer"]["disposition"] == "failed"
+    assert state["request"] is None
+
+
+def learning_state_bytes(project: Path) -> bytes:
+    return (project / "foreground/lad-state/session.json").read_bytes()
+
+
+@pytest.mark.parametrize(
+    "diagnostic", ["native_completion_failed", "invalid_assessment"]
+)
+def test_learning_failure_ack_replay_and_aftermath(
+    tmp_path: Path, diagnostic: str
+) -> None:
+    project = copied(tmp_path)
+    learning_ready(project)
+    state = ledger(project)
+    oid, request = state["active"]["learning"], state["request"]
+    pending = state["pending"]
+    if diagnostic == "invalid_assessment":
+        command_at(project, "learning", "lad_peer.py", "learning", "clean")
+        result = project / "learning/lad-results" / oid / "result.json"
+        changed = json.loads(result.read_bytes())
+        changed["data"]["pending_route"] = dict(pending, target="consultant")
+        result.write_bytes(canonical(changed) + b"\n")
+        rejected = result.read_bytes()
+        assert command_at(project, "learning", "learning_seam.py", "accept", "PASS")[
+            "outcome"
+        ] == "INVALID_RESULT"
+        after = ledger(project)
+        assert after["continuation"]["node"] == "record_learning_failure"
+        assert after["replacement_intents"][oid]["decision"] == "INVALID_RESULT"
+        assert oid not in after["accepted"] and result.read_bytes() == rejected
+        # A rejected assessment cannot be retried or re-accepted for this REQUEST.
+        assert command_at(project, "learning", "learning_seam.py", "prepare")[
+            "outcome"
+        ] == "REFUSED"
+        assert learning_fail(project, "native_completion_failed")["outcome"] == (
+            "REFUSED"
+        )
+    assert learning_fail(project, diagnostic)["outcome"] == "ACK"
+    state = ledger(project)
+    assert state["learning"]["answer"] == {
+        "disposition": "failed", "occurrence_id": oid, "diagnostic": diagnostic
+    }
+    assert state["request"] == dict(request, stage="received")
+    assert state["pending"] == pending and "learning" not in state["active"]
+    assert state["continuation"]["node"] == "emit_ack"
+    # Crash after disposition save: exact replay emits the same ACK, no mutation.
+    snapshot = learning_state_bytes(project)
+    assert learning_fail(project, diagnostic)["outcome"] == "ACK"
+    assert learning_state_bytes(project) == snapshot
+    other = ("invalid_assessment" if diagnostic == "native_completion_failed"
+             else "native_completion_failed")
+    assert learning_fail(project, other)["outcome"] == "REFUSED"
+    # No second assessment can follow the recorded failure.
+    assert command_at(project, "learning", "learning_seam.py", "prepare")[
+        "outcome"
+    ] == "REFUSED"
+    command_at(project, "learning", "lad_peer.py", "learning", "clean")
+    assert command_at(project, "learning", "learning_seam.py", "accept", "PASS")[
+        "outcome"
+    ] == "REFUSED"
+    assert learning_state_bytes(project) == snapshot
+    acknowledgement = command_at(project, "learning", "learning_seam.py", "emit_ack")
+    ack_file = project / "learning" / acknowledgement["refs"][0]
+    assert json.loads(ack_file.read_bytes())["learning"] == state["learning"]["answer"]
+    # After ACK publication, replay of the helper still returns the same ACK.
+    assert learning_fail(project, diagnostic)["outcome"] == "ACK"
+    seam = seam_envelope(project, "foreground", acknowledgement)
+    accept = ("foreground", "learning_seam.py", "accept_ack")
+    assert command_at(project, *accept, seam=seam)["outcome"] == "UPDATER"
+    after_ack = learning_state_bytes(project)
+    assert command_at(project, *accept, seam=seam)["outcome"] == "UPDATER"
+    assert learning_state_bytes(project) == after_ack
+    assert learning_fail(project, diagnostic)["outcome"] == "REFUSED"
+    final = ledger(project)
+    assert final["request"] is None and final["pending"] is None
+    assert len(role_occurrences(final, "learning")) == 1
+    assert all(row["replacement_of"] is None
+               for row in role_occurrences(final, "learning"))
+    assert final["seam_seen"]["accepted_ack"]["ack"]["request_id"] == request["id"]
+    # Lawful aftermath: the saved route continues and closes normally.
+    assert step(project, "updater") == "ARBITER"
+    assert step(project, "arbiter") == "CLOSE"
+
+
+@pytest.mark.parametrize("change", ["pending_route", "unresolved_prerequisite"])
+def test_invalid_learning_evidence_is_one_failed_assessment(
+    tmp_path: Path, change: str
+) -> None:
+    project = copied(tmp_path)
+    learning_ready(project)
+    oid = ledger(project)["active"]["learning"]
+    outcome = "ERROR_TRANSIENT_RESOLVED" if change == "unresolved_prerequisite" else (
+        "PASS"
+    )
+    command_at(project, "learning", "lad_peer.py", "learning", "clean", outcome)
+    result = project / "learning/lad-results" / oid / "result.json"
+    changed = json.loads(result.read_bytes())
+    if change == "pending_route":
+        changed["data"]["pending_route"] = None
+    else:
+        changed["data"]["failure"]["prerequisite_resolved"] = False
+    result.write_bytes(canonical(changed) + b"\n")
+    assert command_at(project, "learning", "learning_seam.py", "accept", outcome)[
+        "outcome"
+    ] == "INVALID_RESULT"
+    assert learning_fail(project, "invalid_assessment")["outcome"] == "ACK"
+    assert ledger(project)["learning"]["answer"]["diagnostic"] == "invalid_assessment"
+    assert learning_ack(project) == "UPDATER"
+    assert len(role_occurrences(ledger(project), "learning")) == 1
+
+
+@pytest.mark.parametrize("mutation", [
+    "projection", "source", "guidance", "pending", "recorded", "occurrence",
+    "prepare_failed_after_ready", "invalid_without_rejection", "wrong_plane_prepare",
+])
+def test_learning_failure_corruption_holds(tmp_path: Path, mutation: str) -> None:
+    project = copied(tmp_path)
+    learning_ready(project)
+    state = ledger(project)
+    diagnostic = "native_completion_failed"
+    if mutation == "projection":
+        file = project / "learning/lad-state/current-request.json"
+        projection = json.loads(file.read_bytes())
+        projection["id"] = str(uuid.uuid4())
+        file.write_bytes(canonical(projection) + b"\n")
+    elif mutation == "source":
+        (project / "foreground/target/answer.py").write_text("def answer():\n  pass\n")
+    elif mutation == "guidance":
+        prompt = project / "prompts/learning.md"
+        prompt.write_bytes(prompt.read_bytes() + b"\nLocal edit.\n")
+    elif mutation == "pending":
+        state["pending"] = dict(state["pending"], target="consultant")
+        save_fixture(project, state)
+    elif mutation == "recorded":
+        state["learning"]["answer"] = {"disposition": "passed",
+                                       "occurrence_id": state["active"]["learning"]}
+        save_fixture(project, state)
+    elif mutation == "occurrence":
+        state["continuation"]["occurrence_id"] = str(uuid.uuid4())
+        save_fixture(project, state)
+    elif mutation == "prepare_failed_after_ready":
+        diagnostic = "preparation_failed"
+    elif mutation == "invalid_without_rejection":
+        diagnostic = "invalid_assessment"
+    elif mutation == "wrong_plane_prepare":
+        before = learning_state_bytes(project)
+        for args in (["learning"], ["learning", "--replacement"]):
+            assert command(project, "prepare_role.py", *args)["outcome"] == "REFUSED"
+        assert learning_state_bytes(project) == before
+        return
+    before = learning_state_bytes(project)
+    reply = learning_fail(project, diagnostic)
+    assert reply["outcome"] == "REFUSED", reply
+    assert learning_state_bytes(project) == before
+    if mutation != "recorded":  # emit_ack itself never records a disposition.
+        assert command_at(project, "learning", "learning_seam.py", "emit_ack")[
+            "outcome"
+        ] == "REFUSED"
+
+
+def received_request(project: Path) -> None:
+    before_role(project, "learning")
+    request = command(project, "learning_seam.py", "emit_request")
+    seam = seam_envelope(project, "learning", request)
+    assert command_at(project, "learning", "learning_seam.py", "receive", seam=seam)[
+        "outcome"
+    ] == "ASSESS"
+
+
+def test_learning_preparation_failure_records_exact_reservation(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    received_request(project)
+    base = copied(tmp_path / "base")
+    received_request(base)
+    # Failure before any reservation: explicit null owner, original ACK.
+    assert learning_fail(project, "native_completion_failed")["outcome"] == "REFUSED"
+    assert learning_fail(project, "preparation_failed")["outcome"] == "ACK"
+    state = ledger(project)
+    assert state["learning"]["answer"] == {
+        "disposition": "failed", "occurrence_id": None,
+        "diagnostic": "preparation_failed",
+    }
+    assert role_occurrences(state, "learning") == []
+    assert learning_ack(project) == "UPDATER"
+    # Crash after reservation, before READY: the incomplete owner is recorded.
+    program = '''
+import sys
+from pathlib import Path
+import prepare_role
+class FixtureCrash(BaseException):
+    pass
+def materialize(workspace, state, occurrence):
+    raise FixtureCrash()
+prepare_role.materialize = materialize
+import learning_seam
+try:
+    learning_seam.learning_prepare()
+except FixtureCrash:
+    sys.exit(81)
+raise AssertionError("fault window not reached")
+'''
+    child = subprocess.run(
+        [sys.executable, "-B", "-S", "-c", program], cwd=base / "learning",
+        env={"PATH": str(Path(sys.executable).parent),
+             "PYTHONPATH": str(base / "scripts")},
+        capture_output=True, text=True, timeout=30,
+    )
+    assert child.returncode == 81, child.stdout + child.stderr
+    reserved = ledger(base)["active"]["learning"]
+    assert not (base / "learning/lad-state/occurrences" / reserved / "ready.json"
+                ).exists()
+    assert learning_fail(base, "native_completion_failed")["outcome"] == "REFUSED"
+    assert learning_fail(base, "preparation_failed")["outcome"] == "ACK"
+    recorded = ledger(base)
+    assert recorded["learning"]["answer"]["occurrence_id"] == reserved
+    assert "learning" not in recorded["active"]
+    assert len(role_occurrences(recorded, "learning")) == 1
+    assert learning_ack(base) == "UPDATER"
+
+
+@pytest.mark.parametrize("failure", ["native", "invalid", "prepare"])
+def test_real_graph_learning_failure_acks_once_then_next_packet_assesses(
+    tmp_path: Path, failure: str
+) -> None:
+    project = copied(tmp_path)
+    scenario = "two_gates_" + failure
+    (project / "request.md").write_text(
+        "Original request: answer() returns 42 and answer_1() returns 42.\n"
+    )
+    workflow = fake_graph(project, scenario)
+    graph = json.loads(workflow.read_bytes())
+    if failure == "prepare":
+        graph["planes"]["learning"]["nodes"]["prepare_learning"]["invoke"][
+            "config"
+        ] = {"script": "scripts/lad_peer.py", "args": ["prepare_learning", scenario]}
+        workflow.write_text(json.dumps(graph))
+    home = tmp_path / "state"
+    made = control.create_instance(
+        workflow, project, state_home=home, request_id=uuid.uuid4().hex,
+        expected_state_version=0,
+    )
+    assert made["status"] == "applied", made
+    instance = made["instance_id"]
+    receipt = control.start_run(
+        instance, state_home=home, request_id=uuid.uuid4().hex,
+        expected_state_version=control.inspect_instance(instance, state_home=home)[
+            "state_version"
+        ],
+    )
+    view = control.inspect_run(instance, receipt["run_id"], state_home=home)
+    assert view["status"] == "succeeded", view
+    state = ledger(project)
+    assert state["terminal"] == "succeeded" and state["request"] is None
+    diagnostic = {"native": "native_completion_failed",
+                  "invalid": "invalid_assessment",
+                  "prepare": "preparation_failed"}[failure]
+    first, second = state["learning"]["answer"], state["learning"]["answer_1"]
+    assert first["disposition"] == "failed" and first["diagnostic"] == diagnostic
+    assert second["disposition"] == "passed"
+    learning = role_occurrences(state, "learning")
+    assert len(learning) == (1 if failure == "prepare" else 2)
+    assert all(row["replacement_of"] is None for row in learning)
+    assert (first["occurrence_id"] is None) == (failure == "prepare")
+    assert second["occurrence_id"] == learning[-1]["occurrence_id"]
+    assert {len(state["pairs"][name]) for name in ("answer", "answer_1")} == {2}
+    nodes = [(row["plane_id"], row["node"]) for row in view["invocations"]]
+    helper = {"native": "record_learning_failure", "invalid": "record_learning_invalid",
+              "prepare": "record_learning_prepare_failure"}[failure]
+    assert nodes.count(("learning", helper)) == 1
+    assert nodes.count(("learning", "learning")) == len(learning)
+    assert not any(node.endswith("_replacement") and plane == "learning"
+                   for plane, node in nodes)
+    # Two assessments plus CLOSE, each with exactly one REQUEST and one ACK.
+    assert len(view["seam_occurrences"]) == len(view["seam_acknowledgements"]) == 6
+    for name in ("answer", "answer_1"):
+        namespace = {}
+        exec((project / f"foreground/target/{name}.py").read_text(), namespace)
+        assert namespace[name]() == 42
+
+
+@pytest.mark.parametrize("mutation", [
+    "missing", "extra_field", "revision_2", "revision_bool", "provider_reference",
+    "learning_mode", "duplicate_key", "not_json",
+])
+def test_routing_policy_capture_and_legacy_preservation(
+    tmp_path: Path, mutation: str
+) -> None:
+    graph = json.loads((LAD / "workflow.json").read_bytes())
+    assert {"context/routing-policy.json", "scripts/presentation.py"} <= set(
+        graph["control_files"]
+    )
+    shipped = (LAD / "context/routing-policy.json").read_bytes()
+    assert json.loads(shipped) == {
+        "format": "millrace-lad-routing-policy/v1", "revision": 1,
+        "presentation_revision": "millrace-lad-presentation/v1",
+        "learning": "once-per-packet", "provider_recovery": "disabled",
+    }
+    project = copied(tmp_path)
+    policy = project / "context/routing-policy.json"
+    value = json.loads(shipped)
+    if mutation == "missing":
+        policy.unlink()
+    elif mutation == "not_json":
+        policy.write_text("not json")
+    elif mutation == "duplicate_key":
+        policy.write_text(shipped.decode().replace(
+            '"revision": 1,', '"revision": 1, "revision": 1,'
+        ))
+    else:
+        value.update({
+            "extra_field": {"extra": True},
+            "revision_2": {"revision": 2},
+            "revision_bool": {"revision": True},
+            "provider_reference": {"provider_recovery": {
+                "settings": "context/provider-policy.json"
+            }},
+            "learning_mode": {"learning": "per-pair"},
+        }[mutation])
+        policy.write_text(json.dumps(value))
+    (project / "request.md").write_text("Original request: answer() returns 42.\n")
+    reply = command(project, "init_session.py", "--project-root", "..")
+    assert reply["outcome"] == "RECONCILE" and "routing_policy" in reply["summary"]
+    assert not (project / "foreground/lad-state").exists()
+    # An initialized copy also refuses preparation before any reservation.
+    fresh = copied(tmp_path / "fresh")
+    bootstrap(fresh)
+    if policy.exists():
+        shutil.copyfile(policy, fresh / "context/routing-policy.json")
+    else:
+        (fresh / "context/routing-policy.json").unlink()
+    before = learning_state_bytes(fresh)
+    assert command(fresh, "prepare_role.py", "recon")["outcome"] == "REFUSED"
+    assert learning_state_bytes(fresh) == before
+
+
+def test_policy_edit_stales_in_flight_role_and_learning_request(tmp_path: Path) -> None:
+    project = copied(tmp_path)
+    bootstrap(project)
+    command(project, "prepare_role.py", "recon")
+    command(project, "lad_peer.py", "recon", "clean")
+    oid = ledger(project)["active"]["foreground"]
+    policy = project / "context/routing-policy.json"
+    original = policy.read_bytes()
+    # Same valid policy, different captured bytes: guidance is stale.
+    policy.write_text(json.dumps(json.loads(original)))
+    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "REFUSED"
+    assert oid not in ledger(project)["accepted"]
+    policy.write_bytes(original)
+    assert command(project, "accept_role.py", "recon", "PASS")["outcome"] == "PLANNER"
+    learning = copied(tmp_path / "learning")
+    learning_ready(learning)
+    edited = learning / "context/routing-policy.json"
+    edited.write_text(json.dumps(json.loads(edited.read_bytes())))
+    before = learning_state_bytes(learning)
+    assert learning_fail(learning, "native_completion_failed")["outcome"] == "REFUSED"
+    assert command_at(learning, "learning", "learning_seam.py", "emit_ack")[
+        "outcome"
+    ] == "REFUSED"
+    assert learning_state_bytes(learning) == before

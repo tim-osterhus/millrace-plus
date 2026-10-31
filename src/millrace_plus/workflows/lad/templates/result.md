@@ -2,9 +2,11 @@
 
 Modified from pinned LAD Factory `templates/result.md`. See `PROVENANCE.md`.
 
-Session/occurrence/role/lineage: `<exact prepared input>`
-Input/source/guidance/baseline identities: `<exact values>`
+Session/occurrence/role/lineage: `<session> / <occurrence> / <role> / <lineage>`
+Input/source/guidance/baseline identities: `<input> / <source> / <guidance> / <baseline or null>`
 Helper mode/evidence: `<echo input, direct uses null evidence>`
+
+These reserved identity labels must state only this occurrence's exact values or keep the placeholders. Name predecessor occurrences with other wording, such as `Fixer occurrence:`.
 
 ## Evidence
 
@@ -14,7 +16,7 @@ For Checker, write requirement-side `baseline.md` before reading implementation.
 
 Every v2 result includes its required history log as an ordinary `artifacts` path/hash entry: `historylog/<RoleTitle>_HHMM-MMDDYY.md` using the UTC `created_at` timestamp. Keep it below 5,120 UTF-8 bytes, include retained identities, and omit transcripts and secrets. Do not add a top-level `historylog` field.
 
-The history log is evidence Markdown too: include substantive `## Evidence` and `## Outcome` sections and at least 100 characters after stripping surrounding whitespace. Include the exact occurrence, session, and role identities. Compute its `artifacts` SHA-256 from the final file bytes after all edits; the history-specific identity and size rules do not replace the other artifact requirements.
+The history log is evidence Markdown too: include nonblank Evidence and Outcome sections. Its raw bytes must include the exact occurrence, session, and role identities. Compute its `artifacts` SHA-256 from the final file bytes after all edits; the history-specific identity and size rules do not replace the other artifact requirements.
 
 ## Outcome
 

@@ -132,6 +132,14 @@ SESSION_KEYS = {
 SESSION_ROLES = {"recon", "planner", "manager", "consultant", "arbiter"}
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 IDENT = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}\Z")
+POLICY_PATH = "context/routing-policy.json"
+POLICY = {
+    "format": "millrace-lad-routing-policy/v1",
+    "revision": 1,
+    "presentation_revision": "millrace-lad-presentation/v1",
+    "learning": "once-per-packet",
+    "provider_recovery": "disabled",
+}
 
 
 class LadError(Exception):
@@ -474,6 +482,11 @@ def _validate_state(
                 allowed_previous = (
                     previous in state["accepted"]
                     or state["occurrences"][oid]["replacement_of"] == previous
+                    # A failed assessment closes its owner without acceptance.
+                    or (plane == "learning" and previous is not None and any(
+                        isinstance(row, dict) and row.get("occurrence_id") == previous
+                        for row in state["learning"].values()
+                    ))
                 )
                 if (
                     ready.exists()
@@ -492,21 +505,20 @@ def _validate_state(
             if occurrence["role"] != "learning"
             else foreground.parent / "learning"
         )
-        raw = load_json(read(workspace, f"lad-results/{oid}/result.json"))
+        raw_bytes = read(workspace, f"lad-results/{oid}/result.json")
+        raw = load_json(raw_bytes)
         if raw != accepted["result"]:
             raise LadError("accepted_output_changed")
+        artifacts = []
         for artifact in raw["artifacts"]:
-            if (
-                digest(
-                    _baseline_read(
-                        workspace,
-                        f"lad-results/{oid}/" + artifact["path"],
-                        baseline_projection,
-                    )
-                )
-                != artifact["sha256"]
-            ):
+            data = _baseline_read(
+                workspace, f"lad-results/{oid}/" + artifact["path"], baseline_projection
+            )
+            if digest(data) != artifact["sha256"]:
                 raise LadError("accepted_artifact_changed")
+            artifacts.append((artifact["path"], data))
+        if occurrence["format"] == "millrace-lad-input/v2":
+            _presentation_pin(workspace, occurrence, raw_bytes, raw, artifacts)
     if state["occurrences"] and not state["continuation"]:
         raise LadError("missing_continuation")
     validate_migration(foreground, state, migration_data=migration_data)
@@ -829,6 +841,104 @@ def _source_at(
                     raise LadError("source_changed_during_observation")
             observed[relative] = checksum.hexdigest()
     return dict(sorted(observed.items()))
+
+
+def routing_policy() -> dict:
+    """Strict captured new-copy policy; any missing or unknown form refuses."""
+    root = Path(__file__).resolve().parent.parent
+    try:
+        raw = read(root, POLICY_PATH)
+        policy = fields(load_json(raw), set(POLICY))
+    except (LadError, ValueError):
+        raise LadError("routing_policy_invalid") from None
+    for key, expected in POLICY.items():
+        if type(policy[key]) is not type(expected) or policy[key] != expected:
+            raise LadError("routing_policy_unsupported_" + key)
+    return {"path": POLICY_PATH, "sha256": digest(raw),
+            "revision": policy["revision"]}
+
+
+def presentation_path(oid: str, raw: bytes) -> str:
+    return f"lad-state/presentation/{oid}/{digest(raw)}.json"
+
+
+_PRESENTATION = None
+
+
+def presentation_module():
+    """This copy's own self-contained stdlib view module, loaded by file path.
+
+    It imports no sibling script and registers no global module name, so it
+    works however this module was loaded and never reuses another copy's view.
+    """
+    global _PRESENTATION
+    if _PRESENTATION is None:
+        import importlib.util
+
+        path = Path(__file__).resolve().parent / "presentation.py"
+        spec = importlib.util.spec_from_file_location("presentation", path)
+        if spec is None or spec.loader is None:
+            raise LadError("presentation_module_missing")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _PRESENTATION = module
+    return _PRESENTATION
+
+
+def development_check(raw: bytes) -> tuple[str, list[str]]:
+    """The one finite packet development check, as this module's LadError codes."""
+    view = presentation_module()
+    try:
+        return view.development_check(raw)
+    except view.LadError as exc:
+        raise LadError(str(exc)) from None
+
+
+def captured_policy(occurrence: dict) -> dict:
+    """The routing policy captured in the occurrence's pinned guidance snapshot."""
+    checksum = occurrence["guidance_files"].get(POLICY_PATH)
+    if not isinstance(checksum, str) or not SHA.fullmatch(checksum):
+        raise LadError("routing_policy_not_captured")
+    return {"path": POLICY_PATH, "sha256": checksum, "revision": POLICY["revision"]}
+
+
+def presentation_record(
+    workspace: Path, occurrence: dict, result: dict, raw_result: bytes,
+    artifacts: list[tuple[str, bytes]],
+) -> tuple[str, bytes]:
+    """Exact expected record from raw, input-projection and captured-policy facts."""
+    oid = occurrence["occurrence_id"]
+    input_raw = canonical(occurrence) + b"\n"
+    if read(workspace, f"lad-state/occurrences/{oid}/input.json") != input_raw:
+        raise LadError("occurrence_projection_conflict")
+    view = presentation_module()
+    try:
+        raw = view.expected_record(
+            occurrence=occurrence, result=result, raw_result=raw_result,
+            artifacts=artifacts, input_raw=input_raw,
+            policy=captured_policy(occurrence),
+        )
+    except view.LadError as exc:
+        raise LadError(str(exc)) from None
+    return presentation_path(oid, raw_result), raw
+
+
+def _presentation_pin(workspace: Path, occurrence: dict, raw: bytes, result: dict,
+                      artifacts: list[tuple[str, bytes]]) -> None:
+    """Every load compares the complete retained record with its recomputation."""
+    try:
+        retained = read(workspace, presentation_path(occurrence["occurrence_id"], raw))
+    except LadError as exc:
+        raise LadError(
+            "accepted_presentation_missing" if str(exc) == "missing_file"
+            else "accepted_presentation_" + str(exc)
+        ) from None
+    try:
+        _, expected = presentation_record(workspace, occurrence, result, raw, artifacts)
+    except LadError:
+        raise LadError("accepted_presentation_conflict") from None
+    if retained != expected:
+        raise LadError("accepted_presentation_conflict")
 
 
 def guidance() -> str:

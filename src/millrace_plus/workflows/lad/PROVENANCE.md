@@ -39,3 +39,11 @@ to fresh child bootstrap and prepared assignments. It preserves the twelve role
 prompts, standalone target contract, immutable baseline backup and Learning seam.
 Destination hashes cover the changed worker and contract files. Original and
 corrected-reference input lists, upstream commits and license remain unchanged.
+
+The v0.23.2 routing follow-up (L-R1) consulted Factory `context/transitions.md`,
+`context/contracts.md` and `prompts/learning.md` at commit
+`e4d587290ceeaa886c6486ae03bd9a15831cf691`, compared from the corrected reference.
+`provenance.json` records their exact hashes under `routing_followup_reference`.
+They are semantic inputs only. Millrace adopts a finite deterministic
+presentation view and one nonrecursive Learning assessment per packet; it does
+not adopt Factory's prose interpretation, Orchestrator or provider waiting.

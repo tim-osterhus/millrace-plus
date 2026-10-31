@@ -15,6 +15,7 @@ from lad_state import (
     assert_foreground,
     atomic,
     canonical,
+    captured_policy,
     digest,
     emit,
     fields,
@@ -23,8 +24,10 @@ from lad_state import (
     load,
     load_json,
     mark,
+    presentation_record,
     read,
     roots,
+    routing_policy,
     run,
     safe,
     save,
@@ -35,11 +38,12 @@ from lad_state import (
 
 def validate(
     workspace: Path, foreground: Path, state: dict, occurrence: dict, expected: str
-) -> tuple[dict, str]:
+) -> tuple[dict, str, tuple[str, bytes] | None]:
     oid = occurrence["occurrence_id"]
     current_contract = occurrence["format"] == "millrace-lad-input/v2"
+    raw_result = read(workspace, f"lad-results/{oid}/result.json")
     result = fields(
-        load_json(read(workspace, f"lad-results/{oid}/result.json")),
+        load_json(raw_result),
         {
             "format",
             "session_id",
@@ -93,6 +97,7 @@ def validate(
     if current_contract:
         validate_execution_evidence(workspace, occurrence, result)
     names = set()
+    raws = []
     for artifact in artifacts:
         fields(artifact, {"path", "sha256"})
         name = text(artifact["path"])
@@ -102,15 +107,26 @@ def validate(
             raise LadError("duplicate_or_nonmarkdown_artifact")
         names.add(name)
         raw = read(workspace, f"lad-results/{oid}/" + name)
-        content = raw.decode("utf-8")
-        if (
-            digest(raw) != artifact["sha256"]
-            or (name != "baseline-freeze.json" and (
+        # Raw bytes are authority: a digest mismatch is integrity, not format.
+        if digest(raw) != artifact["sha256"]:
+            raise LadError("incomplete_or_wrong_occurrence_artifact")
+        if not current_contract:
+            # Retained v1 occurrences keep their original literal interpretation.
+            content = raw.decode("utf-8")
+            if name != "baseline-freeze.json" and (
                 oid not in content or len(content.strip()) < 100
                 or "## Evidence" not in content or "## Outcome" not in content
-            ))
-        ):
-            raise LadError("incomplete_or_wrong_occurrence_artifact")
+            ):
+                raise LadError("incomplete_or_wrong_occurrence_artifact")
+        raws.append((name, raw))
+    presentation = None
+    if current_contract:
+        # The strict current policy must be the occurrence's captured policy.
+        if routing_policy()["sha256"] != captured_policy(occurrence)["sha256"]:
+            raise LadError("routing_policy_capture_changed")
+        presentation = presentation_record(
+            workspace, occurrence, result, raw_result, raws
+        )
     required = set(ARTIFACTS[occurrence["role"]])
     if expected in {"ERROR", "HUMAN_BLOCKED", "ERROR_REPAIRABLE", "ERROR_REPLACEMENT"}:
         required.discard("baseline.md")
@@ -166,7 +182,7 @@ def validate(
             and not failure["prerequisite_resolved"]
         ):
             raise LadError("unresolved_replacement_prerequisite")
-    return result, digest(canonical(result))
+    return result, digest(canonical(result)), presentation
 
 
 def current_source(
@@ -354,17 +370,34 @@ def accept(foreground: Path, workspace: Path, role: str, expected: str) -> str:
     occurrence = state["occurrences"].get(oid)
     if not occurrence or occurrence["role"] != role:
         raise LadError("unknown_or_wrong_role_occurrence")
-    result, checksum = validate(workspace, foreground, state, occurrence, expected)
+    result, checksum, presentation = validate(
+        workspace, foreground, state, occurrence, expected
+    )
     existing = state["accepted"].get(oid)
     if existing:
         if existing["sha256"] != checksum or existing["result"] != result:
             raise LadError("conflicting_accepted_result")
+        if presentation is not None:
+            try:
+                retained = read(workspace, presentation[0])
+            except LadError:
+                raise LadError("accepted_presentation_missing") from None
+            if retained != presentation[1]:
+                raise LadError("accepted_presentation_conflict")
         return existing["route"]
+    if plane == "learning" and (
+        state["continuation"]["node"] != "learning"
+        or state["continuation"]["occurrence_id"] != oid
+    ):
+        raise LadError("learning_assessment_not_selected")
     if state["pending"] and state["pending"]["kind"] == "invalid_result" and (
         state["pending"]["occurrence_id"] == oid
     ):
         state["pending"] = None
     route = choose(state, occurrence, result, foreground)
+    if presentation is not None:
+        # Immutable and idempotent; a conflicting existing record refuses.
+        atomic(workspace, *presentation, immutable=True)
     state["accepted"][oid] = {"sha256": checksum, "result": result, "route": route}
     mark(
         state,
@@ -373,7 +406,7 @@ def accept(foreground: Path, workspace: Path, role: str, expected: str) -> str:
         else "prepare_" + route[7:].lower() + "_replacement",
         oid,
     )
-    if route in {"ASSESS", "CLOSE", "ACK", "PAUSE", "REPLACE_LEARNING"}:
+    if route in {"ASSESS", "CLOSE", "ACK", "PAUSE"}:
         mark(
             state,
             {
@@ -381,7 +414,6 @@ def accept(foreground: Path, workspace: Path, role: str, expected: str) -> str:
                 "CLOSE": "emit_learning_request",
                 "ACK": "emit_ack",
                 "PAUSE": "human_pause",
-                "REPLACE_LEARNING": "prepare_learning_replacement",
             }[route],
             oid,
         )
@@ -439,11 +471,15 @@ def record_invalid(foreground: Path, workspace: Path, role: str, code: str) -> s
         "result_identity_", "result_contract_", "historylog_", "missing_role_",
         "missing_required_", "incomplete_or_wrong_", "duplicate_or_nonmarkdown_",
         "finding_", "pass_with_", "actionable_", "invalid_failure_",
+        "presentation_", "packet_development_check_",
     )) or code in {
         "missing_file", "JSONDecodeError", "ValueError", "KeyError", "TypeError",
         "UnicodeDecodeError", "invalid_fields", "object_required", "nonfinite_json",
         "duplicate_json_key", "stale_source",
-    }
+    } or (role == "learning" and code in {
+        # Invalid assessment evidence is a failed assessment, never a hold.
+        "learning_changed_pending_route", "unresolved_replacement_prerequisite",
+    })
     if not recoverable:
         raise LadError(code)
     state = load(foreground)
@@ -478,11 +514,13 @@ def record_invalid(foreground: Path, workspace: Path, role: str, code: str) -> s
     repeated = any(old_id != oid and intent.get("invalid_fingerprint") == fingerprint
                    for old_id, intent in state["replacement_intents"].items())
     decision = "INVALID_RESULT"
-    if repeated and role == "learning":
-        state["learning"][occurrence["lineage"]] = {
-            "disposition": "failed", "occurrence_id": oid, "diagnostic": code
-        }
-        decision = "INVALID_ACK"
+    if role == "learning":
+        # One assessment only: a rejected result selects the failed-disposition
+        # helper for this exact occurrence and creates no replacement authority.
+        if state["continuation"]["occurrence_id"] != oid or state["continuation"][
+            "node"
+        ] not in {"learning", "record_learning_failure"}:
+            raise LadError("learning_rejection_not_selected")
     elif repeated or repaired_cause:
         route = _recover(state, occurrence, kind="invalid_result", cause=cause)
         decision = (
@@ -507,6 +545,8 @@ def record_invalid(foreground: Path, workspace: Path, role: str, code: str) -> s
     }
     if state["replacement_intents"].get(oid) == intent:
         return decision
+    if role == "learning" and oid in state["replacement_intents"]:
+        raise LadError("learning_rejection_conflict")
     record = f"lad-state/rejections/{oid}/{digest(canonical(intent))}.json"
     atomic(foreground, record, canonical(intent) + b"\n", immutable=True)
     state["replacement_intents"][oid] = intent
@@ -518,7 +558,7 @@ def record_invalid(foreground: Path, workspace: Path, role: str, code: str) -> s
     target = ("prepare_consultant" if decision == "INVALID_CONSULT" else
               "prepare_troubleshooter" if decision == "INVALID_REPEAT" else
               "human_pause" if decision == "INVALID_HOLD" else
-              "emit_ack" if decision == "INVALID_ACK" else
+              "record_learning_failure" if role == "learning" else
               "prepare_" + role + "_replacement")
     mark(state, target, oid)
     save(foreground, state)

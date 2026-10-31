@@ -11,6 +11,7 @@ from lad_state import (
     assert_foreground,
     atomic,
     canonical,
+    development_check,
     digest,
     emit,
     fields,
@@ -124,10 +125,13 @@ def _plan(state: dict, occurrence: dict, result: dict, foreground: Path) -> None
         )
         if artifact is None:
             raise LadError("packet_markdown_not_evidenced")
-        packet_text = read(
+        packet_raw = read(
             foreground, f"lad-results/{occurrence['occurrence_id']}/" + markdown
-        ).decode("utf-8", "strict")
-        if "Development check:" not in packet_text:
+        )
+        if occurrence["format"] == "millrace-lad-input/v2":
+            # One finite line-anchored check from the raw-pinned draft bytes.
+            development_check(packet_raw)
+        elif "Development check:" not in packet_raw.decode("utf-8", "strict"):
             raise LadError("packet_development_check_required")
         for ref in row["input_refs"]:
             fields(ref, {"occurrence_id", "sha256"})
@@ -350,23 +354,8 @@ def choose(state: dict, occurrence: dict, result: dict, foreground: Path) -> str
     if role == "learning":
         if data.get("pending_route") != state["pending"] or not state["request"]:
             raise LadError("learning_changed_pending_route")
-        if outcome == "ERROR_TRANSIENT_RESOLVED":
-            prerequisite = digest(canonical({
-                "failure": data["failure"], "source": result["source_sha256"],
-            }))
-            prior = [accepted["result"] for oid, accepted in state["accepted"].items()
-                     if state["occurrences"][oid]["role"] == "learning"
-                     and state["occurrences"][oid]["lineage"] == lineage]
-            if not any(previous["outcome"] == outcome and digest(canonical({
-                "failure": previous["data"]["failure"],
-                "source": previous["source_sha256"],
-            })) == prerequisite for previous in prior):
-                state["learning"][lineage] = {
-                    "disposition": "retrying",
-                    "occurrence_id": occurrence["occurrence_id"],
-                    "prerequisite": prerequisite,
-                }
-                return "REPLACE_LEARNING"
+        # Once per packet: every non-PASS/FINDINGS marker, including a resolved
+        # transient error, is a failed assessment that returns the saved route.
         state["learning"][lineage] = {
             "disposition": "passed"
             if outcome == "PASS"

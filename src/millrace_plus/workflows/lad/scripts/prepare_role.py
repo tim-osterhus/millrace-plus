@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from lad_state import (
+    POLICY_PATH,
     ROLES,
     LadError,
     _prepare_source,
@@ -23,6 +24,7 @@ from lad_state import (
     read,
     record_event,
     roots,
+    routing_policy,
     run,
     save,
     scope,
@@ -121,6 +123,7 @@ def prepare(
     helper_mode: str = "direct",
     helper_ref: dict | None = None,
 ) -> dict:
+    routing_policy()  # Captured new-copy policy is validated before reservation.
     selected_target = shared_target(foreground)
     if workspace == foreground:
         from accept_role import guard_baseline
@@ -152,6 +155,9 @@ def prepare(
         assert_foreground(state)
     elif not state["request"] or state["request"]["kind"] != "ASSESS":
         raise LadError("learning_request_required")
+    elif replacement or workspace.name != "learning":
+        # One nonrecursive assessment per packet; failures use learning_seam fail.
+        raise LadError("learning_single_assessment_only")
     if (
         state["intake"] is None
         or digest(read(foreground, "request.md")) != state["intake"]["sha256"]
@@ -333,6 +339,8 @@ def prepare(
         guidance_names.append("context/routes.md")
     if role != "planner":
         guidance_names.append("context/harness.md")
+    # Pin the captured policy itself; accepted provenance is checked against it.
+    guidance_names.append(POLICY_PATH)
     guidance_files = {
         name: digest(read(control_root, name)) for name in sorted(guidance_names)
     }
