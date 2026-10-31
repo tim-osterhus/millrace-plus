@@ -230,6 +230,7 @@ def test_lad_package_inventory_matches_admitted_workflow_assets() -> None:
         "scripts/setup_intake.py", "scripts/prepare_role.py", "scripts/accept_role.py",
         "scripts/boundaries.py", "scripts/learning_seam.py",
         "scripts/session_compat.py", "scripts/presentation.py",
+        "scripts/engineering_feedback.py", "context/engineering-profile.example.json",
         *(f"prompts/{role}.md" for role in roles),
     }
     actual = {
@@ -237,7 +238,7 @@ def test_lad_package_inventory_matches_admitted_workflow_assets() -> None:
         for path in root.rglob("*")
         if path.is_file() and "__pycache__" not in path.parts
     }
-    assert len(expected) == 40
+    assert len(expected) == 42
     assert actual == expected
     assert not any(path.is_symlink() for path in root.rglob("*"))
     graph = json.loads((root / "workflow.json").read_text())

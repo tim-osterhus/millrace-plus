@@ -88,3 +88,37 @@ Without an active packet, source observation hashes all nonexcluded target
 content. With a packet, it hashes scoped content and retains outside-path
 identities. Large or unreadable files can refuse or reach the finite command
 timeout. Observation does not promise a metadata-only scan of every target.
+
+## Engineering feedback (L-Q1, opt-in)
+
+Only a copy prepared by `millrace-plus lad engineering-init` before its first session
+captures `context/engineering-profile.json`, its shared path policy, an exact
+requirements snapshot, the generated node map and resolved checks under
+`context/engineering/`. Every other copy keeps the legacy graph, `_SOURCE_EXCLUDES`
+and raw Git/outside identities exactly. An enabled copy requires installed Plus and
+validates the capture at initialization; editing any captured context changes
+guidance and stales in-flight occurrences. There is no converter or recapture.
+
+Enabled source identity excludes the policy's opaque `environment_paths` and
+deterministic `product_paths` everywhere, including inside packet prefixes, and
+filters Git worktree/untracked lists the same way. Tracked files and packet paths
+cannot be masked. Product paths are written only by deterministic checks: every
+role occurrence pins a product observation, and any change by a role, import or
+other non-check writer holds as `undeclared_output`.
+
+`engineering_baseline` runs once per task before the first Builder;
+`engineering_candidate` runs before Checker/Doublechecker review of new source.
+Each phase sequences every captured check through its own `eb_`/`ec_` node (one
+check per invocation, deadline = resolved check timeout plus the captured
+bookkeeping allowance) and its distinct `ab_`/`ac_` guard. A check records only
+observed facts; its guard, reached through Core's stopped-writer route from that
+check, accepts the exact reservation, receipt and product layer. Each phase pins
+full source authority (scoped files, outside identities over the plan scope and
+exact Git facts): a check that changes it is never accepted, and replay, review
+preparation, admission and finalization require that exact checked authority.
+Owned products are reversed before the next native role. Foreign products, divergence or unknown
+process closure hold without deletion. `engineering_admit` compares the actual
+scoped delta with the Updater's admission manifest before Arbiter;
+`engineering_finalize` writes the acceptance projection after Arbiter CLOSE. History
+publication is a separate explicit `engineering-publish` after normal task
+acceptance; it never substitutes for terminal CLOSE/ACK or service settlement.

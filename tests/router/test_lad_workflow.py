@@ -1160,6 +1160,19 @@ def test_catalog_copy_and_stdlib_only_scripts(tmp_path: Path) -> None:
                 if script.name == "session_compat.py":
                     assert parent is not None and parent.name == "upgrade_session"
                     assert node.module == "millrace_plus.router"
+                elif parent is not None and parent.name in {
+                    "engineering_policy", "_source_path", "_plus"
+                }:
+                    # Explicitly enabled L-Q1 copies only; disabled copies never
+                    # reach these functions.
+                    assert script.name == (
+                        "engineering_feedback.py" if parent.name == "_plus"
+                        else "lad_state.py"
+                    )
+                    assert node.module == "millrace_plus"
+                    assert {item.name for item in node.names} <= {
+                        "check_contracts", "engineering_feedback"
+                    }
                 else:
                     assert script.name == "lad_state.py"
                     assert parent is not None and parent.name == "shared_target"
@@ -1176,7 +1189,7 @@ def test_catalog_copy_and_stdlib_only_scripts(tmp_path: Path) -> None:
             else:
                 assert set(names) <= sys.stdlib_module_names | {
                     "lad_state", "boundaries", "prepare_role", "accept_role",
-                    "session_compat",
+                    "session_compat", "engineering_feedback",
                 }
     # Ordinary isolated Python mode proves the copied folder's scripts import
     # their own modules without Plus or a service on sys.path.

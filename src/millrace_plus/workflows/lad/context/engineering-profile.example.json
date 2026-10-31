@@ -1,0 +1,61 @@
+{
+  "format": "millrace-lad-engineering-profile/v1",
+  "profile_id": "example-python-repository",
+  "revision": "edit-before-use",
+  "repository": {
+    "target_id": "example-repository",
+    "root_ref": "foreground/target",
+    "source_scope": ["."],
+    "excluded_paths": []
+  },
+  "requirements_snapshot": {
+    "history_id": "example-repository",
+    "sequence": 1,
+    "path": "example-repository/snapshots/000001-0000000000000000000000000000000000000000000000000000000000000000.json",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "checks": [
+    {
+      "id": "unit-tests",
+      "purpose": "functional",
+      "argv": ["python3", "-m", "pytest", "-q", "-p", "no:cacheprovider"],
+      "cwd": ".",
+      "environment": {"inherit_names": ["PATH"], "set": {"PYTHONDONTWRITEBYTECODE": "1"}},
+      "timeout_seconds": null,
+      "timeout_policy": null,
+      "expected_exit_code": 0,
+      "path_policy_ref": {
+        "path": "check-path-policy.json",
+        "sha256": "02716a40c068e0391effb0d8976f684a649bf151b18ea2e2ce2872dcbd1066cd"
+      },
+      "expected_products": [],
+      "inputs": ["."],
+      "requirement_ids": [],
+      "selection": {"when": "always", "paths": []},
+      "required": true,
+      "origin": "Replace with the repository's own documented test command",
+      "override": "Edit this profile before engineering-init; a captured copy is never edited in place"
+    }
+  ],
+  "guidelines": [],
+  "metrics": {"changed_functions": false, "duplication": false, "nesting": false},
+  "artifact_policy": {
+    "deliverable_paths": ["."],
+    "evidence_root": "engineering-evidence",
+    "scratch_root": "engineering-scratch",
+    "retention_root": "engineering-retained"
+  },
+  "review_bindings": null,
+  "path_policy_ref": {
+    "path": "check-path-policy.json",
+    "sha256": "02716a40c068e0391effb0d8976f684a649bf151b18ea2e2ce2872dcbd1066cd"
+  },
+  "check_bookkeeping": {
+    "seconds": 60,
+    "reason": "Replace with the wrapper/receipt allowance this repository actually needs",
+    "origin": "Operator selection recorded in this profile; there is no stock value",
+    "override": "Edit check_bookkeeping before engineering-init"
+  },
+  "family_policy": "none",
+  "evaluation_export": {"enabled": false, "destination_ref": null}
+}

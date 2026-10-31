@@ -98,11 +98,17 @@ def validate(
         validate_execution_evidence(workspace, occurrence, result)
     names = set()
     raws = []
+    engineering = _engineering() if current_contract else None
+    records = (
+        engineering.ROLE_RECORDS.get(occurrence["role"], set())
+        if engineering is not None else set()
+    )
     for artifact in artifacts:
         fields(artifact, {"path", "sha256"})
         name = text(artifact["path"])
         if name in names or (
             not name.endswith(".md") and name != "baseline-freeze.json"
+            and name not in records
         ):
             raise LadError("duplicate_or_nonmarkdown_artifact")
         names.add(name)
@@ -182,6 +188,9 @@ def validate(
             and not failure["prerequisite_resolved"]
         ):
             raise LadError("unresolved_replacement_prerequisite")
+    if engineering is not None:
+        # Captured deterministic obligations; check evidence never comes from prose.
+        engineering.role_gate(foreground, state, occurrence, result, dict(raws))
     return result, digest(canonical(result)), presentation
 
 
@@ -235,7 +244,23 @@ def current_source(
             raise LadError("shared_target_" + str(exc)) from exc
         if observed_target != selected_target:
             raise LadError("shared_target_changed")
+        engineering = _engineering()
+        if engineering is not None:
+            # Declared product paths are excluded from source identity, so every
+            # non-check write to them is checked separately and holds.
+            engineering.products_unchanged(foreground, occurrence)
     return current
+
+
+def _engineering():
+    """The engineering module only for an explicitly captured profile."""
+    from lad_state import engineering_policy
+
+    if engineering_policy() is None:
+        return None
+    import engineering_feedback
+
+    return engineering_feedback
 
 
 def guard_baseline(foreground: Path, role: str, *, preparing: bool = False) -> bool:
@@ -417,6 +442,14 @@ def accept(foreground: Path, workspace: Path, role: str, expected: str) -> str:
             }[route],
             oid,
         )
+    if route.startswith("RESUME_ENGINEERING_"):
+        # The repaired prerequisite returns to the exact saved phase entry; the
+        # phase then opens a fresh attempt. Its pending record is consumed.
+        pending = state["pending"]
+        if not pending or pending.get("kind") != "engineering_prerequisite":
+            raise LadError("exact_saved_role_required")
+        state["continuation"] = dict(pending["resume_continuation"])
+        state["pending"] = pending["resume_pending"]
     if route == "REPLACE_CONSULTANT":
         mark(state, "prepare_consultant_replacement", oid)
     if route == "REPLACE_ARBITER":

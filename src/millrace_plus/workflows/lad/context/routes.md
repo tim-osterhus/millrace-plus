@@ -79,3 +79,23 @@ The following names are guard outcomes, not role-authored markers:
 - `TECHNICAL_RECOVERY` from replacement preparation means the failed prerequisite is unchanged. The graph selects Troubleshooter. A Troubleshooter replacement selects Consultant. A Consultant replacement selects human hold.
 
 `REFUSED`, deterministic command errors, and unknown command outcomes pause for reconciliation. Only a new source or technical observation can change the failure cause. These observations do not count attempts or grant new allowance. Existing Core writer barriers and source/guidance authority still govern all acceptance and continuation.
+
+## Enabled engineering routes
+
+Copies expanded by `engineering-init` route existing role-preparation entries
+through deterministic phases. `engineering_baseline` emits `RUN_<D>` for the next
+reserved check and `READY` to `prepare_builder`. `engineering_candidate` emits
+`RUN_<D>`, then `CHECKED`/`FINDINGS` to `prepare_checker` after Builder or
+`REPAIR_CHECKED`/`REPAIR_FINDINGS` to `prepare_doublechecker` after repairs.
+Generated check nodes go only to their guard (`PASS`, `FAIL`, `UNAVAILABLE`,
+`NOT_SELECTED`, `UNKNOWN`, errors and unknown results alike); the guard emits
+`ACCEPTED` or a resumable `RECONCILE` hold. A selected required check whose
+technical prerequisite is missing (tool, cwd) emits `TECHNICAL_RECOVERY` to the
+existing Troubleshooter with the exact evidence (or `CONSULTANT` after a verified
+repair of the same cause); a verified repair resumes the phase through
+`RESUME_ENGINEERING_BASELINE`/`RESUME_ENGINEERING_CANDIDATE` and a fresh attempt.
+`HUMAN_REQUIRED` (protected foreign product work) pauses for an explicit human
+decision. Source, outside or Git drift from the checked authority holds.
+`engineering_admit` emits `ADMITTED` to `prepare_arbiter` or a resumable
+`FINDINGS` hold; `engineering_finalize` emits `FINALIZED` to the Learning CLOSE
+request. No phase adds a role, review round or repair quota.

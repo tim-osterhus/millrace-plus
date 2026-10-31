@@ -47,3 +47,10 @@ The v0.23.2 routing follow-up (L-R1) consulted Factory `context/transitions.md`,
 They are semantic inputs only. Millrace adopts a finite deterministic
 presentation view and one nonrecursive Learning assessment per packet; it does
 not adopt Factory's prose interpretation, Orchestrator or provider waiting.
+
+The v0.23.2 engineering feedback packet (L-Q1) adds Millrace-authored opt-in
+engineering capture, deterministic check phases/guards and requirement history
+(`scripts/engineering_feedback.py`, `context/engineering-profile.example.json`
+and edits to the role contracts, selected prompts and existing scripts). It uses
+no new upstream input. User-supplied benchmark conversations motivated the checks
+but are not imported or claimed as evidence of improvement.

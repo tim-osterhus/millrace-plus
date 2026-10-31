@@ -497,3 +497,53 @@ Some replay/order assertions rely on frozen source sequence rather than a
 standalone transcript. No general retained-history, macOS, actual used-copy,
 actual OS restart, production, release or push qualification follows; broader
 packet/release acceptance remains separate.
+
+## Engineering feedback (L-Q1)
+
+`millrace-plus lad engineering-init` opts a new, never-run `bundled:lad` copy into
+captured repository checks, cumulative requirements and artifact admission. Copies
+without a captured profile, existing active or used copies, and service children
+created from an unchanged worker definition keep their exact legacy behavior; there
+is no converter.
+
+Configure check outputs deliberately. Builder, Fixer and other native roles may run
+their otherwise authorized tests and builds. Capture any output those roles also
+produce (for example `.venv`, `node_modules`, `build`, `dist` or `.cache`) as an
+explicit `environment_paths` rule before init. Environment paths are opaque: their
+presence and own metadata are recorded, they are preserved in place and they are
+never candidate content. Enabled copies do not inherit the legacy `_SOURCE_EXCLUDES`
+list, and undeclared trees are walked as source. Reserve `product_paths` for outputs
+written only by deterministic checks: each check's owned layer is accepted by its
+guard and reversed before the next native role. A product-path change by a native
+role, preparation, import or any other non-check writer holds as
+`undeclared_output`. One path cannot be both; if native roles and checks share an
+output, capture it as environment.
+
+A persistent service freezes its worker definition. An inner profile pinned to
+snapshot S can run and settle every task normally, but after the first successor
+publication each later publication from S reports `engineering_history_stale`. This
+is a publication limit, not a service restriction; cumulative continuity comes from
+an explicitly selected next snapshot in a new quiescent copy, an authorized safe
+replacement after proven closure, or the factory's outer layer. Publication never
+substitutes for terminal CLOSE/ACK or service settlement.
+
+Publication ownership comes from the copy's captured inputs: a service child's
+`lad_target` requires its own task's settled terminal receipt under `target_lock`
+even when `--service-home/--task` are omitted; supplied selectors must match.
+
+Checks run one at a time in their own process group. Core's own invocation deadline
+is not handed to command scripts, so check evidence records `invocation_deadline`
+as null rather than a guessed value; the check's deadline is its resolved timeout,
+and when Core times out or cancels the wrapper it kills the check group at once. If
+the wrapper is killed without that signal, the guard holds `RECONCILE` naming the
+recorded group as `group_present_not_proven_live` or `group_absent`; a present group
+needs explicit operator cleanup of exactly that recorded group, and the reservation
+is never rerun. A held phase without check evidence cannot finish; use the existing
+explicit terminal-failure intent or a fresh copy. A missing tool or cwd routes to
+the existing Troubleshooter/Consultant; protected foreign product files need a human
+decision. Any source, outside-scope or Git change by a check, or drift after checks,
+holds instead of being absorbed into a new snapshot.
+
+L-Q1 changes no service continuation, ownership, join, FIFO, terminal or stop
+mechanics. Native14 acceptance remains evidence for its original artifacts only, and
+fake-peer source tests are not provider, B4, history or release qualification.

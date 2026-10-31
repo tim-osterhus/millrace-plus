@@ -21,6 +21,18 @@ from lad_state import (
 )
 
 
+def _engineering():
+    """The engineering module only for an explicitly captured profile."""
+    root = Path(__file__).resolve().parent.parent
+    if not (root / "context/engineering-profile.json").exists() and not (
+        root / "context/engineering-profile.json"
+    ).is_symlink():
+        return None
+    import engineering_feedback
+
+    return engineering_feedback
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-root", required=True)
@@ -70,10 +82,17 @@ def main() -> None:
         atomic(project, "lad-target.json", canonical(selected) + b"\n", immutable=True)
     _, identity, inputs = manifest(project)
     directory = foreground / "lad-state"
+    engineering = _engineering()
     if directory.exists() or directory.is_symlink():
         state = load(foreground)
         if (state["identity_sha256"], state["inputs_sha256"]) != (identity, inputs):
             raise LadError("session_input_identity_changed")
+        if engineering is not None:
+            engineering.initialize(foreground, state, staging=None)
+        elif (foreground / "lad-state/engineering.json").exists() or (
+            foreground / "lad-state/engineering.json"
+        ).is_symlink():
+            raise LadError("engineering_capture_missing")
         used = bool(
             state["events"]
             or state["occurrences"]
@@ -117,7 +136,7 @@ def main() -> None:
             not p.is_file()
             or p.is_symlink()
             or (
-                p.name not in {"owner.json", "session.json"}
+                p.name not in {"owner.json", "session.json", "engineering.json"}
                 and not p.name.startswith(".lad-write-")
             )
             for p in entries
@@ -160,6 +179,9 @@ def main() -> None:
         ),
     )
     atomic(foreground, ".lad-init-session/session.json", canonical(state) + b"\n")
+    if engineering is not None:
+        # An enabled capture validates before any role and publishes with the session.
+        engineering.initialize(foreground, state, staging=staging)
     # Rename publishes the complete directory. No role can run before this exits.
     os.rename(staging, directory)
     atomic(

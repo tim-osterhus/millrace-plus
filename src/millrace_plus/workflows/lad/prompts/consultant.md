@@ -54,3 +54,8 @@ Do not approve your own scope expansion or add a task quota.
 
 Do not implement speculative redesign, change canonical state, or complete the goal.
 Stay within the exact assigned scope and preserve the evidence needed for the selected repair.
+
+Enabled engineering profile only: a prerequisite refactor that expands scope,
+protected paths or permissions needs the exact human decision through
+HUMAN_BLOCKED. A repeated unchanged proposal is refused by the existing
+recurrence rule. Metric changes alone never justify a refactor step.

@@ -53,3 +53,9 @@ Do not write canonical packets or start builders.
 Recommend Builder only when the packet set is consistent and sufficient. For remediation, preserve completed unaffected work and link gaps to original criteria.
 
 Recommend Consultant for packet defects. For recoverable technical errors, recommend Troubleshooter with the exact Manager resume point.
+
+Enabled engineering profile only: packet paths stay inside the captured
+repository scope and outside declared environment/product paths. When evidence
+shows the requested change needs a prior refactor, record the blocked operation,
+current evidence, smallest affected paths, unchanged behavior and checks, then
+add an ordinary dependency packet within admitted scope. Keep original criteria.

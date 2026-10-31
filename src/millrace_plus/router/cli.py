@@ -141,6 +141,25 @@ def _lad_main(argv: Sequence[str]) -> int:
 
     parser = _CatalogParser(prog="millrace-plus lad")
     commands = parser.add_subparsers(dest="operation", required=True)
+    engineering = commands.add_parser("engineering-init")
+    engineering.add_argument("--project-root", required=True, type=Path)
+    engineering.add_argument("--profile", required=True, type=Path)
+    engineering.add_argument("--history-home", required=True, type=Path)
+    engineering.add_argument("--core-settings", type=Path)
+    for name in ("engineering-publish", "engineering-export"):
+        child = commands.add_parser(name)
+        child.add_argument("--project-root", required=True, type=Path)
+        child.add_argument("--history-home", required=True, type=Path)
+        child.add_argument("--snapshot", required=True)
+        if name == "engineering-export":
+            child.add_argument("--output", required=True, type=Path)
+            continue
+        child.add_argument("--state-home", required=True, type=Path)
+        child.add_argument("--instance", required=True)
+        child.add_argument("--run", required=True)
+        child.add_argument("--expected-state-version", required=True, type=int)
+        child.add_argument("--service-home", type=Path)
+        child.add_argument("--task")
     for name in (
         "init",
         "submit",
@@ -190,6 +209,12 @@ def _lad_main(argv: Sequence[str]) -> int:
         and args.decision != "continue"
     ):
         parser.error("--resume-plane requires --decision continue")
+    if args.operation.startswith("engineering-"):
+        if args.operation == "engineering-publish" and (
+            (args.service_home is None) != (args.task is None)
+        ):
+            parser.error("--service-home and --task are selected together")
+        return _engineering_main(args)
     try:
         if args.operation == "init":
             from millrace_plus.lad_service_runtime import initialize
@@ -239,6 +264,37 @@ def _lad_main(argv: Sequence[str]) -> int:
         if not isinstance(getattr(exc, "code", None), str):
             raise
         print(json.dumps({"code": exc.code, "message": exc.code}), file=sys.stderr)
+        return 2
+
+
+def _engineering_main(args: argparse.Namespace) -> int:
+    """Thin L-Q1 parsing; record and closure logic stays in engineering_feedback."""
+    from millrace_plus import engineering_feedback as ef
+
+    try:
+        if args.operation == "engineering-init":
+            result = ef.capture(
+                args.project_root, args.profile, args.history_home,
+                core_settings=args.core_settings,
+            )
+        elif args.operation == "engineering-export":
+            result = ef.export_evaluation(
+                args.project_root, args.history_home, args.snapshot, args.output
+            )
+        else:
+            result = ef.publish_task(
+                args.project_root, args.history_home, args.snapshot,
+                state_home=args.state_home, instance_id=args.instance,
+                run_id=args.run, expected_state_version=args.expected_state_version,
+                service_home=args.service_home, task=args.task,
+            )
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    except ef.EngineeringError as exc:
+        print(json.dumps({"code": exc.code, "message": exc.code}), file=sys.stderr)
+        return 2
+    except OSError:
+        print(json.dumps({"code": "io_error", "message": "io_error"}), file=sys.stderr)
         return 2
 
 

@@ -50,3 +50,11 @@ Recommend the next ordered packet, or Arbiter when the lineage is drained.
 Do not commit, publish, deploy, or send messages unless separately authorized.
 
 Do not mark canonical packet or goal state yourself.
+
+Enabled engineering profile only: write `artifact-admission.json`
+(`millrace-lad-artifact-admission/v1`) for the actual changed product paths since
+the task baseline: requested deliverables, plus evidence, scratch or retained
+context under their captured roots outside the target. Never admit transcripts or
+scratch into product paths, and never request removal of files you do not own.
+If no candidate check was selected, set data `no_check_disposition` with the
+reviewed reason. Preparation holds if source drifted after the candidate checks.

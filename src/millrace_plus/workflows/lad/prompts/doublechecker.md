@@ -50,3 +50,10 @@ Report unchanged causes precisely. Recommend Troubleshooter when an unresolved i
 
 The second actual Fixer–Doublechecker pair feeds Learning, including when this review passes. Preserve the pinned baseline and exact pair evidence.
 Report invalidated requirements or baseline assumptions to Consultant.
+
+Enabled engineering profile only: read the accepted baseline/candidate check
+evidence refs in the engineering context. A regression or a required check that
+is unavailable or not comparable is a finding, never a PASS. A known pre-existing
+required failure needs a non-blocking `maintenance-findings.json` entry tied to a
+current criterion that cites that check's accepted evidence. Retained active
+requirements from the snapshot are reviewed like current criteria.

@@ -55,7 +55,9 @@
     "templates/packet.md",
     "templates/result.md",
     "templates/state.md",
-    "scripts/session_compat.py"
+    "scripts/session_compat.py",
+    "scripts/engineering_feedback.py",
+    "context/engineering-profile.example.json"
   ],
   "planes": {
     "foreground": {

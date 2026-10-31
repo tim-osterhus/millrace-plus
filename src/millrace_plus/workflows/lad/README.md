@@ -29,3 +29,31 @@ assignments then use that validated external root. Each task keeps its own
 request, session, artifacts and Learning seam. Missing or changed authority
 requires reconciliation. Standalone copies continue to use `foreground/target/`.
 This worker support does not supply persistent-service initialization or a loop.
+
+## Optional engineering feedback (L-Q1)
+
+A new, never-run copy can opt in before its first session:
+`millrace-plus lad engineering-init --project-root COPY --profile PROFILE --history-home HISTORY [--core-settings SETTINGS]`.
+Start from `context/engineering-profile.example.json`; replace its commands, IDs,
+snapshot pin and bookkeeping allowance with the repository's own. The profile's
+`path_policy_ref` names a `millrace-check-path-policy/v1` file beside it. The
+history home lives outside the copy and target and holds an operator-admitted
+initial `millrace-lad-requirements-snapshot/v1`; initialization indexes it once.
+`--core-settings` is the JSON later given to `instance create --settings`; it lets
+initialization report, and refuse, an operator timeout ceiling below a derived
+check budget. Without it the ceiling is reported as unknown at capture.
+
+Initialization captures the exact profile, policy, snapshot, node map and resolved
+checks under `context/` and expands only that copy's graph with deterministic
+phase, check and guard nodes. Each check has its own resolved per-check deadline
+plus the declared bookkeeping allowance; there is no stock suite timeout, call,
+retry or quality quota. Enabled copies require installed Plus. Copies without a
+captured profile keep the exact legacy graph and behavior.
+
+After normal task acceptance, publish the next requirements snapshot explicitly:
+`millrace-plus lad engineering-publish --project-root COPY --history-home HISTORY --snapshot SHA256 --state-home STATE --instance ID --run ID --expected-state-version V [--service-home HOME --task ID]`.
+It needs public stopped-success Core facts. A copy whose captured inputs name a
+service `lad_target` also needs that exact task's settled terminal receipt; the
+service is derived from the captured target, and optional selectors must match. A competing successor reports `engineering_history_stale`. With
+`evaluation_export.enabled`, `engineering-export` copies selected accepted records
+and an honest report to the declared destination; unrecorded values stay null.

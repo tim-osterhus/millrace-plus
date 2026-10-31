@@ -566,6 +566,76 @@ _SOURCE_EXCLUDES = {
     ".ruff_cache",
 }
 _PROTECTED_NAMES = {".env", ".env.local", "credentials.json", "secrets.json"}
+ENGINEERING_PROFILE = "context/engineering-profile.json"
+_ENGINEERING: object = None
+
+
+def engineering_policy():
+    """The captured shared path policy of an explicitly enabled copy, else None.
+
+    Only a captured `context/engineering-profile.json` selects policy-aware
+    source identity; every other copy keeps `_SOURCE_EXCLUDES` and its raw Git
+    and outside observations exactly. Enabled copies require installed Plus.
+    """
+    global _ENGINEERING
+    if _ENGINEERING is None:
+        root = Path(__file__).resolve().parent.parent
+        if not os.path.lexists(root / ENGINEERING_PROFILE):
+            _ENGINEERING = False
+            return None
+        try:
+            from millrace_plus import check_contracts as cc
+            from millrace_plus import engineering_feedback as ef
+        except ImportError as exc:
+            raise LadError("engineering_requires_plus") from exc
+        try:
+            profile = ef.load_profile(read(root, ENGINEERING_PROFILE))
+            pin = profile["path_policy_ref"]
+            raw = read(root, "context/" + pin["path"])
+            if digest(raw) != pin["sha256"]:
+                raise LadError("engineering_policy_changed")
+            _ENGINEERING = cc.validate_path_policy(cc.parse(raw))
+        except (ef.EngineeringError, cc.CheckContractError) as exc:
+            raise LadError(exc.code) from exc
+    return _ENGINEERING or None
+
+
+def _source_path(policy, relative: str) -> bool:
+    """Policy classification for enabled copies; environment/product are opaque."""
+    from millrace_plus import check_contracts as cc
+
+    try:
+        return cc.classify(policy, relative) == "source"
+    except cc.CheckContractError as exc:
+        raise LadError(exc.code) from exc
+
+
+def _walk_dirs(root: Path, dirs: list[str], target: Path, paths: list[str],
+               policy) -> list[str]:
+    if policy is not None:
+        # A broad packet prefix never turns declared environment/product
+        # descendants into repairable source.
+        return [
+            name for name in dirs
+            if name != ".git"
+            and _source_path(policy, str((root / name).relative_to(target)))
+        ]
+    return [
+        name
+        for name in dirs
+        if name != ".git"
+        and (
+            name not in _SOURCE_EXCLUDES
+            or any(
+                scope == str((root / name).relative_to(target))
+                or scope.startswith(str((root / name).relative_to(target)) + "/")
+                or str((root / name).relative_to(target)).startswith(
+                    scope.rstrip("/") + "/"
+                )
+                for scope in paths
+            )
+        )
+    ]
 
 
 def shared_target(
@@ -638,19 +708,25 @@ def outside_source(foreground: Path) -> dict:
     return _outside_source_at(foreground, target_root(foreground))
 
 
-def _outside_source_at(foreground: Path, target: Path) -> dict:
+def _outside_source_at(
+    foreground: Path, target: Path, paths: list[str] | None = None
+) -> dict:
     if not target.exists():
         return {}
-    session = foreground / "lad-state/session.json"
-    state = (
-        load_json(read(foreground, "lad-state/session.json"))
-        if session.exists()
-        else None
-    )
-    current = packet(state) if state is not None else None
-    paths = current["paths"] if current else []
+    if paths is None:
+        # The current packet's scope; enabled engineering phases pass their
+        # explicit plan scope instead.
+        session = foreground / "lad-state/session.json"
+        state = (
+            load_json(read(foreground, "lad-state/session.json"))
+            if session.exists()
+            else None
+        )
+        current = packet(state) if state is not None else None
+        paths = current["paths"] if current else []
     if not paths:
         return {}
+    policy = engineering_policy()
     result = {}
     for folder, dirs, files in os.walk(target, followlinks=False):
         root = Path(folder)
@@ -658,26 +734,13 @@ def _outside_source_at(foreground: Path, target: Path) -> dict:
             if (root / name).is_symlink():
                 files.append(name)
                 dirs.remove(name)
-        dirs[:] = [
-            name
-            for name in dirs
-            if name != ".git"
-            and (
-                name not in _SOURCE_EXCLUDES
-                or any(
-                    scope == str((root / name).relative_to(target))
-                    or scope.startswith(str((root / name).relative_to(target)) + "/")
-                    or str((root / name).relative_to(target)).startswith(
-                        scope.rstrip("/") + "/"
-                    )
-                    for scope in paths
-                )
-            )
-        ]
+        dirs[:] = _walk_dirs(root, dirs, target, paths, policy)
         for name in files:
             path = root / name
             relative = str(path.relative_to(target))
             if _owned_marker(foreground, target, relative):
+                continue
+            if policy is not None and not _source_path(policy, relative):
                 continue
             if name not in _PROTECTED_NAMES and any(
                 relative == scope or relative.startswith(scope.rstrip("/") + "/")
@@ -708,8 +771,13 @@ def source_context(foreground: Path) -> dict:
 
 
 def _source_context_at(target: Path, outside: dict) -> dict:
+    return {"git": _git_facts(target, engineering_policy()), "outside": outside}
+
+
+def _git_facts(target: Path, policy) -> dict | None:
+    """Exact Git base/index; enabled copies filter path lists by captured policy."""
     if not target.exists():
-        return {"git": None, "outside": outside}
+        return None
     command = [
         "git",
         "-c",
@@ -733,9 +801,9 @@ def _source_context_at(target: Path, outside: dict) -> dict:
             timeout=10,
         )
     except FileNotFoundError:
-        return {"git": None, "outside": outside}
+        return None
     if top.returncode != 0 or Path(os.fsdecode(top.stdout).strip()).resolve() != target:
-        return {"git": None, "outside": outside}
+        return None
     facts = {}
     for key, args in {
         "base": ["rev-parse", "HEAD"],
@@ -748,12 +816,19 @@ def _source_context_at(target: Path, outside: dict) -> dict:
         )
         if result.returncode != 0:
             raise LadError("source_git_observation_failed")
+        output = result.stdout
+        if policy is not None and key in {"worktree", "untracked"}:
+            # Exact Git lists, minus declared opaque environment/product paths.
+            output = b"".join(
+                item + b"\0" for item in output.split(b"\0")
+                if item and _source_path(policy, os.fsdecode(item))
+            )
         facts[key] = (
-            os.fsdecode(result.stdout).strip()
+            os.fsdecode(output).strip()
             if key == "base"
-            else digest(result.stdout)
+            else digest(output)
         )
-    return {"git": facts, "outside": outside}
+    return facts
 
 
 def source(foreground: Path, paths: list[str] | None = None) -> dict[str, str]:
@@ -779,6 +854,7 @@ def _source_at(
         paths = current["paths"] if current else []
     if any(Path(name).is_absolute() or ".." in Path(name).parts for name in paths):
         raise LadError("source_scope_escape")
+    policy = engineering_policy()
     observed = {}
     for folder, dirs, files in os.walk(target, followlinks=False):
         root = Path(folder)
@@ -786,26 +862,13 @@ def _source_at(
             if (root / name).is_symlink():
                 files.append(name)
                 dirs.remove(name)
-        dirs[:] = [
-            name
-            for name in dirs
-            if name != ".git"
-            and (
-                name not in _SOURCE_EXCLUDES
-                or any(
-                    scope == str((root / name).relative_to(target))
-                    or scope.startswith(str((root / name).relative_to(target)) + "/")
-                    or str((root / name).relative_to(target)).startswith(
-                        scope.rstrip("/") + "/"
-                    )
-                    for scope in paths
-                )
-            )
-        ]
+        dirs[:] = _walk_dirs(root, dirs, target, paths, policy)
         for name in files:
             path = root / name
             relative = str(path.relative_to(target))
             if _owned_marker(foreground, target, relative):
+                continue
+            if policy is not None and not _source_path(policy, relative):
                 continue
             if (
                 paths

@@ -429,7 +429,7 @@ def choose(state: dict, occurrence: dict, result: dict, foreground: Path) -> str
         if outcome == "FINDINGS":
             return "CONSULTANT"
         pending = state["pending"]
-        if not pending or pending["target"] not in {
+        targets = {
             "recon",
             "planner",
             "manager",
@@ -440,7 +440,12 @@ def choose(state: dict, occurrence: dict, result: dict, foreground: Path) -> str
             "updater",
             "arbiter",
             "consultant",
-        }:
+        }
+        if pending and pending.get("kind") == "engineering_prerequisite":
+            # Enabled L-Q1 copies: a repaired check prerequisite resumes its
+            # deterministic phase, never a role replacement.
+            targets = {"engineering_baseline", "engineering_candidate"}
+        if not pending or pending["target"] not in targets:
             raise LadError("exact_saved_role_required")
         if (
             data.get("resume_role") != pending["target"]
@@ -450,6 +455,8 @@ def choose(state: dict, occurrence: dict, result: dict, foreground: Path) -> str
         ):
             raise LadError("repair_resume_evidence_required")
         if outcome == "PASS_REVIEW_REPAIRED":
+            if pending.get("kind") == "engineering_prerequisite":
+                raise LadError("repair_resume_evidence_required")
             if lineage not in state["last_fixer"]:
                 raise LadError("review_repair_requires_inspectable_fixer")
             return "DOUBLECHECKER"

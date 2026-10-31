@@ -86,6 +86,7 @@ def test_production_imports_only_public_core_modules() -> None:
         "opencode_configuration.py",
         "pi.py",
         "preflight.py",
+        "process.py",
         "resolver.py",
         "setting_layers.py",
         "stream_records.py",

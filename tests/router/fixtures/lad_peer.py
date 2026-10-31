@@ -17,6 +17,70 @@ from lad_state import (
 )
 
 
+def engineering_records(
+    workspace: Path, item: dict, role: str, outcome: str, data: dict, target: Path
+) -> list[dict]:
+    """Enabled L-Q1 copies only: exact admission and retained-verdict records."""
+    oid = item["occurrence_id"]
+    context_path = workspace / f"lad-state/occurrences/{oid}/engineering-context.json"
+    if not context_path.exists():
+        return []
+    context = json.loads(context_path.read_bytes())
+    output = workspace / "lad-results" / oid
+    rows = []
+    if role == "updater":
+        baseline = baseline_files(workspace)
+        current = source(workspace, sorted({
+            path for row in load(workspace)["plan"] for path in row["paths"]
+        }))
+        entries = [
+            {"path": name, "sha256": value, "class": "deliverable",
+             "authority_ref": "packet " + item["packet"]["id"],
+             "disposition": "admit",
+             "reason": "Requested implementation file for the original criterion."}
+            for name, value in sorted(current.items()) if baseline.get(name) != value
+        ]
+        body = {
+            "format": "millrace-lad-artifact-admission/v1",
+            "session_id": item["session_id"],
+            "task_id": json.loads(
+                (workspace / "lad-state/engineering.json").read_bytes()
+            )["task_id"],
+            "source_sha256": digest(canonical(source(workspace))),
+            "profile_sha256": context["profile_ref"]["sha256"],
+            "entries": entries,
+        }
+        body["integrity_sha256"] = digest(canonical(body))
+        rows.append(("artifact-admission.json", body))
+    if role == "arbiter":
+        sidecar = json.loads(
+            (workspace / f"lad-state/engineering/occurrences/{oid}.json").read_bytes()
+        )
+        rows.append(("retained-verdict.json", {
+            "format": "millrace-lad-retained-verdict/v1",
+            "occurrence_id": oid,
+            "requirements_sha256": context["requirements_ref"]["sha256"],
+            "source_sha256": digest(canonical(source(workspace))),
+            "verdict": {
+                identity: {"status": "pass", "evidence_refs": [context["profile_ref"]]}
+                for identity in sidecar["retained_requirements"]
+            },
+        }))
+    pinned = []
+    for name, body in rows:
+        path = output / name
+        path.write_bytes(canonical(body) + b"\n")
+        pinned.append({"path": name, "sha256": digest(path.read_bytes())})
+    del outcome, data, target
+    return pinned
+
+
+def baseline_files(workspace: Path) -> dict:
+    state = json.loads((workspace / "lad-state/engineering/state.json").read_bytes())
+    phase = json.loads((workspace / state["baseline"]["path"]).read_bytes())
+    return json.loads((workspace / phase["source_ref"]["path"]).read_bytes())["files"]
+
+
 def result_for(
     workspace: Path, role: str, outcome: str | None = None, scenario: str = "clean"
 ) -> dict:
@@ -347,6 +411,7 @@ def result_for(
         data["next_evidence"] = next(
             row for row in artifacts if row["path"] == "diagnosis.md"
         )
+    artifacts += engineering_records(workspace, item, role, outcome, data, target)
     if role == "checker":
         freeze = {
             "format": "millrace-lad-baseline-freeze/v1",

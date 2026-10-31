@@ -33,6 +33,17 @@ from lad_state import (
 )
 
 
+def _engineering():
+    """The engineering module only for an explicitly captured profile."""
+    from lad_state import engineering_policy
+
+    if engineering_policy() is None:
+        return None
+    import engineering_feedback
+
+    return engineering_feedback
+
+
 def materialize(workspace: Path, state: dict, occurrence: dict) -> None:
     if occurrence["format"] == "millrace-lad-input/v2" and (
         occurrence["helper_mode"] != "direct"
@@ -82,6 +93,12 @@ def materialize(workspace: Path, state: dict, occurrence: dict) -> None:
         if "target_root" in occurrence
         else ""
     )
+    engineering = _engineering()
+    if engineering is not None:
+        # Exact refs pinned by the occurrence sidecar; input-v2 keys are unchanged.
+        target_assignment += engineering.materialize_context(
+            Path(occurrence["foreground_root"]), workspace, oid
+        ) + "\n"
     assignment = (
         f"# {occurrence['role']} assignment\n\n"
         f"Session: {state['session_id']}\nOccurrence: {oid}\n"
@@ -431,6 +448,10 @@ def prepare(
             "sha256": digest(read(foreground.parent, "lad-target.json")),
         }
     occurrence["input_sha256"] = digest(canonical(occurrence))
+    engineering = _engineering()
+    if engineering is not None:
+        # Refuses while a deterministic phase is open; pins refs before publication.
+        engineering.prepare_context(foreground, state, occurrence)
     state["occurrences"][oid] = occurrence
     state["active"][plane] = oid
     mark(state, role, oid)

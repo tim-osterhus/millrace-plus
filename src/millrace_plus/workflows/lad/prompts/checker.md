@@ -54,3 +54,10 @@ Recommend Updater when the packet passes. Recommend Fixer for actionable finding
 
 Recommend Consultant if the contract or baseline cannot support a valid review.
 Do not change application code or canonical state.
+
+Enabled engineering profile only: `assignment.md` names an engineering context.
+Before your baseline freeze it gives requirements and profile only, never check
+results. Freeze expectations for the original criteria and every retained active
+requirement in the pinned snapshot. You may add `maintenance-findings.json`;
+a blocking finding needs a demonstrated violation of an explicit criterion or
+required guideline. Metrics alone never create a criterion or a refactor.

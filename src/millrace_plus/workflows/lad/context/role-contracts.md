@@ -174,3 +174,40 @@ and retained inputs keep their existing shapes.
 Rejected-result history retains a digest and reference to bytes at the original
 result path. It does not create or recheck an immutable rejected-byte backup.
 The independent immutable baseline backup and its original pin remain required.
+
+## Enabled engineering records
+
+These JSON artifacts are accepted only in copies with a captured engineering
+profile. `assignment.md` names `lad-state/occurrences/<id>/engineering-context.json`
+(`millrace-lad-engineering-context/v1`); its refs are relative to the copy root.
+Before its baseline freeze, Checker receives requirements and profile refs only.
+
+- Checker/Doublechecker may add `maintenance-findings.json`
+  (`millrace-lad-maintenance-findings/v1`: `format`, `occurrence_id`,
+  `profile_sha256`, `source_sha256`, `findings`). Each finding has exactly `id`,
+  `criterion_id`, `guideline_id`, `kind`, `location`, `evidence_refs`,
+  `likelihood`, `impact`, `proposed_action` and `blocking`. Blocking needs
+  `demonstrated` likelihood, evidence and a current criterion or required
+  guideline. Doublechecker PASS refuses on a regression or an unavailable/not
+  comparable required check; a pre-existing required failure needs a non-blocking
+  finding tied to a current criterion citing that check's accepted evidence.
+- Updater PASS requires `artifact-admission.json`
+  (`millrace-lad-artifact-admission/v1`: `format`, `session_id`, `task_id`,
+  `source_sha256` equal to the result's, `profile_sha256`, `entries`,
+  `integrity_sha256` over the record without it). Entries are exactly `path`,
+  `sha256`, `class`, `authority_ref`, `disposition`, `reason`. Deliverables are
+  target-relative under captured deliverable paths; evidence, scratch and
+  retained context are workspace-relative under their captured roots, outside the
+  target. `remove_requested` is only for owned scratch under
+  `<scratch_root>/<session_id>/` with its exact digest. If no candidate check was
+  selected, data `no_check_disposition` records the reviewed reason.
+- Troubleshooter may receive pending kind `engineering_prerequisite` (target
+  `engineering_baseline`/`engineering_candidate`) naming the unavailable required
+  checks and their accepted evidence. A verified repair returns
+  `PASS_PREREQUISITE_REPAIRED` with `resume_role` equal to that target; never
+  install tools or edit the captured profile.
+- Arbiter writes `retained-verdict.json` (`millrace-lad-retained-verdict/v1`:
+  `format`, `occurrence_id`, `requirements_sha256`, `source_sha256`, `verdict`)
+  keyed by exactly the retained active requirement IDs, each `{status,
+  evidence_refs}`. A requirement leaves the retained set only through an exact
+  `Supersedes: <id>` request line quoted by a current criterion.

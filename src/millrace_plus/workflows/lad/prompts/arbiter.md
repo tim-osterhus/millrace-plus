@@ -61,3 +61,10 @@ Choose `FINDINGS` only for a remediable gap in an original stable criterion. Eac
 For an operating or process-constraint deviation outside the stable criteria that requires human resolution, choose `HUMAN_BLOCKED`. Set `human_evidence.type` to `human_choice` and `findings` to `[]`. Explain the deviation and the evidence checked. Explain why source repair cannot resolve it. Name the required human decision. Preserve truthful stable verdicts, including passing ones. Never invent an ID or disguise a deviation as criterion repair.
 
 Do not complete the native goal or change canonical state yourself.
+
+Enabled engineering profile only: also write `retained-verdict.json`
+(`millrace-lad-retained-verdict/v1`) keyed by exactly the retained active
+requirement IDs listed for this occurrence, with pass, gap or unavailable and
+evidence refs. Success needs every original and retained verdict to pass. A
+retained gap with no current-criterion gap needs HUMAN_BLOCKED with
+`protected_work` evidence; it is never silently deleted or superseded.
