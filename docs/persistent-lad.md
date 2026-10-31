@@ -7,11 +7,11 @@ cooperatively owned target path; their workflow/project, request, session, insta
 and run identities remain separate. `bundled:lad` remains the standalone per-task
 workflow.
 
-This is a development candidate with bounded Linux offline evidence. Native
-provider, macOS and actual used-copy qualification remain separate. A separately
-authorized offline workload-equivalent study is not actual elapsed-day or
-live-production qualification; its partial result and limits are recorded below.
-Synthetic codec checks do not establish runtime history fit.
+This development candidate has Linux source evidence and scoped live B4
+acceptance recorded in the selected successor section below. macOS and actual
+used-copy qualification remain separate. The earlier offline workload-equivalent
+history study remains partial/unqualified and is not elapsed-day or
+live-production qualification.
 
 ## Historical qualification evidence
 
@@ -226,6 +226,17 @@ and true joined observation, and preserves old nulls as null. `close-failed`
 requires the worker's actual human_pause boundary and exact normal terminal intent;
 it uses the declared terminal_failure route without rewriting the LAD ledger.
 
+An unfinished LAD session still owes CLOSE/ACK and final cleanup. That obligation
+does not itself prohibit continuation: explicit foreground plane resume may
+continue only its validated saved node matching Core's paused resume target or
+cursor. A separate run resume requires the plane already ready at that same
+cursor behind an actual run gate. The unfinished-session check reloads the
+ledger under a fresh exclusive Core snapshot at the selected state version.
+Missing or mismatched continuation, an active writer, non-quiescence, a terminal
+session or Learning-owned request refuses. Continue does not clear the cleanup
+flag or acknowledge success; ordinary settlement still requires actual CLOSE/ACK,
+finalization, all required joins and the guarded task transition.
+
 For failed/cancelled actual runs missing CLOSE/ACK, only deliberate matching
 `acknowledge-failed` or `acknowledge-cancelled` can abandon the domain slot. Supply
 an evidence file with exactly:
@@ -340,7 +351,7 @@ Independent offline history is PARTIAL/UNQUALIFIED:
 History process/cgroup closure and checker OS shutdown are proven. No low-level cause or timeout attribution is established. These checks do not qualify whole-service history, elapsed-day or live-production operation. Full packet, P-L4 and release acceptance remain open. That packet's review scope and exact receipts are recorded in `lab/tasks/v0232-os-transport-closeout/2026-10-27/final-status.json`.
 
 
-## Current replay and B4 packet (2026-10-28)
+## Historical replay and B4 packet (2026-10-28)
 
 The completed predecessor receipt-transport correction passed 440 focused tests,
 Ruff, the package build and installed identity checks. Its repaired saved-case
@@ -365,3 +376,73 @@ promised. Live `decide` / `_maintenance` may hold the existing target and journa
 locks through a receipt GET for up to the remaining 30-second operator budget;
 no new or larger locks are selected. Earlier failed results and held stores remain preserved. History and
 full packet/P-L4/release acceptance remain separate and open.
+
+
+## Selected live B4 qualification (2026-10-29)
+
+Root accepted Native14's scoped Linux B4 journey after independent
+ACCEPT_WITH_NOTES QA with no blockers. Both tasks settled normally with
+CLOSE/ACK; 41 pinned immutable file hashes were independently verified. Seven
+target unittests and independent checks, actual joins and normal main stop
+passed. OS shutdown, dead service threads, exact PID/cgroup absence and executor
+exit 0 are recorded. The exact scope and evidence are in
+`lab/tasks/v0232-b4-live-qualification/2026-10-29/native14-final-acceptance.json`.
+
+The exact task contract, source checks and raw run evidence are under
+`lab/tasks/v0232-b4-live-qualification/2026-10-29/` (`candidate-contract.md`,
+`native14-source-readiness.json` and `native14-verification/final/`). The latest
+source round passed 14 UNKNOWN-observer, eight expiry and nine parent-observer
+cases (31 total), plus three-file Ruff. Earlier overlapping rounds are separate.
+Twenty native invocation records cover four configured pairs: GPT-6 Luna
+xhigh/max through Codex CLI and Claude Haiku 5.5 medium/high through Claude
+Code. They do not count provider-internal calls. Requested settings and reported
+models are distinct: Claude reports claude-haiku-5-5; Codex's reported model is
+absent. Codex model/effort evidence is captured configuration and CLI/source
+evidence; neither backend independently attests effective reasoning effort.
+
+The journey uses real serial LAD roles, two declared approval pauses and
+automatic FIFO claim/start of a distinct second child on the same target. Stock
+observation uses 60 seconds without a minimum native-call duration. The
+lost-join mask ends only after saved genuine recovery/plane-versus-run proof;
+exact original-envelope GET then obtains actual join evidence while preserving
+the null prefix. A separate real OS worker remains held after Core return until
+its actual release/join. These controlled faults do not demonstrate an actual OS
+restart. The obsolete synthetic B4 monolith is archived outside pytest
+discovery; lower-level protocol regressions remain, and default checks invoke no
+native providers.
+
+Task-only observation corrections admit each new parent control normally once,
+then poll public GET of its exact saved envelope without repeated target-lock
+admission. Only narrowly validated parent HOLD causes may resume parent
+observation; child human attention and unknown writers do not auto-continue. A
+separate UNKNOWN final-resume branch requires exact
+decision/operator/input/selector/claim/child binding, then retains genuine GET
+facts through existing attached-row validation, journal locking and lifecycle
+CAS before the unchanged known-owned/same-ID decide path. UNSENT, NULL-only,
+refused, conflicting and failed facts do not qualify; no extra POST, control
+identity, fake join or stale overwrite is introduced. Applied receipts and owned
+FALSE allow observation, not settlement. Normal settlement and stop retain
+actual TRUE join and domain requirements. No arbitrary overall/phase/call/retry
+cap or synthetic workload is selected; finite invocation, transport and existing
+operator budgets remain effective.
+
+The runtime unfinished-continuation guard/tests and explicit existing
+role-field, path/digest guidance are local Plus commits
+`38a86306dae4d668fbb63f85f9b3e326be823366` and
+`785e37f7cf8ffc1ac9a8a509994f83ea28fa422e`. This B4 task's tested
+runtime/guidance bytes are unchanged since those commits; later observer fixes
+are task-driver/helper changes. Source bundles were committed separately; the
+receipt owns local commit disposition. Guidance captures Manager's packet
+template and clarifies existing guards, including canonical accepted-result
+versus exact-byte artifact hashes and post-work source identity; validation is
+not weakened.
+
+All earlier failures, including Native12/13, remain unqualified; unknown
+closures and held states remain preserved. This B4 task changes no Core/OS
+product code. Qualification covers only the pinned Core/Plus/OS artifacts in the
+receipt; later component edits are outside it. The UNKNOWN-first branch passed
+14 unit cases; entry into that branch was not independently established live.
+Some replay/order assertions rely on frozen source sequence rather than a
+standalone transcript. No general retained-history, macOS, actual used-copy,
+actual OS restart, production, release or push qualification follows; broader
+packet/release acceptance remains separate.
