@@ -22,8 +22,9 @@ CI-R1 subset implemented here:
 
 CI-R1 config admits only the hold external policy (`unsupported_until_ci_d1`),
 a null health policy (`unsupported_until_ci_d2`) and null wait-node deadlines.
-Effect, permission, wait, health, publication-chain (CI-D1/CI-D2), feedback and
-correlation (CI-F1) records are deliberately not implemented here.
+Effect, permission, wait, health and publication-chain (CI-D1/CI-D2) records
+remain outside this module. CI-F1 feedback/correlation validators and local
+evidence admission live in `cicd_feedback`.
 
 Everything is pure: no filesystem, process, environment, clock or Core access.
 Consumers read and hash Ref targets, resolve cross-file links and translate

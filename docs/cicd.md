@@ -374,3 +374,56 @@ consumer must invalidate or guard the active-role pointer and inspect later runs
 before reuse. Historical settlement-plan scanning remains home-wide: old evidence
 corruption can block new claims. No history index or long-run qualification is
 provided here.
+
+## Typed feedback in v2 homes
+
+After the ordinary explicit prepare→init bootstrap, submit local feedback without
+another per-report approval:
+
+```sh
+millrace-plus cicd submit-report --workflow-home /owned/ci --report report.json
+millrace-plus cicd correlate --workflow-home /owned/ci --correlation correlation.json
+```
+
+`submit-report` accepts the exact `millrace-plus-cicd-feedback/v1` schema bundled
+as `cicd-v2/schemas/feedback.json`. Bug reports and production incidents retain
+their own identity, original bytes, origin, affected version/environment, observed
+impact, descriptive reproduction steps and hash-pinned evidence. All refs inside
+the submitted record are contained regular files relative to that file's parent.
+They are retained beside its original bytes; input evidence refs address those
+copies from the workflow workspace. Links, hardlinks, escapes, missing files and
+changed hashes refuse. Configure `input.evidence` as an optional captured byte
+guard for each referenced file when the operator's resource policy needs it;
+`input` bounds the submitted record. No numeric default is added.
+
+Feedback requires an explicit redaction attestation, preserving an honest false
+value and its notes; that attestation does not
+prove the absence of secrets. Do not submit credentials or environment dumps.
+The identity is the canonical hash of kind, producer, report_id and repository.
+Exact submitted/evidence bytes replay the original receipt. Changed bytes under
+that identity conflict. A correction uses a new report_id and retains the original
+report through origin_refs. Near-duplicates remain separate FIFO inputs.
+
+Standalone freeze requires an actual affected head matching local HEAD. A stale
+head or a release/artifact-only report remains held for source investigation;
+there is no automatic checkout or fabricated CI head/log. Matching reports use
+the existing reproduce→investigate→repair→checks→review route. Reproduction
+steps, impact and severity hints do not supply executable authority. All selected
+checks and unresolved findings remain obligations. The stock external-effect
+hold remains; a checked patch is not published delivery.
+
+`correlate` retains one exact append-only advisory record using the bundled
+`correlation.json` schema. Each input ID must already exist. A changed record
+under the same correlation_id conflicts; record a new ID for a later disposition.
+Suggested, human_confirmed and rejected dispositions all remain advisory. Status
+returns their refs separately from immutable historical reports, so a later
+hypothesis cannot rewrite a prior terminal receipt. Correlation never merges,
+archives, skips or reprioritizes admitted work.
+
+A held refinement requires `decide --decision continue` with the existing strict
+v2 decision record, the held basis digest, an allowed target stage and actionable
+changed-cause evidence. Wording changes alone refuse. Existing writer closure,
+product restoration/accounting, fresh attempt links, review and scope checks stay
+in force. Status and reload validate evidence; reads never reconstruct missing
+input projections. CI-F1 adds no LAD handoff, Factory composition, publication,
+health observation or rollback.

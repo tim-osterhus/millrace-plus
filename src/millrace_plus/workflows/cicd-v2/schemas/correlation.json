@@ -1,0 +1,73 @@
+{
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "millrace-plus-cicd-correlation/v1"
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "hypothesis": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    },
+    "confidence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "disposition": {
+      "enum": [
+        "suggested",
+        "human_confirmed",
+        "rejected"
+      ]
+    },
+    "actor": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "format",
+    "correlation_id",
+    "input_ids",
+    "hypothesis",
+    "evidence_refs",
+    "confidence",
+    "disposition",
+    "actor"
+  ],
+  "additionalProperties": false
+}

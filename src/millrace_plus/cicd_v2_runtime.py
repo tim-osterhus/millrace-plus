@@ -272,6 +272,7 @@ def _guard_values(config: Mapping[str, object]) -> dict[str, int | float]:
     supported = {
         "input": "bytes",
         "input.log": "bytes",
+        "input.evidence": "bytes",
         "command.stdout": "bytes",
         "command.stderr": "bytes",
         "snapshot.bytes": "bytes",
@@ -497,48 +498,86 @@ class V2Home:
         payload = _object(cast(bytes, task["request_bytes"]))
         original = self.read_ref(payload["original_ref"])
         original_raw = _read(self.resolve_ref(payload["original_ref"]))
-        event = _validate_event(
-            original_raw, str(self.config["repository"]), legacy_limits=False
-        )
-        if event_identity(event) != input_id:
-            raise CicdV2Error("input_changed")
-        if (payload["log_ref"] is None) != (event["log"] is None):
-            raise CicdV2Error("input_log_mismatch")
-        if payload["log_ref"] is not None:
-            expected_log_path = (
-                Path(str(payload["original_ref"]["path"])).parent
-                / str(event["log"]["path"])
-            ).as_posix()
-            if payload["log_ref"] != {
-                "path": expected_log_path,
-                "sha256": event["log"]["sha256"],
-            }:
+        if original.get("format") == "millrace-plus-cicd-feedback/v1":
+            from .cicd_feedback import (
+                feedback_identity,
+                feedback_refs,
+                validate_feedback,
+            )
+
+            report = validate_feedback(original, str(self.config["repository"]))
+            kind = str(report["kind"])
+            identity = feedback_identity(report)
+            if (
+                vr.input_identity(kind, identity) != input_id
+                or payload["log_ref"] is not None
+            ):
+                raise CicdV2Error("input_changed")
+            parent = Path(str(payload["original_ref"]["path"])).parent
+            refs = [
+                {
+                    "path": (parent / str(ref["path"])).as_posix(),
+                    "sha256": ref["sha256"],
+                }
+                for ref in feedback_refs(report)
+            ]
+            for ref in refs:
+                self.resolve_ref(ref)
+            expected = vr.validate_input(
+                {
+                    "format": vr.INPUT,
+                    "input_id": input_id,
+                    "kind": kind,
+                    "original_ref": payload["original_ref"],
+                    "evidence_refs": refs,
+                    "accepted_sequence": task["sequence"],
+                    "repository": report["repository"],
+                    "source_identity": identity,
+                }
+            )
+        else:
+            event = _validate_event(
+                original_raw, str(self.config["repository"]), legacy_limits=False
+            )
+            if event_identity(event) != input_id:
+                raise CicdV2Error("input_changed")
+            if (payload["log_ref"] is None) != (event["log"] is None):
                 raise CicdV2Error("input_log_mismatch")
-            self.resolve_ref(payload["log_ref"])
-        expected = vr.validate_input(
-            {
-                "format": vr.INPUT,
-                "input_id": input_id,
-                "kind": "ci_event",
-                "original_ref": payload["original_ref"],
-                "evidence_refs": []
-                if payload["log_ref"] is None
-                else [payload["log_ref"]],
-                "accepted_sequence": task["sequence"],
-                "repository": original["repository"],
-                "source_identity": {
-                    key: original[key]
-                    for key in (
-                        "source",
-                        "repository",
-                        "run_id",
-                        "attempt",
-                        "job_id",
-                        "head_sha",
-                    )
-                },
-            }
-        )
+            if payload["log_ref"] is not None:
+                expected_log_path = (
+                    Path(str(payload["original_ref"]["path"])).parent
+                    / str(event["log"]["path"])
+                ).as_posix()
+                if payload["log_ref"] != {
+                    "path": expected_log_path,
+                    "sha256": event["log"]["sha256"],
+                }:
+                    raise CicdV2Error("input_log_mismatch")
+                self.resolve_ref(payload["log_ref"])
+            expected = vr.validate_input(
+                {
+                    "format": vr.INPUT,
+                    "input_id": input_id,
+                    "kind": "ci_event",
+                    "original_ref": payload["original_ref"],
+                    "evidence_refs": []
+                    if payload["log_ref"] is None
+                    else [payload["log_ref"]],
+                    "accepted_sequence": task["sequence"],
+                    "repository": original["repository"],
+                    "source_identity": {
+                        key: original[key]
+                        for key in (
+                            "source",
+                            "repository",
+                            "run_id",
+                            "attempt",
+                            "job_id",
+                            "head_sha",
+                        )
+                    },
+                }
+            )
         path = self.workspace / (input_id + ".input.json")
         if _read(path) != canonical(expected):
             raise CicdV2Error("input_projection_missing_or_changed")
@@ -613,7 +652,19 @@ class V2Home:
             )
         return {"input_id": input_id, "event_id": input_id, "receipt": receipt}
 
+    def submit_report(self, report_file: Path) -> dict[str, object]:
+        from .cicd_feedback import submit_report
+
+        return submit_report(self, report_file)
+
+    def correlate(self, record_file: Path) -> dict[str, object]:
+        from .cicd_feedback import record_correlation
+
+        return record_correlation(self, record_file)
+
     def status(self, input_id: str | None = None) -> dict[str, object]:
+        from .cicd_feedback import correlations
+
         rows = self.intake.tasks() if input_id is None else [self.task(input_id)]
         results = []
         for task in rows:
@@ -627,6 +678,7 @@ class V2Home:
                     "status": task["status"],
                     "state": state,
                     "terminal_receipt": task["terminal_receipt"],
+                    "correlation_refs": correlations(self, current),
                     "decision_dispositions": self.decision_dispositions(current),
                 }
             )
@@ -1467,7 +1519,12 @@ class Runtime:
 
         input_id = str(state["input_id"])
         record = self.home.input(input_id)
-        event = self.home.read_ref(record["original_ref"])
+        original = self.home.read_ref(record["original_ref"])
+        reported_head = (
+            original["head_sha"]
+            if record["kind"] == "ci_event"
+            else original["affected_version"]["head_sha"]
+        )
         head = git_head(self.home.target)
         mode = cast(dict[str, object], self.home.config["source_policy"])["mode"]
         if mode != "standalone":
@@ -1478,7 +1535,9 @@ class Runtime:
                 state, "factory_source_validator_unavailable", "held_stale"
             )
         else:
-            if head != event["head_sha"]:
+            if reported_head is None:
+                return self._hold(state, "source_binding_unproven", "held_stale")
+            if head != reported_head:
                 return self._hold(state, "head_mismatch", "held_stale")
             binding = vr.validate_source_binding(
                 {
@@ -1486,7 +1545,7 @@ class Runtime:
                     "mode": "standalone",
                     "input_ref": self._input_ref(input_id),
                     "anchor_head": head,
-                    "reported_head": event["head_sha"],
+                    "reported_head": reported_head,
                     "candidate_ref": None,
                     "publication_ref": None,
                     "preparer_ref": None,
@@ -1527,7 +1586,11 @@ class Runtime:
             ),
             phase="reproduce",
         )
-        if event["conclusion"] in {"success", "cancelled", "skipped"}:
+        if record["kind"] == "ci_event" and original["conclusion"] in {
+            "success",
+            "cancelled",
+            "skipped",
+        }:
             report_ref = self.home.retain(self._report(state, None, "no_action"))
             self._save(state, settlement_ref=report_ref, phase="settle")
             return _out("NO_ACTION")
@@ -3009,10 +3072,13 @@ class Runtime:
         ):
             raise CicdV2Error("settlement_report_mismatch")
         if selected is None:
-            event = self.home.read_ref(
-                self.home.input(str(state["input_id"]))["original_ref"]
-            )
-            no_action = event["conclusion"] in {"success", "cancelled", "skipped"}
+            subject = self.home.input(str(state["input_id"]))
+            original = self.home.read_ref(subject["original_ref"])
+            no_action = subject["kind"] == "ci_event" and original["conclusion"] in {
+                "success",
+                "cancelled",
+                "skipped",
+            }
             if state["assessment_ref"] is not None:
                 no_action |= (
                     vr.validate_assessment(self.home.read_ref(state["assessment_ref"]))[

@@ -10,7 +10,11 @@
       "pattern": "^[0-9a-f]{64}$"
     },
     "kind": {
-      "const": "ci_event"
+      "enum": [
+        "ci_event",
+        "bug_report",
+        "production_incident"
+      ]
     },
     "original_ref": {
       "type": "object",
@@ -60,44 +64,78 @@
       "minLength": 1
     },
     "source_identity": {
-      "type": "object",
-      "properties": {
-        "source": {
-          "enum": [
-            "github-actions",
-            "generic-ci"
-          ]
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "enum": [
+                "github-actions",
+                "generic-ci"
+              ]
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attempt": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "job_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "head_sha": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+            }
+          },
+          "required": [
+            "source",
+            "repository",
+            "run_id",
+            "attempt",
+            "job_id",
+            "head_sha"
+          ],
+          "additionalProperties": false
         },
-        "repository": {
-          "type": "string",
-          "minLength": 1
-        },
-        "run_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "attempt": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "job_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "head_sha": {
-          "type": "string",
-          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "bug_report",
+                "production_incident"
+              ]
+            },
+            "producer": {
+              "type": "string",
+              "minLength": 1
+            },
+            "report_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "kind",
+            "producer",
+            "report_id",
+            "repository"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "source",
-        "repository",
-        "run_id",
-        "attempt",
-        "job_id",
-        "head_sha"
-      ],
-      "additionalProperties": false
+      ]
     }
   },
   "required": [
@@ -110,5 +148,134 @@
     "repository",
     "source_identity"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ci_event"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source_identity": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "enum": [
+                  "github-actions",
+                  "generic-ci"
+                ]
+              },
+              "repository": {
+                "type": "string",
+                "minLength": 1
+              },
+              "run_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "attempt": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "job_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "head_sha": {
+                "type": "string",
+                "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+              }
+            },
+            "required": [
+              "source",
+              "repository",
+              "run_id",
+              "attempt",
+              "job_id",
+              "head_sha"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "source_identity": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "bug_report",
+                  "production_incident"
+                ]
+              },
+              "producer": {
+                "type": "string",
+                "minLength": 1
+              },
+              "report_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "repository": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "kind",
+              "producer",
+              "report_id",
+              "repository"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "bug_report"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source_identity": {
+            "properties": {
+              "kind": {
+                "const": "bug_report"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "production_incident"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source_identity": {
+            "properties": {
+              "kind": {
+                "const": "production_incident"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

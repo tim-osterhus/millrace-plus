@@ -1,0 +1,263 @@
+{
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "millrace-plus-cicd-feedback/v1"
+    },
+    "kind": {
+      "enum": [
+        "bug_report",
+        "production_incident"
+      ]
+    },
+    "origin": {
+      "type": "object",
+      "properties": {
+        "producer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "additionalProperties": false
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "producer",
+        "origin_refs"
+      ],
+      "additionalProperties": false
+    },
+    "report_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "affected_version": {
+      "type": "object",
+      "properties": {
+        "release": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "head_sha": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "release",
+        "head_sha",
+        "artifact_sha256"
+      ],
+      "additionalProperties": false,
+      "not": {
+        "properties": {
+          "release": {
+            "type": "null"
+          },
+          "head_sha": {
+            "type": "null"
+          },
+          "artifact_sha256": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_ref": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "path",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "platform",
+        "configuration_ref"
+      ],
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reproduction_steps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    },
+    "impact": {
+      "type": "object",
+      "properties": {
+        "observed": {
+          "type": "string",
+          "minLength": 1
+        },
+        "affected_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity_hint": {
+          "anyOf": [
+            {
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "observed",
+        "affected_scope",
+        "severity_hint"
+      ],
+      "additionalProperties": false
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "redaction": {
+      "type": "object",
+      "properties": {
+        "performed": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "performed",
+        "notes"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "format",
+    "kind",
+    "origin",
+    "report_id",
+    "repository",
+    "affected_version",
+    "environment",
+    "summary",
+    "reproduction_steps",
+    "evidence_refs",
+    "impact",
+    "occurred_at",
+    "redaction"
+  ],
+  "additionalProperties": false
+}

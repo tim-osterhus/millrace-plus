@@ -29,6 +29,8 @@ def _parser() -> _Parser:
         "prepare",
         "init",
         "submit",
+        "submit-report",
+        "correlate",
         "status",
         "cancel",
         "decide",
@@ -65,6 +67,10 @@ def _parser() -> _Parser:
             child.add_argument("--node", required=True)
             child.add_argument("--plane", default="main")
             child.add_argument("--script", required=True, type=Path)
+        elif name == "submit-report":
+            child.add_argument("--report", required=True, type=Path)
+        elif name == "correlate":
+            child.add_argument("--correlation", required=True, type=Path)
         elif name == "submit":
             child.add_argument("--event", required=True, type=Path)
         else:
@@ -175,6 +181,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 home = V2Home(args.workflow_home)
                 if args.operation == "submit":
                     result = home.submit(args.event)
+                elif args.operation == "submit-report":
+                    result = home.submit_report(args.report)
+                elif args.operation == "correlate":
+                    result = home.correlate(args.correlation)
                 elif args.operation == "status":
                     result = home.status(args.event)
                 elif args.operation == "decide":
@@ -219,6 +229,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     )
                 print(json.dumps(result, ensure_ascii=False))
                 return 0
+            if args.operation in {"submit-report", "correlate"}:
+                raise CicdError("feedback_requires_v2")
             from .cicd_runtime import Home
 
             home = Home(args.workflow_home)
