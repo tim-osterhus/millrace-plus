@@ -106,8 +106,30 @@ def test_advisory_inventory_results_and_agent_metadata(tmp_path: Path) -> None:
 
 def test_stock_graphs_have_no_implicit_skill_authority() -> None:
     # The two finite v3 examples and optional-bound v4 LAD have no skill authority.
+    # CI/CD is the one v4 graph whose role methods are explicit pinned controls.
+    cicd_skills = ["skills/diagnose.md", "skills/repair.md", "skills/review.md"]
     for path in (ROOT / "src/millrace_plus/workflows").glob("*/workflow.json"):
         graph = json.loads(path.read_text())
+        if path.parent.name == "cicd-v2":
+            assert graph["format"] == "millrace-router/v4"
+            assert sorted(a for a in graph["control_files"] if a.startswith("skills/")) == [
+                "skills/investigate.md", "skills/repair.md", "skills/review.md"]
+            assert "selected_authority" not in graph
+            continue
+        if path.parent.name == "cicd":
+            assert graph["format"] == "millrace-router/v4"
+            declared = sorted(a for a in graph["control_files"] if "skills/" in a)
+            assert declared == cicd_skills
+            assert all((path.parent / name).is_file() for name in declared)
+            # Each skill pairs with one declared role node; nothing else is skills.
+            roles = {
+                node["invoke"]["config"]["args"][0]
+                for node in graph["planes"]["main"]["nodes"].values()
+                if node["invoke"]["binding"] == "agent"
+            }
+            assert {f"skills/{role}.md" for role in roles} == set(cicd_skills)
+            assert "selected_authority" not in graph
+            continue
         assert graph["format"] == (
             "millrace-router/v4"
             if path.parent.name in {"lad", "lad-service"}

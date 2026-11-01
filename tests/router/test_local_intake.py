@@ -484,3 +484,142 @@ def test_combined_lifecycle_tasks_preserves_refusal_and_bytes(
         intake._lifecycle_tasks()
     assert combined.value.code == existing.value.code
     assert intake.path.read_bytes() == before
+
+
+def test_accepted_decision_lookup_is_exact_and_read_only(tmp_path: Path) -> None:
+    path = tmp_path / "intake.sqlite3"
+    intake = store(path)
+    intake.initialize()
+    first = intake.submit("first", b"first")
+    second = intake.submit("second", b"second")
+    note = uuid.uuid4().hex
+    intent = {"task_id": first["task_id"], "decision": "note", "evidence": "a"}
+    receipt = intake.decide(note, intent, check=lambda _: None)
+    cancel = uuid.uuid4().hex
+    queued = {
+        "task_id": second["task_id"],
+        "decision": "cancel-queued",
+        "evidence": None,
+    }
+    terminal = intake.decide(cancel, queued, check=lambda _: None, cancel_queued=True)
+    before = path.read_bytes()
+    versions = [row["version"] for row in intake.tasks()]
+
+    assert intake.decision(note) == {"intent": intent, "receipt": receipt}
+    assert intake.decision(note, intent) == {"intent": intent, "receipt": receipt}
+    assert intake.decision(cancel, queued) == {"intent": queued, "receipt": terminal}
+    assert intake.decision(uuid.uuid4().hex) is None  # Absent creates nothing.
+    assert intake.decision(uuid.uuid4().hex, intent) is None
+    with pytest.raises(IntakeError, match="decision_conflict"):
+        intake.decision(note, intent | {"evidence": "b"})
+    with pytest.raises(IntakeError, match="decision_conflict"):
+        intake.decision(note, intent | {"decision": "other"})
+    with pytest.raises(IntakeError, match="invalid_id"):
+        intake.decision("not-a-request")
+    with pytest.raises(IntakeError):
+        intake.decision(note, {"task_id": first["task_id"]})  # Invalid shape.
+
+    # No lookup wrote anything, reserved a request or advanced a version.
+    assert path.read_bytes() == before
+    assert not Path(str(path) + "-journal").exists()
+    assert [row["version"] for row in intake.tasks()] == versions
+    # Ordinary replay is unchanged and still returns the original receipt.
+    assert intake.decide(note, intent, check=lambda _: pytest.fail("rerun")) == receipt
+
+
+@pytest.mark.parametrize("change", ["receipt", "intent"])
+def test_accepted_decision_lookup_refuses_corrupt_store(
+    tmp_path: Path, change: str
+) -> None:
+    path = tmp_path / "intake.sqlite3"
+    intake = store(path)
+    intake.initialize()
+    first = intake.submit("first", b"first")
+    request = uuid.uuid4().hex
+    intent = {"task_id": first["task_id"], "decision": "note", "evidence": "a"}
+    intake.decide(request, intent, check=lambda _: None)
+    column = "receipt" if change == "receipt" else "intent"
+    if change == "receipt":
+        forged = canonical({"request_id": request, "intent": {}}).decode()
+    else:
+        forged = canonical(intent | {"evidence": "forged"}).decode()
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            f"UPDATE decisions SET {column}=? WHERE request_id=?", (forged, request)
+        )
+    before = path.read_bytes()
+    with pytest.raises(IntakeError, match="invalid_intake"):
+        intake.decision(request)
+    with pytest.raises(IntakeError, match="invalid_intake"):
+        intake.decision(uuid.uuid4().hex)  # Whole-store validation, as reads do.
+    assert path.read_bytes() == before
+
+
+def test_accepted_decisions_enumerate_one_task_read_only(tmp_path: Path) -> None:
+    path = tmp_path / "intake.sqlite3"
+    intake = store(path)
+    intake.initialize()
+    first = intake.submit("first", b"first")
+    second = intake.submit("second", b"second")
+    third = intake.submit("third", b"third")
+    accepted = []
+    for evidence in ("a", "b"):
+        request = uuid.uuid4().hex
+        intent = {"task_id": first["task_id"], "decision": "note", "evidence": evidence}
+        receipt = intake.decide(request, intent, check=lambda _: None)
+        accepted.append({"request_id": request, "intent": intent, "receipt": receipt})
+    foreign = uuid.uuid4().hex
+    queued = {
+        "task_id": second["task_id"],
+        "decision": "cancel-queued",
+        "evidence": None,
+    }
+    foreign_receipt = intake.decide(
+        foreign, queued, check=lambda _: None, cancel_queued=True
+    )
+    # An exact replay is the same accepted decision, not another row.
+    again = accepted[0]
+    assert (
+        intake.decide(again["request_id"], again["intent"], check=lambda _: None)
+        == again["receipt"]
+    )
+    before = path.read_bytes()
+    versions = [row["version"] for row in intake.tasks()]
+
+    assert intake.decisions(str(first["task_id"])) == accepted  # Acceptance order.
+    assert intake.decisions(str(second["task_id"])) == [
+        {"request_id": foreign, "intent": queued, "receipt": foreign_receipt}
+    ]
+    assert intake.decisions(str(third["task_id"])) == []
+    for row in accepted:
+        assert intake.decision(row["request_id"]) == {
+            "intent": row["intent"],
+            "receipt": row["receipt"],
+        }
+    with pytest.raises(IntakeError, match="task_not_found"):
+        intake.decisions(uuid.uuid4().hex)
+    with pytest.raises(IntakeError, match="invalid_id"):
+        intake.decisions("not-a-task")
+
+    assert path.read_bytes() == before
+    assert not Path(str(path) + "-journal").exists()
+    assert [row["version"] for row in intake.tasks()] == versions
+
+
+def test_accepted_decisions_enumeration_refuses_corrupt_store(tmp_path: Path) -> None:
+    path = tmp_path / "intake.sqlite3"
+    intake = store(path)
+    intake.initialize()
+    first = intake.submit("first", b"first")
+    request = uuid.uuid4().hex
+    intent = {"task_id": first["task_id"], "decision": "note", "evidence": "a"}
+    intake.decide(request, intent, check=lambda _: None)
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "UPDATE decisions SET intent=? WHERE request_id=?",
+            (canonical(intent | {"evidence": "forged"}).decode(), request),
+        )
+    before = path.read_bytes()
+    with pytest.raises(IntakeError, match="invalid_intake"):
+        intake.decisions(str(first["task_id"]))
+    assert path.read_bytes() == before

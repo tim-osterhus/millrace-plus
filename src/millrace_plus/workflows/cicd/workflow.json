@@ -1,0 +1,577 @@
+{
+  "format": "millrace-router/v4",
+  "limits": {
+    "max_parallel_invocations": 1
+  },
+  "defaults": {
+    "timeout_seconds": 600
+  },
+  "bindings": {
+    "command": {
+      "adapter": "command",
+      "contract": "millrace-command/v1",
+      "executable": "python3",
+      "config": {}
+    },
+    "agent": {
+      "adapter": "command",
+      "contract": "millrace-command/v1",
+      "executable": "cicd_agent",
+      "config": {}
+    }
+  },
+  "control_files": [
+    "prompts/diagnose.md",
+    "prompts/repair.md",
+    "prompts/review.md",
+    "scripts/step.py",
+    "skills/diagnose.md",
+    "skills/repair.md",
+    "skills/review.md"
+  ],
+  "planes": {
+    "main": {
+      "workspace": "main",
+      "start": "reconcile",
+      "nodes": {
+        "reconcile": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 120,
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "reconcile"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "ACTIVE_FREEZE",
+            "ACTIVE_DIAGNOSIS_GUARD",
+            "ACTIVE_PATCH_GUARD",
+            "ACTIVE_CHECKS",
+            "ACTIVE_REVIEW",
+            "ACTIVE_PUBLICATION",
+            "ACTIVE_SETTLE",
+            "HOLD"
+          ],
+          "on": {
+            "READY": {
+              "goto": "claim"
+            },
+            "ACTIVE_FREEZE": {
+              "goto": "freeze"
+            },
+            "ACTIVE_DIAGNOSIS_GUARD": {
+              "goto": "guard_diagnosis"
+            },
+            "ACTIVE_PATCH_GUARD": {
+              "goto": "guard_patch"
+            },
+            "ACTIVE_CHECKS": {
+              "goto": "checks"
+            },
+            "ACTIVE_REVIEW": {
+              "goto": "review"
+            },
+            "ACTIVE_PUBLICATION": {
+              "goto": "guard_publication"
+            },
+            "ACTIVE_SETTLE": {
+              "goto": "settle"
+            },
+            "HOLD": {
+              "goto": "hold"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "claim": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 120,
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "claim"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "CLAIMED",
+            "EMPTY"
+          ],
+          "on": {
+            "CLAIMED": {
+              "goto": "freeze"
+            },
+            "EMPTY": {
+              "goto": "wait_event"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "wait_event": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 330,
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "wait_event"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "WAKE",
+            "IDLE"
+          ],
+          "on": {
+            "WAKE": {
+              "goto": "claim"
+            },
+            "IDLE": {
+              "goto": "claim"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "freeze": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 600,
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "freeze"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "NO_ACTION",
+            "READY",
+            "HOLD"
+          ],
+          "on": {
+            "NO_ACTION": {
+              "goto": "settle"
+            },
+            "READY": {
+              "goto": "diagnose"
+            },
+            "HOLD": {
+              "goto": "hold"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "diagnose": {
+          "invoke": {
+            "binding": "agent",
+            "timeout_seconds": 1800,
+            "config": {
+              "args": [
+                "diagnose"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "SMALL_REPAIR",
+            "LARGE_ISSUE",
+            "UNREPRODUCED",
+            "EXTERNAL_BLOCKER",
+            "NO_ACTION"
+          ],
+          "on": {
+            "SMALL_REPAIR": {
+              "goto": "guard_diagnosis"
+            },
+            "LARGE_ISSUE": {
+              "goto": "guard_diagnosis"
+            },
+            "UNREPRODUCED": {
+              "goto": "guard_diagnosis"
+            },
+            "EXTERNAL_BLOCKER": {
+              "goto": "guard_diagnosis"
+            },
+            "NO_ACTION": {
+              "goto": "guard_diagnosis"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "guard_diagnosis": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 600,
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "guard_diagnosis"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "REPAIR_ALLOWED",
+            "NO_ACTION",
+            "HOLD_LARGE",
+            "HOLD_UNPROVEN",
+            "HOLD_EXTERNAL"
+          ],
+          "on": {
+            "REPAIR_ALLOWED": {
+              "goto": "repair"
+            },
+            "NO_ACTION": {
+              "goto": "settle"
+            },
+            "HOLD_LARGE": {
+              "goto": "hold"
+            },
+            "HOLD_UNPROVEN": {
+              "goto": "hold"
+            },
+            "HOLD_EXTERNAL": {
+              "goto": "hold"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "repair": {
+          "invoke": {
+            "binding": "agent",
+            "timeout_seconds": 1800,
+            "config": {
+              "args": [
+                "repair"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PATCH_READY",
+            "BLOCKED"
+          ],
+          "on": {
+            "PATCH_READY": {
+              "goto": "guard_patch"
+            },
+            "BLOCKED": {
+              "goto": "hold"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "guard_patch": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 600,
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "guard_patch"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "SCOPED",
+            "HOLD"
+          ],
+          "on": {
+            "SCOPED": {
+              "goto": "checks"
+            },
+            "HOLD": {
+              "goto": "hold"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "checks": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 4800,
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "checks"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS",
+            "FAIL",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PASS": {
+              "goto": "review"
+            },
+            "FAIL": {
+              "goto": "hold"
+            },
+            "UNCERTAIN": {
+              "goto": "hold"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "review": {
+          "invoke": {
+            "binding": "agent",
+            "timeout_seconds": 1800,
+            "config": {
+              "args": [
+                "review"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ACCEPT",
+            "REJECT",
+            "BLOCKED"
+          ],
+          "on": {
+            "ACCEPT": {
+              "goto": "guard_publication"
+            },
+            "REJECT": {
+              "goto": "hold"
+            },
+            "BLOCKED": {
+              "goto": "hold"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "guard_publication": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 600,
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "guard_publication"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "STALE"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "goto": "hold"
+            },
+            "STALE": {
+              "goto": "hold"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "settle": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 600,
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "settle"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "SETTLED"
+          ],
+          "on": {
+            "SETTLED": {
+              "goto": "claim"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "hold": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 600,
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "hold"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "WAIT_OPERATOR"
+          ],
+          "on": {
+            "WAIT_OPERATOR": {
+              "pause": {
+                "reason": "cicd_hold",
+                "resume": "reconcile"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        }
+      }
+    }
+  }
+}

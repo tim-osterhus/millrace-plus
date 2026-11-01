@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "millrace-plus-cicd-input/v2"
+    },
+    "input_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "const": "ci_event"
+    },
+    "original_ref": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "accepted_sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_identity": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "enum": [
+            "github-actions",
+            "generic-ci"
+          ]
+        },
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "job_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head_sha": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+        }
+      },
+      "required": [
+        "source",
+        "repository",
+        "run_id",
+        "attempt",
+        "job_id",
+        "head_sha"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "format",
+    "input_id",
+    "kind",
+    "original_ref",
+    "evidence_refs",
+    "accepted_sequence",
+    "repository",
+    "source_identity"
+  ],
+  "additionalProperties": false
+}

@@ -337,6 +337,10 @@ def cli() -> None:
             print(json.dumps({"code": exc.code, "message": str(exc)}), file=sys.stderr)
             code = 2
         raise SystemExit(code)
+    if args and args[0] == "cicd":
+        from millrace_plus.cicd_cli import main as cicd_main
+
+        raise SystemExit(cicd_main(args[1:]))
     if args and args[0] == "paperclip":
         try:
             code = _paperclip_main(args[1:])
@@ -362,7 +366,7 @@ def cli() -> None:
         print(
             "usage: millrace-plus router ... | millrace-plus catalog ... | "
             "millrace-plus subworkflow ... | millrace-plus paperclip ... | "
-            "millrace-plus lad ...",
+            "millrace-plus lad ... | millrace-plus cicd ...",
             file=sys.stderr,
         )
         raise SystemExit(2)

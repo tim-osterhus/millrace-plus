@@ -27,6 +27,7 @@ def test_v023_templates_installed_and_initializable(
     listed = standalone.run(str(console), "catalog", "list", check=True)
     entries = json.loads(listed.stdout)["templates"]
     assert [v["selector"] for v in entries] == [
+        "bundled:cicd", "bundled:cicd-v2",
         "bundled:document-review",
         "bundled:lad",
         "bundled:lad-service",
@@ -55,7 +56,7 @@ def test_v023_templates_installed_and_initializable(
             package, check=True,
         )
         assert loaded.stdout.strip() == "millrace_graph"
-    for name in ("document-review", "lad", "lad-service", "software-change"):
+    for name in ("cicd", "cicd-v2", "document-review", "lad", "lad-service", "software-change"):
         copy = standalone.cwd / name
         standalone.run(
             str(console), "catalog", "init", f"bundled:{name}", str(copy), check=True

@@ -261,7 +261,7 @@ def test_installed_catalog_without_core_from_public_selection(tmp_path: Path) ->
     )
     selectors = [v["selector"] for v in json.loads(listed.stdout)["templates"]]
     assert selectors == [
-        "bundled:document-review", "bundled:lad", "bundled:lad-service",
+        "bundled:cicd", "bundled:cicd-v2", "bundled:document-review", "bundled:lad", "bundled:lad-service",
         "bundled:software-change",
     ]
     for selector in selectors:
@@ -275,6 +275,6 @@ def test_installed_catalog_without_core_from_public_selection(tmp_path: Path) ->
         )
         assert json.loads((destination / "workflow.json").read_text())["format"] == (
             "millrace-router/v4"
-            if selector in {"bundled:lad", "bundled:lad-service"}
+            if selector in {"bundled:cicd", "bundled:cicd-v2", "bundled:lad", "bundled:lad-service"}
             else "millrace-router/v3"
         )

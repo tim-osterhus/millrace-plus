@@ -193,6 +193,8 @@ def test_official_package_data_declares_selected_vendor_selection_assets() -> No
     """Stock examples and LAD are ordinary graph folders, with distinct bounds."""
     root = PROJECT_ROOT / "src/millrace_plus/workflows"
     assert sorted(p.name for p in root.iterdir() if p.is_dir()) == [
+        "cicd",
+        "cicd-v2",
         "document-review",
         "lad",
         "lad-service",
@@ -293,6 +295,29 @@ def test_plus_candidate_targets_reviewed_core_minimum_and_defers_experiment() ->
                     for node in graph["planes"]["service"]["nodes"].values()
                 }
                 assert bindings == {"command"}
+                assert not (folder / "profiles").exists()
+                continue
+            if folder.name == "cicd-v2":
+                graph = json.loads((folder / "workflow.json").read_text())
+                assert graph["format"] == "millrace-router/v4"
+                assert set(graph["planes"]) == {"main"}
+                assert set(graph["bindings"]) == {"command", "investigate", "repair", "review"}
+                for asset in graph["control_files"]:
+                    assert (folder / asset).is_file()
+                continue
+            if folder.name == "cicd":
+                graph = json.loads((folder / "workflow.json").read_text())
+                assert graph["format"] == "millrace-router/v4"
+                assert set(graph["planes"]) == {"main"}
+                bindings = {
+                    node["invoke"]["binding"]
+                    for node in graph["planes"]["main"]["nodes"].values()
+                }
+                assert bindings == {"agent", "command"}
+                assert set(graph["bindings"]) == bindings
+                for binding in graph["bindings"].values():
+                    assert binding["adapter"] == "command"
+                    assert binding["contract"] == "millrace-command/v1"
                 assert not (folder / "profiles").exists()
                 continue
             profile = json.loads((folder / "profiles/claude.json").read_text())

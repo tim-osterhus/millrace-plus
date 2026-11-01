@@ -375,6 +375,52 @@ class Intake:
                 raise IntakeError("task_not_found")
             return [self._task(row) for row in rows]
 
+    def decision(
+        self, request_id: str, intent: dict[str, object] | None = None
+    ) -> dict[str, object] | None:
+        """Read one already accepted decision; never create, reserve or replay one.
+
+        Returns `{"intent", "receipt"}` or None when absent. With `intent`, a
+        different saved canonical intent refuses `decision_conflict`.
+        """
+        identity(request_id)
+        if intent is not None:
+            self.validate_decision(intent)
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT intent,receipt FROM decisions WHERE request_id=?",
+                (request_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            if intent is not None and row["intent"] != canonical(intent).decode():
+                raise IntakeError("decision_conflict")
+            return {
+                "intent": strict_json(row["intent"].encode()),
+                "receipt": strict_json(row["receipt"].encode()),
+            }
+
+    def decisions(self, task_id: str) -> list[dict[str, object]]:
+        """Read one task's accepted decisions in acceptance order; never write."""
+        identity(task_id)
+        with self._connection() as connection:
+            if not connection.execute(
+                "SELECT 1 FROM tasks WHERE task_id=?", (task_id,)
+            ).fetchone():
+                raise IntakeError("task_not_found")
+            return [
+                {
+                    "request_id": row["request_id"],
+                    "intent": strict_json(row["intent"].encode()),
+                    "receipt": strict_json(row["receipt"].encode()),
+                }
+                for row in connection.execute(
+                    "SELECT request_id,intent,receipt FROM decisions "
+                    "WHERE task_id=? ORDER BY rowid",
+                    (task_id,),
+                )
+            ]
+
     def claim(
         self, build: Callable[[dict[str, object]], dict[str, object]]
     ) -> dict[str, object] | None:
