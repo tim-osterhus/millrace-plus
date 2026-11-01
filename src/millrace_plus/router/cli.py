@@ -274,7 +274,9 @@ def _engineering_main(args: argparse.Namespace) -> int:
     try:
         if args.operation == "engineering-init":
             result = ef.capture(
-                args.project_root, args.profile, args.history_home,
+                args.project_root,
+                args.profile,
+                args.history_home,
                 core_settings=args.core_settings,
             )
         elif args.operation == "engineering-export":
@@ -283,10 +285,15 @@ def _engineering_main(args: argparse.Namespace) -> int:
             )
         else:
             result = ef.publish_task(
-                args.project_root, args.history_home, args.snapshot,
-                state_home=args.state_home, instance_id=args.instance,
-                run_id=args.run, expected_state_version=args.expected_state_version,
-                service_home=args.service_home, task=args.task,
+                args.project_root,
+                args.history_home,
+                args.snapshot,
+                state_home=args.state_home,
+                instance_id=args.instance,
+                run_id=args.run,
+                expected_state_version=args.expected_state_version,
+                service_home=args.service_home,
+                task=args.task,
             )
         print(json.dumps(result, ensure_ascii=False))
         return 0
@@ -337,6 +344,10 @@ def cli() -> None:
             print(json.dumps({"code": exc.code, "message": str(exc)}), file=sys.stderr)
             code = 2
         raise SystemExit(code)
+    if args and args[0] == "factory":
+        from millrace_plus.factory_cli import main as factory_main
+
+        raise SystemExit(factory_main(args[1:]))
     if args and args[0] == "cicd":
         from millrace_plus.cicd_cli import main as cicd_main
 
@@ -366,7 +377,8 @@ def cli() -> None:
         print(
             "usage: millrace-plus router ... | millrace-plus catalog ... | "
             "millrace-plus subworkflow ... | millrace-plus paperclip ... | "
-            "millrace-plus lad ... | millrace-plus cicd ...",
+            "millrace-plus lad ... | millrace-plus cicd ... | "
+            "millrace-plus factory ...",
             file=sys.stderr,
         )
         raise SystemExit(2)

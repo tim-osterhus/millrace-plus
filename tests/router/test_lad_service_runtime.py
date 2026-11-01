@@ -1117,9 +1117,12 @@ def test_operation_expiry_during_cas_stays_unknown_and_replay_is_get_only(
         active.parent_control(path, _deadline=clock.now + 5)
     assert [row[0] for row in budgeted_http.requests] == ["OPTIONS", "OPTIONS", "GET"]
     assert budgeted_http.requests[-1][2] == pytest.approx(4.85)
-    assert Service(setup.home).intake.lifecycle()[1]["maintenance"][
-        "parent:" + sent["request_id"]
-    ]["call"] == saved
+    assert (
+        Service(setup.home).intake.lifecycle()[1]["maintenance"][
+            "parent:" + sent["request_id"]
+        ]["call"]
+        == saved
+    )
 
 
 def test_send_preserves_http_subclass_submit_override(setup, monkeypatch):
@@ -2402,7 +2405,10 @@ def test_unfinished_accepted_boundary_continues_exact_plane_without_clearing_cle
     if run_gate:
         with pytest.raises(IntakeError, match="separate_run_resume_required"):
             active.decide(
-                task["task_id"], "continue", decision, evidence,
+                task["task_id"],
+                "continue",
+                decision,
+                evidence,
                 resume_plane="foreground",
             )
         assert [r["operation"] for r in setup.peer.sent[before:]] == ["resume_plane"]
@@ -2410,11 +2416,15 @@ def test_unfinished_accepted_boundary_continues_exact_plane_without_clearing_cle
         run["planes"]["foreground"]["cursor"] = "next"
         active.decide(task["task_id"], "continue", uuid.uuid4().hex, evidence)
         assert [r["operation"] for r in setup.peer.sent[before:]] == [
-            "resume_plane", "resume_run"
+            "resume_plane",
+            "resume_run",
         ]
     else:
         active.decide(
-            task["task_id"], "continue", decision, evidence,
+            task["task_id"],
+            "continue",
+            decision,
+            evidence,
             resume_plane="foreground",
         )
         assert [r["operation"] for r in setup.peer.sent[before:]] == ["resume_plane"]
@@ -2425,9 +2435,17 @@ def test_unfinished_accepted_boundary_continues_exact_plane_without_clearing_cle
 @pytest.mark.parametrize(
     "mutation",
     [
-        "wrong-node", "missing-continuation", "missing-node", "unknown-occurrence",
-        "missing-occurrence", "terminal", "learning-request", "wrong-plane",
-        "default-with-paused-plane", "live-writer", "not-quiescent",
+        "wrong-node",
+        "missing-continuation",
+        "missing-node",
+        "unknown-occurrence",
+        "missing-occurrence",
+        "terminal",
+        "learning-request",
+        "wrong-plane",
+        "default-with-paused-plane",
+        "live-writer",
+        "not-quiescent",
     ],
 )
 def test_unfinished_continuation_refuses_wrong_or_unclosed_authority(
@@ -2467,7 +2485,10 @@ def test_unfinished_continuation_refuses_wrong_or_unclosed_authority(
     before = len(setup.peer.sent)
     with pytest.raises((IntakeError, SubworkflowError)):
         active.decide(
-            task["task_id"], "continue", uuid.uuid4().hex, evidence,
+            task["task_id"],
+            "continue",
+            uuid.uuid4().hex,
+            evidence,
             resume_plane=selector,
         )
     assert "resume_plane" not in [r["operation"] for r in setup.peer.sent[before:]]
@@ -2549,13 +2570,18 @@ def test_gated_plane_attention_replay_then_new_default_reuses_exact_recovery(
         setup.peer.instances[call["instance_id"]]["runs"][0]["status"] = "failed"
         for value in setup.peer.responses.values():
             value.update(
-                source="os_owned_call", phase="call_returned", holder_joined=True,
+                source="os_owned_call",
+                phase="call_returned",
+                holder_joined=True,
             )
         current = after.service.intake.tasks(task["task_id"])[0]
         acknowledgement = setup.home.parent / "acknowledge-failed.json"
         acknowledgement.write_bytes(abandonment(current, version=run["state_version"]))
         after.decide(
-            task["task_id"], "acknowledge-failed", uuid.uuid4().hex, acknowledgement,
+            task["task_id"],
+            "acknowledge-failed",
+            uuid.uuid4().hex,
+            acknowledgement,
         )
         terminal = after.service.intake.tasks(task["task_id"])[0]
         assert terminal["status"] == "failed" and terminal["terminal_receipt"]
@@ -2573,7 +2599,10 @@ def test_gated_plane_attention_replay_then_new_default_reuses_exact_recovery(
             patch.setattr(setup.peer, name, no_observation)
         with pytest.raises(IntakeError, match="^separate_run_resume_required$"):
             after.decide(
-                task["task_id"], "continue", decision, evidence,
+                task["task_id"],
+                "continue",
+                decision,
+                evidence,
                 resume_plane="foreground",
             )
     assert len(setup.peer.sent) == posted
@@ -3460,9 +3489,19 @@ def test_claim_guard_consuming_original_budget_cannot_write_fifo(setup, monkeypa
 @pytest.mark.parametrize(
     "proof",
     [
-        "owned-true", "false", "null", "missing", "unowned-true",
-        "wrong-digest", "wrong-home", "wrong-request", "wrong-target",
-        "changed-bytes", "owned-file-missing", "current-live", "service-start",
+        "owned-true",
+        "false",
+        "null",
+        "missing",
+        "unowned-true",
+        "wrong-digest",
+        "wrong-home",
+        "wrong-request",
+        "wrong-target",
+        "changed-bytes",
+        "owned-file-missing",
+        "current-live",
+        "service-start",
     ],
 )
 def test_public_fixture_ttl_reuses_only_owned_exact_true_and_fresh_closure(
@@ -3488,8 +3527,12 @@ def test_public_fixture_ttl_reuses_only_owned_exact_true_and_fresh_closure(
     }
     expired, observed, reads, shutdown = [False], [], [], []
     view = {
-        "status": "succeeded", "quiescent": True, "inflight_invocations": [],
-        "invocations": [], "completions": [], "controls": [],
+        "status": "succeeded",
+        "quiescent": True,
+        "inflight_invocations": [],
+        "invocations": [],
+        "completions": [],
+        "controls": [],
     }
 
     def observe(envelope, *, deadline):
@@ -3563,9 +3606,9 @@ def test_public_fixture_ttl_reuses_only_owned_exact_true_and_fresh_closure(
     if proof == "service-start":
         inner = owned.request("start_run", instance=uuid.uuid4().hex, expected=1)
         responses[inner["request_id"]] = observation(
-            inner, home="proof", core=receipt(
-                inner, instance=inner["instance_id"], run=uuid.uuid4().hex
-            )
+            inner,
+            home="proof",
+            core=receipt(inner, instance=inner["instance_id"], run=uuid.uuid4().hex),
         )
         owned.parent_calls.append(inner)
         owned.retain_parent_joins()
@@ -3657,19 +3700,24 @@ def test_combined_lifecycle_reloads_mutable_authority_on_each_operation(
     else:
         before = copy.deepcopy(active.record)
         sent = runtime._env(
-            "pause_run", request_id,
-            instance=active.record["instance_id"], run=active.record["run_id"],
+            "pause_run",
+            request_id,
+            instance=active.record["instance_id"],
+            run=active.record["run_id"],
         )
         active.record["maintenance"]["parent:" + request_id] = {
-            "scope": "parent", "task_id": None,
-            "request_raw": canonical(sent).decode(), "call": runtime._row(sent),
+            "scope": "parent",
+            "task_id": None,
+            "request_raw": canonical(sent).decode(),
+            "call": runtime._row(sent),
         }
         active.service.intake.save_lifecycle(active.intent, before, active.record)
     latest = runtime._load_lifecycle(active.service)
     assert latest[0] == initial[0]
     if change == "claim":
-        observed = next(row for row in observed_tasks[-1]
-                        if row["task_id"] == task["task_id"])
+        observed = next(
+            row for row in observed_tasks[-1] if row["task_id"] == task["task_id"]
+        )
         assert observed["status"] == "held"
         assert observed["version"] == task["version"] + 1
         assert observed_tasks[-1] != observed_tasks[0]
@@ -3687,7 +3735,10 @@ def test_combined_and_direct_lifecycle_recheck_tampered_settled_proof(setup, rea
 
     active, task, _, _ = closed_child(setup)
     settle(
-        active, task, decision="acknowledge-failed", request_id=uuid.uuid4().hex,
+        active,
+        task,
+        decision="acknowledge-failed",
+        request_id=uuid.uuid4().hex,
         operator_raw=abandonment(task),
     )
     retained = runtime._load_lifecycle(active.service)
@@ -3726,9 +3777,7 @@ def test_proven_parent_create_expiry_keeps_other_calls_fresh(
     if later_null:
         before = copy.deepcopy(active.record)
         null = copy.deepcopy(create["observations"][-1])
-        null.update(
-            source="core_receipt", phase="receipt_observed", holder_joined=None
-        )
+        null.update(source="core_receipt", phase="receipt_observed", holder_joined=None)
         create["observations"].append(null)
         active.service.intake.save_lifecycle(active.intent, before, active.record)
     before = copy.deepcopy(active.record)
@@ -3761,18 +3810,14 @@ def test_proven_parent_create_expiry_keeps_other_calls_fresh(
     setup.peer.responses[sent["request_id"]].update(
         holder_joined=False, phase="call_active"
     )
-    runtime._send(
-        active.service, active.intent, active.record, row, setup.peer, 10**10
-    )
+    runtime._send(active.service, active.intent, active.record, row, setup.peer, 10**10)
     assert row["observations"][-1]["holder_joined"] is False
     if purpose == "start":
         assert not runtime._joined(active.service, row)
     setup.peer.responses[sent["request_id"]].update(
         holder_joined=True, phase="call_returned"
     )
-    runtime._send(
-        active.service, active.intent, active.record, row, setup.peer, 10**10
-    )
+    runtime._send(active.service, active.intent, active.record, row, setup.peer, 10**10)
     assert observed == [sent, sent] and setup.peer.sent == sends
     assert runtime._joined(active.service, row)
     assert create == before["create"]
@@ -3858,8 +3903,14 @@ def test_joined_parent_create_without_applied_receipt_still_observes(
 @pytest.mark.parametrize(
     "fault",
     [
-        "bound-instance", "receipt-digest", "join-digest", "join-home",
-        "join-target", "later-digest", "envelope", "detached",
+        "bound-instance",
+        "receipt-digest",
+        "join-digest",
+        "join-home",
+        "join-target",
+        "later-digest",
+        "envelope",
+        "detached",
     ],
 )
 def test_proven_parent_create_revalidates_authority_before_reuse(
@@ -3912,8 +3963,12 @@ def test_proven_parent_create_still_requires_capabilities(setup, monkeypatch):
     )
     with pytest.raises(SubworkflowError):
         runtime._send(
-            active.service, active.intent, active.record,
-            active.record["create"], setup.peer, 10**10,
+            active.service,
+            active.intent,
+            active.record,
+            active.record["create"],
+            setup.peer,
+            10**10,
         )
     assert setup.peer.sent == sends
     assert active.service.intake.path.read_bytes() == database
@@ -3929,8 +3984,13 @@ def test_explicit_proven_parent_create_replay_is_not_skipped(setup, monkeypatch)
         setup.peer, "observe", lambda *a, **k: pytest.fail("GET during explicit replay")
     )
     runtime._send(
-        active.service, active.intent, active.record, create,
-        setup.peer, 10**10, replay_create=True,
+        active.service,
+        active.intent,
+        active.record,
+        create,
+        setup.peer,
+        10**10,
+        replay_create=True,
     )
     assert setup.peer.sent == sends + [create["envelope"]]
     assert setup.peer.allocations == allocations and active.record == before
@@ -3954,7 +4014,9 @@ def test_public_fixture_cleanup_records_exact_parent_failure_phase(
     view = {
         "status": "running" if phase == "closed_parent" else "succeeded",
         "quiescent": phase != "closed_parent",
-        "inflight_invocations": [], "invocations": [], "completions": [],
+        "inflight_invocations": [],
+        "invocations": [],
+        "completions": [],
         "controls": [],
     }
     if phase == "partial_parent":
@@ -3968,7 +4030,8 @@ def test_public_fixture_cleanup_records_exact_parent_failure_phase(
         return copy.deepcopy(view)
 
     owned.client = SimpleNamespace(
-        home="local", read=read,
+        home="local",
+        read=read,
         observe=lambda envelope, **kwargs: copy.deepcopy(joined),
     )
     owned.service = SimpleNamespace(
@@ -3991,20 +4054,26 @@ def test_public_fixture_cleanup_records_exact_parent_failure_phase(
     assert saved["parent_instance_id"] == owned.parent
     assert saved["parent_run_id"] == owned.parent_run
     expected_error = {
-        "parent": owned.parent, "parent_run": owned.parent_run,
-        "phase": failure_phase, "error": "AssertionError",
+        "parent": owned.parent,
+        "parent_run": owned.parent_run,
+        "phase": failure_phase,
+        "error": "AssertionError",
     }
     if phase == "retain_parent_joins":
         expected_error = {
-            "operation": sent["operation"], "request_id": sent["request_id"],
-            "instance_id": sent["instance_id"], "run_id": sent["run_id"],
-            "phase": failure_phase, "error": "AssertionError",
+            "operation": sent["operation"],
+            "request_id": sent["request_id"],
+            "instance_id": sent["instance_id"],
+            "run_id": sent["run_id"],
+            "phase": failure_phase,
+            "error": "AssertionError",
         }
     assert saved["errors"] == [expected_error]
     facts = saved["parent_cleanup"]
     assert facts["phase"] == failure_phase
     assert facts["last_closure"] == {
-        "status": view.get("status"), "quiescent": view.get("quiescent"),
+        "status": view.get("status"),
+        "quiescent": view.get("quiescent"),
         "closed": phase == "retain_parent_joins",
     }
     if phase == "retain_parent_joins":
@@ -4012,7 +4081,8 @@ def test_public_fixture_cleanup_records_exact_parent_failure_phase(
         assert facts["join_instance_id"] == sent["instance_id"]
         assert facts["join_run_id"] == sent["run_id"]
         assert facts["last_join"] == {
-            "source": "os_owned_call", "phase": "call_active",
+            "source": "os_owned_call",
+            "phase": "call_active",
             "holder_joined": False,
         }
     else:
@@ -4050,10 +4120,18 @@ def test_published_attention_changed_intent_refuses_without_observation(
 
 
 @pytest.mark.parametrize(
-    "fault", [
-        "request.md", "claim.json", "request.json", "operator", "receipt",
-        "service", "init", "stored-claim", "journal",
-    ]
+    "fault",
+    [
+        "request.md",
+        "claim.json",
+        "request.json",
+        "operator",
+        "receipt",
+        "service",
+        "init",
+        "stored-claim",
+        "journal",
+    ],
 )
 def test_published_attention_revalidates_local_authority_on_existing_runtime(
     setup, monkeypatch, fault
@@ -4087,9 +4165,9 @@ def test_published_attention_revalidates_local_authority_on_existing_runtime(
     elif fault == "journal":
         journal, saved = active.call(active.service.intake.tasks(task["task_id"])[0])
         saved["instance_id"] = uuid.uuid4().hex
-        saved["record_sha256"] = runtime.digest({
-            name: value for name, value in saved.items() if name != "record_sha256"
-        })
+        saved["record_sha256"] = runtime.digest(
+            {name: value for name, value in saved.items() if name != "record_sha256"}
+        )
         journal.path.write_bytes(canonical(saved) + b"\n")
     else:
         before = copy.deepcopy(active.record)
@@ -4106,7 +4184,11 @@ def test_published_attention_revalidates_local_authority_on_existing_runtime(
         monkeypatch.setattr(setup.peer, name, no_observation)
     with pytest.raises((IntakeError, SubworkflowError)) as caught:
         active.decide(
-            task["task_id"], "continue", decision, evidence, resume_plane="foreground",
+            task["task_id"],
+            "continue",
+            decision,
+            evidence,
+            resume_plane="foreground",
         )
     assert caught.value.code != "separate_run_resume_required"
     assert active.service.intake.path.read_bytes() == database
@@ -4138,8 +4220,12 @@ def test_published_attention_preserves_original_caller_expiry(
         monkeypatch.setattr(setup.peer, name, no_observation)
     with pytest.raises(SubworkflowError, match="^observation_window_expired$"):
         active.decide(
-            task["task_id"], "continue", decision, evidence,
-            resume_plane="foreground", _deadline=0 if expiry == "before" else 1,
+            task["task_id"],
+            "continue",
+            decision,
+            evidence,
+            resume_plane="foreground",
+            _deadline=0 if expiry == "before" else 1,
         )
     assert active.service.intake.path.read_bytes() == before
 
@@ -4152,7 +4238,8 @@ def test_published_attention_preserves_nonblocking_ownership_locks(
     journal, _ = active.call(active.service.intake.tasks(task["task_id"])[0])
     guard = (
         runtime.target_lock(active.service.config, protected_roots=(setup.home,))
-        if lock == "target" else journal.lock(observer=True)
+        if lock == "target"
+        else journal.lock(observer=True)
     )
     before = active.service.intake.path.read_bytes()
 
@@ -4163,12 +4250,17 @@ def test_published_attention_preserves_nonblocking_ownership_locks(
     for name in ("read", "capabilities", "observe", "submit"):
         monkeypatch.setattr(setup.peer, name, no_observation)
     error, code = (
-        (IntakeError, "target_busy") if lock == "target"
+        (IntakeError, "target_busy")
+        if lock == "target"
         else (SubworkflowError, "call_busy")
     )
     with guard, pytest.raises(error, match="^" + code + "$"):
         active.decide(
-            task["task_id"], "continue", decision, evidence, resume_plane="foreground",
+            task["task_id"],
+            "continue",
+            decision,
+            evidence,
+            resume_plane="foreground",
         )
     assert active.service.intake.path.read_bytes() == before
 
@@ -4182,11 +4274,15 @@ def test_public_fixture_shutdown_records_event_and_retained_thread_facts(
 
     owned = PublicRuntime(tmp_path / "shutdown-facts")
     owned.parent_calls = [owned.request("create_instance", expected=0)]
-    server = None if threads == "missing" else SimpleNamespace(
-        is_alive=lambda: threads == "alive"
+    server = (
+        None
+        if threads == "missing"
+        else SimpleNamespace(is_alive=lambda: threads == "alive")
     )
-    drain = None if threads == "missing" else SimpleNamespace(
-        is_alive=lambda: threads == "alive"
+    drain = (
+        None
+        if threads == "missing"
+        else SimpleNamespace(is_alive=lambda: threads == "alive")
     )
     calls = []
 
@@ -4202,8 +4298,10 @@ def test_public_fixture_shutdown_records_event_and_retained_thread_facts(
         return event
 
     owned.service = SimpleNamespace(
-        _server_thread=server, _shutdown_thread=None,
-        request_shutdown=request_shutdown, wait_for_stop=wait,
+        _server_thread=server,
+        _shutdown_thread=None,
+        request_shutdown=request_shutdown,
+        wait_for_stop=wait,
     )
     with pytest.raises(AssertionError, match="Unknown fixture cleanup"):
         owned.close()
@@ -4234,17 +4332,23 @@ def test_b4_failure_cleanup_acknowledges_actual_terminal_then_replays_saved_stop
     task = {"task_id": task_id, "version": 7}
     record = {"instance_id": uuid.uuid4().hex, "run_id": uuid.uuid4().hex}
     view = {
-        "status": status, "state_version": 31, "quiescent": status != "running",
-        "inflight_invocations": [], "invocations": [], "completions": [],
+        "status": status,
+        "state_version": 31,
+        "quiescent": status != "running",
+        "inflight_invocations": [],
+        "invocations": [],
+        "completions": [],
         "controls": [],
     }
     acknowledged, calls = [], []
 
     def stop(identifier):
         calls.append(("stop", identifier))
-        return {"status": "stopped"} if acknowledged else {
-            "status": "pending", "reason": "child_disposition_required"
-        }
+        return (
+            {"status": "stopped"}
+            if acknowledged
+            else {"status": "pending", "reason": "child_disposition_required"}
+        )
 
     def decide(task_id_arg, decision, identifier, evidence, *, _deadline):
         calls.append(("decide", identifier))
@@ -4252,21 +4356,25 @@ def test_b4_failure_cleanup_acknowledges_actual_terminal_then_replays_saved_stop
         assert runtime.strict_json(evidence.read_bytes()) == {
             "format": "millrace-plus-lad-abandonment-intent/v1",
             "acknowledge_abandonment": True,
-            "expected_task_version": 7, "expected_state_version": 31,
+            "expected_task_version": 7,
+            "expected_state_version": 31,
         }
         acknowledged.append(identifier)
         return {"disposition": status}
 
     active = SimpleNamespace(
-        stop=stop, decide=decide, active=lambda: task,
+        stop=stop,
+        decide=decide,
+        active=lambda: task,
         call=lambda row: (None, record),
         client=SimpleNamespace(read=lambda *args, **kwargs: view),
     )
     facts = {}
     deadline = runtime.time.monotonic() + 60
-    assert _b4_cleanup_stop(
-        lambda: active, tmp_path, stop_id, facts, deadline=deadline
-    ) is None
+    assert (
+        _b4_cleanup_stop(lambda: active, tmp_path, stop_id, facts, deadline=deadline)
+        is None
+    )
     assert facts["last_stop"]["reason"] == "child_disposition_required"
     assert facts["last_child"]["status"] == status
     if status == "running":
@@ -4275,24 +4383,27 @@ def test_b4_failure_cleanup_acknowledges_actual_terminal_then_replays_saved_stop
         saved_id = facts["acknowledgement"]["request_id"]
         assert _b4_cleanup_stop(
             lambda: active, tmp_path, stop_id, facts, deadline=deadline
-        ) == {
-            "status": "stopped"
-        }
+        ) == {"status": "stopped"}
         assert calls == [("stop", stop_id), ("decide", saved_id), ("stop", stop_id)]
 
 
 def test_b4_failure_cleanup_missing_proof_retains_same_acknowledgement_and_hold(
-    tmp_path
+    tmp_path,
 ):
     from test_lad_service_journeys import _b4_cleanup_stop
 
     identifier = uuid.uuid4().hex
     evidence = tmp_path / "exact-evidence.json"
     evidence.write_bytes(b"original exact evidence")
-    facts = {"acknowledgement": {
-        "task_id": uuid.uuid4().hex, "decision": "acknowledge-cancelled",
-        "request_id": identifier, "evidence_file": str(evidence), "receipt": None,
-    }}
+    facts = {
+        "acknowledgement": {
+            "task_id": uuid.uuid4().hex,
+            "decision": "acknowledge-cancelled",
+            "request_id": identifier,
+            "evidence_file": str(evidence),
+            "receipt": None,
+        }
+    }
     calls = []
 
     def decide(task, decision, request, path, *, _deadline):
@@ -4305,12 +4416,14 @@ def test_b4_failure_cleanup_missing_proof_retains_same_acknowledgement_and_hold(
     for _ in range(2):
         with pytest.raises(IntakeError, match="holder_unjoined"):
             _b4_cleanup_stop(
-                lambda: active, tmp_path, uuid.uuid4().hex, facts,
+                lambda: active,
+                tmp_path,
+                uuid.uuid4().hex,
+                facts,
                 deadline=runtime.time.monotonic() + 60,
             )
     assert calls == [(identifier, b"original exact evidence")] * 2
     assert facts["acknowledgement"]["receipt"] is None
-
 
 
 def test_b4_cleanup_restores_truth_only_after_actual_held_thread_returns(
@@ -4356,9 +4469,7 @@ def test_b4_cleanup_restores_truth_only_after_actual_held_thread_returns(
 
 
 @pytest.mark.parametrize("holder", ["missing", "still-active"])
-def test_b4_cleanup_missing_or_active_holder_keeps_lost_join_mask(
-    monkeypatch, holder
-):
+def test_b4_cleanup_missing_or_active_holder_keeps_lost_join_mask(monkeypatch, holder):
     import threading
     import time
 
@@ -4376,7 +4487,8 @@ def test_b4_cleanup_missing_or_active_holder_keeps_lost_join_mask(
 
     lost, held = uuid.uuid4().hex, uuid.uuid4().hex
     workers = SimpleNamespace(
-        _run=original_run, submit=lambda *args, **kwargs: None,
+        _run=original_run,
+        submit=lambda *args, **kwargs: None,
         _observation=lambda call, **kwargs: Observation(
             source="os_owned_call", phase="call_returned", holder_joined=True
         ),
@@ -4420,9 +4532,11 @@ def test_b4_failure_cleanup_keeps_original_deadline_across_callbacks(
     facts = {}
     if expires_in == "decide":
         facts["acknowledgement"] = {
-            "task_id": task["task_id"], "decision": "acknowledge-cancelled",
+            "task_id": task["task_id"],
+            "decision": "acknowledge-cancelled",
             "request_id": uuid.uuid4().hex,
-            "evidence_file": str(tmp_path / "existing.json"), "receipt": None,
+            "evidence_file": str(tmp_path / "existing.json"),
+            "receipt": None,
         }
 
     def expire(name):
@@ -4443,14 +4557,21 @@ def test_b4_failure_cleanup_keeps_original_deadline_across_callbacks(
         assert deadline == 1
         expire("read")
         return {
-            "status": "cancelled", "quiescent": True, "state_version": 31,
-            "inflight_invocations": [], "invocations": [], "completions": [],
+            "status": "cancelled",
+            "quiescent": True,
+            "state_version": 31,
+            "inflight_invocations": [],
+            "invocations": [],
+            "completions": [],
             "controls": [],
         }
 
     active = SimpleNamespace(
-        decide=decide, stop=stop, active=lambda: task,
-        call=lambda row: (None, record), client=SimpleNamespace(read=read),
+        decide=decide,
+        stop=stop,
+        active=lambda: task,
+        call=lambda row: (None, record),
+        client=SimpleNamespace(read=read),
     )
 
     def engine():
@@ -4515,3 +4636,365 @@ def test_b4_until_clips_passive_sleep_and_starts_no_predicate_after_expiry(
     with pytest.raises(AssertionError, match="bounded B4 public observation expired"):
         _b4_until(predicate, seconds=25, interval=10)
     assert starts == [0, 13] and sleeps == [10, 9] and clock.now == 25
+
+
+def test_owner_retains_original_start_join_before_later_receipt_only_fallback(setup):
+    import time
+
+    f = setup
+    active = activate(f)
+    original = copy.deepcopy(active.record["start"])
+    sent = original["envelope"]
+    posted = len(f.peer.sent)
+    result = active.retain_parent_joins(_deadline=time.monotonic() + 30)
+    assert (
+        result["holder_joined"] is True and result["request_id"] == sent["request_id"]
+    )
+    stored = Service(f.home).intake.lifecycle()[1]["start"]
+    assert stored["observations"] == [f.peer.responses[sent["request_id"]]]
+    assert original["observations"] == [] and stored["envelope"] == original["envelope"]
+    fallback = copy.deepcopy(f.peer.responses[sent["request_id"]])
+    fallback.update(source="core_receipt", phase="receipt_observed", holder_joined=None)
+    f.peer.responses[sent["request_id"]] = fallback
+    reopened = runtime.Runtime(Service(f.home), client=f.peer)
+    runtime._send(
+        reopened.service,
+        reopened.intent,
+        reopened.record,
+        reopened.record["start"],
+        f.peer,
+        time.monotonic() + 30,
+    )
+    assert reopened.record["start"]["observations"][-1] == fallback
+    assert (
+        reopened.retain_parent_joins(_deadline=time.monotonic() + 30)["holder_joined"]
+        is True
+    )
+    assert len(f.peer.sent) == posted  # Original start is never POSTed again.
+    assert f.peer.observed == [sent, sent]
+
+
+@pytest.mark.parametrize(
+    "kind", ["unknown", "false", "wrong-id", "wrong-digest", "wrong-target"]
+)
+def test_owner_start_join_missing_or_mismatched_proof_never_becomes_true(setup, kind):
+    import time
+
+    f = setup
+    active = activate(f)
+    sent = active.record["start"]["envelope"]
+    response = copy.deepcopy(f.peer.responses[sent["request_id"]])
+    if kind == "unknown":
+        response.update(
+            source="core_receipt", phase="receipt_observed", holder_joined=None
+        )
+    elif kind == "false":
+        response.update(holder_joined=False, phase="call_active")
+    elif kind == "wrong-id":
+        response["request_id"] = "f" * 32
+    elif kind == "wrong-digest":
+        response["request_digest"] = "f" * 64
+    else:
+        response["instance_id"] = "f" * 32
+    f.peer.responses[sent["request_id"]] = response
+    posted = len(f.peer.sent)
+    if kind in {"unknown", "false"}:
+        assert (
+            active.retain_parent_joins(_deadline=time.monotonic() + 30)["holder_joined"]
+            is None
+        )
+        assert not runtime._joined(active.service, active.record["start"])
+    else:
+        before = canonical(Service(f.home).intake.lifecycle()[1])
+        with pytest.raises((SubworkflowError, IntakeError)):
+            active.retain_parent_joins(_deadline=time.monotonic() + 30)
+        assert canonical(Service(f.home).intake.lifecycle()[1]) == before
+    assert len(f.peer.sent) == posted
+
+
+def test_parent_start_join_retention_never_overwrites_concurrent_owner_cas(setup):
+    import time
+
+    f = setup
+    active = activate(f)
+    sent = active.record["start"]["envelope"]
+    positive = copy.deepcopy(f.peer.responses[sent["request_id"]])
+    fallback = positive | {
+        "source": "core_receipt",
+        "phase": "receipt_observed",
+        "holder_joined": None,
+    }
+    saved = []
+
+    def concurrent(envelope, *, deadline):
+        assert envelope == sent
+        intent, before = Service(f.home).intake.lifecycle()
+        newer = copy.deepcopy(before)
+        runtime._observe_row(active.service, newer["start"], fallback)
+        active.service.intake.save_lifecycle(intent, before, newer)
+        saved.append(newer)
+        return positive
+
+    f.peer.observe = concurrent
+    with pytest.raises(IntakeError, match="lifecycle_conflict"):
+        active.retain_parent_joins(_deadline=time.monotonic() + 30)
+    assert Service(f.home).intake.lifecycle()[1] == saved[0]
+    assert not runtime._joined(active.service, saved[0]["start"])
+
+
+@pytest.mark.parametrize("operation", ["resume_run", "pause_run"])
+def test_owner_retains_saved_parent_control_join_across_os_fallback(setup, operation):
+    import time
+
+    f = setup
+    active = activate(f)
+    f.peer.joined = False
+    path, sent = parent_request(
+        active, f, operation=operation, expected=None if operation == "pause_run" else 1
+    )
+    assert active.parent_control(path)["holder_joined"] is False
+    old = copy.deepcopy(
+        active.record["maintenance"]["parent:" + sent["request_id"]]["call"]
+    )
+    f.peer.responses[sent["request_id"]].update(
+        holder_joined=True, phase="call_returned"
+    )
+    posted = len(f.peer.sent)
+    answer = active.retain_parent_joins(
+        parent_controls=(sent,), _deadline=time.monotonic() + 30
+    )
+    assert answer["parent_controls"][0]["holder_joined"] is True
+    stored = Service(f.home).intake.lifecycle()[1]["maintenance"][
+        "parent:" + sent["request_id"]
+    ]["call"]
+    assert stored["observations"][: len(old["observations"])] == old["observations"]
+    assert stored["observations"][-1]["holder_joined"] is True
+    f.peer.responses[sent["request_id"]].update(
+        source="core_receipt", holder_joined=None, phase="receipt_observed"
+    )
+    reopened = runtime.Runtime(Service(f.home), client=f.peer)
+    row = reopened.record["maintenance"]["parent:" + sent["request_id"]]["call"]
+    runtime._send(
+        reopened.service,
+        reopened.intent,
+        reopened.record,
+        row,
+        f.peer,
+        time.monotonic() + 30,
+    )
+    assert row["observations"][-1]["holder_joined"] is None
+    assert (
+        reopened.retain_parent_joins(
+            parent_controls=(sent,), _deadline=time.monotonic() + 30
+        )["parent_controls"][0]["holder_joined"]
+        is True
+    )
+    assert (
+        len(f.peer.sent) == posted and old["observations"][-1]["holder_joined"] is False
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "unknown",
+        "false",
+        "wrong-id",
+        "wrong-digest",
+        "wrong-target",
+        "unsent",
+        "envelope",
+    ],
+)
+def test_owner_parent_control_retention_refuses_unknown_and_mismatched_proof(
+    setup, kind
+):
+    import time
+
+    f = setup
+    active = activate(f)
+    active.retain_parent_joins(_deadline=time.monotonic() + 30)
+    f.peer.joined = False
+    path, sent = parent_request(active, f)
+    active.parent_control(path)
+    response = f.peer.responses[sent["request_id"]]
+    if kind == "unknown":
+        response.update(
+            source="core_receipt", holder_joined=None, phase="receipt_observed"
+        )
+    elif kind == "wrong-id":
+        response["request_id"] = "f" * 32
+    elif kind == "wrong-digest":
+        response["request_digest"] = "f" * 64
+    elif kind == "wrong-target":
+        response["run_id"] = "f" * 32
+    elif kind == "unsent":
+        before = copy.deepcopy(active.record)
+        active.record["maintenance"]["parent:" + sent["request_id"]]["call"] = (
+            runtime._row(sent)
+        )
+        runtime._save(active.service, active.intent, before, active.record)
+    elif kind == "envelope":
+        sent = sent | {"payload": {"changed": True}}
+    posted = len(f.peer.sent)
+    if kind in {"unknown", "false"}:
+        result = active.retain_parent_joins(
+            parent_controls=(sent,), _deadline=time.monotonic() + 30
+        )
+        assert result["parent_controls"][0]["holder_joined"] is None
+    else:
+        before = canonical(Service(f.home).intake.lifecycle()[1])
+        with pytest.raises((SubworkflowError, IntakeError)):
+            active.retain_parent_joins(
+                parent_controls=(sent,), _deadline=time.monotonic() + 30
+            )
+        assert canonical(Service(f.home).intake.lifecycle()[1]) == before
+    assert len(f.peer.sent) == posted
+
+
+def test_parent_control_join_retention_cas_cannot_overwrite_concurrent_owner(setup):
+    import time
+
+    f = setup
+    active = activate(f)
+    active.retain_parent_joins(_deadline=time.monotonic() + 30)
+    f.peer.joined = False
+    path, sent = parent_request(active, f)
+    active.parent_control(path)
+    positive = copy.deepcopy(f.peer.responses[sent["request_id"]])
+    positive.update(holder_joined=True, phase="call_returned")
+    saved = []
+
+    def concurrent(envelope, *, deadline):
+        assert envelope == sent
+        intent, before = Service(f.home).intake.lifecycle()
+        newer = copy.deepcopy(before)
+        runtime._observe_row(
+            active.service,
+            newer["maintenance"]["parent:" + sent["request_id"]]["call"],
+            positive
+            | {
+                "source": "core_receipt",
+                "holder_joined": None,
+                "phase": "receipt_observed",
+            },
+        )
+        active.service.intake.save_lifecycle(intent, before, newer)
+        saved.append(newer)
+        return positive
+
+    f.peer.observe = concurrent
+    with pytest.raises(IntakeError, match="lifecycle_conflict"):
+        active.retain_parent_joins(
+            parent_controls=(sent,), _deadline=time.monotonic() + 30
+        )
+    stored = Service(f.home).intake.lifecycle()[1]
+    assert stored == saved[0]
+    assert not runtime._joined(
+        active.service, stored["maintenance"]["parent:" + sent["request_id"]]["call"]
+    )
+
+
+@pytest.mark.parametrize("operation", ["resume_plane", "recover_run", "cancel_run"])
+def test_owner_default_retention_includes_sent_operator_parent_rows(setup, operation):
+    import time
+
+    f = setup
+    active = activate(f)
+    active.retain_parent_joins(_deadline=time.monotonic() + 30)
+    f.peer.joined = False
+    path, sent = parent_request(
+        active,
+        f,
+        operation=operation,
+        expected=None if operation == "cancel_run" else 1,
+        plane_id="service" if operation == "resume_plane" else None,
+    )
+    assert active.parent_control(path)["holder_joined"] is False
+    old = copy.deepcopy(
+        active.record["maintenance"]["parent:" + sent["request_id"]]["call"]
+    )
+    posted = len(f.peer.sent)
+    f.peer.responses[sent["request_id"]].update(
+        holder_joined=True, phase="call_returned"
+    )
+    proof = active.retain_parent_joins(_deadline=time.monotonic() + 30)
+    assert proof["parent_controls"][0]["request_id"] == sent["request_id"]
+    assert proof["parent_controls"][0]["holder_joined"] is True
+    stored = Service(f.home).intake.lifecycle()[1]["maintenance"][
+        "parent:" + sent["request_id"]
+    ]["call"]
+    assert stored["observations"][: len(old["observations"])] == old["observations"]
+    assert len(f.peer.sent) == posted
+    f.peer.responses[sent["request_id"]].update(
+        source="core_receipt", holder_joined=None, phase="receipt_observed"
+    )
+    reopened = runtime.Runtime(Service(f.home), client=f.peer)
+    row = reopened.record["maintenance"]["parent:" + sent["request_id"]]["call"]
+    runtime._send(
+        reopened.service,
+        reopened.intent,
+        reopened.record,
+        row,
+        f.peer,
+        time.monotonic() + 30,
+    )
+    assert (
+        reopened.retain_parent_joins(_deadline=time.monotonic() + 30)[
+            "parent_controls"
+        ][0]["holder_joined"]
+        is True
+    )
+    assert len(f.peer.sent) == posted
+
+
+def test_owner_default_retention_never_sends_unsent_parent_row(setup, monkeypatch):
+    import time
+
+    f = setup
+    active = activate(f)
+    active.retain_parent_joins(_deadline=time.monotonic() + 30)
+    path, sent = parent_request(active, f, operation="resume_plane", plane_id="service")
+    original_send = runtime._send
+    monkeypatch.setattr(runtime, "_send", lambda *a, **k: None)
+    active.parent_control(path)
+    monkeypatch.setattr(runtime, "_send", original_send)
+    posted, observed = len(f.peer.sent), len(f.peer.observed)
+    assert (
+        active.retain_parent_joins(_deadline=time.monotonic() + 30)["parent_controls"]
+        == []
+    )
+    assert len(f.peer.sent) == posted and len(f.peer.observed) == observed
+    assert (
+        active.record["maintenance"]["parent:" + sent["request_id"]]["call"][
+            "reservation"
+        ]
+        == "unsent"
+    )
+
+
+def test_parent_retention_skips_valid_scope_less_child_maintenance(setup, monkeypatch):
+    import time
+
+    from millrace_plus.factory_lad import Lane
+
+    active, task, call, evidence, decision = prepared_plane(setup, monkeypatch)
+    child = copy.deepcopy(active.service.intake.lifecycle()[1]["maintenance"][decision])
+    assert "scope" not in child and child["task_id"] == task["task_id"]
+    path, sent = parent_request(active, setup, operation="pause_run", expected=None)
+    active.parent_control(path)
+    posted = copy.deepcopy(setup.peer.sent)
+    owner = runtime.Runtime(Service(setup.home), client=setup.peer)
+    proof = owner.retain_parent_joins(_deadline=time.monotonic() + 30)
+    assert [row["request_id"] for row in proof["parent_controls"]] == [
+        sent["request_id"]
+    ]
+    assert proof["parent_controls"][0]["holder_joined"] is True
+    assert owner.service.intake.lifecycle()[1]["maintenance"][decision] == child
+    assert setup.peer.sent == posted
+    lane = object.__new__(Lane)
+    lane.runtime = owner
+    lane._known_parent_controls({"controls": []}, {"controls": []})
+    assert (
+        lane._expected_receipts == {}
+    )  # No child row was treated as parent authority.

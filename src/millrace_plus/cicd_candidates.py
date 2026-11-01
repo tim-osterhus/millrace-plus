@@ -1128,14 +1128,20 @@ def _export(home, request: Mapping[str, object]) -> dict[str, object]:
         prior = observed
         origin_refs = [request["subject_ref"]]
     else:
-        subject = home.read_ref(request["subject_ref"])
-        if subject.get("format") != vr.INPUT:
-            raise CicdError("factory_subject_validator_unavailable")
-        vr.validate_input(subject)
-        assessment = vr.validate_assessment(home.read_ref(basis["assessment_ref"]))
-        if (
-            assessment["subject_ref"] != request["subject_ref"]
-            or assessment["route"] != "REPAIR_ALLOWED"
+        subject = _role_subject(home, request["subject_ref"])
+        if subject["format"] == "millrace-plus-factory-input/v1":
+            from .factory_candidate import validate_export_producer
+
+            validate_export_producer(home, request, basis)
+        assessment = _assessment(
+            home, home.read_ref(basis["assessment_ref"]), request["subject_ref"]
+        )
+        if assessment["subject_ref"] != request["subject_ref"] or assessment[
+            "route"
+        ] not in (
+            {"REPAIR_ALLOWED", "LAD_CANDIDATE"}
+            if subject["format"] == "millrace-plus-factory-input/v1"
+            else {"REPAIR_ALLOWED"}
         ):
             raise CicdError("assessment_subject_mismatch")
         previous = _candidate(home, prior_ref)
@@ -1499,10 +1505,41 @@ def _resume_import(
     return result
 
 
+def _subject_id(subject: Mapping[str, object]) -> str:
+    if subject.get("format") == "millrace-plus-factory-input/v1":
+        from .factory_records import subject_id
+
+        return subject_id(subject)
+    return str(subject["input_id"])
+
+
+def _factory_task(home, subject_ref: object) -> bool:
+    record = home.read_ref(subject_ref)
+    if record.get("format") != "millrace-plus-factory-input/v1":
+        return False
+    from .factory_records import validate_input
+
+    return validate_input(record)["source_kind"] == "task"
+
+
+def _assessment(home, value: object, subject_ref: object) -> dict[str, object]:
+    from .cicd_v2_records import validate_assessment
+
+    return validate_assessment(
+        value, allow_empty_reproduction=_factory_task(home, subject_ref)
+    )
+
+
 def _role_subject(home, subject_ref: object) -> dict[str, object]:
     from . import cicd_v2_records as vr
 
     record = home.read_ref(subject_ref)
+    if record.get("format") == "millrace-plus-factory-input/v1":
+        from .factory_records import validate_input
+
+        if home.config["source_policy"]["mode"] != "factory":
+            raise CicdError("factory_source_policy_required")
+        return validate_input(record)
     if record.get("format") != vr.INPUT:
         raise CicdError("factory_subject_validator_unavailable")
     subject = vr.validate_input(record)
@@ -1533,6 +1570,15 @@ def _project_role_locked(
     binding = vr.validate_source_binding(home.read_ref(checked["source_binding_ref"]))
     if binding["input_ref"] != subject_ref or binding["status"] != "bound":
         raise CicdError("role_source_binding_mismatch")
+    if subject["format"] == "millrace-plus-factory-input/v1":
+        from .factory_candidate import validate_local_binding
+
+        validate_local_binding(home, binding)
+        if checked["criteria_ref"] is not None and (
+            not _factory_task(home, subject_ref)
+            or checked["criteria_ref"] != subject_ref
+        ):
+            raise CicdError("factory_criteria_mismatch")
     for key in (
         "subject_schema_ref",
         "source_binding_ref",
@@ -1549,11 +1595,21 @@ def _project_role_locked(
     schema_ref = checked["subject_schema_ref"]
     if schema_ref["path"] not in descriptor["control_files"]:
         raise CicdError("subject_schema_not_captured")
+    if subject["format"] == "millrace-plus-factory-input/v1":
+        from .cicd_v2_runtime import _read
+
+        if (
+            hashlib.sha256(_read(controls / schema_ref["path"])).hexdigest()
+            != schema_ref["sha256"]
+        ):
+            raise CicdError("factory_subject_schema_changed")
     active_lease = _lease(home)
     if active_lease is not None and active_lease["state"] != "restored":
         _require_accounted_operations(home, active_lease)
     if role == "repair":
-        assessment = vr.validate_assessment(home.read_ref(checked["assessment_ref"]))
+        assessment = _assessment(
+            home, home.read_ref(checked["assessment_ref"]), subject_ref
+        )
         if (
             assessment["subject_ref"] != subject_ref
             or assessment["route"] != "REPAIR_ALLOWED"
@@ -1599,7 +1655,7 @@ def _project_role_locked(
     basis_sha = vr.digest(checked)
     role_input = {
         "format": "millrace-plus-cicd-role-input/v2",
-        "input_id": subject["input_id"],
+        "input_id": _subject_id(subject),
         "subject_ref": subject_ref,
         "role": role,
         "attempt_id": attempt_id,
@@ -1621,8 +1677,10 @@ def _project_role_locked(
         {
             "format": vr.SUBJECT_PROJECTION,
             "subject_ref": subject_ref,
-            "subject_kind": "ci_input",
-            "subject_id": subject["input_id"],
+            "subject_kind": "factory_input"
+            if subject["format"] == "millrace-plus-factory-input/v1"
+            else "ci_input",
+            "subject_id": _subject_id(subject),
             "role": role,
             "attempt_id": attempt_id,
             "binding_id": selection["id"],
@@ -1638,7 +1696,7 @@ def _project_role_locked(
     attempt = vr.validate_attempt(
         {
             "format": vr.ATTEMPT,
-            "input_id": subject["input_id"],
+            "input_id": _subject_id(subject),
             "subject_ref": subject_ref,
             "attempt_id": attempt_id,
             "parent_attempt_id": None,
@@ -1674,7 +1732,7 @@ def _project_role_locked(
     pointer = vr.validate_active_role(
         {
             "format": vr.ACTIVE_ROLE,
-            "subject_id": subject["input_id"],
+            "subject_id": _subject_id(subject),
             "role": role,
             "attempt_id": attempt_id,
             "input_ref": projection["input_ref"],
@@ -1811,6 +1869,11 @@ def _prepare_review_locked(
         "config_ref": home.config_ref,
         "output": attempt + ".result.json",
     }
+    from .factory_candidate import verification_context
+
+    factory_context = verification_context(home, request["candidate_ref"])
+    if factory_context is not None:
+        document["factory_context_ref"] = home.retain(factory_context)
     projection = vr.validate_review_projection(
         {
             "format": vr.REVIEW_PROJECTION,
@@ -2207,11 +2270,18 @@ def _verify_candidate(
     plan = vr.select_checks(
         home.config, [item["path"] for item in delta["changes"]], uncertain=False
     )
+    from .factory_candidate import verification_context
+
+    factory_context = verification_context(home, request["candidate_ref"])
+    expected_reviewers = {row["id"] for row in home.config["role_bindings"]["review"]}
+    if factory_context is not None:
+        plan["command_ids"] = factory_context["command_ids"]
+        expected_reviewers = set(factory_context["review_binding_ids"])
     if set(by_id) != set(plan["command_ids"]):
         raise CicdError("candidate_check_set_incomplete")
-    if selected_reviewers != {
-        row["id"] for row in home.config["role_bindings"]["review"]
-    } or len(reviews) != len(selected_reviewers):
+    if selected_reviewers != expected_reviewers or len(reviews) != len(
+        selected_reviewers
+    ):
         raise CicdError("candidate_review_set_incomplete")
     exact_checks = [
         accepted_by_command[identifier] for identifier in plan["command_ids"]
@@ -2260,7 +2330,10 @@ def _validate_repair_delta(
     if not isinstance(allowed, list):
         raise CicdError("repair_scope_mismatch")
     basis = vr.validate_role_basis(home.read_ref(intent["basis_ref"]), role="repair")
-    assessment = vr.validate_assessment(home.read_ref(basis["assessment_ref"]))
+    projection = vr.validate_subject_projection(home.read_ref(intent["projection_ref"]))
+    assessment = _assessment(
+        home, home.read_ref(basis["assessment_ref"]), projection["subject_ref"]
+    )
     projection = vr.validate_subject_projection(home.read_ref(intent["projection_ref"]))
     role_input = home.read_ref(projection["input_ref"])
     publication = _projection_publication(home, projection, "facade")
@@ -2332,6 +2405,22 @@ def _validate_repair_delta(
         "source_after_sha256"
     ] != source_identity(home.observe()):
         raise CicdError("repair_source_mismatch")
+    if (
+        _role_subject(home, projection["subject_ref"])["format"]
+        == "millrace-plus-factory-input/v1"
+    ):
+        # The captured actor contract resolves output Refs at its input parent.
+        # Retain those exact stopped-producer bytes for the CI-owned facade.
+        raw = _read(Path(publication["artifact_root"]) / repair["patch_ref"]["path"])
+        if hashlib.sha256(raw).hexdigest() != repair["patch_ref"]["sha256"]:
+            raise CicdError("factory_repair_patch_changed")
+        from .factory_runtime import write_exact as write_factory_record
+
+        write_factory_record(
+            home.workspace / repair["patch_ref"]["path"],
+            raw,
+            "factory_repair_patch_conflict",
+        )
     home.resolve_ref(repair["patch_ref"])
 
 
@@ -2637,8 +2726,20 @@ def _candidate_scope(home, candidate: Mapping[str, object]) -> None:
     if not delta["changes"]:
         return
     _selected_repair_caps(home, delta)
-    assessment = vr.validate_assessment(home.read_ref(candidate["assessment_ref"]))
-    if assessment["route"] != "REPAIR_ALLOWED":
+    raw_assessment = home.read_ref(candidate["assessment_ref"])
+    assessment = _assessment(home, raw_assessment, raw_assessment["subject_ref"])
+    factory_subject = (
+        _role_subject(home, raw_assessment["subject_ref"])["format"]
+        == "millrace-plus-factory-input/v1"
+    )
+    if factory_subject:
+        from .factory_candidate import verification_context
+
+        if verification_context(home, home.retain(candidate)) is None:
+            raise CicdError("factory_candidate_owner_unavailable")
+    if assessment["route"] not in (
+        {"REPAIR_ALLOWED", "LAD_CANDIDATE"} if factory_subject else {"REPAIR_ALLOWED"}
+    ):
         raise CicdError("candidate_assessment_not_repairable")
     paths = [change["path"] for change in delta["changes"]]
     for path in paths:
@@ -2883,6 +2984,12 @@ def _reproduction_for_role(
 
     if assessment["reproduction_refs"] != basis["reproduction_refs"]:
         raise CicdError("reproduction_basis_mismatch")
+    if not basis["reproduction_refs"] and basis["criteria_ref"] is not None:
+        if basis["criteria_ref"] != assessment["subject_ref"] or not _factory_task(
+            home, assessment["subject_ref"]
+        ):
+            raise CicdError("factory_criteria_mismatch")
+        return
     matcher = home.config["reproduction"]["failure_matcher"]
     commands = {command["id"]: command for command in home.config["commands"]}
     seen = set()
@@ -2986,8 +3093,10 @@ def accept_candidate_role(
             raise CicdError("readonly_role_changed_target")
         document = home.read_ref(projection["input_ref"])
         publication = _projection_publication(home, projection, "facade")
-        assessment = vr.validate_assessment(
-            _object(_read(Path(publication["artifact_root"]) / document["output"]))
+        assessment = _assessment(
+            home,
+            _object(_read(Path(publication["artifact_root"]) / document["output"])),
+            projection["subject_ref"],
         )
         if (
             assessment["input_id"] != projection["subject_id"]
@@ -3186,6 +3295,13 @@ def _publish_projection(
             value = strict_json(raw)
         except IntakeError:
             continue
+        # Factory config is retained provenance. Its service/OS bootstrap files
+        # belong to their owners and are not role-readable CI input assets.
+        if (
+            isinstance(value, dict)
+            and value.get("format") == "millrace-plus-factory-config/v1"
+        ):
+            continue
         values = [(value, True)]
         while values:
             item, follow = values.pop()
@@ -3199,8 +3315,19 @@ def _publish_projection(
                             follow
                             and field not in opaque
                             and not (
-                                item.get("format") == "millrace-plus-cicd-input/v2"
-                                and field == "evidence_refs"
+                                item.get("format")
+                                == "millrace-plus-factory-obligations/v1"
+                                and field in {"requirements", "lq_snapshot_ref"}
+                            )
+                            and not (
+                                item.get("format")
+                                in {
+                                    "millrace-plus-cicd-input/v2",
+                                    "millrace-plus-factory-input/v1",
+                                }
+                                and (
+                                    field == "evidence_refs" or field == "feedback_ref"
+                                )
                             ),
                         )
                         for field, child in item.items()

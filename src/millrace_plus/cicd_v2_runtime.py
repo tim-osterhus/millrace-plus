@@ -3494,6 +3494,10 @@ def prepare(
     template_root = Path(__file__).parent / "workflows" / "cicd-v2"
     template = _object(_read(template_root / "workflow.json"))
     graph = derive_graph(template, config)
+    if config["source_policy"]["mode"] == "factory":
+        graph["control_files"] = sorted(
+            {*graph["control_files"], "schemas/factory-input.json"}
+        )
     wait_node = cast(
         dict[str, object],
         cast(dict[str, dict[str, object]], graph["planes"])["main"]["nodes"][
@@ -3535,6 +3539,12 @@ def prepare(
     workspace.mkdir(parents=True)
     workflow = home / "workflow"
     shutil.copytree(template_root, workflow)
+    if config["source_policy"]["mode"] == "factory":
+        factory_schema = _read(
+            template_root.parent / "software-factory/schemas/input.json"
+        )
+        write_exact(workflow / "schemas/factory-input.json", factory_schema)
+        write_exact(workspace / "schemas/factory-input.json", factory_schema)
     _capture_refs(config, config_file.absolute().parent, workspace)
     policy = cc.validate_path_policy(
         _object(_read(workspace / str(config["path_policy_ref"]["path"])))

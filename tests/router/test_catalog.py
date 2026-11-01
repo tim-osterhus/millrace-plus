@@ -443,3 +443,19 @@ def test_persistent_service_catalog_is_independent_and_command_only(
         source
     )
     assert not (destination / "service.json").exists()
+
+
+def test_factory_template_copies_complete_control_assets_without_core(tmp_path):
+    source = catalog.bundled_root() / "software-factory"
+    before = catalog.workflow_fingerprint(source)
+    destination = tmp_path / "factory-template"
+    catalog.init_template(
+        "bundled:software-factory", destination, catalog_home=tmp_path / "catalog"
+    )
+    graph = json.loads((destination / "workflow.json").read_bytes())
+    assert graph["planes"]["factory"]["start"] == "reconcile"
+    for name in graph["control_files"]:
+        assert (destination / name).read_bytes() == (source / name).read_bytes()
+        assert not (destination / name).samefile(source / name)
+    (destination / "context/contract.md").write_text("edited owned template")
+    assert catalog.workflow_fingerprint(source) == before

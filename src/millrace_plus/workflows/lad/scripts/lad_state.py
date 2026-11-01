@@ -483,10 +483,15 @@ def _validate_state(
                     previous in state["accepted"]
                     or state["occurrences"][oid]["replacement_of"] == previous
                     # A failed assessment closes its owner without acceptance.
-                    or (plane == "learning" and previous is not None and any(
-                        isinstance(row, dict) and row.get("occurrence_id") == previous
-                        for row in state["learning"].values()
-                    ))
+                    or (
+                        plane == "learning"
+                        and previous is not None
+                        and any(
+                            isinstance(row, dict)
+                            and row.get("occurrence_id") == previous
+                            for row in state["learning"].values()
+                        )
+                    )
                 )
                 if (
                     ready.exists()
@@ -610,13 +615,15 @@ def _source_path(policy, relative: str) -> bool:
         raise LadError(exc.code) from exc
 
 
-def _walk_dirs(root: Path, dirs: list[str], target: Path, paths: list[str],
-               policy) -> list[str]:
+def _walk_dirs(
+    root: Path, dirs: list[str], target: Path, paths: list[str], policy
+) -> list[str]:
     if policy is not None:
         # A broad packet prefix never turns declared environment/product
         # descendants into repairable source.
         return [
-            name for name in dirs
+            name
+            for name in dirs
             if name != ".git"
             and _source_path(policy, str((root / name).relative_to(target)))
         ]
@@ -784,6 +791,8 @@ def _git_facts(target: Path, policy) -> dict | None:
         "core.fsmonitor=false",
         "-c",
         "core.hooksPath=" + os.devnull,
+        "-c",
+        "diff.autoRefreshIndex=false",
         "-C",
         str(target),
     ]
@@ -820,14 +829,11 @@ def _git_facts(target: Path, policy) -> dict | None:
         if policy is not None and key in {"worktree", "untracked"}:
             # Exact Git lists, minus declared opaque environment/product paths.
             output = b"".join(
-                item + b"\0" for item in output.split(b"\0")
+                item + b"\0"
+                for item in output.split(b"\0")
                 if item and _source_path(policy, os.fsdecode(item))
             )
-        facts[key] = (
-            os.fsdecode(output).strip()
-            if key == "base"
-            else digest(output)
-        )
+        facts[key] = os.fsdecode(output).strip() if key == "base" else digest(output)
     return facts
 
 
@@ -917,8 +923,7 @@ def routing_policy() -> dict:
     for key, expected in POLICY.items():
         if type(policy[key]) is not type(expected) or policy[key] != expected:
             raise LadError("routing_policy_unsupported_" + key)
-    return {"path": POLICY_PATH, "sha256": digest(raw),
-            "revision": policy["revision"]}
+    return {"path": POLICY_PATH, "sha256": digest(raw), "revision": policy["revision"]}
 
 
 def presentation_path(oid: str, raw: bytes) -> str:
@@ -966,7 +971,10 @@ def captured_policy(occurrence: dict) -> dict:
 
 
 def presentation_record(
-    workspace: Path, occurrence: dict, result: dict, raw_result: bytes,
+    workspace: Path,
+    occurrence: dict,
+    result: dict,
+    raw_result: bytes,
     artifacts: list[tuple[str, bytes]],
 ) -> tuple[str, bytes]:
     """Exact expected record from raw, input-projection and captured-policy facts."""
@@ -977,8 +985,11 @@ def presentation_record(
     view = presentation_module()
     try:
         raw = view.expected_record(
-            occurrence=occurrence, result=result, raw_result=raw_result,
-            artifacts=artifacts, input_raw=input_raw,
+            occurrence=occurrence,
+            result=result,
+            raw_result=raw_result,
+            artifacts=artifacts,
+            input_raw=input_raw,
             policy=captured_policy(occurrence),
         )
     except view.LadError as exc:
@@ -986,14 +997,20 @@ def presentation_record(
     return presentation_path(oid, raw_result), raw
 
 
-def _presentation_pin(workspace: Path, occurrence: dict, raw: bytes, result: dict,
-                      artifacts: list[tuple[str, bytes]]) -> None:
+def _presentation_pin(
+    workspace: Path,
+    occurrence: dict,
+    raw: bytes,
+    result: dict,
+    artifacts: list[tuple[str, bytes]],
+) -> None:
     """Every load compares the complete retained record with its recomputation."""
     try:
         retained = read(workspace, presentation_path(occurrence["occurrence_id"], raw))
     except LadError as exc:
         raise LadError(
-            "accepted_presentation_missing" if str(exc) == "missing_file"
+            "accepted_presentation_missing"
+            if str(exc) == "missing_file"
             else "accepted_presentation_" + str(exc)
         ) from None
     try:

@@ -194,7 +194,8 @@
           "on": {
             "HOLD": {
               "pause": {
-                "reason": "lad_human_decision_required"
+                "reason": "lad_human_decision_required",
+                "resume": "human_pause"
               }
             },
             "TERMINAL_FAILURE": {

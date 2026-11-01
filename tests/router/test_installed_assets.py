@@ -27,11 +27,13 @@ def test_v023_templates_installed_and_initializable(
     listed = standalone.run(str(console), "catalog", "list", check=True)
     entries = json.loads(listed.stdout)["templates"]
     assert [v["selector"] for v in entries] == [
-        "bundled:cicd", "bundled:cicd-v2",
+        "bundled:cicd",
+        "bundled:cicd-v2",
         "bundled:document-review",
         "bundled:lad",
         "bundled:lad-service",
         "bundled:software-change",
+        "bundled:software-factory",
     ]
     standalone.py(
         "import importlib.util; assert importlib.util.find_spec('millrace') is None"
@@ -46,17 +48,28 @@ def test_v023_templates_installed_and_initializable(
             "print(Path(bridge.__file__).parent / 'paperclip/index.js')"
         ).stdout.strip()
         loaded = standalone.run(
-            node, "--input-type=module", "--eval",
+            node,
+            "--input-type=module",
+            "--eval",
             "const mod = await import(process.argv[1]); "
             "const adapter = mod.createServerAdapter(); "
             "if (adapter.type !== 'millrace_graph' || "
             "typeof adapter.execute !== 'function' || "
             "typeof adapter.testEnvironment !== 'function') process.exit(1); "
             "console.log(adapter.type);",
-            package, check=True,
+            package,
+            check=True,
         )
         assert loaded.stdout.strip() == "millrace_graph"
-    for name in ("cicd", "cicd-v2", "document-review", "lad", "lad-service", "software-change"):
+    for name in (
+        "cicd",
+        "cicd-v2",
+        "document-review",
+        "lad",
+        "lad-service",
+        "software-change",
+        "software-factory",
+    ):
         copy = standalone.cwd / name
         standalone.run(
             str(console), "catalog", "init", f"bundled:{name}", str(copy), check=True
@@ -150,7 +163,11 @@ def test_v023_templates_installed_and_initializable(
     )
     lad_after_removal = standalone.cwd / "lad-after-removal"
     standalone.run(
-        str(console), "catalog", "copy", str(lad_copy), str(lad_after_removal),
+        str(console),
+        "catalog",
+        "copy",
+        str(lad_copy),
+        str(lad_after_removal),
         check=True,
     )
     assert files(lad_after_removal) == files(lad_copy)

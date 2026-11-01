@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "millrace-plus-factory-input/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "source_kind", "source_id", "repository", "base_candidate_sha256", "request", "criteria", "feedback_ref", "evidence_refs", "scope_ref", "occurred_at"],
+  "properties": {
+    "format": {"const": "millrace-plus-factory-input/v1"},
+    "source_kind": {"enum": ["task", "ci_event", "user_report", "production_observation"]},
+    "source_id": {"type": "string", "minLength": 1},
+    "repository": {"type": "string", "minLength": 1},
+    "base_candidate_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+    "request": {"type": ["string", "null"]},
+    "criteria": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "text", "origin_ref"], "properties": {"id": {"type": "string", "minLength": 1}, "text": {"type": "string", "minLength": 1}, "origin_ref": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/ref"}]}}}},
+    "feedback_ref": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/ref"}]},
+    "evidence_refs": {"type": "array", "items": {"$ref": "#/$defs/ref"}},
+    "scope_ref": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/ref"}]},
+    "occurred_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {"ref": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"}, "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}}},
+  "allOf": [{"if": {"properties": {"source_kind": {"const": "task"}}}, "then": {"properties": {"request": {"type": "string", "minLength": 1}, "criteria": {"minItems": 1}, "feedback_ref": {"type": "null"}}}, "else": {"properties": {"request": {"type": "null"}, "criteria": {"maxItems": 0}, "feedback_ref": {"$ref": "#/$defs/ref"}}}}]
+}

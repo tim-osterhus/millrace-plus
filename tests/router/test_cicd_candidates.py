@@ -172,15 +172,29 @@ def test_operator_snapshot_guard_holds_and_omitted_guard_is_unbounded(
 
 def _view(**row_changes: object) -> dict[str, object]:
     row = {
-        "id": "inv-2", "run_id": "run-1", "revision_id": "rev-1",
-        "plane_id": "main", "node": "checks", "attempt": 2, "status": "active",
-        "pid": 4242, "cwd": "/home/ci/project/main", "deadline": 1893456000.5,
+        "id": "inv-2",
+        "run_id": "run-1",
+        "revision_id": "rev-1",
+        "plane_id": "main",
+        "node": "checks",
+        "attempt": 2,
+        "status": "active",
+        "pid": 4242,
+        "cwd": "/home/ci/project/main",
+        "deadline": 1893456000.5,
         "argv": ["python3", "/home/ci/project/main/scripts/step.py", "checks"],
     }
     other = {
-        "id": "inv-1", "run_id": "run-1", "revision_id": "rev-1",
-        "plane_id": "main", "node": "freeze", "attempt": 1, "status": "completed",
-        "pid": 4100, "cwd": "/home/ci/project/main", "deadline": 1893450000.0,
+        "id": "inv-1",
+        "run_id": "run-1",
+        "revision_id": "rev-1",
+        "plane_id": "main",
+        "node": "freeze",
+        "attempt": 1,
+        "status": "completed",
+        "pid": 4100,
+        "cwd": "/home/ci/project/main",
+        "deadline": 1893450000.0,
         "argv": ["python3", "/home/ci/project/main/scripts/step.py", "freeze"],
     }
     return {
@@ -210,7 +224,9 @@ def test_invocation_context_matches_one_active_public_invocation() -> None:
     context = match_invocation(view, **_BIND)
     assert tuple(context) == CONTEXT_FIELDS
     assert (context["invocation_id"], context["attempt"], context["node"]) == (
-        "inv-2", 2, "checks"
+        "inv-2",
+        2,
+        "checks",
     )
     assert context["deadline"] == 1893456000.5
     from millrace_plus.local_intake import canonical
@@ -267,8 +283,11 @@ def _manifest_of(target: Path, bundle: Path) -> dict[str, object]:
     view = snapshot_policy(target, cc.validate_path_policy(cc.parse(raw)))
     refs = retain_payloads(target, view, bundle)
     return tree_manifest(
-        view, repository="acme/calc", anchor_head=HEAD,
-        policy_ref=cc.make_ref("path-policy.json", raw), payload_refs=refs,
+        view,
+        repository="acme/calc",
+        anchor_head=HEAD,
+        policy_ref=cc.make_ref("path-policy.json", raw),
+        payload_refs=refs,
     )
 
 
@@ -344,9 +363,10 @@ def test_export_applies_only_the_job_delta_to_the_prior_logical_tree(
     by_path = {entry["path"]: entry for entry in candidate["entries"]}
     prior_by_path = {entry["path"]: entry for entry in prior["entries"]}
     assert by_path["src/other.py"] == prior_by_path["src/other.py"]
-    assert by_path["src/calc.py"] == {
-        entry["path"]: entry for entry in end["entries"]
-    }["src/calc.py"]
+    assert (
+        by_path["src/calc.py"]
+        == {entry["path"]: entry for entry in end["entries"]}["src/calc.py"]
+    )
     assert tree_delta(prior, candidate)["changes"] == job["changes"]
 
 
@@ -356,8 +376,9 @@ def test_export_refuses_foreign_overlap_and_stale_logical_base(tmp_path: Path) -
     target = _tree(tmp_path / "target")
     bundle = tmp_path / "bundle"
     prior = _manifest_of(target, bundle)
-    (target / "src" / "calc.py").write_text("# user's edit\n" + (
-        target / "src" / "calc.py").read_text())
+    (target / "src" / "calc.py").write_text(
+        "# user's edit\n" + (target / "src" / "calc.py").read_text()
+    )
     start = _manifest_of(target, bundle)
     (target / "src" / "calc.py").write_text("def add(a, b):\n    return a + b\n")
     job = tree_delta(start, _manifest_of(target, bundle))
@@ -397,7 +418,9 @@ def test_restore_then_import_round_trips_exact_bytes_and_modes(tmp_path: Path) -
     after = {p: (target / p).read_bytes() for p in ("src/calc.py", "src/pkg/new.py")}
     restored = apply_delta(target, delta, bundle, inverse=True)
     assert sorted(restored["applied"]) == [
-        "src/calc.py", "src/gone.py", "src/pkg/new.py"
+        "src/calc.py",
+        "src/gone.py",
+        "src/pkg/new.py",
     ]
     assert (target / "src" / "calc.py").read_bytes() == original
     assert (target / "src" / "gone.py").read_text() == "old = True\n"
@@ -409,7 +432,8 @@ def test_restore_then_import_round_trips_exact_bytes_and_modes(tmp_path: Path) -
     assert not (target / "src" / "gone.py").exists()
     # Replay after completion is a no-op: every path is already its destination.
     assert apply_delta(target, delta, bundle) == {
-        "applied": [], "already": ["src/calc.py", "src/gone.py", "src/pkg/new.py"]
+        "applied": [],
+        "already": ["src/calc.py", "src/gone.py", "src/pkg/new.py"],
     }
 
 
@@ -461,12 +485,28 @@ def test_link_parent_and_missing_payload_hold_before_any_write(tmp_path: Path) -
 def _git(root: Path, *args: str) -> str:
     import subprocess
 
-    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(root),
-           "GIT_CONFIG_NOSYSTEM": "1", "LC_ALL": "C"}
+    env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": str(root),
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "LC_ALL": "C",
+    }
     done = subprocess.run(
-        ["git", "-c", "user.name=test", "-c", "user.email=test@invalid",
-         "-c", "init.defaultBranch=main", *args],
-        cwd=root, env=env, capture_output=True, text=True, check=True,
+        [
+            "git",
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@invalid",
+            "-c",
+            "init.defaultBranch=main",
+            *args,
+        ],
+        cwd=root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return done.stdout.strip()
 
@@ -479,8 +519,14 @@ def test_foreign_dirty_paths_cover_staged_unstaged_untracked_ignored_and_deleted
     root = tmp_path / "repo"
     (root / "src").mkdir(parents=True)
     _git(root, "init", "-q")
-    files = {"src/calc.py": "a = 1\n", "src/run.sh": "echo\n", "src/keep.py": "k\n",
-             "src/staged.py": "s\n", "src/gone.py": "g\n", ".gitignore": "*.log\n"}
+    files = {
+        "src/calc.py": "a = 1\n",
+        "src/run.sh": "echo\n",
+        "src/keep.py": "k\n",
+        "src/staged.py": "s\n",
+        "src/gone.py": "g\n",
+        ".gitignore": "*.log\n",
+    }
     for name, text in files.items():
         (root / name).write_text(text)
     os.symlink("calc.py", root / "src" / "link")
@@ -503,8 +549,13 @@ def test_foreign_dirty_paths_cover_staged_unstaged_untracked_ignored_and_deleted
     (root / "src" / "__pycache__" / "x.pyc").write_bytes(b"\0")  # environment
     dirty = foreign_dirty_paths(root, head, snapshot_policy(root, policy), 30)
     assert dirty == [
-        "debug.log", "src/calc.py", "src/gone.py", "src/link", "src/new.py",
-        "src/run.sh", "src/staged.py",
+        "debug.log",
+        "src/calc.py",
+        "src/gone.py",
+        "src/link",
+        "src/new.py",
+        "src/run.sh",
+        "src/staged.py",
     ]
     # Read-only: nothing was staged or committed by the classification.
     assert _git(root, "rev-parse", "HEAD") == head
@@ -549,11 +600,16 @@ def _h(text: str) -> str:
 
 def _result(**changes: object) -> dict[str, object]:
     record = {
-        "format": "millrace-plus-cicd-candidate-result/v1", "request_id": "req-1",
-        "request_sha256": _h("request"), "operation": "import",
-        "candidate_id": _h("candidate"), "materialization_id": "lease-1",
-        "materialization_version": 3, "status": "completed",
-        "target_before_sha256": _h("before"), "target_after_sha256": _h("after"),
+        "format": "millrace-plus-cicd-candidate-result/v1",
+        "request_id": "req-1",
+        "request_sha256": _h("request"),
+        "operation": "import",
+        "candidate_id": _h("candidate"),
+        "materialization_id": "lease-1",
+        "materialization_version": 3,
+        "status": "completed",
+        "target_before_sha256": _h("before"),
+        "target_after_sha256": _h("after"),
         "artifact_refs": [{"path": "receipts/import.json", "sha256": _h("r")}],
         "writer_facts": {"core_invocation_id": "inv-9", "writer_state": "stopped"},
         "refusal": None,
@@ -577,11 +633,18 @@ def test_candidate_result_never_completes_a_write_with_unknown_writer() -> None:
     # Verify is read-only toward its target: before and after must be equal.
     with pytest.raises(CicdV2Error):
         validate_candidate_result(_result(operation="verify"))
-    validate_candidate_result(_result(
-        operation="verify", target_after_sha256=_h("before"),
-    ))
-    for bad in ({"refusal": "x"}, {"status": "refused"},
-                {"materialization_version": True}, {"extra": 1}):
+    validate_candidate_result(
+        _result(
+            operation="verify",
+            target_after_sha256=_h("before"),
+        )
+    )
+    for bad in (
+        {"refusal": "x"},
+        {"status": "refused"},
+        {"materialization_version": True},
+        {"extra": 1},
+    ):
         with pytest.raises(CicdV2Error):
             validate_candidate_result(_result(**bad))
 
@@ -594,16 +657,24 @@ def test_candidate_verification_requires_complete_current_evidence() -> None:
 
     record = {
         "format": "millrace-plus-cicd-candidate-verification/v1",
-        "candidate_id": _h("candidate"), "materialization_id": "lease-1",
-        "config_sha256": _h("config"), "observed_head": "c" * 40,
+        "candidate_id": _h("candidate"),
+        "materialization_id": "lease-1",
+        "config_sha256": _h("config"),
+        "observed_head": "c" * 40,
         "observed_source_sha256": _h("source"),
         "checks_refs": [{"path": "checks/a.json", "sha256": _h("a")}],
         "review_refs": [{"path": "reviews/1.json", "sha256": _h("v")}],
-        "status": "verified", "evidence_refs": [], "refusal": None,
+        "status": "verified",
+        "evidence_refs": [],
+        "refusal": None,
     }
     validate_candidate_verification(dict(record))
-    for change in ({"checks_refs": []}, {"review_refs": []},
-                   {"observed_head": None}, {"refusal": "stale"}):
+    for change in (
+        {"checks_refs": []},
+        {"review_refs": []},
+        {"observed_head": None},
+        {"refusal": "stale"},
+    ):
         with pytest.raises(CicdV2Error):
             validate_candidate_verification(record | change)
     # A stale or refused verdict must say why.
@@ -616,26 +687,32 @@ def test_active_role_pointer_names_exact_prepared_attempt() -> None:
     from millrace_plus.cicd_v2_records import CicdV2Error, validate_active_role
 
     pointer = {
-        "format": "millrace-plus-cicd-active-role/v2", "subject_id": "i" * 64,
-        "role": "repair", "attempt_id": "attempt-3",
+        "format": "millrace-plus-cicd-active-role/v2",
+        "subject_id": "i" * 64,
+        "role": "repair",
+        "attempt_id": "attempt-3",
         "input_ref": {"path": "roles/input.json", "sha256": _h("in")},
         "projection_ref": {"path": "roles/projection.json", "sha256": _h("p")},
         "basis_sha256": _h("basis"),
     }
     for role in ("investigate", "repair", "review"):
         validate_active_role(pointer | {"role": role})
-    for change in ({"role": "checks"}, {"projection_ref": None},
-                   {"basis_sha256": "x"}, {"extra": True}):
+    for change in (
+        {"role": "checks"},
+        {"projection_ref": None},
+        {"basis_sha256": "x"},
+        {"extra": True},
+    ):
         with pytest.raises(CicdV2Error):
             validate_active_role(pointer | change)
 
 
 def _workarea(name: str, inode: int) -> dict[str, object]:
-    return {"root": f"/srv/{name}",
-            "filesystem_identity": {
-                "path": f"/srv/{name}", "device": 1, "inode": inode
-            },
-            "owner_ref": {"path": f"owners/{name}.json", "sha256": _h(name)}}
+    return {
+        "root": f"/srv/{name}",
+        "filesystem_identity": {"path": f"/srv/{name}", "device": 1, "inode": inode},
+        "owner_ref": {"path": f"owners/{name}.json", "sha256": _h(name)},
+    }
 
 
 def test_export_basis_prior_candidate_is_null_only_for_anchor_bootstrap() -> None:
@@ -645,13 +722,18 @@ def test_export_basis_prior_candidate_is_null_only_for_anchor_bootstrap() -> Non
         return {"path": f"{name}.json", "sha256": _h(name)}
 
     basis = {
-        "format": "millrace-plus-cicd-export-basis/v1", "subject_ref": ref("subject"),
+        "format": "millrace-plus-cicd-export-basis/v1",
+        "subject_ref": ref("subject"),
         "source_target": _workarea("dev", 10),
         "verification_target": _workarea("ci", 11),
-        "anchor_head": "a" * 40, "logical_base_id": _h("base"),
-        "prior_candidate_ref": ref("prior"), "before_manifest_ref": ref("before"),
-        "source_after_manifest_ref": ref("after"), "config_ref": ref("config"),
-        "assessment_ref": ref("assessment"), "authority_ref": ref("authority"),
+        "anchor_head": "a" * 40,
+        "logical_base_id": _h("base"),
+        "prior_candidate_ref": ref("prior"),
+        "before_manifest_ref": ref("before"),
+        "source_after_manifest_ref": ref("after"),
+        "config_ref": ref("config"),
+        "assessment_ref": ref("assessment"),
+        "authority_ref": ref("authority"),
         "writer_facts": {"core_invocation_id": "inv-1", "writer_state": "stopped"},
     }
     validate_export_basis(dict(basis))
@@ -662,36 +744,104 @@ def test_export_basis_prior_candidate_is_null_only_for_anchor_bootstrap() -> Non
     with pytest.raises(CicdV2Error):
         validate_export_basis(basis | {"assessment_ref": None})
     with pytest.raises(CicdV2Error) as live:
-        validate_export_basis(basis | {"writer_facts": {
-            "core_invocation_id": "inv-1", "writer_state": "may_live"}})
+        validate_export_basis(
+            basis
+            | {
+                "writer_facts": {
+                    "core_invocation_id": "inv-1",
+                    "writer_state": "may_live",
+                }
+            }
+        )
     assert live.value.code == "writer_not_stopped"
     # Development and validation workareas must be distinct.
     with pytest.raises(CicdV2Error):
         validate_export_basis(basis | {"verification_target": _workarea("dev", 10)})
 
 
-def test_repair_role_basis_needs_assessment_scope_and_reproduction_or_criteria(
-) -> None:
+def test_repair_role_basis_needs_assessment_scope_and_reproduction_or_criteria() -> (
+    None
+):
     from millrace_plus.cicd_v2_records import CicdV2Error, validate_role_basis
 
     def ref(name: str) -> dict[str, object]:
         return {"path": f"{name}.json", "sha256": _h(name)}
 
     basis = {
-        "format": "millrace-plus-cicd-role-basis/v1", "subject_schema_ref": ref("s"),
-        "source_binding_ref": ref("binding"), "source_before_sha256": _h("src"),
-        "config_sha256": _h("cfg"), "assessment_ref": ref("assessment"),
-        "reproduction_refs": [ref("repro")], "criteria_ref": None,
-        "scope_ref": ref("scope"), "public_writer_refs": [],
+        "format": "millrace-plus-cicd-role-basis/v1",
+        "subject_schema_ref": ref("s"),
+        "source_binding_ref": ref("binding"),
+        "source_before_sha256": _h("src"),
+        "config_sha256": _h("cfg"),
+        "assessment_ref": ref("assessment"),
+        "reproduction_refs": [ref("repro")],
+        "criteria_ref": None,
+        "scope_ref": ref("scope"),
+        "public_writer_refs": [],
     }
     validate_role_basis(dict(basis), role="repair")
-    validate_role_basis(basis | {"reproduction_refs": [], "criteria_ref": ref("c")},
-                        role="repair")
+    validate_role_basis(
+        basis | {"reproduction_refs": [], "criteria_ref": ref("c")}, role="repair"
+    )
     # Investigation may start before any assessment exists.
-    validate_role_basis(basis | {"assessment_ref": None, "scope_ref": None},
-                        role="investigate")
-    for change in ({"assessment_ref": None}, {"scope_ref": None},
-                   {"reproduction_refs": []}):
+    validate_role_basis(
+        basis | {"assessment_ref": None, "scope_ref": None}, role="investigate"
+    )
+    for change in (
+        {"assessment_ref": None},
+        {"scope_ref": None},
+        {"reproduction_refs": []},
+    ):
         with pytest.raises(CicdV2Error) as refused:
             validate_role_basis(basis | change, role="repair")
         assert refused.value.code == "repair_basis_incomplete"
+
+
+def test_factory_task_criteria_exception_never_weakens_failure_subjects():
+    from types import SimpleNamespace
+
+    from test_cicd_v2_records import _assessment
+    from test_factory_records import task
+
+    from millrace_plus import cicd_candidates as facade
+    from millrace_plus.cicd_v2_records import CicdV2Error
+
+    subject_ref = {"path": "factory-input.json", "sha256": "a" * 64}
+    subject = task()
+    home = SimpleNamespace(
+        read_ref=lambda ref: subject, config={"source_policy": {"mode": "factory"}}
+    )
+    assert facade._role_subject(home, subject_ref) == subject
+    assessment = _assessment() | {"subject_ref": subject_ref, "reproduction_refs": []}
+    assert facade._assessment(home, assessment, subject_ref) == assessment
+    for kind in ("ci_event", "user_report", "production_observation"):
+        subject = task() | {
+            "source_kind": kind,
+            "request": None,
+            "criteria": [],
+            "feedback_ref": {"path": "original.json", "sha256": "b" * 64},
+        }
+        with pytest.raises(CicdV2Error, match="unsupported_repair"):
+            facade._assessment(home, assessment, subject_ref)
+    subject = {"format": "millrace-plus-cicd-input/v2"}
+    with pytest.raises(CicdV2Error, match="unsupported_repair"):
+        facade._assessment(home, assessment, subject_ref)
+
+
+def test_factory_source_mode_needs_real_schema_and_selected_owner_not_a_marker():
+    from types import SimpleNamespace
+
+    from millrace_plus import cicd_candidates as facade
+    from millrace_plus import factory_records as fr
+    from millrace_plus.factory_candidate import _factory_consumer
+
+    ref = {"path": "subject.json", "sha256": "a" * 64}
+    home = SimpleNamespace(
+        read_ref=lambda ref: {"format": fr.INPUT},
+        config={"source_policy": {"mode": "factory"}},
+        authority={"actors": []},
+    )
+    with pytest.raises(fr.FactoryError):
+        facade._role_subject(home, ref)
+    with pytest.raises(fr.FactoryError, match="factory_subject_owner_unavailable"):
+        _factory_consumer(home, ref)

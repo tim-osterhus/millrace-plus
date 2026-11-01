@@ -427,3 +427,16 @@ product restoration/accounting, fresh attempt links, review and scope checks sta
 in force. Status and reload validate evidence; reads never reconstruct missing
 input projections. CI-F1 adds no LAD handoff, Factory composition, publication,
 health observation or rollback.
+
+### Advisory correlation recovery and report scope
+
+An interruption after retaining a correlation record but before publishing its
+pointer can make `status` fail with `io_error`. Replay the exact original
+`cicd correlate --workflow-home H --correlation FILE` request to publish that
+pointer. Preserve the retained files. This status-read failure does not change
+runtime execution, intake claims or settlement authority.
+
+The current `report/v2` field `correlation_refs: []` is unpopulated. It makes no
+claim that correlations are absent. `cicd status` carries the current advisory
+correlations. Corrupt correlation evidence remains a refusal; correlation never
+changes FIFO, original input identity, source mapping or command authority.

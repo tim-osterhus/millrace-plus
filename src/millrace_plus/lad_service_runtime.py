@@ -109,9 +109,7 @@ def _unfinished_continuation_ready(
     continuation = state.get("continuation")
     if (
         not isinstance(continuation, dict)
-        or set(continuation) != {
-            "node", "occurrence_id", "lineage", "cleanup_required"
-        }
+        or set(continuation) != {"node", "occurrence_id", "lineage", "cleanup_required"}
         or continuation["cleanup_required"] is not True
         or not {"terminal", "request", "occurrences"} <= state.keys()
         or state.get("terminal") is not None
@@ -349,8 +347,7 @@ def _local_call(
         or record["definition"] != claim["definition"]
         or target != expected_target
         or inputs["request_markdown"] != cast(bytes, task["request_bytes"]).decode()
-        or _read_exact(task_root / "request.md", limit=65536)
-        != task["request_bytes"]
+        or _read_exact(task_root / "request.md", limit=65536) != task["request_bytes"]
         or _read_exact(task_root / "claim.json") != canonical(claim) + b"\n"
         or _read_exact(task_root / "request.json").decode() != record["request_raw"]
     ):
@@ -1191,6 +1188,90 @@ class Runtime:
                 # The competing binder established exactly this authority. Keep
                 # its newer stop/maintenance facts; never overwrite their state.
         return view, run
+
+    def retain_parent_joins(
+        self, *, parent_controls: tuple[dict, ...] | None = None, _deadline: float
+    ) -> dict[str, object]:
+        """GET/CAS-retain this owner's sent parent rows, without authorizing sends.
+
+        Default selection includes every already-sent control on the current run,
+        including operator controls and stop obligations. Explicit selection still
+        requires the exact saved envelope. Call outside source locks; null/false
+        stays unproven, and lifecycle CAS conflicts are never retried here.
+        """
+        intent, record = _load_lifecycle(self.service)
+        if intent != self.intent:
+            raise IntakeError("lifecycle_authority_changed")
+        self.record = record
+        self.parent(_deadline=_deadline)
+        select_all = parent_controls is None
+        if select_all:
+            selected = []
+            for value in mapping(self.record["maintenance"]).values():
+                item = mapping(value)
+                if item.get("scope") != "parent":
+                    continue
+                row = mapping(item["call"])
+                if row["reservation"] != "unsent":
+                    selected.append(row["envelope"])
+            parent_controls = tuple(selected)
+        controls = []
+        for envelope in parent_controls or ():
+            sent = _parent_envelope(envelope)
+            item = mapping(self.record["maintenance"]).get(
+                "parent:" + sent["request_id"]
+            )
+            if item is None:
+                raise IntakeError("parent_control_join_unresolved")
+            item = mapping(item)
+            row = mapping(item["call"])
+            if (
+                item["scope"] != "parent"
+                or item["task_id"] is not None
+                or sent["instance_id"] != self.record["instance_id"]
+                or sent["run_id"] != self.record["run_id"]
+                or row["envelope"] != sent
+                or strict_json(str(item["request_raw"]).encode()) != sent
+            ):
+                raise IntakeError("parent_control_conflict")
+            if row["reservation"] == "unsent":
+                raise IntakeError("parent_control_join_unresolved")
+            controls.append(row)
+        if select_all:
+            for stop in mapping(self.record["stops"]).values():
+                for label in ("pause", "cancel"):
+                    row = mapping(mapping(stop)[label])
+                    if row["reservation"] == "unsent":
+                        continue
+                    sent = _parent_envelope(row["envelope"])
+                    if (
+                        sent["instance_id"] != self.record["instance_id"]
+                        or sent["run_id"] != self.record["run_id"]
+                    ):
+                        raise IntakeError("parent_control_conflict")
+                    controls.append(row)
+        start = mapping(self.record["start"])
+        if start["reservation"] == "unsent":
+            raise IntakeError("parent_start_unresolved")
+        for row in [start, *controls]:
+            if not _joined(self.service, row):
+                _send(
+                    self.service,
+                    self.intent,
+                    self.record,
+                    row,
+                    self.connection,
+                    _deadline,
+                )
+
+        def proof(row):
+            return {
+                "request_id": mapping(row["envelope"])["request_id"],
+                "holder_joined": True if _joined(self.service, row) else None,
+                "observations": copy.deepcopy(row["observations"]),
+            }
+
+        return proof(start) | {"parent_controls": [proof(row) for row in controls]}
 
     def source(self, *, _deadline: float | None = None) -> dict[str, object]:
         if _deadline is None:
@@ -2037,11 +2118,14 @@ class Runtime:
                     "sha256": sha,
                 }
                 requested = {
-                    "task_id": task_id, "decision": decision, "evidence": operator,
+                    "task_id": task_id,
+                    "decision": decision,
+                    "evidence": operator,
                 }
                 if resume_plane is not None:
                     requested["evidence"] = {
-                        "operator_evidence": operator, "resume_plane": resume_plane,
+                        "operator_evidence": operator,
+                        "resume_plane": resume_plane,
                     }
                 with self.service.intake._connection() as connection:
                     saved = connection.execute(
@@ -2093,7 +2177,12 @@ class Runtime:
         task_id, request_id = identity(task_id), identity(request_id)
         raw = _read_exact(evidence_file)
         self._refuse_historical_attention(
-            task_id, decision, request_id, raw, resume_plane, deadline=deadline,
+            task_id,
+            decision,
+            request_id,
+            raw,
+            resume_plane,
+            deadline=deadline,
         )
         task = self.service.intake.tasks(task_id)[0]
         if resume_plane is not None:
