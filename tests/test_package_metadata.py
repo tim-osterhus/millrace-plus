@@ -199,6 +199,7 @@ def test_official_package_data_declares_selected_vendor_selection_assets() -> No
         "lad",
         "lad-service",
         "software-change",
+        "software-factory",
     ]
     for name in ("document-review", "software-change"):
         folder = root / name
@@ -301,7 +302,30 @@ def test_plus_candidate_targets_reviewed_core_minimum_and_defers_experiment() ->
                 graph = json.loads((folder / "workflow.json").read_text())
                 assert graph["format"] == "millrace-router/v4"
                 assert set(graph["planes"]) == {"main"}
-                assert set(graph["bindings"]) == {"command", "investigate", "repair", "review"}
+                assert set(graph["bindings"]) == {
+                    "command", "investigate", "repair", "review"
+                }
+                for asset in graph["control_files"]:
+                    assert (folder / asset).is_file()
+                continue
+            if folder.name == "software-factory":
+                graph = json.loads((folder / "workflow.json").read_text())
+                assert graph["format"] == "millrace-router/v4"
+                assert set(graph["planes"]) == {"factory"}
+                bindings = {"command", "investigate", "repair", "review"}
+                assert set(graph["bindings"]) == bindings
+                assert {
+                    node["invoke"]["binding"]
+                    for node in graph["planes"]["factory"]["nodes"].values()
+                } == bindings
+                for name, binding in graph["bindings"].items():
+                    assert binding["adapter"] == "command"
+                    assert binding["contract"] == "millrace-command/v1"
+                    assert binding["executable"] == (
+                        "python3" if name == "command" else "cicd_agent"
+                    )
+                    assert binding["config"] == {}
+                assert not (folder / "profiles").exists()
                 for asset in graph["control_files"]:
                     assert (folder / asset).is_file()
                 continue

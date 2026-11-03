@@ -1688,3 +1688,82 @@ def test_settlement_holds_target_lock_through_terminal_cas(
         pass
     # NO_ACTION settles with no operator request, so nothing is marked applied.
     assert home(fx).load_state(event_id)["applied"] == []
+
+
+def _interrupt_after_terminal_cas(
+    monkeypatch: pytest.MonkeyPatch, root: Path
+) -> Path:
+    """Interrupt the captured subprocess after real CAS, before its marker."""
+    witness = root / "terminal-cas-saved.json"
+    original_init = catalog.init_template
+    wrapper = f'''
+# Test-owned crash window in the captured workflow copy; no runtime edit.
+from millrace_plus.local_intake import Intake as _Intake
+_original_decide = _Intake.decide
+def _decide_then_interrupt(self, request_id, intent, *args, **kwargs):
+    receipt = _original_decide(self, request_id, intent, *args, **kwargs)
+    witness = Path({str(witness)!r})
+    if intent.get("decision") == "settle" and not witness.exists():
+        witness.write_text(json.dumps({{"request_id": request_id,
+                                       "receipt": receipt}}))
+        raise OSError("test interruption after terminal CAS, before applied marker")
+    return receipt
+_Intake.decide = _decide_then_interrupt
+'''
+
+    def prepare(*args, **kwargs):
+        result = original_init(*args, **kwargs)
+        script = Path(args[1]) / "scripts" / "step.py"
+        raw = script.read_text()
+        marker = 'if __name__ == "__main__":'
+        assert raw.count(marker) == 1
+        script.write_text(raw.replace(marker, wrapper + "\n" + marker))
+        return result
+
+    monkeypatch.setattr(catalog, "init_template", prepare)
+    return witness
+
+
+def test_terminal_receipt_without_applied_marker_preserves_fifo_aftermath(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CI-v1: terminal authority survives a missing marker and public resume."""
+    witness = _interrupt_after_terminal_cas(monkeypatch, tmp_path)
+    fx = initialized(tmp_path)
+    first = submit(fx, name="first")
+    drive(fx, _start)
+    second = submit(fx, name="second", summary="SCENARIO:large", run_id="1002")
+    report = (files(fx, first) / "report.json").read_bytes()
+    close_id = new_id()
+    home(fx).decide(first, "close", close_id, evidence(tmp_path))
+
+    interrupted = drive(fx, _resume)
+    assert nodes(interrupted)[len(FIRST_PATH) :] == ["reconcile", "settle"]
+    assert interrupted["planes"]["main"]["status"] == "paused"
+    assert interrupted["planes"]["main"]["pause_reason"] == "cicd_hold"
+    saved = json.loads(witness.read_text())
+    terminal = task(fx, first)  # A fresh Home reload reads the real Intake CAS.
+    assert terminal["status"] == "succeeded"
+    assert terminal["terminal_receipt"] == saved["receipt"]
+    decisions = home(fx).intake.decisions(str(terminal["task_id"]))
+    assert decisions[-1]["request_id"] == saved["request_id"]
+    assert decisions[-1]["intent"]["decision"] == "settle"
+    state = home(fx).load_state(first)
+    assert close_id not in state["applied"]  # Exact missing-marker branch.
+    assert (files(fx, first) / "report.json").read_bytes() == report
+    assert task(fx, second)["status"] == "queued"
+    old_calls = calls(fx)
+
+    resumed = drive(fx, _resume)  # Supported pause -> reconcile -> claim path.
+    assert nodes(resumed)[len(nodes(interrupted)) :] == [
+        "reconcile", "claim", "freeze", "diagnose", "guard_diagnosis", "hold"
+    ]
+    assert task(fx, second)["status"] == "held"
+    assert calls(fx) == [*old_calls, "diagnose"]  # Only the successor dispatches.
+    again = drive(fx, _resume)
+    assert nodes(again)[len(nodes(resumed)) :] == ["reconcile", "hold"]
+    assert calls(fx) == [*old_calls, "diagnose"]
+    assert task(fx, first) == terminal  # No new claim/version or terminal receipt.
+    assert home(fx).intake.decisions(str(terminal["task_id"])) == decisions
+    assert home(fx).load_state(first) == state  # No implicit marker repair.
+    assert (files(fx, first) / "report.json").read_bytes() == report

@@ -9,6 +9,7 @@ from millrace.router.execution import ExecutionAdapter, RouterError  # noqa: E40
 
 from .claude import ClaudePrintAdapter  # noqa: E402
 from .codex import CodexExecAdapter  # noqa: E402
+from .droid import DroidExecAdapter  # noqa: E402
 from .opencode import OpenCodeRunAdapter  # noqa: E402
 from .pi import PiJsonAdapter  # noqa: E402
 
@@ -22,4 +23,6 @@ def resolve_adapter(adapter_id: str, contract: str) -> ExecutionAdapter:
         return ClaudePrintAdapter()
     if (adapter_id, contract) == ("opencode_run", "millrace-opencode-run/v1"):
         return OpenCodeRunAdapter()
+    if (adapter_id, contract) == ("droid_exec", "millrace-droid-exec/v1"):
+        return DroidExecAdapter()
     raise RouterError("unsupported_adapter_contract", f"{adapter_id} {contract}")

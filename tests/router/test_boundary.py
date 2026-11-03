@@ -82,6 +82,8 @@ def test_production_imports_only_public_core_modules() -> None:
         "codex_configuration.py",
         "configuration.py",
         "control.py",
+        "droid.py",
+        "droid_configuration.py",
         "opencode.py",
         "opencode_configuration.py",
         "pi.py",

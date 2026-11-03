@@ -172,6 +172,10 @@ published records in both directions:
   settlement or other decision starts. A `reconcile` holds the event as
   `uncertain` with reason `decision_projection_missing`.
 
+This projection scan covers `decisions/*.json`. Unrelated non-JSON stray files
+are not decision records. Accepted decisions still reference
+`<request_id>.evidence`, whose bytes are verified against that accepted reference.
+
 Reading never creates or replays a decision. To recover, rerun the same command
 with the same request ID (and the same evidence file for `close` or
 `retry-checks`). It returns the original receipt and republishes the identical
@@ -184,6 +188,18 @@ accepted `NO_ACTION` diagnosis completion. A saved settlement that disagrees
 refuses before any report is rewritten or the slot is released. The frozen
 HEAD and configuration digests in the event record must equal the verified
 event and frozen configuration.
+
+In CI-v1 (`cicd_runtime.py`), settlement holds the target/home lock, then the
+event-state lock, through report verification, terminal Intake CAS and the final
+applied-marker write. The terminal receipt remains authoritative if a crash
+interrupts that final write. Terminal tasks are excluded from the active event:
+the missing marker does not permit reclaim, redispatch or a second settlement
+of the old task, and marker repair is unsupported. The interrupted step pauses
+at `cicd_hold`; public resume goes through `reconcile` and `claim` to the next
+queued event, or `wait_event` when empty. Re-entering `settle` without an active
+event refuses `active_event_missing`. The source comment promising same-request
+replay before the marker is stale and grants no authority. These limits do not
+describe CI-v2, which has separate terminal-projection completion.
 
 After a decision, resume the paused plane with the public Core control
 (`millrace-plus router ... resume-plane --plane main`).
