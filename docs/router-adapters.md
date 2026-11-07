@@ -15,6 +15,15 @@ Plus owns the native `pi_json`, `codex_exec` and `claude_print` adapters, their 
 and their harness-specific settings. Plus exposes the public Core controls through a thin
 facade. It keeps no state and no scheduler, and it does not ship a copy of Core.
 
+## Millforge
+
+The optional `millforge_run` / `millrace-millforge-run/v1` bridge invokes an
+independently installed Millforge runtime. Its captured profile owns native
+settings; Plus maps public request/record identities and selected seam input
+into existing execution-v2 / `json-v1`. Configuration, timing and conservative
+writer holds are documented in [Millforge adapter](millforge-adapter.md).
+Offline verification does not qualify a live adapter route.
+
 ## Install And Handshake
 
 The base distribution declares no runtime dependencies. The optional `router`
