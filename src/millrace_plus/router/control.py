@@ -6,6 +6,13 @@ every lock, expected version, request ID, receipt, drain guard and writer
 hold; this module owns no state, scheduler or process-global resolver.
 Callers cannot substitute another resolver here. Core resolves its builtin
 `command` adapter itself and never consults this resolver for it.
+
+The five bounded inspection reads forward only when Core's control module
+exposes `INSPECTION_CONTRACT` `millrace-router-inspection/v1`. Otherwise they
+raise `CoreContractError` before any read: `core_contract_missing` for an absent
+marker or operation, `core_contract_mismatch` for a different marker. Every
+other operation here keeps working with an older Core. Their results are
+Core's, returned unchanged.
 """
 
 from __future__ import annotations
@@ -17,7 +24,7 @@ from typing import cast
 
 from millrace_plus import catalog as _catalog
 
-from . import require_core
+from . import CoreContractError, require_core
 
 require_core()
 
@@ -25,6 +32,10 @@ from millrace.router import control as _core  # noqa: E402 - after the handshake
 from millrace.router.execution import RouterError  # noqa: E402
 
 from .resolver import resolve_adapter  # noqa: E402
+
+# Public marker of the importable Core; `None` for a Core without inspection.
+INSPECTION_CONTRACT = getattr(_core, "INSPECTION_CONTRACT", None)
+_INSPECTION = "millrace-router-inspection/v1"
 
 __all__ = [
     "resolve_adapter",
@@ -51,6 +62,11 @@ __all__ = [
     "release_project_hold",
     "execute_request",
     "load_instance",
+    "list_instances_page",
+    "inspect_instance_page",
+    "inspect_run_page",
+    "inspect_revision_graph",
+    "validate_revision_summary",
 ]
 
 _OMITTED = object()
@@ -602,4 +618,96 @@ def load_instance(instance_id: str, state_home: Path) -> object:
     """Load one instance configuration through Core with the Plus resolver."""
     return _core.load_instance(
         instance_id, state_home, adapter_resolver=resolve_adapter
+    )
+
+
+def _inspection(operation: str) -> Callable[..., dict[str, object]]:
+    """Return the public Core inspection operation, or refuse before any read."""
+    found = getattr(_core, operation, None)
+    if INSPECTION_CONTRACT is None:
+        code = "core_contract_missing"
+    elif INSPECTION_CONTRACT != _INSPECTION:
+        code = "core_contract_mismatch"
+    elif not callable(found):
+        code = "core_contract_missing"
+    else:
+        return cast(Callable[..., dict[str, object]], found)
+    raise CoreContractError(
+        code,
+        f"{operation} requires Core INSPECTION_CONTRACT {_INSPECTION!r}; "
+        f"found {INSPECTION_CONTRACT!r}.",
+    )
+
+
+def list_instances_page(
+    *, state_home: Path, limit: int = 50, cursor: str | None = None
+) -> dict[str, object]:
+    return _inspection("list_instances_page")(
+        state_home=state_home,
+        limit=limit,
+        cursor=cursor,
+        adapter_resolver=resolve_adapter,
+    )
+
+
+def inspect_instance_page(
+    instance_id: str,
+    *,
+    state_home: Path,
+    limit: int = 50,
+    cursor: str | None = None,
+) -> dict[str, object]:
+    return _inspection("inspect_instance_page")(
+        instance_id,
+        state_home=state_home,
+        limit=limit,
+        cursor=cursor,
+        adapter_resolver=resolve_adapter,
+    )
+
+
+def inspect_run_page(
+    instance_id: str,
+    run_id: str | None,
+    *,
+    state_home: Path,
+    section: str = "summary",
+    limit: int = 50,
+    cursor: str | None = None,
+    request_id: str | None = None,
+    invocation_id: str | None = None,
+) -> dict[str, object]:
+    return _inspection("inspect_run_page")(
+        instance_id,
+        run_id,
+        state_home=state_home,
+        section=section,
+        limit=limit,
+        cursor=cursor,
+        request_id=request_id,
+        invocation_id=invocation_id,
+        adapter_resolver=resolve_adapter,
+    )
+
+
+def inspect_revision_graph(
+    instance_id: str, run_id: str, revision_id: str, *, state_home: Path
+) -> dict[str, object]:
+    return _inspection("inspect_revision_graph")(
+        instance_id,
+        run_id,
+        revision_id,
+        state_home=state_home,
+        adapter_resolver=resolve_adapter,
+    )
+
+
+def validate_revision_summary(
+    instance_id: str, *, state_home: Path, run_id: str | None = None
+) -> dict[str, object]:
+    return _inspection("validate_revision_summary")(
+        instance_id,
+        state_home=state_home,
+        run_id=run_id,
+        adapter_resolver=resolve_adapter,
     )
