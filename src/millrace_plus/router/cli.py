@@ -305,6 +305,36 @@ def _engineering_main(args: argparse.Namespace) -> int:
         return 2
 
 
+def _views_main(argv: Sequence[str]) -> int:
+    """Publish one saved exact record; its bytes and timestamp are used as given."""
+    from millrace_plus import workflow_views as views
+
+    parser = _CatalogParser(prog="millrace-plus views")
+    commands = parser.add_subparsers(dest="operation", required=True)
+    publish = commands.add_parser("publish")
+    publish.add_argument("--file", required=True, type=Path)
+    publish.add_argument("--state-home", required=True, type=Path)
+    args = parser.parse_args(argv)
+    try:
+        # publish_output strictly validates the parsed value, including its type.
+        record = views._strict_json(args.file.read_bytes())
+        result = views.publish_output(
+            record,  # type: ignore[arg-type]
+            state_home=args.state_home.absolute(),
+        )
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    except OSError:
+        print(json.dumps({"code": "io_error", "message": "io_error"}), file=sys.stderr)
+        return 2
+    except Exception as exc:
+        # Typed refusals: WorkflowViewsError, Core RouterError, CoreContractError.
+        if not isinstance(getattr(exc, "code", None), str):
+            raise
+        print(json.dumps({"code": exc.code, "message": exc.code}), file=sys.stderr)
+        return 2
+
+
 def _paperclip_main(argv: Sequence[str]) -> int:
     from millrace_plus.integrations import paperclip_bridge
     from millrace_plus.integrations.paperclip_records import BridgeError
@@ -366,6 +396,13 @@ def cli() -> None:
             print(json.dumps({"code": exc.code, "message": str(exc)}), file=sys.stderr)
             code = 2
         raise SystemExit(code)
+    if args and args[0] == "views":
+        try:
+            code = _views_main(args[1:])
+        except catalog.CatalogError as exc:
+            print(json.dumps({"code": exc.code, "message": str(exc)}), file=sys.stderr)
+            code = 2
+        raise SystemExit(code)
     if args and args[0] == "catalog":
         try:
             code = _catalog_main(args[1:])
@@ -378,7 +415,7 @@ def cli() -> None:
             "usage: millrace-plus router ... | millrace-plus catalog ... | "
             "millrace-plus subworkflow ... | millrace-plus paperclip ... | "
             "millrace-plus lad ... | millrace-plus cicd ... | "
-            "millrace-plus factory ...",
+            "millrace-plus factory ... | millrace-plus views ...",
             file=sys.stderr,
         )
         raise SystemExit(2)
