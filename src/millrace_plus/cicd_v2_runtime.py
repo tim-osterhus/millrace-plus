@@ -708,9 +708,15 @@ class V2Home:
                     "terminal_receipt": task["terminal_receipt"],
                     "correlation_refs": correlations(self, current),
                     "decision_dispositions": self.decision_dispositions(current),
+                    "delivery_basis_ref": self._delivery_basis(current),
                 }
             )
         return {"service_id": self.service_id, "inputs": results}
+
+    def _delivery_basis(self, input_id):
+        from .cicd_effects import basis_ref
+
+        return basis_ref(self, input_id)
 
     def decision_dispositions(self, input_id):
         result = []
@@ -824,6 +830,17 @@ class V2Home:
                     self.resolve_ref(item)
                 if record["changed_cause_ref"] is not None:
                     self.resolve_ref(record["changed_cause_ref"])
+                if record["kind"] == "close" and state["delivery_refs"]:
+                    from .cicd_effects import disposition
+
+                    if disposition(self, state) == "inspect":
+                        raise CicdV2Error("effect_unresolved")
+                if record["kind"] == "approve_delivery":
+                    from .cicd_effects import check_permission
+
+                    check_permission(self, state, record)
+                if record["kind"] == "continue" and state["delivery_refs"]:
+                    raise CicdV2Error("delivery_already_approved")
                 if record["kind"] == "continue":
                     Runtime(self, self.home / "workflow")._continuation_basis(
                         state, record
@@ -1174,6 +1191,11 @@ class Runtime:
                 )
             )
             runs.add(str(cast(dict[str, object], prep["invocation"])["run_id"]))
+        if state["delivery_refs"]:
+            from .cicd_effects import history
+
+            _, operations = history(self.home, state)
+            runs.update(str(row["invocation"]["run_id"]) for row in operations)
         for run_id in runs:
             view = self._run(run_id)
             for row in cast(list[dict[str, object]], view["invocations"]):
@@ -1217,7 +1239,7 @@ class Runtime:
                 "review_refs": reviews,
                 "correlation_refs": [],
                 "candidate_ref": state["candidate_ref"],
-                "delivery_refs": [],
+                "delivery_refs": state["delivery_refs"],
                 "health_refs": [],
                 "incident_refs": [],
                 "hold_reason": reason,
@@ -1449,6 +1471,10 @@ class Runtime:
                 sleep=time.sleep,
             )
             return _out(str(result["outcome"]), cast(str | None, result["reason"]))
+        if node in {"prepare_effect", "execute_effect", "inspect_effect"}:
+            from .cicd_effects import operation
+
+            return operation(self, node.removesuffix("_effect"), mine)
         if node in {"reproduce", "checks", "probe"}:
             return self._commands(node, mine)
         with self.home.lock(), self.home.state_lock():
@@ -1496,7 +1522,7 @@ class Runtime:
             self.home.input(input_id)
             state = self._state(input_id)
             if node == "freeze":
-                return self._freeze(state)
+                return self._freeze(state, mine)
             self._stopped(state, mine)
             if node == "reconcile":
                 return self._reconcile(state, mine)
@@ -1544,10 +1570,12 @@ class Runtime:
                     )
                     return _out("STALE" if node.startswith("guard_review_") else "HOLD")
             if node == "guard_delivery":
-                return self._guard_delivery(state)
+                return self._guard_delivery(state, mine)
             raise CicdV2Error("unknown_node")
 
-    def _freeze(self, state: dict[str, object]) -> dict[str, object]:
+    def _freeze(
+        self, state: dict[str, object], mine: dict[str, object]
+    ) -> dict[str, object]:
         from .cicd_candidates import retain_payloads
 
         input_id = str(state["input_id"])
@@ -1600,6 +1628,10 @@ class Runtime:
             "config_ref": self.home.config_ref,
             "input_ref": self._input_ref(input_id),
         }
+        from .cicd_effects import capture_git, selected
+
+        if selected(self.home):
+            frozen["delivery_git"] = capture_git(self.home, view, mine)
         freeze_ref = self.home.retain(frozen)
         write_exact(
             self.home.workspace / (input_id + ".freeze.json"),
@@ -2542,7 +2574,9 @@ class Runtime:
             self._save(state, phase="guard_delivery")
         return _out("ACCEPT")
 
-    def _guard_delivery(self, state: dict[str, object]) -> dict[str, object]:
+    def _guard_delivery(
+        self, state: dict[str, object], mine: dict[str, object]
+    ) -> dict[str, object]:
         """Recheck the exact post-patch checks and ordered review chain."""
         source = source_identity(self._source(state))
         check_plan = vr.verify_check_plan(
@@ -2633,6 +2667,15 @@ class Runtime:
             previous = attempt["attempt_id"]
         if state["current_attempt_id"] != previous:
             raise CicdV2Error("delivery_attempt_mismatch")
+        from . import cicd_effects as effects
+
+        if state["delivery_refs"]:
+            return effects.guard(self, state, mine)
+        if effects.selected(self.home):
+            try:
+                effects.freeze_basis(self, state, patch, mine)
+            except (CicdError, CicdV2Error) as exc:
+                return self._hold(state, exc.code, "held_repair")
         self._hold(state, "delivery_requires_operator", "checked_patch")
         return _out("HUMAN_REQUIRED")
 
@@ -2707,6 +2750,20 @@ class Runtime:
                         "role_artifact_invalid:"
                         + getattr(exc, "code", type(exc).__name__),
                     )
+        if state["delivery_refs"]:
+            from . import cicd_effects as effects
+
+            state = effects.accept_observation(self, state)
+            pending_stop = any(
+                row["kind"] in {"close", "cancel"}
+                and row["request_id"] not in state["applied_decision_ids"]
+                for row in self.home.decisions(str(state["input_id"]))
+            )
+            _, operations = effects.history(self.home, state)
+            possible = any(row["operation"] == "execute" for row in operations)
+            choice = effects.disposition(self.home, state)
+            if not pending_stop or (possible and choice not in {"complete", "execute"}):
+                return effects.reconcile(self, state)
         plan_path = self.home.workspace / (str(state["input_id"]) + ".settlement.json")
         if plan_path.exists():
             plan = _object(_read(plan_path))
@@ -2729,6 +2786,11 @@ class Runtime:
                 )
                 self._save(state, settlement_ref=report_ref, phase="settle")
                 return _out("SETTLE_READY")
+            if decision["kind"] == "approve_delivery":
+                from .cicd_effects import approve
+
+                approve(self, state, decision)
+                return _out("DELIVERY_READY")
             return self._continue(state, decision, mine)
         if state["settlement_ref"] is not None:
             return _out("SETTLE_READY")
@@ -3068,7 +3130,16 @@ class Runtime:
             if existing_plan is not None
             else (pending[0] if pending else None)
         )
-        if selected is not None and selected["kind"] not in {"close", "cancel"}:
+        if report["status"] == "published":
+            from .cicd_effects import publication_decision
+
+            selected = publication_decision(self.home, state)
+        from .cicd_effects import settlement_guard
+
+        settlement_guard(self, state, mine, published=report["status"] == "published")
+        if selected is not None and selected["kind"] not in {
+            "close", "cancel", "approve_delivery"
+        }:
             raise CicdV2Error("settlement_decision_mismatch")
         if selected is None and report["status"] != "no_action":
             raise CicdV2Error("settlement_authority_missing")
@@ -3082,7 +3153,7 @@ class Runtime:
         for key in ("patch_ref", "assessment_ref"):
             if report[key] is not None:
                 self.home.resolve_ref(report[key])
-        for key in ("checks_refs", "review_refs", "attempt_refs"):
+        for key in ("checks_refs", "review_refs", "attempt_refs", "delivery_refs"):
             for ref in report[key]:
                 self.home.resolve_ref(ref)
         if (
@@ -3090,6 +3161,7 @@ class Runtime:
             or report["config_sha256"] != self.home.config_sha256
             or report["attempt_refs"] != state["attempt_refs"]
             or report["assessment_ref"] != state["assessment_ref"]
+            or report["delivery_refs"] != state["delivery_refs"]
         ):
             raise CicdV2Error("settlement_report_mismatch")
         if (
@@ -3132,7 +3204,7 @@ class Runtime:
             if selected is not None and selected["kind"] == "cancel"
             else (
                 "succeeded"
-                if report["status"] in {"no_action", "checked_patch"}
+                if report["status"] in {"no_action", "checked_patch", "published"}
                 else "failed"
             )
         )
@@ -3239,6 +3311,7 @@ class Runtime:
             or report["config_sha256"] != self.home.config_sha256
             or report["attempt_refs"] != state["attempt_refs"]
             or origin["attempt_refs"] != state["attempt_refs"]
+            or report["delivery_refs"] != state["delivery_refs"]
             or plan["intent"]
             != {
                 "task_id": task["task_id"],
@@ -3260,7 +3333,7 @@ class Runtime:
             if decision is not None and decision["kind"] == "cancel"
             else (
                 "succeeded"
-                if report["status"] in {"no_action", "checked_patch"}
+                if report["status"] in {"no_action", "checked_patch", "published"}
                 else "failed"
             )
         )
@@ -3272,17 +3345,25 @@ class Runtime:
                 for row in self.home.decisions(str(state["input_id"]))
                 if row["request_id"] == decision["request_id"]
             ]
-            if saved != [decision] or decision["kind"] not in {"close", "cancel"}:
+            if saved != [decision] or decision["kind"] not in {
+                "close", "cancel", "approve_delivery"
+            }:
                 raise CicdV2Error("settlement_decision_mismatch")
             if decision["kind"] == "close" and (
                 state["hold_ref"] != plan["report_ref"]
                 or decision["basis_sha256"] != plan["report_ref"]["sha256"]
             ):
                 raise CicdV2Error("settlement_basis_mismatch")
+        if report["status"] == "published":
+            from .cicd_effects import disposition, publication_decision
+
+            if (decision != publication_decision(self.home, state)
+                    or disposition(self.home, state) != "complete"):
+                raise CicdV2Error("settlement_delivery_mismatch")
         for key in ("patch_ref", "assessment_ref"):
             if report[key] is not None:
                 self.home.resolve_ref(report[key])
-        for key in ("checks_refs", "review_refs", "attempt_refs"):
+        for key in ("checks_refs", "review_refs", "attempt_refs", "delivery_refs"):
             for ref in report[key]:
                 self.home.resolve_ref(ref)
         if terminal:

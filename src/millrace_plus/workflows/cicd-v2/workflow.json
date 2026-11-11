@@ -71,7 +71,8 @@
             "REVIEW_RESULT",
             "DELIVERY_READY",
             "SETTLE_READY",
-            "HOLD"
+            "HOLD",
+            "EFFECT_UNKNOWN"
           ],
           "on": {
             "READY": {
@@ -112,6 +113,9 @@
             },
             "HOLD": {
               "goto": "hold"
+            },
+            "EFFECT_UNKNOWN": {
+              "goto": "inspect_effect"
             }
           },
           "on_error": {
@@ -695,7 +699,10 @@
           "outcomes": [
             "HUMAN_REQUIRED",
             "STALE",
-            "HOLD"
+            "HOLD",
+            "PREPARE_REQUIRED",
+            "AUTHORIZED",
+            "COMPLETE"
           ],
           "on": {
             "HUMAN_REQUIRED": {
@@ -706,6 +713,15 @@
             },
             "HOLD": {
               "goto": "hold"
+            },
+            "PREPARE_REQUIRED": {
+              "goto": "prepare_effect"
+            },
+            "AUTHORIZED": {
+              "goto": "execute_effect"
+            },
+            "COMPLETE": {
+              "goto": "settle"
             }
           },
           "on_error": {
@@ -773,6 +789,138 @@
           "on": {
             "SETTLED": {
               "goto": "claim"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "prepare_effect": {
+          "invoke": {
+            "binding": "command",
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "prepare_effect"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PREPARED",
+            "REFUSED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PREPARED": {
+              "goto": "guard_delivery"
+            },
+            "REFUSED": {
+              "goto": "hold"
+            },
+            "UNCERTAIN": {
+              "goto": "hold"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "execute_effect": {
+          "invoke": {
+            "binding": "command",
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "execute_effect"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "APPLIED",
+            "NOT_APPLIED",
+            "PENDING",
+            "REFUSED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "APPLIED": {
+              "goto": "guard_delivery"
+            },
+            "NOT_APPLIED": {
+              "goto": "hold"
+            },
+            "PENDING": {
+              "goto": "hold"
+            },
+            "REFUSED": {
+              "goto": "hold"
+            },
+            "UNCERTAIN": {
+              "goto": "hold"
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "cicd_hold",
+              "resume": "reconcile"
+            }
+          }
+        },
+        "inspect_effect": {
+          "invoke": {
+            "binding": "command",
+            "config": {
+              "script": "scripts/step.py",
+              "args": [
+                "inspect_effect"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "APPLIED",
+            "NOT_APPLIED",
+            "PENDING",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "APPLIED": {
+              "goto": "guard_delivery"
+            },
+            "NOT_APPLIED": {
+              "goto": "guard_delivery"
+            },
+            "PENDING": {
+              "goto": "hold"
+            },
+            "UNCERTAIN": {
+              "goto": "hold"
             }
           },
           "on_error": {

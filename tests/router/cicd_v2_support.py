@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from cicd_support import make_target, write_json
@@ -19,6 +20,7 @@ def initialized(
     products: bool = False,
     guards: list[dict[str, object]] | None = None,
     environment_paths: list[str] | None = None,
+    configure: Callable[[dict[str, object]], None] | None = None,
 ) -> dict[str, object]:
     target, head = make_target(root)
     value = config()
@@ -104,6 +106,8 @@ def initialized(
             selection[key] = cc.make_ref(name, destination.read_bytes())
     if guards:
         value["resource_policy"]["guards"].extend(guards)
+    if configure is not None:
+        configure(value)
     config_file = write_json(root / "config.json", value)
     home = root / "home"
     prepared = prepare(home, target, config_file)

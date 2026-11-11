@@ -182,6 +182,26 @@ def test_single_reviewer_graph_is_admitted_with_static_budgets() -> None:
     assert reproduction_node_budget(value)["effective_seconds"] == 150
 
 
+def test_effect_operations_are_declared_separate_graph_steps() -> None:
+    graph = derive_graph(_template(), config())
+    _admitted(graph)
+    nodes = graph["planes"]["main"]["nodes"]
+    assert nodes["guard_delivery"]["on"]["PREPARE_REQUIRED"] == {
+        "goto": "prepare_effect"
+    }
+    assert nodes["guard_delivery"]["on"]["AUTHORIZED"] == {"goto": "execute_effect"}
+    assert nodes["guard_delivery"]["on"]["COMPLETE"] == {"goto": "settle"}
+    assert nodes["reconcile"]["on"]["EFFECT_UNKNOWN"] == {"goto": "inspect_effect"}
+    assert nodes["execute_effect"]["on"]["NOT_APPLIED"] == {"goto": "hold"}
+    assert nodes["inspect_effect"]["on"]["NOT_APPLIED"] == {"goto": "guard_delivery"}
+    for name in ("prepare_effect", "execute_effect", "inspect_effect"):
+        assert nodes[name]["invoke"]["config"]["args"] == [name]
+        for failure in ("on_error", "on_unknown"):
+            assert nodes[name][failure] == {
+                "pause": {"reason": "cicd_hold", "resume": "reconcile"}
+            }
+
+
 def test_two_reviewers_expand_in_declared_order() -> None:
     value = config()
     value["role_bindings"]["review"] = [_selection("first"), _selection("second")]

@@ -239,7 +239,7 @@ def test_full_ids_must_cover_every_rule_mandatory_and_quality_command() -> None:
     [
         (
             lambda c: c["external_policy"].update(mode="authorized"),
-            "unsupported_until_ci_d1",
+            "invalid_external_policy",
         ),
         (
             lambda c: c.update(health_policy={"environment": "prod"}),
@@ -1049,12 +1049,11 @@ def test_continue_decision_needs_changed_cause_and_allowed_stage(stage: str) -> 
     )
 
 
-def test_ci_r1_applies_close_and_cancel_but_not_effect_approvals() -> None:
-    for kind in ("close", "cancel"):
+def test_local_decisions_include_delivery_but_rollback_stays_deferred() -> None:
+    for kind in ("close", "cancel", "approve_delivery"):
         decision = _decision(kind)
         assert require_ci_r1_decision(copy.deepcopy(decision)) == decision
     for kind, code in (
-        ("approve_delivery", "unsupported_until_ci_d1"),
         ("approve_rollback", "unsupported_until_ci_d2"),
     ):
         decision = _decision(kind)

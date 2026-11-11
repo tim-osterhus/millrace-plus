@@ -35,6 +35,8 @@ def _parser() -> _Parser:
         "cancel",
         "decide",
         "candidate",
+        "deliver",
+        "inspect-delivery",
     ):
         child = commands.add_parser(name)
         child.add_argument("--workflow-home", required=True, type=Path)
@@ -45,6 +47,13 @@ def _parser() -> _Parser:
             child.add_argument("--state-home", type=Path)
             child.add_argument("--catalog-home", type=Path)
             child.add_argument("--authority", type=Path)
+        elif name in {"deliver", "inspect-delivery"}:
+            child.add_argument("--request", required=True, type=Path)
+            child.add_argument("--result", required=True, type=Path)
+            child.add_argument("--execution-home", required=True, type=Path)
+            child.add_argument("--node", required=True)
+            child.add_argument("--plane", default="main")
+            child.add_argument("--script", required=True, type=Path)
         elif name == "candidate":
             child.add_argument(
                 "--operation",
@@ -142,6 +151,34 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.state_home,
                 catalog_home=args.catalog_home,
             )
+        elif args.operation in {"deliver", "inspect-delivery"}:
+            import os
+
+            from .cicd_candidates import bind_invocation
+            from .cicd_effects import operate_delivery, validate_request
+            from .cicd_source import write_exact
+            from .cicd_v2_runtime import Runtime, V2Home
+            from .local_intake import canonical, strict_json
+
+            home = V2Home(args.workflow_home)
+            request = validate_request(strict_json(args.request.read_bytes()))
+            inspecting = args.operation == "inspect-delivery"
+            if inspecting != (request["operation"] == "inspect"):
+                raise CicdError("effect_operation_mismatch")
+            result_path = args.result.resolve()
+            if (
+                result_path == args.request.resolve()
+                or result_path.is_relative_to(home.target)
+            ):
+                raise CicdError("invalid_result_path")
+            invocation = bind_invocation(
+                args.execution_home, args.plane, args.node,
+                args.script, os.getpid(), Path.cwd(),
+            )
+            result = operate_delivery(
+                Runtime(home, args.script.parent.parent), request, invocation
+            )
+            write_exact(result_path, canonical(result), "result_conflict")
         elif args.operation == "candidate":
             import os
 

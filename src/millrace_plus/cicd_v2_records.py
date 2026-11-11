@@ -20,11 +20,12 @@ CI-R1 subset implemented here:
   review-projection, materialization, materialization-operation and
   candidate-verification.
 
-CI-R1 config admits only the hold external policy (`unsupported_until_ci_d1`),
-a null health policy (`unsupported_until_ci_d2`) and null wait-node deadlines.
-Effect, permission, wait, health and publication-chain (CI-D1/CI-D2) records
-remain outside this module. CI-F1 feedback/correlation validators and local
-evidence admission live in `cicd_feedback`.
+CI-D1a adds a standalone working-tree commit selector through `cicd_effects`.
+Health remains null (`unsupported_until_ci_d2`) and wait-node deadlines remain
+null. Effect/approval/permission records live in the cohesive `cicd_effects`
+module; full CI-D1 waits/publication chains and CI-D2 remain deferred. CI-F1
+feedback/correlation validators and local evidence admission live in
+`cicd_feedback`.
 
 Everything is pure: no filesystem, process, environment, clock or Core access.
 Consumers read and hash Ref targets, resolve cross-file links and translate
@@ -1130,8 +1131,9 @@ def validate_config(
     _role_bindings(obj["role_bindings"])
     _repair_policy(obj["repair_policy"], protected_classes)
     _resource_policy(obj["resource_policy"])
-    if obj["external_policy"] != _HOLD:
-        raise CicdV2Error("unsupported_until_ci_d1")
+    from .cicd_effects import validate_policy
+
+    validate_policy(obj["external_policy"], obj)
     if obj["health_policy"] is not None:
         raise CicdV2Error("unsupported_until_ci_d2")
     if policy is not None:
@@ -1919,10 +1921,8 @@ def validate_decision(value: object) -> dict[str, object]:
 
 
 def require_ci_r1_decision(decision: object) -> dict[str, object]:
-    """CI-R1 applies only continue/close/cancel; effect approvals wait for D1/D2."""
+    """Local decisions include selected CI-D1a delivery; rollback stays deferred."""
     record = validate_decision(decision)
-    if record["kind"] == "approve_delivery":
-        raise CicdV2Error("unsupported_until_ci_d1")
     if record["kind"] == "approve_rollback":
         raise CicdV2Error("unsupported_until_ci_d2")
     return record

@@ -276,8 +276,8 @@ way to stop live processes. `decide --event ID --request-id ID --decision KIND
 --evidence FILE` consumes the exact v2 decision JSON matching those arguments.
 Continue requires an actionable changed cause, the exact held report digest and
 state version; wording changes do not permit another identical failure attempt.
-Close binds the immutable held report. Delivery/rollback approval refuses until
-separate CI-D1/D2 selection.
+Close binds the immutable held report. CI-D1a supports the explicit standalone
+commit approval described below. Rollback approval remains unsupported.
 
 Reproduction runs trusted captured argv before repair. Investigation and review
 are read-only; only configured probe IDs execute. Actual changes, protected
@@ -486,3 +486,129 @@ The current `report/v2` field `correlation_refs: []` is unpopulated. It makes no
 claim that correlations are absent. `cicd status` carries the current advisory
 correlations. Corrupt correlation evidence remains a refusal; correlation never
 changes FIFO, original input identity, source mapping or command authority.
+
+
+## CI-D1a standalone commit intents
+
+V2 retains hold mode by default. An optional authorized policy now supports one
+`commit` selector in `working_tree` mode. It requires an exact operator authority,
+explicit approval/permission and a trusted argv adapter with exact inspection.
+This package supplies no real Git effect backend. Offline fake-peer evidence
+qualifies the protocol mechanics only. Real Git or remote operations require
+separate route qualification and operator authorization.
+
+The current completion guard requires the frozen HEAD, branch and index facts
+to remain unchanged. An ordinary real Git commit advances HEAD and changes the
+index, so this guard would hold. A future Git route must implement and qualify
+post-apply commit identity, expected tree, parent, branch and index validation.
+Configuring a trusted argv command alone does not supply that behavior.
+
+The pre-init selector contains only fixed target facts:
+
+```json
+{"kind":"commit","target":{"repository_root":"/owned/repo","branch":"main","mode":"working_tree"}}
+```
+
+The policy's `adapters.commit` names trusted configured command IDs for
+`prepare`, `execute` and `inspect`. Its `capabilities` contains exactly
+`{"id":"exact_inspection","evidence_ref":{"path":"inspection-evidence.json","sha256":"..."}}`.
+Each selected command uses the existing command contract, no expected products,
+and argv tokens `{request_file}` and `{result_file}` exactly once. Those two
+whole arguments expand to owned files. No shell or event/model-provided command
+is accepted. The policy captures a nonnull `authority_ref` and null
+`wait_policy_ref`. An authorized policy with empty effects still holds.
+
+After the normal checks and every reviewer accept, `status` exposes the immutable
+`delivery_basis_ref`. It freezes the exact input, patch, checked source, config,
+checks/reviews, target and Git HEAD/branch/index. The realized target adds
+`base_head`, `patch_sha256` and `source_after_sha256` to the selector. Detached
+HEAD, staged changes or a repaired path containing preexisting user edits holds.
+Unchanged foreign dirty files stay preserved and outside the patch.
+
+The operator supplies two immutable JSON records. Every listed field is required:
+
+- `millrace-plus-cicd-action-approval/v1`: `format,approval_id,issuer,input_id,
+  candidate_id,patch_sha256,source_after_sha256,config_sha256,effects,authority_ref,
+  evidence_refs`.
+- `millrace-plus-cicd-action-permission/v1`: `format,permission_id,issuer,input_id,
+  candidate_id,patch_sha256,source_after_sha256,config_sha256,effects,authority_ref,
+  approval_ref`.
+
+Both records name the exact realized `{kind,target}` effect, the same issuer and
+unchanged authority. Exactly one subject ID is nonnull; this selected route
+requires `input_id` and null `candidate_id`. Permission's `approval_ref` pins the
+independent approval record. The approval contains no decision or permission
+reference, avoiding a circular digest dependency. These are recorded operator
+approvals, with no signature/key setup. Retain these files under the owned
+`project/main` evidence root and use exact contained path/SHA-256 references.
+
+Submit the existing v2 `approve_delivery` decision with the permission reference,
+held report digest and expected state version:
+
+```text
+millrace-plus cicd decide --workflow-home H --event INPUT_ID --request-id REQUEST_ID --decision approve_delivery --evidence DECISION.json
+```
+
+Approval queues no subprocess. Resume the existing public graph. It performs one
+read-only preparation, returns to the delivery guard, then executes the saved
+intent once. Each following guard requires the exact public stopped-writer
+completion. All execute requests, permission/target/command digests and the
+possible-send reservation are durable before a potential launch. Results and
+process evidence are retained before graph advancement.
+
+New operation records use `millrace-plus-cicd-effect-operation/v2`. Their required
+`retained_evidence_refs` list contains ordered `{original_ref,retained_ref}`
+entries for every result evidence reference. Each retained copy uses the owned
+filename `<sha256>.effect-evidence.bin` and the original digest. The original raw
+result bytes and result reference remain unchanged, including its original
+`evidence_refs`. Reserved records and observations without a usable result carry
+an empty mapping.
+
+History validates v2 proof through these required retained copies. Original
+adapter files may later change or disappear. Missing or corrupt retained copies
+refuse even if the originals remain valid. Reads never reconstruct copies or
+fall back to original files. Legacy operation/v1 records keep original-path
+validation and are never migrated by a read.
+
+A lost or malformed execute response holds. Public resume, including a new run
+after normal old-run closure, inspects that exact saved effect. Applied inspection
+settles without executing again. Only a proven `not_applied` inspection permits
+the identical saved intent to retry. A different request/effect identity cannot
+bypass uncertainty. Pending and unavailable results hold for explicit inspection;
+this subpacket adds no automatic poll or wait policy.
+
+The trusted adapter uses the strict effect request/result v2 fieldsets from the
+CI specification. Applied/absence results include exact evidence. Their first
+`evidence_refs` entry is `millrace-plus-cicd-effect-evidence/v1` with
+`format,effect_id,intent_sha256,target_sha256,status,remote_id,observed_head`.
+`intent_sha256` hashes the saved execute request, including during inspection.
+The target digest and observed identity must match the result. This record binds
+adapter evidence; the adapter's actual effect/inspection behavior still requires
+route qualification. The test peer records only an owned fake external ledger.
+
+A crash without retained nested-process closure evidence stays held, even when
+the outer Core writer stopped. Missing child/group facts never become permission
+to inspect, retry or settle. Available inspection remains read-only after source
+drift so prior effects can be retained; drift blocks further delivery completion.
+
+Cancellation prevents a new execute. A possible sent effect must be inspected
+and every writer closed before cancellation settles. Applied evidence remains
+in the cancelled report. Unknown effects keep the active input held and block
+the next input. Close refuses unresolved effects. Cancellation never reverses an
+effect or removes patches. Published and cancelled terminal receipts remain
+replayable after later inputs run.
+
+The graph explicitly declares `prepare_effect`, `execute_effect` and
+`inspect_effect`. Each node performs one operation; the graph selects the next
+step. `cicd deliver --request FILE --result FILE` and `cicd inspect-delivery` expose
+the same operation through the existing exact public invocation binder. Like the
+candidate facade, these commands require `--execution-home`, `--node`, `--plane`
+and `--script` identifying the actual captured command invocation. An arbitrary
+operator shell cannot impersonate that invocation.
+
+Full CI-D1 remains open: retained-tree object construction/inspection,
+`expected_ref_cas` push semantics, PRs, remote checks, deploy, publication-chain
+rules and shared cooperative waits are deferred. CI-D2 health/rollback and
+Factory F2 remain unsupported. Factory `approve-delivery` still refuses with
+`unsupported_until_factory_f2`. Existing v1 homes retain their original hold-only
+behavior, schemas and refusal codes.
