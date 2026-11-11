@@ -166,10 +166,20 @@ def test_selected_native_shim_keeps_its_dispatch_name(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("version", sorted(SUPPORTED_CLAUDE_VERSIONS))
+@pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh", "max"])
 def test_claude_profile_keeps_exact_version_and_selected_settings(
-    tmp_path, monkeypatch, version
+    tmp_path, monkeypatch, version, effort
 ):
-    monkeypatch.setattr(discovery.shutil, "which", lambda name: sys.executable)
+    monkeypatch.setattr(
+        discovery.shutil,
+        "which",
+        lambda cmd, mode=os.F_OK | os.X_OK, path=None: sys.executable,
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "Popen",
+        lambda *a, **kw: pytest.fail("admission launched a process"),
+    )
     inherited = discovery.select_native("claude_print")
     assert inherited["profile"] == {
         "format": "millrace-claude-print-profile/v1",
@@ -180,13 +190,131 @@ def test_claude_profile_keeps_exact_version_and_selected_settings(
         "format": "millrace-claude-print-profile/v1",
         "claude_version": version,
         "model": "sonnet",
-        "effort": "high",
+        "reasoning_effort": effort,
     }
     profile.write_bytes(canonical_bytes(captured))
     selected = discovery.select_native("claude_print", profile)
     assert selected["profile"] == captured
-    assert selected["settings"] == {"model": "sonnet", "effort": "high"}
+    settings = {"model": "sonnet", "reasoning_effort": effort}
+    assert selected["settings"] == settings
     assert selected["provenance"] == "explicit"
+    consent = discovery.consent_description(selected)
+    assert "reasoning_effort" in consent and effort in consent and "sonnet" in consent
+    assert "'effort':" not in consent
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    workflow = materialize(
+        workspace,
+        native=selected,
+        no_web=True,
+        session_file=tmp_path / "session.json",
+    )
+    profile.write_bytes(b"{}")  # The admitted copy retains the selected settings.
+    assert json.loads((workspace / "profiles/native.json").read_bytes()) == captured
+    state_home = tmp_path / "state"
+    receipt = control.create_instance(
+        workflow,
+        workspace,
+        state_home=state_home,
+        request_id="a" * 32,
+        expected_state_version=0,
+    )
+    assert receipt["status"] == "applied"
+    validation = control.validate_revision_summary(
+        receipt["instance_id"], state_home=state_home
+    )["data"]
+    assert validation["valid"] is True
+    # The bounded summary exposes common settings only. The public full
+    # validation read also exposes the admitted adapter settings.
+    full = control.validate_revision(receipt["instance_id"], state_home=state_home)
+    assert full["valid"] is True
+    admitted = full["resolved_nodes"]["main"]["native"]["adapter"]
+    assert admitted["requested"] == admitted["effective"] == settings
+    assert admitted["provenance"] == {
+        key: {"source": "profile", "policy": None} for key in settings
+    }
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"effort": "high"},
+        {"effort": "high", "reasoning_effort": "high"},
+        {"unknown": "high"},
+        {"reasoning_effort": "unsupported"},
+        {"reasoning_effort": True},
+        {"reasoning_effort": "--high"},
+    ],
+)
+def test_claude_profile_refuses_legacy_and_invalid_settings(
+    tmp_path, monkeypatch, settings
+):
+    monkeypatch.setattr(discovery.shutil, "which", lambda name: sys.executable)
+    monkeypatch.setattr(
+        subprocess,
+        "Popen",
+        lambda *a, **kw: pytest.fail("discovery launched a process"),
+    )
+    profile = tmp_path / "profile.json"
+    profile.write_bytes(
+        canonical_bytes(
+            {
+                "format": "millrace-claude-print-profile/v1",
+                "claude_version": CLAUDE_VERSION,
+                **settings,
+            }
+        )
+    )
+    with pytest.raises(DemoError, match="invalid_native_profile"):
+        discovery.select_native("claude_print", profile)
+
+
+def test_claude_omitted_settings_remain_inherited_through_admission(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        discovery.shutil,
+        "which",
+        lambda cmd, mode=os.F_OK | os.X_OK, path=None: sys.executable,
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "Popen",
+        lambda *a, **kw: pytest.fail("admission launched a process"),
+    )
+    native = discovery.select_native("claude_print")
+    assert native["settings"] == {} and native["provenance"] == "inherited"
+    assert (
+        "native inheritance; effective values unknown"
+        in discovery.consent_description(native)
+    )
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    workflow = materialize(
+        workspace,
+        native=native,
+        no_web=True,
+        session_file=tmp_path / "session.json",
+    )
+    state_home = tmp_path / "state"
+    receipt = control.create_instance(
+        workflow,
+        workspace,
+        state_home=state_home,
+        request_id="a" * 32,
+        expected_state_version=0,
+    )
+    assert receipt["status"] == "applied"
+    validation = control.validate_revision_summary(
+        receipt["instance_id"], state_home=state_home
+    )["data"]
+    assert validation["valid"] is True
+    full = control.validate_revision(receipt["instance_id"], state_home=state_home)
+    assert full["valid"] is True
+    admitted = full["resolved_nodes"]["main"]["native"]["adapter"]
+    assert (
+        admitted["requested"] == admitted["effective"] == admitted["provenance"] == {}
+    )
 
 
 @pytest.mark.parametrize(

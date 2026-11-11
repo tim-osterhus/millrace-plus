@@ -934,8 +934,123 @@ def test_finish_saved_joins_use_one_deadline_and_refuse_late_positive(
     assert deadlines == [15.0, 15.0]
     rows = events[0][1]["requests"]
     assert rows[0]["observation"]["holder_joined"] is True
-    assert rows[1]["observation"] is None
+    assert rows[1]["observation"]["holder_joined"] is True
     assert owner.root.exists() and owner.error == "control_join_not_observed"
+    assert owner._refresh_saved_joins(deadline=15.0) is False
+    assert deadlines == [15.0, 15.0]
+    record = json.loads(
+        next(owner.options.output.glob("demo-*/execution.json")).read_bytes()
+    )
+    assert all(row["holder_joined"] is True for row in record["requests"])
+    assert record["error"] == "control_join_not_observed"
+    assert record["retention"]["cleanup"] == "retained"
+    assert record["retention"]["reason"] == "closure_unconfirmed"
+
+
+@pytest.mark.parametrize("expiry", ["sleep", "summary"])
+@pytest.mark.parametrize("late_quiescent", [False, True])
+def test_finish_timely_joins_preserve_writer_expiry_classification(
+    owner, monkeypatch, expiry, late_quiescent
+):
+    clock, events, reads, gets = [0.0], [], [], []
+    owner.cancelled, owner.stop_source = True, "terminal_enter"
+    resume = saved_request(owner, "resume_plane", "d" * 32, plane_id="main")
+    owner.requests, owner.calls = [resume], [complete_observation(resume)]
+
+    def summary():
+        if expiry == "summary" and len(reads) == 1:
+            clock[0] = 15.0
+        reads.append(clock[0])
+        stopped = late_quiescent and clock[0] >= 15.0
+        return {
+            "status": "cancelled" if stopped else "paused",
+            "quiescent": stopped,
+            "inflight_invocations": [],
+        }
+
+    def observe(request, *, deadline):
+        gets.append(request)
+        pytest.fail("timely confirmed joins must not issue another GET")
+
+    owner.client = SimpleNamespace(
+        submit=lambda request, **kw: complete_observation(request), observe=observe
+    )
+    owner.handle = closing_handle(owner, events)
+    monkeypatch.setattr(coordinator.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(coordinator.time, "sleep", lambda _: clock.__setitem__(0, 15.0))
+    monkeypatch.setattr(owner, "_summary", summary)
+    monkeypatch.setattr(owner, "_invocations", lambda: [])
+    assert owner._finish() == 1 and owner.root.exists()
+    expected = (
+        "cleanup_observation_expired"
+        if late_quiescent
+        else "writer_closure_not_observed"
+    )
+    assert owner.error == expected and gets == []
+    assert reads == ([0.0, 0.0, 15.0] if expiry == "sleep" else [0.0, 15.0])
+    assert [request["operation"] for request in owner.requests] == [
+        "resume_plane",
+        "cancel_run",
+    ]
+    assert all(
+        row["observation"]["holder_joined"] is True for row in events[0][1]["requests"]
+    )
+    record = json.loads(
+        next(owner.options.output.glob("demo-*/execution.json")).read_bytes()
+    )
+    assert record["error"] == expected
+    assert record["writers_stopped"] is late_quiescent
+    assert all(row["holder_joined"] is True for row in record["requests"])
+    assert record["retention"] == {
+        "keep_demo": False,
+        "cleanup": "retained",
+        "reason": expected if late_quiescent else "closure_unconfirmed",
+    }
+
+
+@pytest.mark.parametrize("mismatch", ["target", "digest"])
+def test_finish_invalid_late_join_preserves_valid_prior_facts(
+    owner, monkeypatch, mismatch
+):
+    clock, events, gets = [0.0], [], []
+    request = saved_request(owner, "resume_plane", "c" * 32, plane_id="main")
+    prior = complete_observation(request, joined=False)
+    owner.requests, owner.calls = [request], [prior]
+
+    def observe(envelope, *, deadline):
+        gets.append(envelope)
+        assert deadline == 15.0
+        fresh = complete_observation(envelope)
+        if mismatch == "target":
+            fresh["instance_id"] = "d" * 32
+        else:
+            fresh["request_digest"] = "0" * 64
+        clock[0] = 16.0
+        return fresh
+
+    owner.client = SimpleNamespace(observe=observe)
+    owner.handle = closing_handle(owner, events)
+    monkeypatch.setattr(coordinator.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(
+        owner,
+        "_summary",
+        lambda: {"status": "cancelled", "quiescent": True, "inflight_invocations": []},
+    )
+    monkeypatch.setattr(owner, "_invocations", lambda: [])
+    assert owner._finish() == 1
+    assert gets == [request] and owner.calls == [prior] and owner.root.exists()
+    assert owner.error == (
+        "wrong_os_target" if mismatch == "target" else "wrong_os_digest"
+    )
+    snapshot = events[0][1]["requests"][0]
+    assert snapshot["request_digest"] == public_request_digest(request)
+    assert snapshot["observation"]["holder_joined"] is False
+    record = json.loads(
+        next(owner.options.output.glob("demo-*/execution.json")).read_bytes()
+    )
+    assert record["requests"][0]["holder_joined"] is False
+    assert record["retention"]["cleanup"] == "retained"
+    assert record["retention"]["reason"] == "closure_unconfirmed"
 
 
 def test_finish_invalid_then_valid_join_keeps_failure_and_root(owner, monkeypatch):
@@ -973,7 +1088,7 @@ def test_finish_invalid_then_valid_join_keeps_failure_and_root(owner, monkeypatc
     assert record["retention"] == {
         "keep_demo": False,
         "cleanup": "retained",
-        "reason": "closure_unconfirmed",
+        "reason": "wrong_os_target",
     }
 
 
@@ -1003,7 +1118,80 @@ def test_finish_late_writer_summary_keeps_fact_without_closeout_credit(
     )
     assert record["writers_stopped"] and record["requests"][0]["holder_joined"]
     assert record["error"] == "cleanup_observation_expired"
+    assert record["retention"]["reason"] == "cleanup_observation_expired"
+
+
+@pytest.mark.parametrize(
+    "error,keep_demo,expected_reason",
+    [
+        ("graph_incomplete", False, "graph_incomplete"),
+        ("graph_incomplete", True, "keep_demo"),
+        ("wrong_os_target", False, "wrong_os_target"),
+    ],
+)
+def test_finish_retention_reason_uses_safe_error_after_positive_closure(
+    owner, monkeypatch, error, keep_demo, expected_reason
+):
+    owner.error = error
+    owner.options = replace(owner.options, keep_demo=keep_demo)
+    events = []
+    owner.handle = closing_handle(owner, events)
+    monkeypatch.setattr(
+        owner,
+        "_summary",
+        lambda: {"status": "cancelled", "quiescent": True, "inflight_invocations": []},
+    )
+    monkeypatch.setattr(owner, "_invocations", lambda: [])
+    assert owner._finish() == 1 and owner.root.exists()
+    path = next(owner.options.output.glob("demo-*/execution.json"))
+    record = json.loads(path.read_bytes())
+    assert record["writers_stopped"] and record["child_exited"]
+    assert record["shutdown"]["workers_drained"]
+    assert record["shutdown"]["service_stopped"]
+    assert record["retention"] == {
+        "keep_demo": keep_demo,
+        "cleanup": "retained",
+        "reason": expected_reason,
+    }
+    assert record["error"] == error
+
+
+def test_finish_retention_reason_keeps_unconfirmed_child_closure(owner, monkeypatch):
+    owner.error = "graph_incomplete"
+    owner.handle = closing_handle(owner, [])
+    owner.handle.wait = lambda: False
+    monkeypatch.setattr(
+        owner,
+        "_summary",
+        lambda: {"status": "cancelled", "quiescent": True, "inflight_invocations": []},
+    )
+    monkeypatch.setattr(owner, "_invocations", lambda: [])
+    assert owner._finish() == 1 and owner.root.exists()
+    record = json.loads(
+        next(owner.options.output.glob("demo-*/execution.json")).read_bytes()
+    )
+    assert record["error"] == "graph_incomplete"
     assert record["retention"]["reason"] == "closure_unconfirmed"
+
+
+def test_finish_retention_reason_keeps_failed_ownership_removal(owner, monkeypatch):
+    owner.report = build_report(
+        owner.owner["demo_id"], build_baseline(unknown_hardware())
+    )
+    owner.handle = closing_handle(owner, [])
+    monkeypatch.setattr(
+        owner,
+        "_summary",
+        lambda: {"status": "succeeded", "quiescent": True, "inflight_invocations": []},
+    )
+    monkeypatch.setattr(owner, "_invocations", lambda: [])
+    monkeypatch.setattr(coordinator, "cleanup_root", lambda *a, **kw: False)
+    assert owner._finish() == 0 and owner.root.exists()
+    record = json.loads(
+        next(owner.options.output.glob("demo-*/execution.json")).read_bytes()
+    )
+    assert record["error"] is None
+    assert record["retention"]["reason"] == "ownership_unconfirmed"
 
 
 def test_finish_join_snapshot_is_whitelisted_and_precedes_shutdown(owner, monkeypatch):

@@ -543,7 +543,9 @@ class Coordinator:
                         "cancel_run", {}, version=None, deadline=deadline
                     )
             while True:
-                joins_confirmed = self._refresh_saved_joins(deadline=deadline)
+                # Keep timely joins while waiting for independent writer closure.
+                if not joins_confirmed:
+                    joins_confirmed = self._refresh_saved_joins(deadline=deadline)
                 if cancel is not None:
                     cancel_id = cancel.get("request_id")
                     cancel = next(
@@ -631,15 +633,15 @@ class Coordinator:
                 },
                 completion="cancelled" if self.cancelled else "incomplete",
             )
-        confirmed = (
+        closure_confirmed = (
             stopped
             and joins_confirmed
             and snapshot_saved
-            and self.error is None
             and child_exited
             and shutdown.get("workers_drained") is True
             and shutdown.get("service_stopped") is True
         )
+        confirmed = closure_confirmed and self.error is None
         files_to_export: dict[str, bytes] = {}
         if self.baseline is not None:
             assert self.baseline_bytes is not None
@@ -703,8 +705,8 @@ class Coordinator:
                 else "keep_demo"
                 if self.options.keep_demo
                 else "closure_unconfirmed"
-                if not confirmed
-                else "ownership_unconfirmed"
+                if not closure_confirmed
+                else _safe_code(self.error) or "ownership_unconfirmed"
             )
             execution["timestamps"]["exported_at"] = _now()
             execution["timestamps"]["cleanup_observed_at"] = _now()
@@ -886,10 +888,11 @@ class Coordinator:
                     assert self.client is not None
                     fresh = self.client.observe(request, deadline=deadline)
                     validate_call(fresh, "demo", request)
-                    if time.monotonic() >= deadline:
-                        raise DemoError("control_join_not_observed")
                     observed = fresh
                     self._remember(observed)
+                # Preserve valid late facts without granting timely closeout.
+                if time.monotonic() >= deadline:
+                    raise DemoError("control_join_not_observed")
                 if not self._joined(observed):
                     joined = False
             except Exception as exc:

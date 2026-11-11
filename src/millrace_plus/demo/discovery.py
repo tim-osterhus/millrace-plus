@@ -80,7 +80,9 @@ def select_native(adapter: str, profile: Path | None = None) -> dict[str, Any] |
         else {"format": profile_format, version_key: version}
     )
     settings = (
-        {"model", "effort"} if adapter == "claude_print" else {"model", "variant"}
+        {"model", "reasoning_effort"}
+        if adapter == "claude_print"
+        else {"model", "variant"}
     )
     if (
         set(parsed) - {"format", version_key} - settings
@@ -97,6 +99,10 @@ def select_native(adapter: str, profile: Path | None = None) -> dict[str, Any] |
             or len(value) > 256
             or value.startswith("-")
             or any(c.isspace() for c in value)
+            or (
+                key == "reasoning_effort"
+                and value not in {"low", "medium", "high", "xhigh", "max"}
+            )
         ):
             raise DemoError("invalid_native_profile")
     return {

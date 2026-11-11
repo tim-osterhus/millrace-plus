@@ -30,6 +30,12 @@ based on the captured baseline; it does not change native tool permissions.
 Live native-route qualification remains separate from deterministic/fake D1
 checks.
 
+Explicit Claude profiles accept `model` and `reasoning_effort`. Supported effort
+values are `low`, `medium`, `high`, `xhigh` and `max`. The legacy key `effort`
+is refused. Omitted settings inherit the native configuration. Consent and
+captured launch settings use the same canonical keys; selected settings do not
+attest effective provider behavior.
+
 The coordinator captures the baseline at its authored pause gate and publishes
 its exact producer and digests through generic workflow outputs before resuming.
 Native proposals cannot replace baseline facts or estimates. Cancellation never
@@ -37,9 +43,14 @@ starts fallback work. The demo owns one foreground OS child, its private state
 and one Core run; an existing OS service is unaffected.
 
 `--keep-demo` preserves the private state after supported shutdown. Default
-cleanup requires public writer closure, OS worker drain, exact child exit,
-durable export verification and unchanged root ownership identity. Uncertain
-shutdown or failed export retains state and prints its recovery location.
+cleanup requires public writer closure, every exact OS-call join, OS worker
+drain, exact child exit, durable export verification and unchanged root ownership
+identity. Uncertain shutdown or failed export retains state and prints its
+recovery location. Valid late join observations are retained as facts, but
+deadline expiry still prevents successful closeout and deletion.
+`retention.reason` records `keep_demo` first, then `closure_unconfirmed` when
+closure proof is incomplete. With positive closure facts, a safe recorded error
+explains retention; otherwise `ownership_unconfirmed` records failed removal.
 No process is killed by a saved PID, and no stale-state reaper is installed.
 
 Exit 0 means a valid complete report and confirmed shutdown. Exit 1 means
