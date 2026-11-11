@@ -241,6 +241,31 @@ def _object(raw: bytes) -> dict[str, object]:
     return value
 
 
+def _validate_repair_profile(
+    config: Mapping[str, object], assets: Path, *, workflow: Path | None = None,
+) -> None:
+    """Admit Droid writes only from the exact validated captured profile."""
+    roles = cast(dict[str, object], config["role_bindings"])
+    selection = cast(dict[str, object], roles["repair"])
+    binding = cast(dict[str, object], selection["binding"])
+    if binding["adapter"] != "droid_exec":
+        return
+    from .router import droid_configuration as droid
+
+    ref = cc.validate_ref(selection["profile_ref"])
+    raw = _read(assets / str(ref["path"]), limit=droid.CONTROL_LIMIT)
+    if _sha(raw) != ref["sha256"]:
+        raise CicdV2Error("asset_changed")
+    try:
+        profile = droid.profile(raw)
+    except droid.RouterError as exc:
+        raise CicdV2Error("invalid_repair_profile") from exc
+    if profile["permission_mode"] != "auto_medium":
+        raise CicdV2Error("binding_cannot_write")
+    if workflow is not None and _read(workflow / str(ref["path"])) != raw:
+        raise CicdV2Error("prepared_control_changed")
+
+
 def _out(outcome: str, reason: str | None = None) -> dict[str, object]:
     return {"outcome": outcome, "summary": reason or outcome, "refs": []}
 
@@ -308,6 +333,9 @@ class V2Home:
         self.workspace = self.home / "project" / "main"
         self.config_ref = cast(dict[str, object], self.record["config_ref"])
         self.config = vr.validate_config(self.read_ref(self.config_ref))
+        _validate_repair_profile(
+            self.config, self.workspace, workflow=self.home / "workflow"
+        )
         self.config_sha256 = str(self.config_ref["sha256"])
         self.target = canonical_dir(str(self.config["target_root"]), "invalid_target")
         self.target_identity = cast(dict[str, object], self.record["target_identity"])
@@ -1287,6 +1315,11 @@ class Runtime:
         )
         if selection["id"] not in self.home.authority["operations"]:
             raise CicdV2Error("binding_not_authorized")
+        if role == "repair":
+            _validate_repair_profile(
+                self.home.config, self.home.workspace,
+                workflow=self.home.home / "workflow",
+            )
         state, attempt = self._reserve(
             state, role, invocation, future=True, changed=changed
         )
@@ -3491,6 +3524,7 @@ def prepare(
         )
     vr.validate_config(config)
     _guard_values(config)
+    _validate_repair_profile(config, config_file.absolute().parent)
     template_root = Path(__file__).parent / "workflows" / "cicd-v2"
     template = _object(_read(template_root / "workflow.json"))
     graph = derive_graph(template, config)

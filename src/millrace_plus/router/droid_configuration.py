@@ -44,6 +44,7 @@ SEMANTIC_LIMIT = 65536
 PROBE_LIMIT = 4096
 SETTINGS = {"model", "reasoning_effort"}
 EFFORTS = {"off", "none", "low", "medium", "high"}
+PERMISSION_MODES = {"read_only", "auto_medium"}
 LAUNCH_FIELDS = {
     "format", "profile_path", "profile_sha256", "prompt_source",
     "prompt_source_sha256", "prompt_path", "prompt_sha256", "expected_version",
@@ -109,19 +110,30 @@ def _control(files: Mapping[str, bytes], value: object) -> tuple[str, bytes]:
     return path, files[path]
 
 
-def binding(
-    config: Mapping[str, object], files: Mapping[str, bytes],
-) -> tuple[str, bytes, dict[str, object]]:
-    path, raw = _control(files, fields(config, {"profile"})["profile"])
+def profile(raw: bytes) -> dict[str, object]:
+    """Validate captured native authority without reading files or probing Droid."""
     if len(raw) > CONTROL_LIMIT:
         raise RouterError("invalid_droid_profile")
     obj = fields(
         strict_json(raw), {"format", "droid_version", "permission_mode"}, SETTINGS,
     )
-    if obj["format"] != PROFILE_FORMAT or obj["permission_mode"] != "read_only":
+    if (
+        obj["format"] != PROFILE_FORMAT
+        or not isinstance(obj["permission_mode"], str)
+        or obj["permission_mode"] not in PERMISSION_MODES
+    ):
         raise RouterError("invalid_droid_profile")
     if obj["droid_version"] != DROID_VERSION:
         raise RouterError("unsupported_droid_version")
+    settings_layer({k: v for k, v in obj.items() if k in SETTINGS})
+    return obj
+
+
+def binding(
+    config: Mapping[str, object], files: Mapping[str, bytes],
+) -> tuple[str, bytes, dict[str, object]]:
+    path, raw = _control(files, fields(config, {"profile"})["profile"])
+    obj = profile(raw)
     selected = settings_layer({k: v for k, v in obj.items() if k in SETTINGS})
     return path, raw, selected
 
@@ -189,8 +201,11 @@ def _prefix(outcomes: object) -> bytes:
 
 def argv(
     executable: str, prompt_path: str, cwd: str, effective: Mapping[str, object],
+    permission_mode: str = "read_only",
 ) -> tuple[str, ...]:
     result = [executable, "exec", "-f", prompt_path, "--cwd", cwd, "-o", "json"]
+    if permission_mode == "auto_medium":
+        result.extend(("--auto", "medium"))
     for key in ("model", "reasoning_effort"):
         if key in effective:
             result.extend(("--" + key.replace("_", "-"), cast(str, effective[key])))
@@ -204,6 +219,7 @@ def plan(request: InvocationRequest) -> LaunchPlan:
         for value in (request.runtime, request.workflow, request.plane)
     )
     profile_path, profile_raw, fallback = binding(request.binding_config, request.files)
+    permission_mode = cast(str, profile(profile_raw)["permission_mode"])
     prompt_source, task, overrides = node(request.node_config, request.files)
     if request.result_contract != "json-v1":
         raise RouterError("invalid_droid_result_contract")
@@ -218,7 +234,7 @@ def plan(request: InvocationRequest) -> LaunchPlan:
         "prompt_source_sha256": digest(task),
         "prompt_path": str(request.invocation_root / PROMPT_NAME),
         "prompt_sha256": digest(prompt), "expected_version": DROID_VERSION,
-        "permission_mode": "read_only", "native_inheritance": True,
+        "permission_mode": permission_mode, "native_inheritance": True,
         "environment_names": list(request.environment_names),
         "cwd": str(request.project_root),
         "common_settings": dict(request.common_settings), "result_contract": "json-v1",
@@ -227,7 +243,7 @@ def plan(request: InvocationRequest) -> LaunchPlan:
     return LaunchPlan(
         request.invocation_id, ADAPTER_ID, ADAPTER_CONTRACT,
         argv(request.executable, str(details["prompt_path"]), str(request.project_root),
-             mapping(selected["effective"])),
+             mapping(selected["effective"]), permission_mode),
         {}, {PROMPT_NAME: prompt}, selected, details,
     )
 
@@ -245,7 +261,8 @@ def launch_details(plan: LaunchPlan) -> dict[str, object]:
     obj = fields(plan.details, LAUNCH_FIELDS)
     if (
         obj["format"] != LAUNCH_FORMAT or obj["expected_version"] != DROID_VERSION
-        or obj["permission_mode"] != "read_only"
+        or not isinstance(obj["permission_mode"], str)
+        or obj["permission_mode"] not in PERMISSION_MODES
         or obj["native_inheritance"] is not True
         or obj["result_contract"] != "json-v1"
     ):
@@ -286,7 +303,7 @@ def launch_details(plan: LaunchPlan) -> dict[str, object]:
         or set(plan.generated_controls) != {PROMPT_NAME}
         or plan.argv != argv(
             plan.argv[0], cast(str, obj["prompt_path"]),
-            cast(str, obj["cwd"]), effective,
+            cast(str, obj["cwd"]), effective, cast(str, obj["permission_mode"]),
         )
     ):
         raise RouterError("invalid_launch_plan")

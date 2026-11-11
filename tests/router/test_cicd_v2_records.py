@@ -265,7 +265,7 @@ def test_ci_r1_refuses_effect_and_health_configuration(mutate, code: str) -> Non
     _refused(value, code)
 
 
-def test_read_only_droid_binding_may_review_but_never_repair() -> None:
+def test_droid_role_structure_requires_separate_profile_content_admission() -> None:
     value = config()
     value["role_bindings"]["investigate"] = _selection("droid-look", "droid_exec")
     value["role_bindings"]["review"] = [
@@ -274,7 +274,11 @@ def test_read_only_droid_binding_may_review_but_never_repair() -> None:
     ]
     validate_config(value)
     value["role_bindings"]["repair"] = _selection("droid-fix", "droid_exec")
-    _refused(value, "binding_cannot_write")
+    # These are digest refs, not profile contents. Preparation/home load/dispatch
+    # must resolve them before granting write authority; structural parsing cannot.
+    validate_config(value)
+    value["role_bindings"]["repair"]["profile_ref"] = None
+    _refused(value, "invalid_role_bindings")
 
 
 def test_native_binding_requires_captured_profile_and_known_contract() -> None:

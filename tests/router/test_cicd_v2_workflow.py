@@ -30,6 +30,125 @@ def _template() -> dict[str, object]:
     return json.loads(TEMPLATE.read_text())
 
 
+def _droid_ci_preparation(tmp_path):
+    from cicd_support import make_target, write_json
+    from cicd_v2_support import initialized
+    from test_additional_adapter_contracts import PROFILE, fake
+
+    from millrace_plus import check_contracts as cc
+
+    base = initialized(tmp_path / "base")
+    target, _ = make_target(tmp_path / "candidate")
+    config_file = base["config"].parent / "droid-config.json"
+    value = json.loads(base["config"].read_text())
+    value["target_root"] = str(target)
+    selection = value["role_bindings"]["repair"]
+    selection["binding"] = {
+        "adapter": "droid_exec", "contract": "millrace-droid-exec/v1",
+        "executable": str(fake(tmp_path / "native-peer")), "config": {},
+    }
+    raw = json.dumps({**PROFILE, "permission_mode": "auto_medium"}).encode()
+    profile = config_file.parent / "repair-droid.json"
+    profile.write_bytes(raw)
+    selection["profile_ref"] = cc.make_ref(profile.name, raw)
+    write_json(config_file, value)
+    return tmp_path / "droid-home", target, config_file, profile
+
+
+@pytest.mark.parametrize("fault", ["read_only", "malformed", "missing", "drift"])
+def test_droid_repair_profile_refuses_before_preparation_side_effects(tmp_path, fault):
+    from millrace_plus import check_contracts as cc
+    from millrace_plus.cicd_source import OWNER
+    from millrace_plus.cicd_v2_runtime import prepare
+
+    home, target, config_file, profile = _droid_ci_preparation(tmp_path)
+    value = json.loads(config_file.read_text())
+    if fault == "read_only":
+        selected = json.loads(profile.read_text())
+        selected["permission_mode"] = "read_only"
+        profile.write_text(json.dumps(selected))
+    elif fault == "malformed":
+        profile.write_bytes(b'{"permission_mode":"auto_medium"}')
+    elif fault == "missing":
+        profile.unlink()
+    else:
+        profile.write_bytes(profile.read_bytes() + b" ")
+    if fault in {"read_only", "malformed"}:
+        value["role_bindings"]["repair"]["profile_ref"] = cc.make_ref(
+            profile.name, profile.read_bytes()
+        )
+        config_file.write_text(json.dumps(value))
+    with pytest.raises((CicdV2Error, FileNotFoundError)):
+        prepare(home, target, config_file)
+    assert not home.exists()
+    assert not (target / OWNER).exists()
+    assert (target / "src/calc.py").read_text().endswith("return a - b\n")
+
+
+def _initialize_droid_ci(tmp_path):
+    from millrace_plus.cicd_v2_runtime import initialize, prepare
+
+    home, target, config_file, _ = _droid_ci_preparation(tmp_path)
+    manifest = prepare(home, target, config_file)
+    result = initialize(
+        home, target, config_file,
+        authority_file=Path(manifest["suggested_authority_file"]),
+    )
+    return home, result["instance_id"], Path(manifest["state_home"])
+
+
+@pytest.mark.parametrize("surface", ["captured", "workflow"])
+def test_droid_repair_profile_drift_refuses_reload_and_role_reservation(
+    tmp_path, monkeypatch, surface,
+):
+    from cicd_support import event
+
+    from millrace_plus.cicd_source import git_head
+    from millrace_plus.cicd_v2_runtime import Runtime, V2Home
+
+    home_path, _, _ = _initialize_droid_ci(tmp_path)
+    home = V2Home(home_path)
+    accepted = home.submit(event(tmp_path, git_head(home.target)))
+    runtime = Runtime(home, home_path / "workflow")
+    root = home.workspace if surface == "captured" else home_path / "workflow"
+    profile = root / "repair-droid.json"
+    profile.write_bytes(profile.read_bytes() + b" ")
+    with pytest.raises(CicdV2Error):
+        V2Home(home_path)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("invalid profile reserved a repair attempt")
+
+    monkeypatch.setattr(runtime, "_reserve", forbidden)
+    with pytest.raises(CicdV2Error):
+        runtime._prepare_role({"input_id": accepted["input_id"]}, "repair", {})
+
+
+def test_droid_ci_uses_public_environment_settings_control_before_start(tmp_path):
+    from millrace_plus.cicd_v2_runtime import V2Home
+    from millrace_plus.router import control
+
+    home_path, instance, state_home = _initialize_droid_ci(tmp_path)
+    before = control.inspect_instance(instance, state_home=state_home)
+    names = [
+        "HOME", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR",
+        "FACTORY_DROID_AUTO_UPDATE_ENABLED",
+    ]
+    receipt = control.update_instance_config(
+        instance, settings={"env_allowlist": names}, state_home=state_home,
+        request_id="d" * 32, expected_state_version=before["state_version"],
+    )
+    assert receipt["status"] == "applied", receipt
+    after = control.inspect_instance(instance, state_home=state_home)
+    assert after["env_allowlist"] == names
+    for field in ("path", "host_paths", "runtime_defaults", "operator_policy"):
+        assert after[field] == before[field]
+    assert after["runs"] == []
+    # Authored files are no longer live authority after capture.
+    (tmp_path / "base/repair-droid.json").write_text("{}")
+    assert V2Home(home_path).instance() == instance
+
+
 def _admitted(graph: dict[str, object]):
     from millrace.router.graph import parse_graph
 

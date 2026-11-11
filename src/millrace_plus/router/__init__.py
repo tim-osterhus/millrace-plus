@@ -9,7 +9,7 @@ Public modules:
 - `millrace_plus.router.claude`: `claude_print` / `millrace-claude-print/v1`.
 - `millrace_plus.router.opencode`: `opencode_run` / `millrace-opencode-run/v1`.
 - `millrace_plus.router.droid`: `droid_exec` / `millrace-droid-exec/v1`,
-  a pinned read-only foreground contract; native qualification is separate.
+  profile-selected `read_only`/`auto_medium`; native qualification is separate.
 - `millrace_plus.router.resolver`: direct selection of these five exact pairs.
 - `millrace_plus.router.cli`: `python -m millrace_plus.router` and
   `millrace-plus router`, thin wrappers around the generic Core CLI `main`.

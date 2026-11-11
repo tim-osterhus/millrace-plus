@@ -287,6 +287,36 @@ selection uses the full configured set. Every ordered reviewer must accept
 current evidence with zero unresolved findings. Command-peer checks prove source
 behavior; they do not qualify native backends or effective model effort.
 
+V2 role bindings can select captured native profiles. A Droid `droid_exec`
+repair selection requires an exact valid Droid 0.247.0 profile with
+`permission_mode: "auto_medium"`; `read_only` may investigate/review but refuses
+repair. Pure config/graph validation checks the reference structure, not write
+authority. Preparation verifies the profile digest and contents before creating
+the home or claiming its target. Retained-home loading and repair admission
+recheck the captured bytes against that digest and the workflow control copy
+before constructing intake or reserving repair work. Missing, changed or invalid
+profiles refuse. The adapter uses the same profile parser for both roles.
+The bounded 2026-11-03 Linux trial passed with the exact recorded Core/Plus
+artifacts, Droid 0.247.0 and the selected existing Factory Pro OAuth/native-default
+route: one native repair, trusted deterministic checks, deterministic command-peer
+review, normal task close and an applied public main stop. This qualifies only
+that recorded artifact/route combination, without packet/release acceptance or
+a claim of native AI review. Prior read-only A/B/C evidence retains its original
+artifact scope; it does not transfer to other artifacts or modes.
+
+For an existing authenticated route, an operator can use the public
+`control.update_instance_config` after init and before the first run to extend
+`env_allowlist`, preserving path, host paths and other settings. Only explicitly
+allowed names reach the child from the actual controller environment; the
+allowlist does not supply values. For the selected Factory OAuth route, the
+known names are `HOME`, `DBUS_SESSION_BUS_ADDRESS`, `XDG_RUNTIME_DIR` and
+`FACTORY_DROID_AUTO_UPDATE_ENABLED` (set to `false` by the controller).
+This requires no account/configuration change and adds no CI environment API.
+Investigation, review and trusted checks can retain command bindings while only
+repair uses Droid. The repair prompt delegates checks to the trusted stage;
+medium native permissions do not widen the selected repair paths or authorize
+external effects.
+
 Command deadlines resolve through existing Core defaults, excluding the derived
 check node from their own calculation. The reproduce/checks node budgets are
 static sums plus operator-captured bookkeeping. Idle wait defaults to a one-second

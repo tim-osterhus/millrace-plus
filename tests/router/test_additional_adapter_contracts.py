@@ -18,6 +18,7 @@ from millrace.router.execution import (
     AdapterConfiguration,
     CompletionFacts,
     InvocationRequest,
+    LaunchPlan,
     RouterError,
 )
 from plus_support import create_instance, new_id, start_run, store_path
@@ -116,7 +117,7 @@ def invoke(plan, root, *, timeout=3, poll=lambda: False, started=lambda pid: Non
     return result
 
 
-def droid_flow(single_flow, **options):
+def droid_flow(single_flow, *, permission_mode="read_only", **options):
     workflow, project, home = single_flow
     graph = json.loads(workflow.read_text())
     graph["bindings"] = {"native": {
@@ -130,7 +131,9 @@ def droid_flow(single_flow, **options):
         "timeout_seconds": 3,
     }
     workflow.write_text(json.dumps(graph))
-    (workflow.parent / "droid.json").write_text(json.dumps(PROFILE))
+    (workflow.parent / "droid.json").write_text(json.dumps({
+        **PROFILE, "permission_mode": permission_mode,
+    }))
     (workflow.parent / "task.txt").write_text("Review the project.")
     return workflow, project, home
 
@@ -173,11 +176,17 @@ def test_droid_settings_precedence_and_omission(tmp_path):
             action()
 
 
-def test_droid_captured_authority_and_pure_reload(tmp_path, monkeypatch):
+@pytest.mark.parametrize("mode", ["read_only", "auto_medium"])
+def test_droid_captured_authority_and_pure_reload(tmp_path, monkeypatch, mode):
     req = request(tmp_path)
+    req = replace(req, files={
+        **req.files,
+        "droid.json": json.dumps({**PROFILE, "permission_mode": mode}).encode(),
+    })
     plan = c.plan(req)
     assert plan == c.plan(req)
     run_plan = prepared(tmp_path)
+    run_plan = c.plan(replace(req, executable=run_plan.argv[0]))
     result = invoke(run_plan, tmp_path)
     native = Path(run_plan.argv[0])
     native.unlink()
@@ -193,6 +202,26 @@ def test_droid_captured_authority_and_pure_reload(tmp_path, monkeypatch):
     assert c.plan(req) == plan
     original = facts(run_plan, result, result.adapter_evidence["pid"])
     c.validate_completion(run_plan, original)
+
+
+@pytest.mark.parametrize("mode", ["read_only", "auto_medium"])
+def test_droid_permission_profile_is_frozen_for_completed_run(single_flow, mode):
+    workflow, project, home = droid_flow(single_flow, permission_mode=mode)
+    instance = str(create_instance(workflow, project, state_home=home)["instance_id"])
+    run = start_run(instance, state_home=home)
+    assert run["status"] == "succeeded", run
+    launch = copy.deepcopy(run["invocations"][0]["launch"])
+    assert launch["details"]["permission_mode"] == mode
+    profile = workflow.parent / "droid.json"
+    profile.write_text(json.dumps({
+        **PROFILE,
+        "permission_mode": "read_only" if mode == "auto_medium" else "auto_medium",
+    }))
+    executable = json.loads(workflow.read_text())["bindings"]["native"]["executable"]
+    Path(executable).unlink()
+    later = control.inspect_run(instance, run["id"], state_home=home)
+    assert later["status"] == "succeeded"
+    assert later["invocations"][0]["launch"] == launch
 
 
 def test_droid_unused_binding_and_plane_settings_refuse(tmp_path):
@@ -351,6 +380,7 @@ def test_droid_live_edit_uses_producing_contract_and_new_routing_revision(
 @pytest.mark.parametrize("mutation", [
     "invocation", "plane", "node", "binding", "revision", "workspace",
     "adapter", "contract", "control_digest", "provenance", "coherent_wrong_plan",
+    "coherent_permission_escalation",
     "native_identity", "final_digest", "exit", "origin",
 ])
 def test_droid_store_authority_and_legal_aftermath(single_flow, mutation):
@@ -384,6 +414,26 @@ def test_droid_store_authority_and_legal_aftermath(single_flow, mutation):
             argv = list(launch["argv"])
             argv[argv.index("--model") + 1] = "foreign"
             launch["argv"], body["argv"] = argv, argv.copy()
+        elif mutation == "coherent_permission_escalation":
+            profile = single_flow[0].parent / "droid.json"
+            captured = profile.read_bytes()
+            assert json.loads(captured)["permission_mode"] == "read_only"
+            assert launch["details"]["profile_sha256"] == c.digest(captured)
+            assert launch["details"]["permission_mode"] == "read_only"
+            launch["details"]["permission_mode"] = "auto_medium"
+            argv = list(launch["argv"])
+            argv[8:8] = ["--auto", "medium"]
+            launch["argv"], body["argv"] = argv, argv.copy()
+            # This forgery is internally consistent. Only rebuilding against
+            # the unchanged producing profile can reject the escalated mode.
+            forged = LaunchPlan(
+                body["id"], launch["adapter_id"], launch["adapter_contract"],
+                tuple(argv), launch["environment"],
+                {c.PROMPT_NAME: Path(launch["details"]["prompt_path"]).read_bytes()},
+                launch["settings"], launch["details"],
+            )
+            assert c.launch_details(forged)["permission_mode"] == "auto_medium"
+            assert profile.read_bytes() == captured
         elif mutation == "native_identity":
             body["adapter_evidence"]["session_id"] = ""
         elif mutation == "final_digest":

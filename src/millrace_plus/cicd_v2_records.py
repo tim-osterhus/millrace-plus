@@ -217,8 +217,9 @@ NATIVE_BINDINGS = {
     "claude_print": "millrace-claude-print/v1",
     "droid_exec": "millrace-droid-exec/v1",
 }
-# Finite read-only contracts: may investigate or review, never claim write repair.
-READ_ONLY_ADAPTERS = frozenset({"droid_exec"})
+# Droid permissions depend on captured profile bytes. Structural validation
+# cannot establish write authority; runtime admission checks those exact bytes.
+READ_ONLY_ADAPTERS: frozenset[str] = frozenset()
 # Declared section 7.4 graph nodes; a consuming graph may pass its own subset.
 PHASES = (
     "reconcile",
@@ -1097,7 +1098,8 @@ def validate_config(
     With `policy` (the validated record behind `path_policy_ref`), expected
     products must be declared product paths, and repair, protected and
     exception prefixes must remain source. Identity is `config_digest` of the
-    exact retained bytes.
+    exact retained bytes. Role profile contents are checked separately at CI
+    preparation, retained-home load and repair admission, before any repair work.
     """
     code = "invalid_config_v2"
     obj = _record(value, _CONFIG_FIELDS, CONFIG, code)

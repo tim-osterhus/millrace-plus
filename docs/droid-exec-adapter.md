@@ -1,7 +1,16 @@
 # Factory Droid exec adapter
 
 `droid_exec` / `millrace-droid-exec/v1` selects one fresh foreground Droid
-0.247.0 `exec` invocation. This source candidate has no native route qualification.
+0.247.0 `exec` invocation. The bounded 2026-11-03 Linux `auto_medium` trial
+passed with the exact recorded Core/Plus artifacts, Droid 0.247.0 and the selected
+existing Factory Pro OAuth/native-default route. One actual native repair passed
+trusted deterministic checks and deterministic command-peer review, followed by
+normal task close and an applied public main stop. Qualification covers that
+recorded artifact/route combination only. Prior `read_only` A/B/C evidence retains
+its own artifact scope. This trial does not establish packet/release acceptance,
+other model/platform qualification, provider abort or independently attested
+authentication/billing properties. Native metadata does not attest effective
+model or reasoning effort.
 An ordinary installed fake uses the same public version and result protocol.
 Factory Droid remains an optional external executable, without a Python dependency.
 
@@ -40,10 +49,18 @@ and effort flags when present. A captured fixed wrapper requests Core's
 `json-v1` result and places the original task after formatting instructions.
 Original and materialized prompt hashes remain distinct. Stdin is closed.
 
-The fixed `read_only` policy emits no `--auto`, unsafe bypass, tool selector,
-settings overlay or hook/MCP/plugin suppression. Native managed policy remains
-effective. Read-only is a native permission policy, not a security sandbox or
-claim that native integrations create no side effects. Session continuation,
+The profile requires an explicit `permission_mode`. `read_only` retains the
+original argv without `--auto`. Opt-in `auto_medium` emits exactly
+`--auto medium`, Factory's local-development permission level, which permits
+file changes and ordinary local development commands. The mode is captured
+with the profile hash and cannot be overridden through model/effort setting
+layers. Saved read-only launches retain their original format and validation.
+Other permission modes, unsafe bypass, tool selectors and settings overlays
+are not accepted. Neither mode suppresses hooks/MCP/plugins; native managed
+policy remains effective. These are native permission policies, not security
+sandboxes or claims that native integrations create no side effects. The
+write profile does not grant workflow or operator authority to commit, publish
+or change unrelated files. Session continuation,
 fork, mission, spec, remote, worktree, RPC and ACP modes are excluded.
 
 Success requires one strict documented result object, `subtype=success`,

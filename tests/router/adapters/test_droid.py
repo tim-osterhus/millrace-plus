@@ -72,6 +72,71 @@ def test_modes_and_permission_policy_are_closed(tmp_path, field):
     ))
 
 
+@pytest.mark.parametrize("mode", ["read_only", "auto_medium"])
+def test_profile_permission_modes_capture_exact_native_argv(tmp_path, mode):
+    capture = tmp_path / "capture.json"
+    base = prepared(tmp_path, capture=str(capture))
+    req = request(tmp_path, executable=base.argv[0])
+    req = replace(req, files={
+        **req.files,
+        "droid.json": json.dumps({**PROFILE, "permission_mode": mode}).encode(),
+    })
+    c.validate_configuration(configuration(req))
+    plan = c.plan(req)
+    expected = (
+        base.argv[0], "exec", "-f", str(tmp_path / "invocation/droid-prompt.txt"),
+        "--cwd", str(tmp_path), "-o", "json",
+    )
+    if mode == "auto_medium":
+        expected += ("--auto", "medium")
+    assert plan.argv == expected
+    assert plan.details["permission_mode"] == mode
+    assert invoke(plan, tmp_path).stdout == FINAL
+    assert json.loads(capture.read_text())["argv"] == list(expected[1:])
+    # A native flag alone or a captured mode alone cannot change authority.
+    opposite = "read_only" if mode == "auto_medium" else "auto_medium"
+    for forged in (
+        replace(plan, details={**plan.details, "permission_mode": opposite}),
+        replace(plan, argv=(*base.argv, "--auto", "low")),
+        replace(plan, argv=(*base.argv, "--auto", "high")),
+        replace(plan, argv=(*plan.argv, "--skip-permissions-unsafe")),
+        replace(plan, argv=(
+            base.argv if mode == "auto_medium" else expected + ("--auto", "medium")
+        )),
+    ):
+        with pytest.raises(RouterError):
+            c.launch_details(forged)
+
+
+@pytest.mark.parametrize("mode", [
+    None, True, [], "auto_low", "auto_high", "medium", "auto",
+])
+def test_permission_modes_refuse_unselected_authority(tmp_path, mode):
+    req = request(tmp_path)
+    req = replace(req, files={
+        **req.files,
+        "droid.json": json.dumps({**PROFILE, "permission_mode": mode}).encode(),
+    })
+    with pytest.raises(RouterError):
+        c.plan(req)
+    with pytest.raises(RouterError):
+        c.validate_configuration(configuration(req))
+
+
+@pytest.mark.parametrize("layer", ["runtime", "workflow", "plane", "node"])
+def test_permission_mode_is_profile_only(tmp_path, layer):
+    req = request(tmp_path)
+    value = {"permission_mode": "auto_medium"}
+    if layer == "node":
+        req = replace(req, node_config={**req.node_config, **value})
+    else:
+        req = replace(req, **{layer: value})
+    with pytest.raises(RouterError):
+        c.plan(req)
+    with pytest.raises(RouterError):
+        c.validate_configuration(configuration(req))
+
+
 @pytest.mark.parametrize("raw", [
     b"{}", b"\xff", b'{"format":"x","format":"y"}',
     json.dumps({**PROFILE, "droid_version": "latest"}).encode(),
