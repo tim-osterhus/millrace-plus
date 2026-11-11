@@ -90,6 +90,8 @@ def test_production_imports_only_public_core_modules() -> None:
         "opencode_configuration.py",
         "pi.py",
         "preflight.py",
+        "prime.py",
+        "prime_configuration.py",
         "process.py",
         "resolver.py",
         "setting_layers.py",
@@ -112,6 +114,7 @@ def test_production_imports_only_public_core_modules() -> None:
         "codex_configuration.py",
         "opencode_configuration.py",
         "millforge_configuration.py",
+        "prime_configuration.py",
     ):
         _assert_pure_module(SOURCE / name)
 

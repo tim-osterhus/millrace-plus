@@ -13,6 +13,7 @@ from .droid import DroidExecAdapter  # noqa: E402
 from .millforge import MillforgeRunAdapter  # noqa: E402
 from .opencode import OpenCodeRunAdapter  # noqa: E402
 from .pi import PiJsonAdapter  # noqa: E402
+from .prime import PrimePrintAdapter  # noqa: E402
 
 
 def resolve_adapter(adapter_id: str, contract: str) -> ExecutionAdapter:
@@ -26,6 +27,8 @@ def resolve_adapter(adapter_id: str, contract: str) -> ExecutionAdapter:
         return OpenCodeRunAdapter()
     if (adapter_id, contract) == ("droid_exec", "millrace-droid-exec/v1"):
         return DroidExecAdapter()
+    if (adapter_id, contract) == ("prime_print", "millrace-prime-print/v1"):
+        return PrimePrintAdapter()
     if (adapter_id, contract) == ("millforge_run", "millrace-millforge-run/v1"):
         return MillforgeRunAdapter()
     raise RouterError("unsupported_adapter_contract", f"{adapter_id} {contract}")
