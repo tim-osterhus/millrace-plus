@@ -52,7 +52,7 @@ NATIVE_STATUSES = {
 }
 _PLAIN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ud800-\udfff<>]")
 _CLAIM = re.compile(
-    r"\b(?:guarantee\w*|definitely\s+fit|will\s+(?:fit|load|run))\b|"
+    r"\b(?:(?<!not )guarantee\w*|definitely\s+fit|will\s+(?:fit|load|run))\b|"
     r"\b\d+(?:\.\d+)?\s*(?:tokens?\s*/\s*s(?:ec)?|tps|tok/s|[kK]?\s*context)\b",
     re.IGNORECASE,
 )

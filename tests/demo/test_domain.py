@@ -262,6 +262,51 @@ def test_candidate_refusals(candidate, change):
         validate_candidate(candidate)
 
 
+def test_saved_no_web_candidate_accepts_its_negated_guarantee():
+    # Exact candidate content retained from the first D2 no-web journey. The
+    # native main completed; the old guarantee-token guard rejected its caveat.
+    candidate = {
+        "format": "millrace-demo-candidate/v1",
+        "research_status": "skipped",
+        "summary": "The baseline reports a Linux x86_64 host with 8 logical CPUs, "
+        "about 12.3 GB physical RAM and about 6.1 GB available, plus an Intel GPU "
+        "(0x8086:0x8a56) with unknown memory. On the CPU pool, the provisional "
+        "estimated context is 32768 tokens for Qwen2.5 3B Instruct Q4_K_M and "
+        "8192 for the 7B, while the 32B is marked insufficient_budget; loading "
+        "and fit are not guaranteed, and speed and prefill are unknown. Web "
+        "research was disabled, so no alternatives or published measurements "
+        "are proposed.",
+        "suggestions": [],
+        "published_measurements": [],
+    }
+    assert validate_candidate(candidate, no_web=True) == candidate
+
+
+@pytest.mark.parametrize("negation", ["not guaranteed", "NOT GUARANTEED"])
+def test_candidate_accepts_negated_guarantee(candidate, negation):
+    candidate["summary"] = f"Loading and fit are {negation}. Host speed is unknown."
+    assert validate_candidate(candidate, no_web=True) == candidate
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "Fit is guaranteed",
+        "It will definitely fit",
+        "It will load",
+        "It will run",
+        "Speed is 99 tokens/sec",
+        "It has 32k context",
+        "Loading is not guaranteed, but will fit",
+        "Loading is not guaranteed, but fit is guaranteed",
+    ],
+)
+def test_negated_guarantee_does_not_hide_unsupported_claims(candidate, claim):
+    candidate["summary"] = f"{claim}. Host speed is unknown."
+    with pytest.raises(DemoError, match="unsupported_candidate_claim"):
+        validate_candidate(candidate, no_web=True)
+
+
 def test_candidate_sources_no_web_and_oversize(candidate):
     candidate["research_status"] = "completed"
     candidate["suggestions"] = [
