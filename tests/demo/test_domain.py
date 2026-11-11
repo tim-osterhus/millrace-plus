@@ -282,6 +282,26 @@ def test_saved_no_web_candidate_accepts_its_negated_guarantee():
     assert validate_candidate(candidate, no_web=True) == candidate
 
 
+def test_saved_no_web_candidate_accepts_provisional_baseline_context():
+    # Exact candidate content from the second D2 no-web journey. Its context
+    # numbers restate the baseline; they introduce no suggestion or measurement.
+    candidate = {
+        "format": "millrace-demo-candidate/v1",
+        "research_status": "skipped",
+        "summary": "The baseline reports a Linux x86_64 host with 8 logical CPUs, "
+        "12300804096 bytes of physical RAM and 6121086976 bytes available, with "
+        "GPU memory unknown. Its provisional CPU estimates are 32768 context "
+        "tokens for Qwen2.5 3B Instruct Q4_K_M, 8192 for Qwen2.5 7B Instruct "
+        "Q4_K_M, and insufficient budget for Qwen2.5 32B Instruct Q4_K_M; "
+        "loading and fit are not guaranteed, and speed and prefill are unknown "
+        "because no model was run. Web research was disabled, so no alternatives "
+        "or published measurements are proposed.",
+        "suggestions": [],
+        "published_measurements": [],
+    }
+    assert validate_candidate(candidate, no_web=True) == candidate
+
+
 @pytest.mark.parametrize("negation", ["not guaranteed", "NOT GUARANTEED"])
 def test_candidate_accepts_negated_guarantee(candidate, negation):
     candidate["summary"] = f"Loading and fit are {negation}. Host speed is unknown."
@@ -296,15 +316,45 @@ def test_candidate_accepts_negated_guarantee(candidate, negation):
         "It will load",
         "It will run",
         "Speed is 99 tokens/sec",
-        "It has 32k context",
+        "Speed is 99 tps",
         "Loading is not guaranteed, but will fit",
         "Loading is not guaranteed, but fit is guaranteed",
     ],
 )
-def test_negated_guarantee_does_not_hide_unsupported_claims(candidate, claim):
-    candidate["summary"] = f"{claim}. Host speed is unknown."
+@pytest.mark.parametrize("field", ["summary", "rationale"])
+def test_negated_guarantee_does_not_hide_unsupported_claims(candidate, claim, field):
+    if field == "summary":
+        candidate["summary"] = f"{claim}. Host speed is unknown."
+    else:
+        candidate["research_status"] = "completed"
+        candidate["suggestions"] = [
+            {
+                "model_id": "model",
+                "artifact_url": "https://example.com/model",
+                "source_urls": ["https://example.com/source"],
+                "rationale": claim,
+            }
+        ]
     with pytest.raises(DemoError, match="unsupported_candidate_claim"):
-        validate_candidate(candidate, no_web=True)
+        validate_candidate(candidate)
+
+
+@pytest.mark.parametrize(
+    "rationale",
+    ["It has 32k context", "Its provisional estimate is 32768 context tokens"],
+)
+def test_suggestion_cannot_introduce_numerical_context(candidate, rationale):
+    candidate["research_status"] = "completed"
+    candidate["suggestions"] = [
+        {
+            "model_id": "model",
+            "artifact_url": "https://example.com/model",
+            "source_urls": ["https://example.com/source"],
+            "rationale": rationale,
+        }
+    ]
+    with pytest.raises(DemoError, match="unsupported_candidate_claim"):
+        validate_candidate(candidate)
 
 
 def test_candidate_sources_no_web_and_oversize(candidate):

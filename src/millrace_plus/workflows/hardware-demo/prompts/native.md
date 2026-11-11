@@ -9,8 +9,12 @@ Optionally research up to three current alternatives using already permitted
 usable web tools. No new tool or MCP server may be installed or enabled. Give
 2–3 short factual sentences (at most 1200 characters) based on the baseline.
 Keep estimated context provisional; loading/fit are not guaranteed and this
-host's speed/prefill are unknown. Do not assert numerical fit or performance for
-suggestions. Never replace hardware, frozen reference numbers or display.
+host's speed/prefill are unknown. Summary numbers must come from baseline.json;
+any quoted context estimate must remain explicitly provisional. Do not invent
+new estimates or host measurements. The summary is unverified model
+interpretation, not a factual verification of the baseline. Do not assert
+numerical fit, context or performance for suggestions. Never replace hardware,
+frozen reference numbers or display.
 
 Write strict UTF-8 JSON, at most 32768 bytes, with exactly:
 {"format":"millrace-demo-candidate/v1","research_status":"completed|unavailable|partial|skipped","summary":"Two or three sentences.","suggestions":[],"published_measurements":[]}

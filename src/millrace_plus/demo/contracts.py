@@ -53,9 +53,12 @@ NATIVE_STATUSES = {
 _PLAIN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ud800-\udfff<>]")
 _CLAIM = re.compile(
     r"\b(?:(?<!not )guarantee\w*|definitely\s+fit|will\s+(?:fit|load|run))\b|"
-    r"\b\d+(?:\.\d+)?\s*(?:tokens?\s*/\s*s(?:ec)?|tps|tok/s|[kK]?\s*context)\b",
+    r"\b\d+(?:\.\d+)?\s*(?:tokens?\s*/\s*s(?:ec)?|tps|tok/s)\b",
     re.IGNORECASE,
 )
+# Summaries may restate provisional baseline context; suggestion rationales
+# cannot introduce numerical context estimates for another model.
+_CONTEXT_CLAIM = re.compile(r"\b\d+(?:\.\d+)?\s*[kK]?\s*context\b", re.IGNORECASE)
 
 
 class DemoError(ValueError):
@@ -290,7 +293,8 @@ def validate_candidate(value: object, *, no_web: bool = False) -> dict[str, Any]
             raise DemoError("missing_candidate_source")
         for url in urls:
             safe_url(url)
-        if _CLAIM.search(_text(suggestion["rationale"], 400)):
+        rationale = _text(suggestion["rationale"], 400)
+        if _CLAIM.search(rationale) or _CONTEXT_CLAIM.search(rationale):
             raise DemoError("unsupported_candidate_claim")
     for measurement in _list(obj["published_measurements"], 3):
         measurement = _object(
