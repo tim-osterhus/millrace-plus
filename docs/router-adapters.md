@@ -387,9 +387,23 @@ Redaction is not universal data-loss prevention.
 After normal root exit, the adapter drains and polls until natural foreground
 group closure or the invocation deadline. A short-lived native descendant can
 close normally. Cancel, timeout or output/delivery failure starts bounded
-TERM/KILL cleanup; forced cleanup yields `may_live` and no semantic result.
-Supported reconciliation precedes further work. Native sessions are never
-resumed by this adapter.
+TERM/KILL cleanup. Cancellation may return `cancelled` with writer `stopped`
+only after the adapter reaps its live-owned root, closes stdin, observes real
+stdout/stderr EOF and confirms the original process group is absent. All facts
+must be observed before the existing five-second cleanup bound expires.
+Cancellation produces no semantic result, including when valid output arrived
+before cleanup. Missing closure facts, permission uncertainty or an expired
+cleanup bound retain `may_live`. Timeout and output/delivery failure also retain
+`may_live` after forced cleanup. Supported reconciliation remains necessary for
+uncertain writers before further work. The adapter never reconciles a writer
+automatically and never resumes a native session.
+
+New cleanup observations use the optional, versioned `cleanup` evidence object
+within `millrace-claude-print-result/v1`. It records the owned root identity,
+cleanup return reason and observed closure facts. Completion validation requires
+that proof for a launched cancellation reported as `stopped`. Historical
+evidence without this object remains readable unchanged and acquires no new
+closure claim.
 
 Permission bypass is not a sandbox; use only trusted workspaces. Managed policy
 can reject bypass or silently auto-deny prompts, which the adapter does not

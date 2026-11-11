@@ -53,6 +53,22 @@ def test_nonterminal_native_requires_explicit_consent(command, monkeypatch):
     assert command[0][0].native == {"selected": True} and command[0][0].no_web
 
 
+@pytest.mark.parametrize("status", [130, 1])
+def test_native_cancel_closeout_status_reaches_cli(command, monkeypatch, status):
+    from millrace_plus.demo import coordinator
+
+    monkeypatch.setattr(discovery, "select_native", lambda *a: {"selected": True})
+    monkeypatch.setattr(discovery, "consent_description", lambda *a, **k: "disclosure")
+
+    def run(options, versions):
+        command.append((options, versions))
+        return status
+
+    monkeypatch.setattr(coordinator, "run_demo", run)
+    assert cli.main(["--native", "claude_print", "--consent-native"]) == status
+    assert len(command) == 1 and command[0][0].native_consent is True
+
+
 def test_candidate_checks_contracts_without_equal_versions(monkeypatch):
     monkeypatch.setattr(cli.sys, "version_info", (3, 12))
     monkeypatch.setattr(

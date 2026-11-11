@@ -8,10 +8,11 @@ import subprocess
 import time
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from claude_support import FINAL, config, envelope, fake, request
+from claude_support import FINAL, cleanup_proof, config, envelope, fake, request
 from millrace.router.execution import CompletionFacts, RouterError
 
 from millrace_plus.router import claude as c
@@ -362,11 +363,14 @@ def test_process_controls_and_writer_uncertainty(tmp_path: Path, case: str) -> N
             run(plan, tmp_path, started=started)
     else:
         result = run(plan, tmp_path, timeout=timeout, poll=poll, started=started)
-        if case in {"large_prompt", "delayed_child", "duplex"}:
+        if case in {"large_prompt", "delayed_child", "duplex", "cancel"}:
+            expected = "cancelled" if case == "cancel" else "completed"
             assert (
-                result.classification == "completed"
-                and result.writer_state == "stopped"
+                result.classification == expected and result.writer_state == "stopped"
             )
+            if case == "cancel":
+                assert result.stdout == b""
+                assert result.adapter_evidence["cleanup"] == cleanup_proof(pids[0])
         else:
             assert (
                 result.stdout == b""
@@ -376,6 +380,181 @@ def test_process_controls_and_writer_uncertainty(tmp_path: Path, case: str) -> N
     for pid in pids:
         with pytest.raises(ProcessLookupError):
             os.kill(pid, 0)
+
+
+@pytest.mark.parametrize(
+    "missing",
+    [
+        None,
+        "root_reaped",
+        "stdin_closed",
+        "stdout_eof",
+        "stderr_eof",
+        "group_present",
+        "group_unknown",
+        "deadline",
+        "earlier_timeout",
+    ],
+)
+def test_cancellation_cleanup_requires_each_live_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing: str | None
+) -> None:
+    class Pipe:
+        def __init__(self, descriptor: int) -> None:
+            self.descriptor, self.closed = descriptor, False
+
+        def fileno(self) -> int:
+            return self.descriptor
+
+        def close(self) -> None:
+            self.closed = True
+
+    pipes = {name: Pipe(fd) for fd, name in enumerate(("stdin", "stdout", "stderr"))}
+    child = SimpleNamespace(
+        pid=123,
+        **pipes,
+        poll=lambda: None if missing == "root_reaped" else -15,
+    )
+
+    class Selector:
+        def __init__(self) -> None:
+            self.keys: dict[Pipe, Any] = {}
+
+        def register(self, pipe: Pipe, event: int, name: str) -> None:
+            self.keys[pipe] = SimpleNamespace(fileobj=pipe, fd=pipe.fileno(), data=name)
+
+        def unregister(self, pipe: Pipe) -> None:
+            del self.keys[pipe]
+
+        def select(self, timeout: float) -> list[tuple[Any, int]]:
+            return [
+                (key, 0)
+                for key in self.keys.values()
+                if not (key.data == "stdin" and missing == "stdin_closed")
+            ]
+
+        def close(self) -> None:
+            self.keys.clear()
+
+    elapsed = 0.0
+
+    def clock() -> float:
+        nonlocal elapsed
+        elapsed += 6 if missing == "deadline" else 0.25
+        return elapsed
+
+    def read(fd: int, count: int) -> bytes:
+        if missing == ("stdout_eof" if fd == 1 else "stderr_eof"):
+            raise BlockingIOError
+        return b""
+
+    groups = {"group_present": "present", "group_unknown": "unknown"}
+    started = []
+    polls = 0
+    group_reads = 0
+
+    def poll() -> bool:
+        nonlocal polls
+        if not started:
+            return False
+        polls += 1
+        return not (missing == "earlier_timeout" and polls == 1)
+
+    def group(pid: int) -> str:
+        nonlocal group_reads
+        group_reads += 1
+        if missing == "earlier_timeout" and group_reads == 1:
+            return "present"
+        return groups.get(missing, "absent")
+
+    monkeypatch.setattr(c.subprocess, "Popen", lambda *a, **kw: child)
+    monkeypatch.setattr(c.selectors, "DefaultSelector", Selector)
+    monkeypatch.setattr(
+        c,
+        "os",
+        SimpleNamespace(
+            name="posix",
+            set_blocking=lambda *a: None,
+            killpg=lambda *a: None,
+            read=read,
+        ),
+    )
+    monkeypatch.setattr(c, "time", SimpleNamespace(monotonic=clock, time=lambda: 0))
+    monkeypatch.setattr(c, "_group", group)
+    result = c._process(
+        ("inert",),
+        tmp_path,
+        {},
+        0.1 if missing == "earlier_timeout" else 100,
+        poll,
+        started.append,
+        b"prompt",
+        1024,
+        1024,
+    )
+    proof = result.cleanup
+    expected = "timeout" if missing == "earlier_timeout" else "cancelled"
+    assert result.transport == expected and started == [123]
+    assert result.writer == ("stopped" if missing is None else "may_live")
+    assert proof == cleanup_proof(
+        return_reason="confirmed"
+        if missing in {None, "earlier_timeout"}
+        else "deadline",
+        root_reaped=missing != "root_reaped",
+        stdin_closed=missing != "stdin_closed",
+        stdout_eof=missing != "stdout_eof",
+        stderr_eof=missing != "stderr_eof",
+        group_state=groups.get(missing, "absent"),
+    )
+    # finally closes descriptors, but cannot upgrade an unobserved EOF/close fact.
+    assert all(pipe.closed for pipe in pipes.values())
+
+
+@pytest.mark.parametrize(
+    "error,expected",
+    [(None, "present"), (ProcessLookupError, "absent"), (PermissionError, "unknown")],
+)
+def test_group_absence_requires_a_positive_lookup(
+    monkeypatch: pytest.MonkeyPatch, error: type[OSError] | None, expected: str
+) -> None:
+    def lookup(pid: int, sig: int) -> None:
+        assert (pid, sig) == (123, 0)
+        if error is not None:
+            raise error
+
+    monkeypatch.setattr(c, "os", SimpleNamespace(killpg=lookup))
+    assert c._group(123) == expected
+
+
+@pytest.mark.parametrize("ignore_term", [False, True])
+def test_cancelled_cleanup_keeps_no_semantics_after_term_or_kill(
+    tmp_path: Path, ignore_term: bool
+) -> None:
+    ready = tmp_path / "ready"
+    wire = json.dumps(envelope()).encode()
+    handler = (
+        "signal.SIG_IGN"
+        if ignore_term
+        else f"lambda *_: (os.write(1, {wire!r}), sys.exit(0))"
+    )
+    before = (
+        f"signal.signal(signal.SIGTERM, {handler});"
+        f"Path({str(ready)!r}).write_text('ready');time.sleep(10)"
+    )
+    pids = []
+    result = run(
+        prepared(tmp_path, before=before),
+        tmp_path,
+        poll=ready.exists,
+        started=pids.append,
+    )
+    assert result.classification == "cancelled" and result.writer_state == "stopped"
+    assert result.stdout == b"" and result.diagnostic == "claude_cancelled"
+    assert result.adapter_evidence["native_stdout_bytes"] == (
+        0 if ignore_term else len(wire)
+    )
+    assert result.adapter_evidence["semantic_sha256"] is None
+    assert result.adapter_evidence["cleanup"] == cleanup_proof(pids[0])
 
 
 def test_failure_diagnostics_preserve_cause_and_scrub_secrets(
@@ -444,6 +623,153 @@ def test_completion_evidence_integrity(tmp_path: Path, version: str) -> None:
             replace(plan, details={**plan.details, "expected_version": "2.1.306"}),
             facts,
         )
+
+
+@pytest.mark.parametrize("version", ["2.1.296", "2.1.305"])
+@pytest.mark.parametrize("phase", ["main", "probe"])
+def test_cancelled_stopped_requires_matching_cleanup_evidence(
+    tmp_path: Path, version: str, phase: str
+) -> None:
+    plan = c.ClaudePrintAdapter().plan(request(tmp_path, claude_version=version))
+    evidence = {
+        **c._evidence(plan.invocation_id),
+        "phase": phase,
+        "observed_version": version if phase == "main" else None,
+        "probe_pid": 321 if phase == "main" else 123,
+        "terminal_state": "error",
+        "failure_code": "claude_cancelled",
+        "cleanup": cleanup_proof(),
+    }
+    facts = CompletionFacts(
+        plan.invocation_id,
+        123 if phase == "main" else None,
+        b"",
+        b"",
+        "cancelled",
+        "stopped",
+        "claude_cancelled",
+        -15,
+        evidence,
+        "adapter",
+    )
+    adapter = c.ClaudePrintAdapter()
+    adapter.validate_completion(plan, facts)
+    legacy = {key: value for key, value in evidence.items() if key != "cleanup"}
+    adapter.validate_completion(
+        plan, replace(facts, writer_state="may_live", evidence=legacy)
+    )
+    with pytest.raises(RouterError, match="completion_integrity"):
+        adapter.validate_completion(plan, replace(facts, evidence=legacy))
+    uncertain = {**evidence, "cleanup": cleanup_proof(return_reason="deadline")}
+    adapter.validate_completion(
+        plan, replace(facts, writer_state="may_live", evidence=uncertain)
+    )
+    with pytest.raises(RouterError, match="completion_integrity"):
+        adapter.validate_completion(plan, replace(facts, evidence=uncertain))
+    timeout = {**evidence, "failure_code": "claude_timeout"}
+    adapter.validate_completion(
+        plan,
+        replace(
+            facts,
+            transport="timeout",
+            writer_state="may_live",
+            diagnostic="claude_timeout",
+            evidence=timeout,
+        ),
+    )
+    with pytest.raises(RouterError, match="completion_integrity"):
+        adapter.validate_completion(
+            plan,
+            replace(
+                facts,
+                transport="timeout",
+                diagnostic="claude_timeout",
+                evidence=timeout,
+            ),
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "format",
+        "wrong_pid",
+        "bool_pid",
+        "zero_pid",
+        "return_reason",
+        "root_reaped",
+        "stdin_closed",
+        "stdout_eof",
+        "stderr_eof",
+        "group_state",
+        "unknown_group",
+        "bool_fact",
+        "missing_field",
+        "extra_field",
+        "exit_code",
+        "null_exit",
+        "failure_code",
+        "unstarted",
+        "preflight",
+    ],
+)
+def test_invalid_cleanup_proof_cannot_assert_stopped(
+    tmp_path: Path, mutation: str
+) -> None:
+    plan = c.ClaudePrintAdapter().plan(request(tmp_path))
+    proof = cleanup_proof()
+    evidence = {
+        **c._evidence(plan.invocation_id),
+        "phase": "main",
+        "observed_version": "2.1.296",
+        "probe_pid": 321,
+        "terminal_state": "error",
+        "failure_code": "claude_cancelled",
+        "cleanup": proof,
+    }
+    facts = CompletionFacts(
+        plan.invocation_id,
+        123,
+        b"",
+        b"",
+        "cancelled",
+        "stopped",
+        "claude_cancelled",
+        -15,
+        evidence,
+        "adapter",
+    )
+    replacements = {
+        "format": ("format", "unknown"),
+        "wrong_pid": ("root_pid", 124),
+        "bool_pid": ("root_pid", True),
+        "zero_pid": ("root_pid", 0),
+        "return_reason": ("return_reason", "unknown"),
+        "group_state": ("group_state", "present"),
+        "unknown_group": ("group_state", "unknown"),
+        "bool_fact": ("stdout_eof", 1),
+    }
+    if mutation in replacements:
+        key, value = replacements[mutation]
+        proof[key] = value
+    elif mutation in {"root_reaped", "stdin_closed", "stdout_eof", "stderr_eof"}:
+        proof[mutation] = False
+    elif mutation == "missing_field":
+        del proof["stdout_eof"]
+    elif mutation == "extra_field":
+        proof["unexpected"] = True
+    elif mutation in {"exit_code", "null_exit"}:
+        facts = replace(facts, exit_code=True if mutation == "exit_code" else None)
+    elif mutation == "failure_code":
+        evidence["failure_code"] = "claude_timeout"
+        facts = replace(facts, diagnostic="claude_timeout")
+    elif mutation == "unstarted":
+        facts = replace(facts, pid=None)
+    else:
+        evidence.update(phase="preflight", observed_version=None, probe_pid=None)
+        facts = replace(facts, pid=None)
+    with pytest.raises(RouterError, match="completion_integrity"):
+        c.ClaudePrintAdapter().validate_completion(plan, facts)
 
 
 @pytest.mark.parametrize(

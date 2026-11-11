@@ -43,6 +43,7 @@ SUPPORTED_CLAUDE_VERSIONS = frozenset({"2.1.296", CLAUDE_VERSION})
 PROFILE_FORMAT = "millrace-claude-print-profile/v1"
 LAUNCH_FORMAT = "millrace-claude-print-launch/v1"
 RESULT_FORMAT = "millrace-claude-print-result/v1"
+CLEANUP_FORMAT = "millrace-claude-cleanup/v1"
 PROMPT_NAME = "claude-prompt.txt"
 SCHEMA_NAME = "claude-result-schema.json"
 SETTINGS = {"model", "reasoning_effort"}
@@ -229,16 +230,17 @@ class _Process:
     transport: str
     writer: str
     failure: str | None
+    cleanup: dict[str, object] | None = None
 
 
-def _group(pid: int) -> bool:
+def _group(pid: int) -> str:
     try:
         os.killpg(pid, 0)
-        return True
+        return "present"
     except ProcessLookupError:
-        return False
+        return "absent"
     except PermissionError:
-        return True
+        return "unknown"
 
 
 def _process(
@@ -306,6 +308,7 @@ def _process(
     selector = selectors.DefaultSelector()
     output = {"stdout": bytearray(), "stderr": bytearray()}
     counts = {"stdout": 0, "stderr": 0}
+    eof = {"stdout": False, "stderr": False}
     digest = hashlib.sha256()
     offset = 0
     reason: str | None = None
@@ -368,6 +371,7 @@ def _process(
                 except BlockingIOError:
                     continue
                 if not chunk:
+                    eof[str(key.data)] = True
                     selector.unregister(pipe)
                     continue
                 name = str(key.data)
@@ -384,10 +388,33 @@ def _process(
                 fail("execution_failure", "claude_stdin_failure")
             # Normal root exit never starts cleanup. Native foreground children
             # get the same invocation deadline to close their pipes and group.
-            closed = not selector.get_map()
-            if (code is not None and closed and not _group(child.pid)) or (
-                cleanup is not None and time.monotonic() - cleanup >= 5
-            ):
+            group = (
+                _group(child.pid)
+                if code is not None or cleanup is not None
+                else "present"
+            )
+            closed = (
+                code is not None
+                and child.stdin.closed
+                and eof["stdout"]
+                and eof["stderr"]
+                and group == "absent"
+            )
+            expired = cleanup is not None and time.monotonic() - cleanup >= 5
+            if closed or expired:
+                confirmed = closed and not expired
+                proof: dict[str, object] | None = None
+                if cleanup is not None:
+                    proof = {
+                        "format": CLEANUP_FORMAT,
+                        "root_pid": child.pid,
+                        "return_reason": "confirmed" if confirmed else "deadline",
+                        "root_reaped": code is not None,
+                        "stdin_closed": child.stdin.closed,
+                        "stdout_eof": eof["stdout"],
+                        "stderr_eof": eof["stderr"],
+                        "group_state": group,
+                    }
                 finished = True
                 return _Process(
                     bytes(output["stdout"]),
@@ -398,8 +425,11 @@ def _process(
                     child.pid,
                     code,
                     reason or ("completed" if code == 0 else "execution_failure"),
-                    "may_live" if cleanup is not None else "stopped",
+                    "stopped"
+                    if cleanup is None or (reason == "cancelled" and confirmed)
+                    else "may_live",
                     failure or (None if code == 0 else "claude_native_exit"),
+                    proof,
                 )
     finally:
         selector.close()
@@ -565,6 +595,41 @@ def _evidence(invocation: str) -> dict[str, object]:
     }
 
 
+def _cleanup_proof(value: object, pid: object, exit_code: int | None) -> bool:
+    proof = fields(
+        value,
+        {
+            "format",
+            "root_pid",
+            "return_reason",
+            "root_reaped",
+            "stdin_closed",
+            "stdout_eof",
+            "stderr_eof",
+            "group_state",
+        },
+    )
+    facts = ("root_reaped", "stdin_closed", "stdout_eof", "stderr_eof")
+    if (
+        proof["format"] != CLEANUP_FORMAT
+        or type(proof["root_pid"]) is not int
+        or proof["root_pid"] <= 0
+        or proof["root_pid"] != pid
+        or proof["return_reason"] not in {"confirmed", "deadline"}
+        or any(type(proof[key]) is not bool for key in facts)
+        or proof["group_state"] not in {"absent", "present", "unknown"}
+        or (exit_code is not None and type(exit_code) is not int)
+        or proof["root_reaped"] != (exit_code is not None)
+    ):
+        raise RouterError("completion_integrity")
+    confirmed = all(proof[key] is True for key in facts) and (
+        proof["group_state"] == "absent"
+    )
+    if proof["return_reason"] == "confirmed" and not confirmed:
+        raise RouterError("completion_integrity")
+    return confirmed and proof["return_reason"] == "confirmed"
+
+
 def _terminal(raw: bytes) -> tuple[dict[str, object] | None, bytes, str | None]:
     try:
         value = strict_json(raw)
@@ -714,6 +779,8 @@ class ClaudePrintAdapter:
             4096,
         )
         evidence["probe_pid"] = probe.pid
+        if probe.cleanup is not None:
+            evidence["cleanup"] = probe.cleanup
         banner = f"{expected_version} (Claude Code)".encode()
         if probe.transport != "completed" or probe.stdout not in (
             banner,
@@ -760,6 +827,8 @@ class ClaudePrintAdapter:
             native_stdout_sha256=result.stdout_sha256,
             native_stderr_bytes=result.stderr_bytes,
         )
+        if result.cleanup is not None:
+            evidence["cleanup"] = result.cleanup
         obj: dict[str, object] | None = None
         semantic = b""
         failure = result.failure
@@ -824,7 +893,7 @@ class ClaudePrintAdapter:
     ) -> None:
         try:
             details = _details(plan)
-            e = fields(completion.evidence, EVIDENCE_FIELDS)
+            e = fields(completion.evidence, EVIDENCE_FIELDS, {"cleanup"})
             if (
                 completion.invocation_id != plan.invocation_id
                 or e["invocation_id"] != plan.invocation_id
@@ -899,6 +968,31 @@ class ClaudePrintAdapter:
                 raise RouterError("completion_integrity")
             if e["phase"] == "preflight" and (
                 e["probe_pid"] is not None or e["terminal_state"] != "not_started"
+            ):
+                raise RouterError("completion_integrity")
+            process_pid = completion.pid if e["phase"] == "main" else e["probe_pid"]
+            confirmed_cleanup = False
+            if "cleanup" in e:
+                if (
+                    e["phase"] == "preflight"
+                    or process_pid is None
+                    or completion.transport == "completed"
+                ):
+                    raise RouterError("completion_integrity")
+                confirmed_cleanup = _cleanup_proof(
+                    e["cleanup"], process_pid, completion.exit_code
+                )
+                if completion.writer_state != "may_live" and not (
+                    completion.transport == "cancelled" and confirmed_cleanup
+                ):
+                    raise RouterError("completion_integrity")
+            if (
+                completion.transport == "cancelled"
+                and process_pid is not None
+                and completion.writer_state == "stopped"
+                and (
+                    not confirmed_cleanup or completion.diagnostic != "claude_cancelled"
+                )
             ):
                 raise RouterError("completion_integrity")
             if completion.transport == "completed":

@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 from urllib.parse import urlsplit, urlunsplit
 
-from millrace_plus.workflow_os_client import WorkflowOSClient
+from millrace_plus.subworkflow_records import SubworkflowError, public_request_digest
+from millrace_plus.workflow_os_client import WorkflowOSClient, validate_call
 
 from .contracts import (
     DemoError,
@@ -529,26 +530,49 @@ class Coordinator:
         )
         child_exited = False if self.service_start_attempted else self.handle is None
         shutdown: dict[str, Any] = {}
+        joins_confirmed = False
+        snapshot_saved = False
+        cancel: dict[str, Any] | None = None
         deadline = time.monotonic() + 15
         try:
             if self.run_id is not None:
                 summary = self._summary()
                 if summary["status"] not in {"succeeded", "failed", "cancelled"}:
                     self.cancelled = self.cancelled or self.stop_source is not None
-                    observed = self._submit(
+                    cancel = self._submit(
                         "cancel_run", {}, version=None, deadline=deadline
                     )
-                    self._await_stop_join(observed, deadline=deadline)
-                while True:
+            while True:
+                joins_confirmed = self._refresh_saved_joins(deadline=deadline)
+                if cancel is not None:
+                    cancel_id = cancel.get("request_id")
+                    cancel = next(
+                        (row for row in self.calls if row["request_id"] == cancel_id),
+                        cancel,
+                    )
+                    if (
+                        self._joined(cancel)
+                        and (cancel.get("core_receipt") or {}).get("status")
+                        != "applied"
+                    ):
+                        raise DemoError("cancel_refused")
+                if self.run_id is not None:
                     summary = self._summary()
                     stopped = summary.get("quiescent") is True and not summary.get(
                         "inflight_invocations"
                     )
-                    if stopped:
-                        break
+                if stopped and joins_confirmed:
                     if time.monotonic() >= deadline:
-                        raise DemoError("writer_closure_not_observed")
-                    time.sleep(min(0.2, max(0, deadline - time.monotonic())))
+                        raise DemoError("cleanup_observation_expired")
+                    break
+                if time.monotonic() >= deadline:
+                    raise DemoError(
+                        "control_join_not_observed"
+                        if not joins_confirmed
+                        else "writer_closure_not_observed"
+                    )
+                time.sleep(min(0.2, max(0, deadline - time.monotonic())))
+            if self.run_id is not None:
                 if summary["status"] in {"succeeded", "failed", "cancelled"}:
                     self.graph_completed_at = self.graph_completed_at or _now()
         except Exception as exc:
@@ -556,6 +580,15 @@ class Coordinator:
                 str(exc) if isinstance(exc, DemoError) else type(exc).__name__
             )
         finally:
+            try:
+                if not joins_confirmed:
+                    joins_confirmed = self._refresh_saved_joins(deadline=deadline)
+                self._write_join_snapshot()
+                snapshot_saved = True
+            except Exception as exc:
+                self.error = self.error or (
+                    str(exc) if isinstance(exc, DemoError) else type(exc).__name__
+                )
             if self.handle is not None:
                 try:
                     self.handle.finish(cancel=self.cancelled or self.error is not None)
@@ -600,6 +633,9 @@ class Coordinator:
             )
         confirmed = (
             stopped
+            and joins_confirmed
+            and snapshot_saved
+            and self.error is None
             and child_exited
             and shutdown.get("workers_drained") is True
             and shutdown.get("service_stopped") is True
@@ -644,7 +680,12 @@ class Coordinator:
         except (OSError, ValueError):
             self.error = self.error or "export_failed"
         removed = False
-        if not self.options.keep_demo:
+        if (
+            not self.options.keep_demo
+            and joins_confirmed
+            and snapshot_saved
+            and self.error is None
+        ):
             removed = cleanup_root(
                 self.root,
                 self.owner,
@@ -817,16 +858,102 @@ class Coordinator:
         _validate_execution(record)
         return record
 
-    def _await_stop_join(self, observed: dict[str, Any], *, deadline: float) -> None:
-        # Cancel receipt and writer observation share the original cleanup window.
-        end = deadline
-        while not self._joined(observed):
-            if time.monotonic() >= end:
-                raise DemoError("cancel_observation_expired")
-            time.sleep(0.2)
-            observed = self._observe(deadline=end)
-        if (observed.get("core_receipt") or {}).get("status") != "applied":
-            raise DemoError("cancel_refused")
+    def _refresh_saved_joins(self, *, deadline: float) -> bool:
+        """Refresh every pending original identity without POST or a new budget."""
+        saved = {row["request_id"]: row for row in self.calls}
+        joined = True
+        for request in self.requests:
+            observed = saved.get(request["request_id"])
+            if observed is not None:
+                try:
+                    validate_call(observed, "demo", request)
+                except Exception as exc:
+                    self.calls = [
+                        row
+                        for row in self.calls
+                        if row["request_id"] != request["request_id"]
+                    ]
+                    observed = None
+                    self.error = self.error or (
+                        str(exc)
+                        if isinstance(exc, SubworkflowError)
+                        else type(exc).__name__
+                    )
+            try:
+                if observed is None or not self._joined(observed):
+                    if time.monotonic() >= deadline:
+                        raise DemoError("control_join_not_observed")
+                    assert self.client is not None
+                    fresh = self.client.observe(request, deadline=deadline)
+                    validate_call(fresh, "demo", request)
+                    if time.monotonic() >= deadline:
+                        raise DemoError("control_join_not_observed")
+                    observed = fresh
+                    self._remember(observed)
+                if not self._joined(observed):
+                    joined = False
+            except Exception as exc:
+                # Invalid fresh rows cannot replace validated saved facts.
+                self.error = self.error or (
+                    str(exc)
+                    if isinstance(exc, (DemoError, SubworkflowError))
+                    else type(exc).__name__
+                )
+                joined = False
+        return joined
+
+    def _write_join_snapshot(self) -> None:
+        assert self.root is not None
+        observed = {row["request_id"]: row for row in self.calls}
+        rows = []
+        for request in self.requests:
+            call = observed.get(request["request_id"])
+            safe_call = None
+            if call is not None:
+                validate_call(call, "demo", request)
+                receipt = call["core_receipt"]
+                safe_call = {
+                    key: call[key]
+                    for key in (
+                        "instance_id",
+                        "run_id",
+                        "source",
+                        "phase",
+                        "holder_joined",
+                    )
+                }
+                safe_call["receipt"] = (
+                    {
+                        key: _safe_code(receipt.get(key))
+                        for key in (
+                            "request_id",
+                            "request_digest",
+                            "operation",
+                            "instance_id",
+                            "run_id",
+                            "plane_id",
+                            "status",
+                            "code",
+                        )
+                    }
+                    if receipt is not None
+                    else None
+                )
+            rows.append(
+                {
+                    "request_id": request["request_id"],
+                    "request_digest": public_request_digest(request),
+                    "operation": request["operation"],
+                    "target": {
+                        key: request[key]
+                        for key in ("instance_id", "run_id", "plane_id")
+                    },
+                    "observation": safe_call,
+                }
+            )
+        write_private(
+            self.root / "join-observations.json", canonical_bytes({"requests": rows})
+        )
 
 
 class ExecutionRecord(TypedDict):

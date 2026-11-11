@@ -15,6 +15,20 @@ ADAPTER_CONTRACT = "millrace-claude-print/v1"
 FINAL = {"outcome": "READY", "summary": "done", "refs": []}
 
 
+def cleanup_proof(root_pid: int = 123, **changes: Any) -> dict[str, Any]:
+    return {
+        "format": "millrace-claude-cleanup/v1",
+        "root_pid": root_pid,
+        "return_reason": "confirmed",
+        "root_reaped": True,
+        "stdin_closed": True,
+        "stdout_eof": True,
+        "stderr_eof": True,
+        "group_state": "absent",
+        **changes,
+    }
+
+
 def envelope(**changes: Any) -> dict[str, Any]:
     # Ordinary envelope fields were observed in OX; structured_output is fake.
     return {

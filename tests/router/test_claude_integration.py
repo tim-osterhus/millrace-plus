@@ -6,6 +6,7 @@ import copy
 import json
 import sqlite3
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -152,14 +153,32 @@ def test_producing_launch_authority_refuses(
         control.inspect_run(instance, str(run["id"]), state_home=home)
 
 
-@pytest.mark.parametrize("mode", ["cancel", "locked", "live"])
+@pytest.mark.parametrize(
+    "mode,version",
+    [
+        ("cancel", "2.1.296"),
+        ("cancel", "2.1.305"),
+        ("legacy_cancel", "2.1.296"),
+        ("legacy_cancel", "2.1.305"),
+        ("locked", "2.1.296"),
+        ("live", "2.1.296"),
+    ],
+)
 def test_controls_recovery_and_revision_authority(
-    single_flow: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch, mode: str
+    single_flow: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+    version: str,
 ) -> None:
-    if mode != "cancel":
+    if mode not in {"cancel", "legacy_cancel"}:
         _revision_case(single_flow, monkeypatch, mode)
         return
-    workflow, project, home = flow(single_flow, before="time.sleep(10)")
+    workflow, project, home = flow(
+        single_flow,
+        before="time.sleep(10)",
+        claude_version=version,
+        version=f"{version} (Claude Code)\n".encode(),
+    )
     instance = create_instance(workflow, project, state_home=home)["instance_id"]
     ids = {}
     cancel_id = new_id()
@@ -177,7 +196,13 @@ def test_controls_recovery_and_revision_authority(
                 == "queued"
             )
 
-        return original(self, *args, **{**kwargs, "on_started": started})
+        result = original(self, *args, **{**kwargs, "on_started": started})
+        if mode == "legacy_cancel":
+            # Preserve the pre-amendment result shape as a historical fixture.
+            evidence = dict(result.adapter_evidence or {})
+            del evidence["cleanup"]
+            return replace(result, writer_state="may_live", adapter_evidence=evidence)
+        return result
 
     with monkeypatch.context() as patch:
         patch.setattr(ClaudePrintAdapter, "invoke", instrument)
@@ -185,7 +210,9 @@ def test_controls_recovery_and_revision_authority(
     assert cancelled["completions"][0]["transport"] == "cancelled"
     current = control.inspect_run(instance, str(ids["run_id"]), state_home=home)
     target = current["invocations"][0]
-    if target["writer_state"] != "stopped":
+    if mode == "legacy_cancel":
+        assert target["writer_state"] == "may_live"
+        assert "cleanup" not in target["adapter_evidence"]
         receipt = control.reconcile_invocation(
             instance,
             str(current["id"]),
@@ -198,15 +225,22 @@ def test_controls_recovery_and_revision_authority(
             plane_id="main",
         )
         assert receipt["status"] == "applied"
+    else:
+        assert target["writer_state"] == "stopped"
+        assert target["adapter_evidence"]["cleanup"]["return_reason"] == "confirmed"
     current = control.inspect_run(instance, str(current["id"]), state_home=home)
     assert current["status"] == "cancelled"
+    assert current["quiescent"] and not current["inflight_invocations"]
+    assert current["completions"][0]["writer"] == (
+        "may_live" if mode == "legacy_cancel" else "stopped"
+    )
     assert (
         control.cancel_run(
             instance, str(current["id"]), state_home=home, request_id=cancel_id
         )["status"]
         == "applied"
     )
-    fake(workflow.parent)
+    fake(workflow.parent, version=f"{version} (Claude Code)\n".encode())
     fresh = start_run(instance, state_home=home)
     assert fresh["status"] == "succeeded" and fresh["id"] != current["id"]
     assert (
@@ -215,6 +249,32 @@ def test_controls_recovery_and_revision_authority(
         ]
         == current["completions"]
     )
+    for name in ("fake-claude", "fake-claude.json", "claude.json", "task.txt"):
+        (workflow.parent / name).unlink()
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            subprocess, "Popen", lambda *a, **kw: pytest.fail("reload spawned process")
+        )
+        cold = control.inspect_run(instance, str(current["id"]), state_home=home)
+        for key in ("completions", "invocations", "transitions"):
+            assert cold[key] == current[key]
+    if mode == "cancel":
+        path = store_path(instance, home)
+        with sqlite3.connect(path) as db:
+            row = db.execute(
+                "SELECT body FROM invocations WHERE id=?", (target["id"],)
+            ).fetchone()
+            body = json.loads(row[0])
+            body["adapter_evidence"]["cleanup"]["root_pid"] += 1
+            db.execute(
+                "UPDATE invocations SET body=? WHERE id=?",
+                (json.dumps(body), target["id"]),
+            )
+            before = list(db.iterdump())
+        with pytest.raises(RouterError, match="completion_integrity"):
+            control.inspect_run(instance, str(current["id"]), state_home=home)
+        with sqlite3.connect(path) as db:
+            assert list(db.iterdump()) == before
 
 
 def _revision_case(
