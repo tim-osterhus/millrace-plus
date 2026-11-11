@@ -12,6 +12,8 @@ import pytest
 from millrace_plus.demo import discovery
 from millrace_plus.demo.contracts import DemoError, canonical_bytes
 from millrace_plus.demo.materialize import materialize
+from millrace_plus.router import control
+from millrace_plus.router.claude import CLAUDE_VERSION, SUPPORTED_CLAUDE_VERSIONS
 
 
 @pytest.mark.parametrize("native_selected", [False, True])
@@ -50,6 +52,8 @@ def test_exact_materialized_branches(tmp_path, monkeypatch, native_selected):
     assert not (tmp_path / "demo-session.json").exists()
     if native_selected:
         assert nodes["native"]["invoke"]["inputs"] == ["baseline.json"]
+        assert "timeout_seconds" not in nodes["native"]["invoke"]
+        assert "timeout_seconds" not in graph["defaults"]
         assert nodes["native"]["on_error"] == {"goto": "fallback"}
     else:
         assert set(graph["bindings"]) == {"command"}
@@ -100,7 +104,9 @@ def test_passive_discovery_and_inherited_selection(monkeypatch):
         assert native["settings"] == {} and native["provenance"] == "inherited"
         text = discovery.consent_description(native)
         for phrase in (
-            "120-second",
+            "1800-second fallback",
+            "runtime defaults",
+            "admitted effective timeout",
             "billing",
             "hooks",
             "MCP",
@@ -135,3 +141,113 @@ def test_missing_unknown_and_bad_selected_profile(tmp_path, monkeypatch):
     )
     with pytest.raises(DemoError, match="invalid_native_profile"):
         discovery.select_native("claude_print", profile)
+
+
+def test_selected_native_shim_keeps_its_dispatch_name(tmp_path, monkeypatch):
+    dispatcher = tmp_path / "mise"
+    dispatcher.write_text(
+        f"#!{sys.executable}\n"
+        "import pathlib,sys\n"
+        "if pathlib.Path(sys.argv[0]).name != 'claude':\n"
+        "    raise SystemExit('wrong shim dispatch')\n"
+        "print('2.1.305 (Claude Code)')\n"
+    )
+    dispatcher.chmod(0o700)
+    shim = tmp_path / "claude"
+    shim.symlink_to(dispatcher)
+    monkeypatch.setattr(discovery.shutil, "which", lambda name: str(shim))
+    selected = discovery.select_native("claude_print")
+    assert (
+        subprocess.check_output(
+            [selected["binding"]["executable"], "--version"], text=True
+        ).strip()
+        == "2.1.305 (Claude Code)"
+    )
+
+
+@pytest.mark.parametrize("version", sorted(SUPPORTED_CLAUDE_VERSIONS))
+def test_claude_profile_keeps_exact_version_and_selected_settings(
+    tmp_path, monkeypatch, version
+):
+    monkeypatch.setattr(discovery.shutil, "which", lambda name: sys.executable)
+    inherited = discovery.select_native("claude_print")
+    assert inherited["profile"] == {
+        "format": "millrace-claude-print-profile/v1",
+        "claude_version": CLAUDE_VERSION,
+    }
+    profile = tmp_path / "profile.json"
+    captured = {
+        "format": "millrace-claude-print-profile/v1",
+        "claude_version": version,
+        "model": "sonnet",
+        "effort": "high",
+    }
+    profile.write_bytes(canonical_bytes(captured))
+    selected = discovery.select_native("claude_print", profile)
+    assert selected["profile"] == captured
+    assert selected["settings"] == {"model": "sonnet", "effort": "high"}
+    assert selected["provenance"] == "explicit"
+
+
+@pytest.mark.parametrize(
+    "runtime,policy,timeout,source,constraint",
+    [
+        ({}, {}, 1800, "fallback", None),
+        ({"timeout_seconds": 90}, {}, 90, "runtime", None),
+        (
+            {"timeout_seconds": 90},
+            {"timeout_ceiling_seconds": 45},
+            45,
+            "runtime",
+            {"kind": "ceiling", "value": 45},
+        ),
+    ],
+)
+def test_materialized_native_timeout_uses_public_core_resolution(
+    tmp_path, monkeypatch, runtime, policy, timeout, source, constraint
+):
+    monkeypatch.setattr(
+        discovery.shutil,
+        "which",
+        lambda cmd, mode=os.F_OK | os.X_OK, path=None: sys.executable,
+    )
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    workflow = materialize(
+        workspace,
+        native=discovery.select_native("claude_print"),
+        no_web=True,
+        session_file=tmp_path / "session.json",
+    )
+    graph = json.loads(workflow.read_bytes())
+    # A command stand-in exercises real admission without executing a native
+    # runtime, probe, model or any graph node.
+    graph["bindings"]["native"] = dict(graph["bindings"]["command"])
+    graph["planes"]["main"]["nodes"]["native"]["invoke"]["config"] = {
+        "script": "scripts/stage.py",
+        "args": ["skip"],
+    }
+    workflow.write_bytes(canonical_bytes(graph))
+    state_home = tmp_path / "state"
+    receipt = control.create_instance(
+        workflow,
+        workspace,
+        state_home=state_home,
+        request_id="a" * 32,
+        expected_state_version=0,
+        runtime_defaults=runtime,
+        operator_policy=policy,
+    )
+    assert receipt["status"] == "applied"
+    validation = control.validate_revision_summary(
+        receipt["instance_id"], state_home=state_home
+    )["data"]
+    assert validation["valid"] is True
+    nodes = validation["resolved_nodes"]["main"]
+    common = nodes["native"]["common"]
+    assert common["effective"]["timeout_seconds"] == timeout
+    assert common["provenance"]["timeout_seconds"] == {
+        "source": source,
+        "policy": constraint,
+    }
+    assert nodes["detect"]["common"]["effective"]["timeout_seconds"] == 15

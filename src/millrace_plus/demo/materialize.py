@@ -87,6 +87,9 @@ def materialize(
     controls.append("demo-choice.json")
     if native is not None:
         del nodes["skip"]
+        # Command stages already author their finite timeouts. Leave the native
+        # timeout to Core runtime defaults, operator policy and its fallback.
+        graph["defaults"].pop("timeout_seconds", None)
         profile = workspace / "profiles/native.json"
         profile.parent.mkdir()
         profile.write_bytes(canonical_bytes(native["profile"]))
@@ -104,7 +107,6 @@ def materialize(
         nodes["native"] = {
             "invoke": {
                 "binding": "native",
-                "timeout_seconds": 120,
                 "config": {"prompt": "prompts/native.md"},
                 "cwd": ".",
                 "inputs": ["baseline.json"],

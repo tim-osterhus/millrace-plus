@@ -38,7 +38,8 @@ from .configuration import (  # noqa: E402
 
 ADAPTER_ID = "claude_print"
 ADAPTER_CONTRACT = "millrace-claude-print/v1"
-CLAUDE_VERSION = "2.1.296"
+CLAUDE_VERSION = "2.1.305"
+SUPPORTED_CLAUDE_VERSIONS = frozenset({"2.1.296", CLAUDE_VERSION})
 PROFILE_FORMAT = "millrace-claude-print-profile/v1"
 LAUNCH_FORMAT = "millrace-claude-print-launch/v1"
 RESULT_FORMAT = "millrace-claude-print-result/v1"
@@ -128,7 +129,10 @@ def _binding(
     parsed = fields(strict_json(raw), {"format", "claude_version"}, SETTINGS)
     if parsed["format"] != PROFILE_FORMAT:
         raise RouterError("invalid_claude_profile")
-    if parsed["claude_version"] != CLAUDE_VERSION:
+    if (
+        not isinstance(parsed["claude_version"], str)
+        or parsed["claude_version"] not in SUPPORTED_CLAUDE_VERSIONS
+    ):
         raise RouterError("unsupported_claude_version")
     _settings({k: v for k, v in parsed.items() if k in SETTINGS})
     return name, raw, parsed
@@ -182,7 +186,8 @@ def _details(plan: LaunchPlan) -> dict[str, object]:
     details = fields(plan.details, LAUNCH_FIELDS)
     if (
         details["format"] != LAUNCH_FORMAT
-        or details["expected_version"] != CLAUDE_VERSION
+        or not isinstance(details["expected_version"], str)
+        or details["expected_version"] not in SUPPORTED_CLAUDE_VERSIONS
         or details["native_inheritance"] is not True
         or plan.environment
         or set(plan.generated_controls) != {PROMPT_NAME, SCHEMA_NAME}
@@ -667,7 +672,7 @@ class ClaudePrintAdapter:
             "prompt_path": str(request.invocation_root / PROMPT_NAME),
             "prompt_sha256": _digest(prompt),
             "schema_sha256": _digest(schema),
-            "expected_version": CLAUDE_VERSION,
+            "expected_version": parsed["claude_version"],
             "native_inheritance": True,
         }
         return LaunchPlan(
@@ -691,7 +696,8 @@ class ClaudePrintAdapter:
         poll: Callable[[], bool],
         on_started: Callable[[int], None],
     ) -> AdapterResult:
-        _details(plan)
+        details = _details(plan)
+        expected_version = cast(str, details["expected_version"])
         child_env = dict(os.environ)
         child_env.update(env)
         evidence = _evidence(plan.invocation_id)
@@ -708,10 +714,11 @@ class ClaudePrintAdapter:
             4096,
         )
         evidence["probe_pid"] = probe.pid
+        banner = f"{expected_version} (Claude Code)".encode()
         if probe.transport != "completed" or probe.stdout not in (
-            b"2.1.296 (Claude Code)",
-            b"2.1.296 (Claude Code)\n",
-            b"2.1.296 (Claude Code)\r\n",
+            banner,
+            banner + b"\n",
+            banner + b"\r\n",
         ):
             failure = (
                 probe.failure
@@ -735,7 +742,7 @@ class ClaudePrintAdapter:
                 evidence,
             )
         evidence.update(
-            phase="main", observed_version=CLAUDE_VERSION, terminal_state="incomplete"
+            phase="main", observed_version=expected_version, terminal_state="incomplete"
         )
         result = _process(
             plan.argv,
@@ -816,7 +823,7 @@ class ClaudePrintAdapter:
         self, plan: LaunchPlan, completion: CompletionFacts
     ) -> None:
         try:
-            _details(plan)
+            details = _details(plan)
             e = fields(completion.evidence, EVIDENCE_FIELDS)
             if (
                 completion.invocation_id != plan.invocation_id
@@ -825,7 +832,7 @@ class ClaudePrintAdapter:
                 or e["phase"] not in {"preflight", "probe", "main"}
                 or e["terminal_state"]
                 not in {"not_started", "incomplete", "invalid", "error", "success"}
-                or e["observed_version"] not in {None, CLAUDE_VERSION}
+                or e["observed_version"] not in (None, details["expected_version"])
                 or type(e["stderr_truncated"]) is not bool
             ):
                 raise RouterError("completion_integrity")
@@ -869,7 +876,10 @@ class ClaudePrintAdapter:
             ):
                 raise RouterError("completion_integrity")
             if e["phase"] == "main":
-                if e["observed_version"] != CLAUDE_VERSION or e["probe_pid"] is None:
+                if (
+                    e["observed_version"] != details["expected_version"]
+                    or e["probe_pid"] is None
+                ):
                     raise RouterError("completion_integrity")
                 if completion.pid is None and e["failure_code"] not in {
                     "claude_spawn_failed",

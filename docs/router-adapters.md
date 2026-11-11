@@ -334,8 +334,14 @@ separate, each limited to its exact accepted source, artifacts and route.
 
 ## Claude Code print
 
-`claude_print` / `millrace-claude-print/v1` invokes Claude Code 2.1.296 through
-its public print/JSON Schema interface. The profile is a captured control:
+`claude_print` / `millrace-claude-print/v1` supports captured Claude Code
+2.1.296 and 2.1.305 profiles through its public print/JSON Schema interface.
+The demo defaults to 2.1.305. Explicit 2.1.296 profiles and retained 2.1.296
+launches remain supported. Each launch uses its captured profile version and
+requires that exact version in the native banner; the default does not
+reinterpret historical launches. This source/offline compatibility does not
+qualify the live demo route. D2 Claude OAuth qualification remains pending.
+The profile is a captured control:
 
 ```json
 {"format":"millrace-claude-print-profile/v1","claude_version":"2.1.296"}

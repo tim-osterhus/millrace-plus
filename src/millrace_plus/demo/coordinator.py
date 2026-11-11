@@ -309,6 +309,25 @@ class Coordinator:
             raise DemoError("incomplete_final_report")
         self._publish(self.report, "report", identity)
 
+    def _disclose_native_timeout(self) -> None:
+        from millrace_plus.router import control
+
+        assert self.instance is not None
+        validation = control.validate_revision_summary(
+            self.instance, state_home=self.state_home
+        )["data"]
+        if type(validation) is not dict or validation["valid"] is not True:
+            raise DemoError("native_validation_failed")
+        common = validation["resolved_nodes"]["main"]["native"]["common"]
+        timeout = common["effective"]["timeout_seconds"]
+        provenance = common["provenance"]["timeout_seconds"]
+        print(
+            f"Admitted native node timeout: {timeout} seconds; "
+            f"source: {provenance['source']}; policy: {provenance['policy']}. "
+            "Core's captured launch settings remain authoritative.",
+            flush=True,
+        )
+
     def _start(self) -> None:
         import secrets
 
@@ -402,6 +421,8 @@ class Coordinator:
         version = instance["state_version"]
         if type(version) is not int:
             raise DemoError("invalid_instance_version")
+        if self.native is not None:
+            self._disclose_native_timeout()
         observed = self._submit("start_run", {"edit_mode": "locked"}, version=version)
         while self.run_id is None:
             if (observed.get("core_receipt") or {}).get("status") == "refused":
@@ -560,11 +581,11 @@ class Coordinator:
                 if self.admission_failed
                 else "skipped"
                 if self.native is None
+                else "writer_unconfirmed"
+                if not stopped
                 else "cancelled"
                 if self.cancelled
                 else "unknown_outcome"
-                if stopped
-                else "writer_unconfirmed"
             )
             self.report = build_report(
                 self.owner["demo_id"],

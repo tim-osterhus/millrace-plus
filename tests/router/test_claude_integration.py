@@ -36,6 +36,7 @@ def test_resolver_three_exact_pairs() -> None:
     )
 
 
+@pytest.mark.parametrize("version", ["2.1.296", "2.1.305"])
 @pytest.mark.parametrize(
     "semantic,status,classification",
     [
@@ -52,9 +53,13 @@ def test_raw_first_completion_and_corruption(
     semantic: dict[str, Any],
     status: str,
     classification: str,
+    version: str,
 ) -> None:
     workflow, project, home = flow(
-        single_flow, wire=json.dumps(envelope(structured_output=semantic)).encode()
+        single_flow,
+        claude_version=version,
+        version=f"{version} (Claude Code)\n".encode(),
+        wire=json.dumps(envelope(structured_output=semantic)).encode(),
     )
     instance = create_instance(workflow, project, state_home=home)["instance_id"]
     ids = {}
@@ -75,6 +80,9 @@ def test_raw_first_completion_and_corruption(
             "SELECT stdout,transport,classification FROM completions"
         ).fetchone() == (raw, "completed", None)
         assert db.execute("SELECT count(*) FROM transitions").fetchone()[0] == 0
+        captured = json.loads(db.execute("SELECT body FROM invocations").fetchone()[0])
+        assert captured["launch"]["details"]["expected_version"] == version
+        assert captured["adapter_evidence"]["observed_version"] == version
     run = control.inspect_run(instance, str(ids["run_id"]), state_home=home)
     receipt = control.recover_run(
         instance,
@@ -114,7 +122,9 @@ def test_raw_first_completion_and_corruption(
         assert list(db.iterdump()) == before
 
 
-@pytest.mark.parametrize("mutation", ["argv", "settings", "evidence"])
+@pytest.mark.parametrize(
+    "mutation", ["argv", "settings", "evidence", "launch_version", "observed_version"]
+)
 def test_producing_launch_authority_refuses(
     single_flow: tuple[Path, Path, Path], mutation: str
 ) -> None:
@@ -131,6 +141,10 @@ def test_producing_launch_authority_refuses(
             body["launch"]["settings"]["effective"]["model"] = "forged"
         if mutation == "evidence":
             body["adapter_evidence"]["invocation_id"] = "copied"
+        if mutation == "launch_version":
+            body["launch"]["details"]["expected_version"] = "2.1.305"
+        if mutation == "observed_version":
+            body["adapter_evidence"]["observed_version"] = "2.1.305"
         db.execute(
             "UPDATE invocations SET body=? WHERE id=?", (json.dumps(body), row[0])
         )

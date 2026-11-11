@@ -17,8 +17,10 @@ from millrace.router.execution import CompletionFacts, RouterError
 from millrace_plus.router import claude as c
 
 
-def prepared(tmp: Path, **options: Any) -> Any:
-    req = request(tmp, executable=str(fake(tmp, **options)))
+def prepared(tmp: Path, *, claude_version: str = "2.1.296", **options: Any) -> Any:
+    req = request(
+        tmp, executable=str(fake(tmp, **options)), claude_version=claude_version
+    )
     return c.ClaudePrintAdapter().plan(req)
 
 
@@ -66,10 +68,15 @@ def test_configuration_and_inherited_settings(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("layer", ["runtime", "profile", "workflow", "plane", "node"])
-@pytest.mark.parametrize("selected", [
-    {}, {"model": "operator-selected"}, {"reasoning_effort": "high"},
-    {"model": "operator-selected", "reasoning_effort": "high"},
-])
+@pytest.mark.parametrize(
+    "selected",
+    [
+        {},
+        {"model": "operator-selected"},
+        {"reasoning_effort": "high"},
+        {"model": "operator-selected", "reasoning_effort": "high"},
+    ],
+)
 def test_independent_model_effort_overrides_preserve_omitted_native_defaults(
     tmp_path: Path, layer: str, selected: dict
 ) -> None:
@@ -143,6 +150,73 @@ def test_purity_and_version_preflight(
             and result.stdout == b""
             and result.diagnostic == "claude_version_mismatch"
         )
+
+
+@pytest.mark.parametrize("version", ["2.1.296", "2.1.305"])
+@pytest.mark.parametrize("ending", [b"", b"\n", b"\r\n"])
+def test_supported_profile_pins_exact_native_version(
+    tmp_path: Path, version: str, ending: bytes
+) -> None:
+    capture = tmp_path / "capture.json"
+    plan = prepared(
+        tmp_path,
+        claude_version=version,
+        version=f"{version} (Claude Code)".encode() + ending,
+        capture=str(capture),
+    )
+    assert plan.details["expected_version"] == version
+    result = run(plan, tmp_path)
+    assert capture.exists() and result.classification == "completed"
+    assert result.adapter_evidence["observed_version"] == version
+    assert plan.settings["effective"] == {}
+    assert "--model" not in plan.argv and "--effort" not in plan.argv
+
+
+@pytest.mark.parametrize("version", ["2.1.297", "2.1.306", "2.1", "latest", [], None])
+def test_unsupported_profile_version_refuses_without_host_access(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: Any
+) -> None:
+    req = request(tmp_path)
+    profile = json.loads(req.files["claude.json"])
+    profile["claude_version"] = version
+    req = replace(req, files={**req.files, "claude.json": json.dumps(profile).encode()})
+
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("unsupported profile accessed host")
+
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    for operation, value in (
+        (c.ClaudePrintAdapter().validate_configuration, config(req)),
+        (c.ClaudePrintAdapter().plan, req),
+    ):
+        with pytest.raises(RouterError, match="unsupported_claude_version"):
+            operation(value)
+
+
+@pytest.mark.parametrize(
+    "selected,actual",
+    [
+        ("2.1.296", "2.1.305"),
+        ("2.1.305", "2.1.296"),
+        ("2.1.305", "2.1.306"),
+    ],
+)
+def test_preflight_refuses_other_supported_or_unknown_version(
+    tmp_path: Path, selected: str, actual: str
+) -> None:
+    capture = tmp_path / "capture.json"
+    plan = prepared(
+        tmp_path,
+        claude_version=selected,
+        version=f"{actual} (Claude Code)\n".encode(),
+        capture=str(capture),
+    )
+    started = []
+    result = run(plan, tmp_path, started=started.append)
+    assert not started and not capture.exists()
+    assert result.classification == "execution_failure"
+    assert result.diagnostic == "claude_version_mismatch" and result.stdout == b""
+    assert result.adapter_evidence["observed_version"] is None
 
 
 @pytest.mark.parametrize(
@@ -330,8 +404,13 @@ def test_failure_diagnostics_preserve_cause_and_scrub_secrets(
     assert b"inert-API" not in result.stderr
 
 
-def test_completion_evidence_integrity(tmp_path: Path) -> None:
-    plan = prepared(tmp_path)
+@pytest.mark.parametrize("version", ["2.1.296", "2.1.305"])
+def test_completion_evidence_integrity(tmp_path: Path, version: str) -> None:
+    plan = prepared(
+        tmp_path,
+        claude_version=version,
+        version=f"{version} (Claude Code)\n".encode(),
+    )
     result = run(plan, tmp_path)
     e = result.adapter_evidence
     facts = CompletionFacts(
@@ -353,11 +432,18 @@ def test_completion_evidence_integrity(tmp_path: Path) -> None:
         ("semantic_sha256", "0" * 64),
         ("probe_pid", None),
         ("terminal_state", "error"),
+        ("observed_version", "2.1.305" if version == "2.1.296" else "2.1.296"),
+        ("observed_version", "2.1.306"),
     ):
         with pytest.raises(RouterError):
             c.ClaudePrintAdapter().validate_completion(
                 plan, replace(facts, evidence={**e, key: value})
             )
+    with pytest.raises(RouterError, match="completion_integrity"):
+        c.ClaudePrintAdapter().validate_completion(
+            replace(plan, details={**plan.details, "expected_version": "2.1.306"}),
+            facts,
+        )
 
 
 @pytest.mark.parametrize(

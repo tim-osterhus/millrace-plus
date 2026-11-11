@@ -63,6 +63,61 @@ def test_request_saved_before_post_and_uncertainty_observes_same_id(owner):
     assert seen[0][1]["expected_state_version"] is None
 
 
+def test_native_timeout_disclosure_uses_public_effective_value(
+    owner, monkeypatch, capsys
+):
+    from millrace_plus.router import control
+
+    calls = []
+
+    def validate(instance_id, *, state_home):
+        calls.append((instance_id, state_home))
+        return {
+            "data": {
+                "valid": True,
+                "resolved_nodes": {
+                    "main": {
+                        "native": {
+                            "common": {
+                                "requested": {"timeout_seconds": 90},
+                                "effective": {"timeout_seconds": 45},
+                                "provenance": {
+                                    "timeout_seconds": {
+                                        "source": "runtime",
+                                        "policy": {"kind": "ceiling", "value": 45},
+                                    }
+                                },
+                            }
+                        }
+                    }
+                },
+            }
+        }
+
+    monkeypatch.setattr(control, "validate_revision_summary", validate)
+    owner._disclose_native_timeout()
+    assert calls == [(owner.instance, owner.state_home)]
+    text = capsys.readouterr().out
+    assert "45 seconds" in text and "source: runtime" in text
+    assert "'kind': 'ceiling', 'value': 45" in text
+    assert "90 seconds" not in text and "1800 seconds" not in text
+
+
+def test_invalid_native_admission_does_not_disclose_an_effective_timeout(
+    owner, monkeypatch, capsys
+):
+    from millrace_plus.router import control
+
+    monkeypatch.setattr(
+        control,
+        "validate_revision_summary",
+        lambda *a, **kw: {"data": {"valid": False}},
+    )
+    with pytest.raises(DemoError, match="native_validation_failed"):
+        owner._disclose_native_timeout()
+    assert capsys.readouterr().out == ""
+
+
 def test_unknown_started_run_retains_state_after_child_drain(owner):
     owner.run_id = None
     seen = []
@@ -211,14 +266,20 @@ def test_changed_session_or_baseline_refuses_final(owner, monkeypatch):
 
 
 @pytest.mark.parametrize("stopped,expected", [(False, 1), (True, 130)])
+@pytest.mark.parametrize("native_selected", [False, True])
 def test_cancel_retains_baseline_and_requires_public_closure(
-    owner, monkeypatch, stopped, expected
+    owner, monkeypatch, stopped, expected, native_selected
 ):
     baseline = build_baseline(unknown_hardware())
     owner.baseline, owner.baseline_bytes = baseline, canonical_bytes(baseline)
     working = owner.root / "workspace/baseline.json"
     working.write_bytes(b"replaced")
     owner.cancelled, owner.stop_source = True, "terminal_enter"
+    if native_selected:
+        owner.native = {"binding": {"adapter": "claude_print"}}
+        owner.options = coordinator.DemoOptions(
+            output=owner.options.output, native=owner.native, native_consent=True
+        )
     handle = SimpleNamespace(
         finish=lambda **kw: None,
         wait=lambda: True,
@@ -242,7 +303,18 @@ def test_cancel_retains_baseline_and_requires_public_closure(
     report_path = next(owner.options.output.glob("demo-*/report.json"))
     report = json.loads(report_path.read_bytes())
     assert report["completion"] == "cancelled" and report["baseline"] == baseline
-    assert report["native"]["status"] == "skipped"
+    assert report["native"]["status"] == (
+        "skipped"
+        if not native_selected
+        else "cancelled"
+        if stopped
+        else "writer_unconfirmed"
+    )
+    record = json.loads(report_path.with_name("execution.json").read_bytes())
+    assert record["completion"] == "cancelled"
+    assert record["stop_source"] == "terminal_enter"
+    assert record["writers_stopped"] is stopped
+    assert record["native"]["status"] == report["native"]["status"]
     if not stopped:
         assert working.read_bytes() == b"replaced" and owner.root.exists()
     else:

@@ -31,7 +31,7 @@ _CONTRACTS = {
         "millrace-claude-print/v1",
         "millrace-claude-print-profile/v1",
         "claude_version",
-        "2.1.296",
+        "2.1.305",
     ),
     "opencode_run": (
         "opencode",
@@ -85,7 +85,8 @@ def select_native(adapter: str, profile: Path | None = None) -> dict[str, Any] |
     if (
         set(parsed) - {"format", version_key} - settings
         or parsed.get("format") != profile_format
-        or parsed.get(version_key) != version
+        or parsed.get(version_key)
+        not in (("2.1.296", version) if adapter == "claude_print" else (version,))
     ):
         raise DemoError("invalid_native_profile")
     for key in set(parsed) & settings:
@@ -102,7 +103,9 @@ def select_native(adapter: str, profile: Path | None = None) -> dict[str, Any] |
         "binding": {
             "adapter": adapter,
             "contract": contract,
-            "executable": str(Path(selected).resolve()),
+            # Native shims can dispatch by their invocation basename. Resolving
+            # a claude symlink to mise would execute the dispatcher as mise.
+            "executable": str(Path(selected).absolute()),
             "config": {"profile": "profiles/native.json"},
         },
         "profile": parsed,
@@ -118,7 +121,10 @@ def consent_description(native: dict[str, Any], *, no_web: bool = False) -> str:
         f"Adapter: {adapter}; profile: {native['provenance']}. "
         "Model/settings: "
         f"{settings if settings else 'native inheritance; effective values unknown'}. "
-        "One main attempt, 120-second node timeout; possible provider billing. "
+        "One main attempt; node timeout inherits Core runtime defaults and "
+        "operator policy, with Core's 1800-second fallback when unset. "
+        "The admitted effective timeout is shown before execution. "
+        "Possible provider billing. "
         "Existing native/project hooks, plugins, MCP and tool permissions "
         "remain effective and have not been inspected. Sanitized architecture, "
         "RAM/CPU/GPU facts, frozen reference estimates and limitations are "

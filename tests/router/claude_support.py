@@ -62,7 +62,11 @@ def fake(
 
 
 def request(
-    root: Path, *, prompt: bytes = b"Review.", executable: str = "/no/claude"
+    root: Path,
+    *,
+    prompt: bytes = b"Review.",
+    executable: str = "/no/claude",
+    claude_version: str = "2.1.296",
 ) -> InvocationRequest:
     return InvocationRequest(
         invocation_id="1" * 32,
@@ -78,10 +82,13 @@ def request(
         workflow={},
         common_settings={},
         files={
-            "claude.json": (
-                b'{"format":"millrace-claude-print-profile/v1",'
-                b'"claude_version":"2.1.296"}'
-            ),
+            "claude.json": json.dumps(
+                {
+                    "format": "millrace-claude-print-profile/v1",
+                    "claude_version": claude_version,
+                },
+                separators=(",", ":"),
+            ).encode(),
             "task.txt": prompt,
         },
         host_paths={},
@@ -110,7 +117,12 @@ def config(req: InvocationRequest) -> AdapterConfiguration:
     )
 
 
-def flow(single: tuple[Path, Path, Path], **options: Any) -> tuple[Path, Path, Path]:
+def flow(
+    single: tuple[Path, Path, Path],
+    *,
+    claude_version: str = "2.1.296",
+    **options: Any,
+) -> tuple[Path, Path, Path]:
     workflow, project, home = single
     native = fake(workflow.parent, **options)
     data = json.loads(workflow.read_text())
@@ -130,5 +142,7 @@ def flow(single: tuple[Path, Path, Path], **options: Any) -> tuple[Path, Path, P
     data["planes"]["main"]["nodes"]["draft"]["on_unknown"] = {"finish": "failed"}
     workflow.write_text(json.dumps(data))
     (workflow.parent / "task.txt").write_text("Review.")
-    (workflow.parent / "claude.json").write_bytes(request(project).files["claude.json"])
+    (workflow.parent / "claude.json").write_bytes(
+        request(project, claude_version=claude_version).files["claude.json"]
+    )
     return workflow, project, home
