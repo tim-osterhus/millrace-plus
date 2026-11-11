@@ -1,0 +1,30 @@
+[
+  {
+    "operation": "create_instance",
+    "status": "applied",
+    "code": null,
+    "expected_state_version": 0,
+    "holder_joined": true
+  },
+  {
+    "operation": "start_run",
+    "status": "applied",
+    "code": null,
+    "expected_state_version": 1,
+    "holder_joined": true
+  },
+  {
+    "operation": "resume_run",
+    "status": "refused",
+    "code": "run_not_paused",
+    "expected_state_version": 12,
+    "holder_joined": true
+  },
+  {
+    "operation": "cancel_run",
+    "status": "applied",
+    "code": null,
+    "expected_state_version": null,
+    "holder_joined": true
+  }
+]

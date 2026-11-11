@@ -80,3 +80,7 @@ The release also includes the finite OpenCode 1.19.3 adapter. Selected native ev
 The three packaged skills are advisory package data, not runtime-installed authority.
 
 Release publication follows the matched Core, Plus, OS, then bundle order.
+
+The optional full-component `millrace demo` command and its deterministic hardware
+workflow are described in [docs/demo.md](docs/demo.md). Native-route and release
+bundle qualification remain separate from local D1 evidence.

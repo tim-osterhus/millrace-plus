@@ -196,6 +196,7 @@ def test_official_package_data_declares_selected_vendor_selection_assets() -> No
         "cicd",
         "cicd-v2",
         "document-review",
+        "hardware-demo",
         "lad",
         "lad-service",
         "software-change",
@@ -217,23 +218,50 @@ def test_official_package_data_declares_selected_vendor_selection_assets() -> No
 def test_lad_package_inventory_matches_admitted_workflow_assets() -> None:
     root = PROJECT_ROOT / "src/millrace_plus/workflows/lad"
     roles = {
-        "recon", "planner", "manager", "builder", "checker", "fixer",
-        "doublechecker", "troubleshooter", "consultant", "updater",
-        "learning", "arbiter",
+        "recon",
+        "planner",
+        "manager",
+        "builder",
+        "checker",
+        "fixer",
+        "doublechecker",
+        "troubleshooter",
+        "consultant",
+        "updater",
+        "learning",
+        "arbiter",
     }
     expected = {
-        "workflow.json", "README.md", "PROVENANCE.md", "provenance.json",
-        "licenses/lad-factory-Apache-2.0.txt", "profiles/claude.json",
-        "foreground/README.md", "learning/README.md",
-        "context/contracts.md", "context/role-contracts.md", "context/routes.md",
-        "context/harness.md", "context/routing-policy.json",
-        "templates/goal.md", "templates/bootstrap.md",
-        "templates/state.md", "templates/assignment.md", "templates/packet.md",
-        "templates/result.md", "scripts/lad_state.py", "scripts/init_session.py",
-        "scripts/setup_intake.py", "scripts/prepare_role.py", "scripts/accept_role.py",
-        "scripts/boundaries.py", "scripts/learning_seam.py",
-        "scripts/session_compat.py", "scripts/presentation.py",
-        "scripts/engineering_feedback.py", "context/engineering-profile.example.json",
+        "workflow.json",
+        "README.md",
+        "PROVENANCE.md",
+        "provenance.json",
+        "licenses/lad-factory-Apache-2.0.txt",
+        "profiles/claude.json",
+        "foreground/README.md",
+        "learning/README.md",
+        "context/contracts.md",
+        "context/role-contracts.md",
+        "context/routes.md",
+        "context/harness.md",
+        "context/routing-policy.json",
+        "templates/goal.md",
+        "templates/bootstrap.md",
+        "templates/state.md",
+        "templates/assignment.md",
+        "templates/packet.md",
+        "templates/result.md",
+        "scripts/lad_state.py",
+        "scripts/init_session.py",
+        "scripts/setup_intake.py",
+        "scripts/prepare_role.py",
+        "scripts/accept_role.py",
+        "scripts/boundaries.py",
+        "scripts/learning_seam.py",
+        "scripts/session_compat.py",
+        "scripts/presentation.py",
+        "scripts/engineering_feedback.py",
+        "context/engineering-profile.example.json",
         *(f"prompts/{role}.md" for role in roles),
     }
     actual = {
@@ -270,7 +298,9 @@ def test_paperclip_local_esm_package_has_no_package_dependencies() -> None:
         "license": "Apache-2.0",
     }
     assert {path.name for path in root.iterdir()} == {
-        "package.json", "index.js", "README.md",
+        "package.json",
+        "index.js",
+        "README.md",
     }
 
 
@@ -287,6 +317,16 @@ def test_plus_candidate_targets_reviewed_core_minimum_and_defers_experiment() ->
     workflows = PROJECT_ROOT / "src/millrace_plus/workflows"
     for folder in workflows.iterdir():
         if folder.is_dir():
+            if folder.name == "hardware-demo":
+                graph = json.loads((folder / "workflow.json").read_text())
+                assert graph["format"] == "millrace-router/v4"
+                assert graph["limits"] == {"max_parallel_invocations": 1}
+                assert set(graph["planes"]) == {"main"}
+                assert set(graph["bindings"]) == {"command"}
+                assert not (folder / "profiles").exists()
+                for asset in graph["control_files"]:
+                    assert (folder / asset).is_file()
+                continue
             if folder.name == "lad-service":
                 graph = json.loads((folder / "workflow.json").read_text())
                 assert graph["format"] == "millrace-router/v4"
@@ -303,7 +343,10 @@ def test_plus_candidate_targets_reviewed_core_minimum_and_defers_experiment() ->
                 assert graph["format"] == "millrace-router/v4"
                 assert set(graph["planes"]) == {"main"}
                 assert set(graph["bindings"]) == {
-                    "command", "investigate", "repair", "review"
+                    "command",
+                    "investigate",
+                    "repair",
+                    "review",
                 }
                 for asset in graph["control_files"]:
                     assert (folder / asset).is_file()

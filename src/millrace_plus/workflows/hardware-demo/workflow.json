@@ -1,0 +1,33 @@
+{
+  "format": "millrace-router/v4",
+  "limits": {"max_parallel_invocations": 1},
+  "defaults": {"timeout_seconds": 15},
+  "bindings": {"command": {"adapter": "command", "contract": "millrace-command/v1", "executable": "python3", "config": {}}},
+  "control_files": ["scripts/stage.py", "references/shortlist.json"],
+  "planes": {"main": {"workspace": ".", "start": "detect", "nodes": {
+    "detect": {
+      "invoke": {"binding": "command", "timeout_seconds": 15, "config": {"script": "scripts/stage.py", "args": ["detect"]}, "cwd": ".", "inputs": []},
+      "result": "json-v1", "outcomes": ["READY"], "on": {"READY": {"goto": "baseline"}}, "on_error": {"goto": "unavailable"}, "on_unknown": {"goto": "unavailable"}
+    },
+    "baseline": {
+      "invoke": {"binding": "command", "timeout_seconds": 15, "config": {"script": "scripts/stage.py", "args": ["baseline"]}, "cwd": ".", "inputs": []},
+      "result": "json-v1", "outcomes": ["READY"], "on": {"READY": {"pause": {"reason": "baseline_saved", "resume": "skip"}}}, "on_error": {"pause": {"reason": "baseline_failed", "resume": "baseline"}}, "on_unknown": {"pause": {"reason": "baseline_failed", "resume": "baseline"}}
+    },
+    "skip": {
+      "invoke": {"binding": "command", "timeout_seconds": 5, "config": {"script": "scripts/stage.py", "args": ["skip"]}, "cwd": ".", "inputs": []},
+      "result": "json-v1", "outcomes": ["SKIPPED"], "on": {"SKIPPED": {"goto": "fallback"}}, "on_error": {"goto": "fallback"}, "on_unknown": {"goto": "fallback"}
+    },
+    "fallback": {
+      "invoke": {"binding": "command", "timeout_seconds": 10, "config": {"script": "scripts/stage.py", "args": ["fallback"]}, "cwd": ".", "inputs": []},
+      "result": "json-v1", "outcomes": ["READY"], "on": {"READY": {"goto": "render"}}, "on_error": {"pause": {"reason": "fallback_failed", "resume": "fallback"}}, "on_unknown": {"pause": {"reason": "fallback_failed", "resume": "fallback"}}
+    },
+    "render": {
+      "invoke": {"binding": "command", "timeout_seconds": 10, "config": {"script": "scripts/stage.py", "args": ["render"]}, "cwd": ".", "inputs": []},
+      "result": "json-v1", "outcomes": ["READY"], "on": {"READY": {"finish": "succeeded"}}, "on_error": {"pause": {"reason": "render_failed", "resume": "render"}}, "on_unknown": {"pause": {"reason": "render_failed", "resume": "render"}}
+    },
+    "unavailable": {
+      "invoke": {"binding": "command", "timeout_seconds": 10, "config": {"script": "scripts/stage.py", "args": ["unavailable"]}, "cwd": ".", "inputs": []},
+      "result": "json-v1", "outcomes": ["READY"], "on": {"READY": {"finish": "succeeded"}}, "on_error": {"pause": {"reason": "hardware_unavailable", "resume": "unavailable"}}, "on_unknown": {"pause": {"reason": "hardware_unavailable", "resume": "unavailable"}}
+    }
+  }}}
+}

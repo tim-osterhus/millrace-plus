@@ -1,0 +1,75 @@
+{
+  "summary": {
+    "instance_id": null,
+    "run_id": "b7597745fafe4734a8cc1e9c3369f0c9",
+    "status": "paused",
+    "quiescent": true,
+    "state_version": 12,
+    "planes": {
+      "main": {
+        "status": "paused",
+        "cursor": "skip",
+        "active_invocation": null,
+        "pause_reason": "baseline_saved",
+        "resume_target": "skip",
+        "dependencies": [],
+        "selected": {},
+        "progress": {},
+        "pending_completion_ids": [],
+        "last_event": {
+          "event_kind": "transition",
+          "event_id": "82591284f4af4a82b06eaccf968ae272",
+          "completion_id": "82591284f4af4a82b06eaccf968ae272",
+          "plane_id": "main",
+          "node_id": "baseline",
+          "producing_revision_id": "a9b8a4ed1e7e6c527dfc213ec4be195452ff2d852b86d2a3e0ed0f6bd8475d9f",
+          "routing_revision_id": "a9b8a4ed1e7e6c527dfc213ec4be195452ff2d852b86d2a3e0ed0f6bd8475d9f",
+          "outcome": "READY",
+          "action": "{\"pause\":{\"reason\":\"baseline_saved\",\"resume\":\"skip\"}}",
+          "target": "skip",
+          "retry_delta": 0,
+          "version": 12
+        }
+      }
+    }
+  },
+  "invocations": {
+    "next_cursor": null,
+    "items": [
+      {
+        "invocation_id": "82591284f4af4a82b06eaccf968ae272",
+        "plane_id": "main",
+        "node_id": "baseline",
+        "producing_revision_id": "a9b8a4ed1e7e6c527dfc213ec4be195452ff2d852b86d2a3e0ed0f6bd8475d9f",
+        "completion": {
+          "transport": "completed",
+          "exit_code": 0,
+          "classification": "semantic",
+          "outcome": "READY",
+          "diagnostic": null
+        },
+        "writer": {
+          "original": "stopped",
+          "effective": "stopped"
+        }
+      },
+      {
+        "invocation_id": "d11d8faa216b4d48ab3a6478bff5f394",
+        "plane_id": "main",
+        "node_id": "detect",
+        "producing_revision_id": "a9b8a4ed1e7e6c527dfc213ec4be195452ff2d852b86d2a3e0ed0f6bd8475d9f",
+        "completion": {
+          "transport": "completed",
+          "exit_code": 0,
+          "classification": "semantic",
+          "outcome": "READY",
+          "diagnostic": null
+        },
+        "writer": {
+          "original": "stopped",
+          "effective": "stopped"
+        }
+      }
+    ]
+  }
+}

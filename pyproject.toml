@@ -36,6 +36,7 @@ include = [
     "/pyproject.toml",
     "src/millrace_plus",
     "tests/router",
+    "tests/demo",
     "tests/test_package_metadata.py",
     "tests/test_public_package_boundary.py",
     "tests/test_agent_skill_assets.py",
@@ -46,7 +47,7 @@ include = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/router", "tests/test_package_metadata.py", "tests/test_public_package_boundary.py", "tests/test_agent_skill_assets.py", "tests/test_public_test_support_boundary.py"]
+testpaths = ["tests/router", "tests/demo", "tests/test_package_metadata.py", "tests/test_public_package_boundary.py", "tests/test_agent_skill_assets.py", "tests/test_public_test_support_boundary.py"]
 pythonpath = ["src"]
 addopts = ["-p", "no:cacheprovider"]
 markers = [

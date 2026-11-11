@@ -134,7 +134,8 @@ def test_stock_graphs_have_no_implicit_skill_authority() -> None:
             continue
         assert graph["format"] == (
             "millrace-router/v4"
-            if path.parent.name in {"lad", "lad-service", "software-factory"}
+            if path.parent.name
+            in {"lad", "lad-service", "software-factory", "hardware-demo"}
             else "millrace-router/v3"
         )
         assert all("skills/" not in asset for asset in graph["control_files"])

@@ -27,7 +27,7 @@ NON_PUBLIC_REGRESSION_TESTS = {
     "tests/test_simple_loop_governed_context_lifecycle.py",
     "tests/test_workflow_package_manifest.py",
 }
-ACTIVE = ["tests/router", *PUBLIC_TESTS[:4]]
+ACTIVE = ["tests/router", "tests/demo", *PUBLIC_TESTS[:4]]
 
 
 def _text(path: str) -> str:
@@ -261,9 +261,14 @@ def test_installed_catalog_without_core_from_public_selection(tmp_path: Path) ->
     )
     selectors = [v["selector"] for v in json.loads(listed.stdout)["templates"]]
     assert selectors == [
-        "bundled:cicd", "bundled:cicd-v2", "bundled:document-review",
-        "bundled:lad", "bundled:lad-service",
-        "bundled:software-change", "bundled:software-factory",
+        "bundled:cicd",
+        "bundled:cicd-v2",
+        "bundled:document-review",
+        "bundled:hardware-demo",
+        "bundled:lad",
+        "bundled:lad-service",
+        "bundled:software-change",
+        "bundled:software-factory",
     ]
     for selector in selectors:
         destination = outside / selector.split(":")[1]
@@ -276,9 +281,14 @@ def test_installed_catalog_without_core_from_public_selection(tmp_path: Path) ->
         )
         assert json.loads((destination / "workflow.json").read_text())["format"] == (
             "millrace-router/v4"
-            if selector in {
-                "bundled:cicd", "bundled:cicd-v2", "bundled:lad",
-                "bundled:lad-service", "bundled:software-factory",
+            if selector
+            in {
+                "bundled:cicd",
+                "bundled:cicd-v2",
+                "bundled:hardware-demo",
+                "bundled:lad",
+                "bundled:lad-service",
+                "bundled:software-factory",
             }
             else "millrace-router/v3"
         )
