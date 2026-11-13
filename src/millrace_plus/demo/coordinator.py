@@ -710,6 +710,8 @@ class Coordinator:
             )
             execution["timestamps"]["exported_at"] = _now()
             execution["timestamps"]["cleanup_observed_at"] = _now()
+            # The record was built before export; carry an error first set since then.
+            execution["error"] = _safe_code(self.error)
             try:
                 _validate_execution(execution)
                 encoded = canonical_bytes(execution)

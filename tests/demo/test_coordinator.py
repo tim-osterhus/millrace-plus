@@ -560,6 +560,81 @@ def test_postcleanup_annotation_failure_keeps_prior_durable_record(owner, monkey
     assert path.with_name("report.html").is_file()
 
 
+def _complete_export_owner(owner, monkeypatch, *, error=None):
+    owner.error = error
+    owner.baseline = build_baseline(unknown_hardware())
+    owner.baseline_bytes = canonical_bytes(owner.baseline)
+    owner.report = build_report("demo", owner.baseline)
+    owner.handle = closing_handle(owner, [])
+    monkeypatch.setattr(
+        owner,
+        "_summary",
+        lambda: {"status": "succeeded", "quiescent": True, "inflight_invocations": []},
+    )
+    monkeypatch.setattr(owner, "_invocations", lambda: [])
+
+
+def _print_fails_on_result_path(monkeypatch):
+    printed = []
+
+    def fake_print(*args, **kwargs):
+        text = " ".join(str(item) for item in args)
+        if "report.html" in text:
+            raise OSError("/private/credential-locator private-bearer")
+        printed.append(text)
+
+    monkeypatch.setattr(coordinator, "print", fake_print, raising=False)
+    return printed
+
+
+@pytest.mark.parametrize(
+    "prior_error,expected",
+    [(None, "export_failed"), ("graph_incomplete", "graph_incomplete")],
+)
+def test_print_oserror_after_verified_export_records_safe_error(
+    owner, monkeypatch, prior_error, expected
+):
+    _complete_export_owner(owner, monkeypatch, error=prior_error)
+    printed = _print_fails_on_result_path(monkeypatch)
+    assert owner._finish() == 1
+    result = next(owner.options.output.glob("demo-*"))
+    raw = (result / "execution.json").read_bytes()
+    record = json.loads(raw)
+    assert owner.error == expected and record["error"] == expected
+    assert owner.root.exists()
+    assert record["retention"] == {
+        "keep_demo": False,
+        "cleanup": "retained",
+        "reason": expected,
+    }
+    for name, digest in record["artifacts"].items():
+        assert coordinator._sha((result / name).read_bytes()) == digest
+    assert any(line.startswith("Demo state retained: ") for line in printed)
+    for forbidden in (b"credential-locator", b"private-bearer"):
+        assert forbidden not in raw
+        assert all(forbidden.decode() not in line for line in printed)
+
+
+def test_print_oserror_with_failed_annotation_keeps_prior_record(owner, monkeypatch):
+    _complete_export_owner(owner, monkeypatch)
+    printed = _print_fails_on_result_path(monkeypatch)
+    original = coordinator.write_private
+
+    def fail_annotation(path, raw):
+        if path.name == "execution.json" and path.parent.parent == owner.options.output:
+            raise OSError("disk full private-bearer")
+        return original(path, raw)
+
+    monkeypatch.setattr(coordinator, "write_private", fail_annotation)
+    assert owner._finish() == 1
+    path = next(owner.options.output.glob("demo-*/execution.json"))
+    record = json.loads(path.read_bytes())
+    assert record["error"] is None and record["retention"]["cleanup"] == "pending"
+    assert owner.error == "export_failed" and owner.root.exists()
+    assert any(line.startswith("Execution annotation failed") for line in printed)
+    assert all("private-bearer" not in line for line in printed)
+
+
 def test_actual_public_baseline_gate_projection_pins_exact_producer():
     from pathlib import Path
 

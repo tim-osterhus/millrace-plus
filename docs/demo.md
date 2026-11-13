@@ -51,6 +51,12 @@ deadline expiry still prevents successful closeout and deletion.
 `retention.reason` records `keep_demo` first, then `closure_unconfirmed` when
 closure proof is incomplete. With positive closure facts, a safe recorded error
 explains retention; otherwise `ownership_unconfirmed` records failed removal.
+The final annotation refreshes the record's `error` with the safe error detected
+before the annotation is written, for example `export_failed` after a verified
+export is followed by a failed output write. `retention.reason` keeps the
+precedence above, so `keep_demo` or `closure_unconfirmed` still wins and an earlier
+safe error keeps precedence over a later one. If the annotation cannot be saved,
+the earlier saved record (`cleanup: pending`) remains.
 No process is killed by a saved PID, and no stale-state reaper is installed.
 
 Exit 0 means a valid complete report and confirmed shutdown. Exit 1 means
