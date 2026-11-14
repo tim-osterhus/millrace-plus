@@ -27,6 +27,7 @@ from millrace.router.execution import (  # noqa: E402
     RouterError,
 )
 
+from . import native_diagnostic as nd  # noqa: E402
 from .configuration import (  # noqa: E402
     fields,
     mapping,
@@ -43,6 +44,15 @@ SUPPORTED_CLAUDE_VERSIONS = frozenset({"2.1.296", CLAUDE_VERSION})
 PROFILE_FORMAT = "millrace-claude-print-profile/v1"
 LAUNCH_FORMAT = "millrace-claude-print-launch/v1"
 RESULT_FORMAT = "millrace-claude-print-result/v1"
+# Bridge-enabled formats: the complete v1 shapes plus only the bridge members.
+LAUNCH_FORMAT_V2 = "millrace-claude-print-launch/v2"
+RESULT_FORMAT_V2 = "millrace-claude-print-result/v2"
+BRIDGE_FAILURES = frozenset("claude_" + code for code in nd.PREFLIGHT_FAILURES)
+# Only these terminal failures carry a parsed JSON result envelope with a status.
+STATUS_FAILURES = {
+    "claude_native_exit": "execution_failure",
+    "claude_native_error": "protocol_failure",
+}
 CLEANUP_FORMAT = "millrace-claude-cleanup/v1"
 PROMPT_NAME = "claude-prompt.txt"
 SCHEMA_NAME = "claude-result-schema.json"
@@ -142,7 +152,8 @@ def _binding(
 def _node(
     value: object, files: Mapping[str, bytes]
 ) -> tuple[str, bytes, dict[str, object]]:
-    config = fields(value, {"prompt"}, SETTINGS)
+    config = fields(value, {"prompt"}, SETTINGS | {nd.CONFIG_KEY})
+    nd.node_bridge(config)
     name, raw = _control(files, config["prompt"])
     try:
         if "\x00" in raw.decode("utf-8-sig"):
@@ -184,9 +195,14 @@ def _argv(
 
 def _details(plan: LaunchPlan) -> dict[str, object]:
     _contract(plan.adapter_id, plan.adapter_contract)
-    details = fields(plan.details, LAUNCH_FIELDS)
+    selected = mapping(plan.details).get("format")
+    if selected == LAUNCH_FORMAT_V2:
+        details = fields(plan.details, LAUNCH_FIELDS | nd.LAUNCH_FIELDS)
+        nd.launch_bridge(details)
+    else:
+        details = fields(plan.details, LAUNCH_FIELDS)
     if (
-        details["format"] != LAUNCH_FORMAT
+        details["format"] not in (LAUNCH_FORMAT, LAUNCH_FORMAT_V2)
         or not isinstance(details["expected_version"], str)
         or details["expected_version"] not in SUPPORTED_CLAUDE_VERSIONS
         or details["native_inheritance"] is not True
@@ -669,6 +685,49 @@ def _terminal(raw: bytes) -> tuple[dict[str, object] | None, bytes, str | None]:
     return obj, semantic, None
 
 
+def _api_status(envelope: dict[str, object] | None, failure: object) -> int | None:
+    """Typed status from a parsed terminal error envelope only; never from prose."""
+    if (
+        envelope is None
+        or failure not in STATUS_FAILURES
+        or envelope.get("type") != "result"
+        or envelope.get("is_error") is not True
+    ):
+        return None
+    return nd.typed_status(envelope.get("api_error_status"))
+
+
+def _bridge_evidence(
+    details: Mapping[str, object],
+    e: Mapping[str, object],
+    completion: CompletionFacts,
+) -> None:
+    """Pure v2 checks over retained launch and evidence; no sidecar is read."""
+    _, status, admitted = nd.evidence_links(
+        e,
+        bridge=nd.launch_bridge(details),
+        invocation_id=completion.invocation_id,
+        protocol=nd.CLAUDE_PROTOCOL,
+    )
+    if (e["failure_code"] in BRIDGE_FAILURES) == admitted:
+        raise RouterError("completion_integrity")
+    if not admitted and (
+        e["phase"] != "preflight"
+        or completion.transport != "execution_failure"
+        or completion.writer_state != "stopped"
+        or completion.exit_code is not None
+        or completion.stderr
+    ):
+        raise RouterError("completion_integrity")
+    if status is not None and (
+        e["phase"] != "main"
+        or STATUS_FAILURES.get(cast(str, e["failure_code"])) != completion.transport
+        or not 0 < cast(int, e["native_stdout_bytes"]) <= 1048576
+        or (completion.exit_code == 0) != (completion.transport == "protocol_failure")
+    ):
+        raise RouterError("completion_integrity")
+
+
 class ClaudePrintAdapter:
     """Direct Plus adapter. Only invoke reads live host configuration/environment."""
 
@@ -740,6 +799,17 @@ class ClaudePrintAdapter:
             "expected_version": parsed["claude_version"],
             "native_inheritance": True,
         }
+        bridge = nd.node_bridge(request.node_config)
+        if bridge is not None:
+            details["format"] = LAUNCH_FORMAT_V2
+            details.update(
+                nd.launch_extension(
+                    bridge,
+                    request.plane_id,
+                    request.node_id,
+                    request.producing_revision,
+                )
+            )
         return LaunchPlan(
             request.invocation_id,
             ADAPTER_ID,
@@ -762,6 +832,48 @@ class ClaudePrintAdapter:
         on_started: Callable[[int], None],
     ) -> AdapterResult:
         details = _details(plan)
+        if details["format"] != LAUNCH_FORMAT_V2:
+            return self._run(plan, details, cwd, env, deadline, poll, on_started)[0]
+        bridge = nd.launch_bridge(details)
+        try:
+            context = nd.preflight(cwd, bridge)
+        except RouterError as exc:
+            # Refused before any native process: an ordinary stopped failure.
+            failure = "claude_" + exc.code
+            evidence = nd.preflight_evidence(
+                _evidence(plan.invocation_id), RESULT_FORMAT_V2
+            )
+            evidence["failure_code"] = failure
+            return AdapterResult(
+                b"", b"", "execution_failure", "stopped", failure, None, evidence
+            )
+        result, envelope = self._run(
+            plan, details, cwd, env, deadline, poll, on_started
+        )
+        return nd.export_result(
+            result,
+            plan=plan,
+            cwd=cwd,
+            bridge=bridge,
+            context=context,
+            evidence_format=RESULT_FORMAT_V2,
+            protocol=nd.CLAUDE_PROTOCOL,
+            api_error_status=_api_status(
+                envelope, mapping(result.adapter_evidence).get("failure_code")
+            ),
+        )
+
+    def _run(
+        self,
+        plan: LaunchPlan,
+        details: Mapping[str, object],
+        cwd: Path,
+        env: Mapping[str, str],
+        deadline: float,
+        poll: Callable[[], bool],
+        on_started: Callable[[int], None],
+    ) -> tuple[AdapterResult, dict[str, object] | None]:
+        """The unchanged native lifecycle; also returns the parsed envelope."""
         expected_version = cast(str, details["expected_version"])
         child_env = dict(os.environ)
         child_env.update(env)
@@ -797,7 +909,7 @@ class ClaudePrintAdapter:
             evidence.update(terminal_state="error", failure_code=failure)
             stderr, cut = _diagnostics(probe, child_env, None)
             evidence["stderr_truncated"] = cut
-            return AdapterResult(
+            refused = AdapterResult(
                 b"",
                 stderr,
                 probe.transport
@@ -808,6 +920,7 @@ class ClaudePrintAdapter:
                 probe.exit_code,
                 evidence,
             )
+            return refused, None
         evidence.update(
             phase="main", observed_version=expected_version, terminal_state="incomplete"
         )
@@ -878,7 +991,7 @@ class ClaudePrintAdapter:
             )
             stderr, cut = _diagnostics(result, child_env, obj)
         evidence.update(stderr_truncated=cut, failure_code=failure)
-        return AdapterResult(
+        outcome = AdapterResult(
             semantic,
             stderr,
             transport,
@@ -887,17 +1000,23 @@ class ClaudePrintAdapter:
             result.exit_code,
             evidence,
         )
+        return outcome, obj
 
     def validate_completion(
         self, plan: LaunchPlan, completion: CompletionFacts
     ) -> None:
         try:
             details = _details(plan)
-            e = fields(completion.evidence, EVIDENCE_FIELDS, {"cleanup"})
+            bridged = details["format"] == LAUNCH_FORMAT_V2
+            e = fields(
+                completion.evidence,
+                EVIDENCE_FIELDS | (nd.EVIDENCE_FIELDS if bridged else set()),
+                {"cleanup"},
+            )
             if (
                 completion.invocation_id != plan.invocation_id
                 or e["invocation_id"] != plan.invocation_id
-                or e["format"] != RESULT_FORMAT
+                or e["format"] != (RESULT_FORMAT_V2 if bridged else RESULT_FORMAT)
                 or e["phase"] not in {"preflight", "probe", "main"}
                 or e["terminal_state"]
                 not in {"not_started", "incomplete", "invalid", "error", "success"}
@@ -1019,5 +1138,7 @@ class ClaudePrintAdapter:
                 "semantic_sha256"
             ] != (_digest(completion.stdout) if completion.stdout else None):
                 raise RouterError("completion_integrity")
+            if bridged:
+                _bridge_evidence(details, e, completion)
         except (RouterError, KeyError, TypeError, ValueError, UnicodeError) as exc:
             raise RouterError("completion_integrity") from exc

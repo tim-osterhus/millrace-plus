@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import shutil
 import sqlite3
 import subprocess
 from dataclasses import replace
@@ -28,7 +29,9 @@ from millrace.router.execution import AdapterResult, RouterError
 from millrace.router.store import Store
 from plus_support import Crash, new_id, start_run, store_path
 
+from millrace_plus.router import codex as codex_adapter
 from millrace_plus.router import control
+from millrace_plus.router import native_diagnostic as nd
 
 
 def _inspect(instance: str, run: str, home: Path) -> dict[str, Any]:
@@ -546,3 +549,147 @@ def test_live_and_locked_edits_keep_producing_contract(
     assert final["completions"][0]["stdout"] == FINAL.decode()
     assert len(final["transitions"]) == 2
     assert _inspect(instance, str(result["id"]), home) == final
+
+
+BRIDGE = {
+    "context_path": "state/native-context.json",
+    "outbox_path": "state/native-diagnostics",
+}
+CONTEXT_ID = "00000000-0000-4000-8000-0000000000cc"
+
+
+@pytest.mark.parametrize(
+    "case", ["success", "turn_failed", "error_nonzero_exit", "missing_context"]
+)
+def test_bridge_v2_codex_status_is_typed_null_and_reload_is_pure(
+    single_flow: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+) -> None:
+    """Codex 0.163.0 message-only errors never yield a positive status."""
+    started = [
+        {"type": "thread.started", "thread_id": "fake-thread"},
+        {"type": "turn.started"},
+    ]
+    options: dict[str, Any] = {}
+    if case == "turn_failed":
+        failed = {"message": "429 Too Many Requests: rate limit exceeded"}
+        options.update(
+            events=[*started, {"type": "turn.failed", "error": failed}],
+            final=None,
+            exit_code=1,
+        )
+    elif case == "error_nonzero_exit":
+        error = {"type": "error", "message": "HTTP 503 Service Unavailable"}
+        options.update(events=[*started, error], final=None, exit_code=1)
+    workflow, project, home, native_home = codex_flow(single_flow, **options)
+    graph = json.loads(workflow.read_text())
+    node = graph["planes"]["main"]["nodes"]["draft"]
+    node["invoke"]["config"]["diagnostic_bridge"] = BRIDGE
+    node["on_error"] = {"finish": "failed"}
+    workflow.write_text(json.dumps(graph))
+    if case != "missing_context":
+        context = project / BRIDGE["context_path"]
+        context.parent.mkdir(parents=True)
+        value = {
+            "format": "millrace-native-context/v1",
+            "context_id": CONTEXT_ID,
+            "input_sha256": "e" * 64,
+        }
+        context.write_text(json.dumps(value))
+    instance = codex_instance(workflow, project, home, native_home)
+    native: list[object] = []
+    original = codex_adapter._process
+
+    def observed(*args: Any, **kwargs: Any) -> Any:
+        native.append(args[0])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(codex_adapter, "_process", observed)
+    run = start_run(instance, state_home=home)
+    assert run["status"] == ("succeeded" if case == "success" else "failed")
+    current = _inspect(instance, str(run["id"]), home)
+    invocation = current["invocations"][0]
+    details = invocation["launch"]["details"]
+    evidence = invocation["adapter_evidence"]
+    assert details["format"] == "millrace-codex-exec-launch/v2"
+    assert evidence["format"] == "millrace-codex-exec-result/v2"
+    completion = current["completions"][0]
+    if case == "missing_context":
+        assert native == []
+        assert evidence["failure_code"] == "codex_bridge_context_missing"
+        assert evidence["native_diagnostic"] is None
+        assert evidence["diagnostic_bridge"] is None
+        assert not (project / "state").exists()
+    else:
+        assert len(native) == 2
+        assert evidence["native_diagnostic"] == {
+            "protocol": "codex-exec-jsonl/v1",
+            "api_error_status": None,
+        }
+        expected_failure = {
+            "success": None,
+            "turn_failed": "codex_turn_failed",
+            "error_nonzero_exit": "codex_nonzero_exit",
+        }[case]
+        assert evidence["failure_code"] == expected_failure
+        ref = nd.DiagnosticBridgeRef(**evidence["diagnostic_bridge"])
+        raw = (project / ref.path).read_bytes()
+        record = nd.verify_record(
+            raw,
+            ref,
+            nd.BridgeConfig.load(BRIDGE),
+            {
+                "context_id": CONTEXT_ID,
+                "input_sha256": "e" * 64,
+                "invocation_id": invocation["id"],
+                "adapter_id": ADAPTER_ID,
+                "adapter_contract": ADAPTER_CONTRACT,
+                "launch_sha256": hashlib.sha256(nd.canonical(details)).hexdigest(),
+                "failure_code": expected_failure,
+                "native_diagnostic": evidence["native_diagnostic"],
+            },
+        )
+        assert record.api_error_status is None
+        assert b"Too Many" not in raw and b"Service Unavailable" not in raw
+        shutil.rmtree(project / "state")
+    # Reload never reads the sidecar or spawns the native CLI.
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            subprocess, "Popen", lambda *a, **k: pytest.fail("reload spawned process")
+        )
+        cold = _inspect(instance, str(run["id"]), home)
+    assert cold["completions"][0] == completion
+    assert cold["invocations"] == current["invocations"]
+    path = store_path(instance, home)
+    with sqlite3.connect(path) as db:
+        row = db.execute("SELECT id,body FROM invocations").fetchone()
+        body = json.loads(row[1])
+        body["adapter_evidence"]["native_diagnostic"] = {
+            "protocol": "codex-exec-jsonl/v1",
+            "api_error_status": 429,
+        }
+        db.execute(
+            "UPDATE invocations SET body=? WHERE id=?", (json.dumps(body), row[0])
+        )
+    corrupted = _dump(path)
+    with pytest.raises(RouterError) as error:
+        _inspect(instance, str(run["id"]), home)
+    assert error.value.code in {"completion_integrity", "invocation_integrity"}
+    assert _dump(path) == corrupted
+
+
+def test_bridge_disabled_codex_capture_stays_v1(
+    single_flow: tuple[Path, Path, Path],
+) -> None:
+    from millrace_plus.router import codex_configuration as c
+
+    workflow, project, home, native_home = codex_flow(single_flow)
+    instance = codex_instance(workflow, project, home, native_home)
+    run = start_run(instance, state_home=home)
+    assert run["status"] == "succeeded"
+    invocation = _inspect(instance, str(run["id"]), home)["invocations"][0]
+    assert invocation["launch"]["details"]["format"] == c.LAUNCH_FORMAT
+    assert set(invocation["launch"]["details"]) == c.LAUNCH_FIELDS
+    assert invocation["adapter_evidence"]["format"] == c.RESULT_FORMAT
+    assert set(invocation["adapter_evidence"]) == c.EVIDENCE_FIELDS

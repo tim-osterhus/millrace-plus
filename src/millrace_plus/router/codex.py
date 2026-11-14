@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import os
 import re
 import stat
@@ -25,6 +26,7 @@ from millrace.router.execution import (  # noqa: E402
 )
 
 from . import codex_configuration as c  # noqa: E402
+from . import native_diagnostic as nd  # noqa: E402
 from .configuration import fields, mapping, text  # noqa: E402
 from .stream_records import FramingError, JsonLineRecords  # noqa: E402
 
@@ -107,13 +109,14 @@ class Stream:
     def invalid(self) -> bool:
         return self.records.invalid
 
-    def feed(self, raw: bytes) -> None:
+    def feed(self, raw: builtins.bytes) -> None:
         try:
             self.records.feed(raw, self.event)
         except FramingError as exc:
             code = (
                 "codex_event_limit"
-                if exc.code == "event_limit" else "codex_invalid_events"
+                if exc.code == "event_limit"
+                else "codex_invalid_events"
             )
             raise RouterError(code) from exc
         except (RouterError, UnicodeError, RecursionError) as exc:
@@ -403,7 +406,11 @@ def _process(
         try:
             stream.feed(chunk)
         except (
-            RouterError, UnicodeError, RecursionError, TypeError, ValueError
+            RouterError,
+            UnicodeError,
+            RecursionError,
+            TypeError,
+            ValueError,
         ) as exc:
             native_error = exc
             fail("protocol_failure", "codex_invalid_events")
@@ -417,7 +424,9 @@ def _process(
             return
         if probe:
             if code == 0 and bytes(version) in {
-                b"codex-cli 0.163.0", b"codex-cli 0.163.0\n", b"codex-cli 0.163.0\r\n",
+                b"codex-cli 0.163.0",
+                b"codex-cli 0.163.0\n",
+                b"codex-cli 0.163.0\r\n",
             }:
                 transport, raw = "completed", bytes(version)
             else:
@@ -445,18 +454,25 @@ def _process(
                 error = (
                     exc.code if isinstance(exc, RouterError) else "codex_invalid_final"
                 )
-                fail({"codex_cancelled": "cancelled", "codex_timeout": "timeout"}.get(
-                    error, "protocol_failure"
-                ), error)
+                fail(
+                    {"codex_cancelled": "cancelled", "codex_timeout": "timeout"}.get(
+                        error, "protocol_failure"
+                    ),
+                    error,
+                )
 
     version = bytearray()
 
     def version_bytes(chunk: bytes) -> None:
-        version.extend(chunk[:max(0, 4096 - len(version))])
+        version.extend(chunk[: max(0, 4096 - len(version))])
 
     process_deadline = min(deadline, time.time() + 5) if probe else deadline
     request = ProcessRequest(
-        argv, cwd, env, None if probe else prompt, process_deadline,
+        argv,
+        cwd,
+        env,
+        None if probe else prompt,
+        process_deadline,
         stdin_limit=1114112,
         stdout_capture_limit=4096 if probe else 1,
         stderr_capture_limit=4096 if probe else 65536,
@@ -466,8 +482,11 @@ def _process(
     )
     try:
         result = run_owned_process(
-            request, poll=poll, on_started=started,
-            on_stdout=version_bytes if probe else feed, on_drained=drained,
+            request,
+            poll=poll,
+            on_started=started,
+            on_stdout=version_bytes if probe else feed,
+            on_drained=drained,
             on_stop=stopped,
         )
     except OwnedProcessError as exc:
@@ -479,13 +498,22 @@ def _process(
     if transport is None:
         fail("execution_failure", "codex_close_timeout")
     writer = (
-        "may_live" if result.cleanup_forced else
-        "stopped" if result.cleanup_confirmed else "unknown"
+        "may_live"
+        if result.cleanup_forced
+        else "stopped"
+        if result.cleanup_confirmed
+        else "unknown"
     )
     return ProcessResult(
-        raw if transport == "completed" else b"", result.stderr,
-        transport or "execution_failure", writer, failure, result.exit_code,
-        result.pid, result.stderr_truncated, result.stdout_bytes,
+        raw if transport == "completed" else b"",
+        result.stderr,
+        transport or "execution_failure",
+        writer,
+        failure,
+        result.exit_code,
+        result.pid,
+        result.stderr_truncated,
+        result.stdout_bytes,
         result.stdout_sha256 if result.stdout_bytes else None,
     )
 
@@ -513,6 +541,44 @@ class CodexExecAdapter:
         on_started: Callable[[int], None],
     ) -> AdapterResult:
         details = c.launch_details(plan)
+        selected = c.bridge(details)
+        if selected is None:
+            return self._run(plan, details, cwd, env, deadline, poll, on_started)
+        try:
+            context = nd.preflight(cwd, selected)
+        except RouterError as exc:
+            # Refused before any native process: an ordinary stopped failure.
+            failure = "codex_" + exc.code
+            evidence = nd.preflight_evidence(
+                c.evidence(plan.invocation_id), c.RESULT_FORMAT_V2
+            )
+            evidence["failure_code"] = failure
+            return AdapterResult(
+                b"", b"", "execution_failure", "stopped", failure, None, evidence
+            )
+        # Codex 0.163.0 errors are message-only: the status is always typed null.
+        return nd.export_result(
+            self._run(plan, details, cwd, env, deadline, poll, on_started),
+            plan=plan,
+            cwd=cwd,
+            bridge=selected,
+            context=context,
+            evidence_format=c.RESULT_FORMAT_V2,
+            protocol=nd.CODEX_PROTOCOL,
+            api_error_status=None,
+        )
+
+    def _run(
+        self,
+        plan: LaunchPlan,
+        details: Mapping[str, object],
+        cwd: Path,
+        env: Mapping[str, str],
+        deadline: float,
+        poll: Callable[[], bool],
+        on_started: Callable[[int], None],
+    ) -> AdapterResult:
+        """The unchanged native lifecycle and v1 evidence."""
         evidence = c.evidence(plan.invocation_id)
         try:
             require_owned_process()
@@ -520,8 +586,13 @@ class CodexExecAdapter:
             failure = "codex_" + exc.code
             evidence["failure_code"] = failure
             return AdapterResult(
-                b"", ("[codex] " + failure).encode(), "execution_failure",
-                "stopped", failure, None, evidence,
+                b"",
+                ("[codex] " + failure).encode(),
+                "execution_failure",
+                "stopped",
+                failure,
+                None,
+                evidence,
             )
         native_env = launch_environment(env)
         try:

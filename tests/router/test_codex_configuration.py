@@ -13,6 +13,7 @@ import pytest
 from codex_support import ADAPTER_CONTRACT, ADAPTER_ID
 from millrace.router.execution import (
     AdapterConfiguration,
+    CompletionFacts,
     InvocationRequest,
     RouterError,
 )
@@ -400,3 +401,150 @@ def test_mixed_pi_codex_environment_is_local(
         control.inspect_run(instance, run["id"], state_home=home)["status"]
         == "succeeded"
     )
+
+
+BRIDGE = {
+    "context_path": "state/native-context.json",
+    "outbox_path": "state/native-diagnostics",
+}
+
+
+def test_bridge_launch_v2_is_pure_and_extends_legacy_v1_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from millrace_plus.router import codex_configuration as c
+
+    legacy_request = request(tmp_path)
+    legacy = c.plan(legacy_request)
+    assert legacy.details["format"] == "millrace-codex-exec-launch/v1"
+    assert set(legacy.details) == c.LAUNCH_FIELDS
+    req = replace(
+        legacy_request,
+        node_config={**legacy_request.node_config, "diagnostic_bridge": BRIDGE},
+    )
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("pure operation probed live filesystem")
+
+    with monkeypatch.context() as patch:
+        for name in ("exists", "stat", "lstat", "resolve", "read_bytes", "open"):
+            patch.setattr(Path, name, forbidden)
+        patch.setattr(os, "open", forbidden)
+        c.validate_configuration(config(req))
+        plan = c.plan(req)
+        c.launch_details(plan)
+    assert plan.details == {
+        **legacy.details,
+        "format": "millrace-codex-exec-launch/v2",
+        "diagnostic_bridge": BRIDGE,
+        "plane_id": "main",
+        "node_id": "draft",
+        "producing_revision": "revision",
+    }
+    assert (plan.argv, plan.environment, plan.settings) == (
+        legacy.argv,
+        legacy.environment,
+        legacy.settings,
+    )
+    assert plan.generated_controls == legacy.generated_controls
+    for details in (
+        {**plan.details, "format": "millrace-codex-exec-launch/v1"},
+        {**plan.details, "diagnostic_bridge": {**BRIDGE, "context_path": "/abs"}},
+        {**plan.details, "node_id": None},
+        {**plan.details, "extra": 1},
+        {k: v for k, v in plan.details.items() if k != "plane_id"},
+    ):
+        with pytest.raises(RouterError):
+            c.launch_details(replace(plan, details=details))
+    for bridge in (None, {**BRIDGE, "outbox_path": "../out"}, {"outbox_path": "x"}):
+        hostile = replace(
+            req, node_config={**req.node_config, "diagnostic_bridge": bridge}
+        )
+        with pytest.raises(RouterError):
+            c.validate_configuration(config(hostile))
+        with pytest.raises(RouterError):
+            c.plan(hostile)
+
+
+def test_bridge_v2_completion_is_typed_null_and_format_exact(tmp_path: Path) -> None:
+    from millrace_plus.router import codex_configuration as c
+
+    req = request(tmp_path)
+    plan = c.plan(
+        replace(req, node_config={**req.node_config, "diagnostic_bridge": BRIDGE})
+    )
+    legacy = c.plan(req)
+    refused = {
+        **c.evidence(plan.invocation_id),
+        "format": c.RESULT_FORMAT_V2,
+        "failure_code": "codex_bridge_context_missing",
+        "native_diagnostic": None,
+        "diagnostic_bridge": None,
+    }
+    facts = CompletionFacts(
+        plan.invocation_id,
+        None,
+        b"",
+        b"",
+        "execution_failure",
+        "stopped",
+        "codex_bridge_context_missing",
+        None,
+        refused,
+        "adapter",
+    )
+    c.validate_completion(plan, facts)
+    path = f"{BRIDGE['outbox_path']}/ctx-1/{plan.invocation_id}.json"
+    typed_null = {"protocol": "codex-exec-jsonl/v1", "api_error_status": None}
+    admitted = {
+        **refused,
+        "failure_code": "invalid_codex_credentials",
+        "native_diagnostic": typed_null,
+        "diagnostic_bridge": {"path": path, "sha256": "d" * 64},
+    }
+    c.validate_completion(
+        plan,
+        replace(facts, diagnostic="invalid_codex_credentials", evidence=admitted),
+    )
+    c.validate_completion(
+        plan,
+        replace(
+            facts,
+            diagnostic="invalid_codex_credentials",
+            evidence={**admitted, "diagnostic_bridge": None},
+        ),
+    )
+    native = typed_null
+    for evidence, target in (
+        ({**admitted, "native_diagnostic": {**native, "api_error_status": 429}}, plan),
+        ({**admitted, "native_diagnostic": {**native, "api_error_status": True}}, plan),
+        ({**admitted, "native_diagnostic": {**native, "protocol": "claude"}}, plan),
+        ({**admitted, "failure_code": "codex_bridge_context_invalid"}, plan),
+        ({**refused, "failure_code": "invalid_codex_credentials"}, plan),
+        ({**refused, "diagnostic_bridge": admitted["diagnostic_bridge"]}, plan),
+        ({**refused, "format": c.RESULT_FORMAT}, plan),
+        ({**refused, "provider": "x"}, plan),
+        (refused, legacy),
+        (
+            {
+                k: v
+                for k, v in refused.items()
+                if k not in {"native_diagnostic", "diagnostic_bridge"}
+            },
+            plan,
+        ),
+    ):
+        diagnostic = str(evidence["failure_code"])
+        with pytest.raises(RouterError, match="completion_integrity"):
+            c.validate_completion(
+                target, replace(facts, diagnostic=diagnostic, evidence=evidence)
+            )
+    # A refused preflight can only be a stopped, process-free failure.
+    for changes in (
+        {"writer_state": "may_live"},
+        {"transport": "timeout"},
+        {"stderr": b"[codex] refused"},
+        {"exit_code": 1},
+    ):
+        with pytest.raises(RouterError, match="completion_integrity"):
+            c.validate_completion(plan, replace(facts, **changes))

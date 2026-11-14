@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import shutil
 import sqlite3
 import subprocess
 from dataclasses import replace
@@ -16,7 +18,9 @@ from millrace.router.execution import AdapterResult, RouterError
 from millrace.router.store import Store
 from plus_support import Crash, create_instance, new_id, start_run, store_path
 
+from millrace_plus.router import claude as claude_adapter
 from millrace_plus.router import control
+from millrace_plus.router import native_diagnostic as nd
 from millrace_plus.router.claude import ClaudePrintAdapter
 
 
@@ -322,3 +326,172 @@ def _revision_case(
     assert final["invocations"][0]["revision_id"] != final["revision_id"]
     assert final["invocations"][1]["launch"]["adapter_id"] == "command"
     assert final["transitions"][0]["revision_id"] == final["revision_id"]
+
+
+BRIDGE = {
+    "context_path": "state/native-context.json",
+    "outbox_path": "state/native-diagnostics",
+}
+CONTEXT_ID = "00000000-0000-4000-8000-0000000000bb"
+
+
+def _bridged_flow(
+    single: tuple[Path, Path, Path], *, context: bool = True, **options: Any
+) -> tuple[Path, Path, Path]:
+    workflow, project, home = flow(single, **options)
+    data = json.loads(workflow.read_text())
+    node_config = data["planes"]["main"]["nodes"]["draft"]["invoke"]["config"]
+    node_config["diagnostic_bridge"] = BRIDGE
+    workflow.write_text(json.dumps(data))
+    if context:
+        path = project / BRIDGE["context_path"]
+        path.parent.mkdir(parents=True)
+        value = {
+            "format": "millrace-native-context/v1",
+            "context_id": CONTEXT_ID,
+            "input_sha256": "c" * 64,
+        }
+        path.write_text(json.dumps(value))
+    return workflow, project, home
+
+
+def _invocation_body(instance: str, home: Path) -> dict[str, Any]:
+    with sqlite3.connect(store_path(instance, home)) as db:
+        raw = db.execute("SELECT body FROM invocations").fetchone()[0]
+    return dict(json.loads(raw))
+
+
+@pytest.mark.parametrize("version", ["2.1.296", "2.1.305"])
+@pytest.mark.parametrize("case", ["success", "provider_status"])
+def test_bridge_v2_store_roundtrip_reload_and_corruption(
+    single_flow: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    version: str,
+    case: str,
+) -> None:
+    value = (
+        envelope()
+        if case == "success"
+        else envelope(is_error=True, api_error_status=429, structured_output=None)
+    )
+    workflow, project, home = _bridged_flow(
+        single_flow,
+        claude_version=version,
+        version=f"{version} (Claude Code)\n".encode(),
+        wire=json.dumps(value).encode(),
+    )
+    instance = create_instance(workflow, project, state_home=home)["instance_id"]
+    run = start_run(instance, state_home=home)
+    assert run["status"] == ("succeeded" if case == "success" else "failed")
+    current = control.inspect_run(instance, str(run["id"]), state_home=home)
+    invocation = current["invocations"][0]
+    details = invocation["launch"]["details"]
+    assert details["format"] == "millrace-claude-print-launch/v2"
+    assert (details["plane_id"], details["node_id"]) == ("main", "draft")
+    assert details["producing_revision"] == invocation["launch"]["producing_revision"]
+    assert details["diagnostic_bridge"] == BRIDGE
+    evidence = invocation["adapter_evidence"]
+    status = None if case == "success" else 429
+    assert evidence["format"] == "millrace-claude-print-result/v2"
+    assert evidence["native_diagnostic"] == {
+        "protocol": "claude-print-json/v1",
+        "api_error_status": status,
+    }
+    # A later consumer can verify the actual sidecar from public reads alone.
+    ref = nd.DiagnosticBridgeRef(**evidence["diagnostic_bridge"])
+    raw = (project / ref.path).read_bytes()
+    bridge = nd.BridgeConfig.load(BRIDGE)
+    record = nd.verify_record(
+        raw,
+        ref,
+        bridge,
+        {
+            "context_id": CONTEXT_ID,
+            "input_sha256": "c" * 64,
+            "invocation_id": invocation["id"],
+            "launch_sha256": hashlib.sha256(nd.canonical(details)).hexdigest(),
+            "failure_code": evidence["failure_code"],
+            "native_diagnostic": evidence["native_diagnostic"],
+        },
+    )
+    assert record.producing_revision == invocation["launch"]["producing_revision"]
+    # A well-formed but forged status is caught only against the actual sidecar.
+    forged = {**evidence["native_diagnostic"], "api_error_status": 503}
+    with pytest.raises(RouterError, match="native_diagnostic_mismatch"):
+        nd.verify_record(raw, ref, bridge, {"native_diagnostic": forged})
+    # Cold reload is pure over retained evidence: no sidecar, context or process.
+    shutil.rmtree(project / "state")
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            subprocess, "Popen", lambda *a, **k: pytest.fail("reload spawned process")
+        )
+        cold = control.inspect_run(instance, str(run["id"]), state_home=home)
+    for key in ("completions", "invocations", "transitions"):
+        assert cold[key] == current[key]
+    path = store_path(instance, home)
+    with sqlite3.connect(path) as db:
+        row = db.execute("SELECT id,body FROM invocations").fetchone()
+        body = json.loads(row[1])
+        # A status on a success, or a bool status, fails pure validation.
+        body["adapter_evidence"]["native_diagnostic"]["api_error_status"] = (
+            429 if case == "success" else True
+        )
+        db.execute(
+            "UPDATE invocations SET body=? WHERE id=?", (json.dumps(body), row[0])
+        )
+        before = list(db.iterdump())
+    with pytest.raises(RouterError):
+        control.inspect_run(instance, str(run["id"]), state_home=home)
+    with sqlite3.connect(path) as db:
+        assert list(db.iterdump()) == before
+
+
+def test_bridge_missing_context_is_ordinary_stopped_failure(
+    single_flow: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow, project, home = _bridged_flow(single_flow, context=False)
+    instance = create_instance(workflow, project, state_home=home)["instance_id"]
+    native: list[object] = []
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        native.append(args)
+        raise AssertionError("native process started")
+
+    monkeypatch.setattr(claude_adapter, "_process", forbidden)
+    run = start_run(instance, state_home=home)
+    assert native == []
+    # Ordinary error routing, not adapter_exception/unknown uncertainty.
+    assert run["status"] == "failed"
+    with sqlite3.connect(store_path(instance, home)) as db:
+        assert db.execute(
+            "SELECT transport,writer,diagnostic,exit_code FROM completions"
+        ).fetchone() == (
+            "execution_failure",
+            "stopped",
+            "claude_bridge_context_missing",
+            None,
+        )
+    evidence = _invocation_body(instance, home)["adapter_evidence"]
+    assert evidence["phase"] == "preflight" and evidence["probe_pid"] is None
+    assert evidence["native_diagnostic"] is None
+    assert evidence["diagnostic_bridge"] is None
+    assert not (project / BRIDGE["outbox_path"]).exists()
+    first = control.inspect_run(instance, str(run["id"]), state_home=home)
+    again = control.inspect_run(instance, str(run["id"]), state_home=home)
+    assert again["completions"] == first["completions"]
+    assert again["invocations"] == first["invocations"]
+
+
+def test_bridge_disabled_store_capture_stays_v1(
+    single_flow: tuple[Path, Path, Path],
+) -> None:
+    workflow, project, home = flow(single_flow)
+    instance = create_instance(workflow, project, state_home=home)["instance_id"]
+    run = start_run(instance, state_home=home)
+    assert run["status"] == "succeeded"
+    body = _invocation_body(instance, home)
+    assert body["launch"]["details"]["format"] == "millrace-claude-print-launch/v1"
+    assert set(body["launch"]["details"]) == claude_adapter.LAUNCH_FIELDS
+    assert body["adapter_evidence"]["format"] == "millrace-claude-print-result/v1"
+    assert set(body["adapter_evidence"]) == claude_adapter.EVIDENCE_FIELDS
+    assert not (project / "state").exists()

@@ -20,6 +20,7 @@ from millrace.router.execution import (  # noqa: E402
     RouterError,
 )
 
+from . import native_diagnostic as nd  # noqa: E402
 from .configuration import (  # noqa: E402
     fields,
     identifier,
@@ -36,6 +37,10 @@ ADAPTER_CONTRACT = "millrace-codex-exec/v1"
 PROFILE_FORMAT = "millrace-codex-exec-profile/v1"
 LAUNCH_FORMAT = "millrace-codex-exec-launch/v1"
 RESULT_FORMAT = "millrace-codex-exec-result/v1"
+# Bridge-enabled formats: the complete v1 shapes plus only the bridge members.
+LAUNCH_FORMAT_V2 = "millrace-codex-exec-launch/v2"
+RESULT_FORMAT_V2 = "millrace-codex-exec-result/v2"
+BRIDGE_FAILURES = frozenset("codex_" + code for code in nd.PREFLIGHT_FAILURES)
 CODEX_VERSION = "0.163.0"
 CONTROL_LIMIT = 1048576
 EVENT_LIMIT = 16777216
@@ -148,7 +153,8 @@ def binding(
 def node(
     config: Mapping[str, object], files: Mapping[str, bytes]
 ) -> tuple[str, bytes, dict[str, object]]:
-    obj = fields(config, {"prompt"}, SETTINGS)
+    obj = fields(config, {"prompt"}, SETTINGS | {nd.CONFIG_KEY})
+    nd.node_bridge(obj)
     path, raw = _control(files, obj["prompt"])
     try:
         if len(raw) > CONTROL_LIMIT or "\x00" in raw.decode("utf-8-sig"):
@@ -308,6 +314,14 @@ def plan(request: InvocationRequest) -> LaunchPlan:
         "line_limit": LINE_LIMIT,
         "final_limit": FINAL_LIMIT,
     }
+    opt_in = nd.node_bridge(request.node_config)
+    if opt_in is not None:
+        details["format"] = LAUNCH_FORMAT_V2
+        details.update(
+            nd.launch_extension(
+                opt_in, request.plane_id, request.node_id, request.producing_revision
+            )
+        )
     return LaunchPlan(
         request.invocation_id,
         ADAPTER_ID,
@@ -322,9 +336,13 @@ def plan(request: InvocationRequest) -> LaunchPlan:
 
 def launch_details(plan: LaunchPlan) -> dict[str, object]:
     _contract(plan.adapter_id, plan.adapter_contract)
-    obj = fields(plan.details, LAUNCH_FIELDS)
+    if mapping(plan.details).get("format") == LAUNCH_FORMAT_V2:
+        obj = fields(plan.details, LAUNCH_FIELDS | nd.LAUNCH_FIELDS)
+        nd.launch_bridge(obj)
+    else:
+        obj = fields(plan.details, LAUNCH_FIELDS)
     if (
-        obj["format"] != LAUNCH_FORMAT
+        obj["format"] not in (LAUNCH_FORMAT, LAUNCH_FORMAT_V2)
         or obj["expected_version"] != CODEX_VERSION
         or obj["auth_mode"] != "chatgpt"
         or (not isinstance(obj["sandbox"], str) or obj["sandbox"] not in SANDBOXES)
@@ -384,14 +402,46 @@ def _positive(value: object) -> bool:
     return type(value) is int and value > 0
 
 
+def bridge(details: Mapping[str, object]) -> nd.BridgeConfig | None:
+    """The pinned bridge of validated launch details; null for legacy v1."""
+    if details["format"] != LAUNCH_FORMAT_V2:
+        return None
+    return nd.launch_bridge(details)
+
+
+def _bridge_evidence(
+    selected: nd.BridgeConfig, e: Mapping[str, object], completion: CompletionFacts
+) -> None:
+    """Pure v2 checks: typed-null status only, no positive Codex rule."""
+    _, status, admitted = nd.evidence_links(
+        e,
+        bridge=selected,
+        invocation_id=completion.invocation_id,
+        protocol=nd.CODEX_PROTOCOL,
+    )
+    if status is not None or (e["failure_code"] in BRIDGE_FAILURES) == admitted:
+        raise RouterError("completion_integrity")
+    if not admitted and (
+        e["phase"] != "preflight"
+        or completion.transport != "execution_failure"
+        or completion.writer_state != "stopped"
+        or completion.exit_code is not None
+        or completion.stderr
+    ):
+        raise RouterError("completion_integrity")
+
+
 def validate_completion(plan: LaunchPlan, completion: CompletionFacts) -> None:
     try:
-        launch_details(plan)
-        e = fields(completion.evidence, EVIDENCE_FIELDS)
+        selected = bridge(launch_details(plan))
+        e = fields(
+            completion.evidence,
+            EVIDENCE_FIELDS | (nd.EVIDENCE_FIELDS if selected is not None else set()),
+        )
         if (
             completion.invocation_id != plan.invocation_id
             or e["invocation_id"] != plan.invocation_id
-            or e["format"] != RESULT_FORMAT
+            or e["format"] != (RESULT_FORMAT if selected is None else RESULT_FORMAT_V2)
             or e["phase"] not in {"preflight", "invocation"}
             or e["observed_version"] not in {None, CODEX_VERSION}
             or e["protocol_state"]
@@ -460,5 +510,7 @@ def validate_completion(plan: LaunchPlan, completion: CompletionFacts) -> None:
                 raise RouterError("completion_integrity")
         elif completion.stdout or e["failure_code"] is None or e["final"] is not None:
             raise RouterError("completion_integrity")
+        if selected is not None:
+            _bridge_evidence(selected, e, completion)
     except (RouterError, KeyError, TypeError, ValueError, UnicodeError) as exc:
         raise RouterError("completion_integrity") from exc

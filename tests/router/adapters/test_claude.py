@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import shutil
 import subprocess
 import time
 from dataclasses import replace
@@ -16,6 +18,7 @@ from claude_support import FINAL, cleanup_proof, config, envelope, fake, request
 from millrace.router.execution import CompletionFacts, RouterError
 
 from millrace_plus.router import claude as c
+from millrace_plus.router import native_diagnostic as nd
 
 
 def prepared(tmp: Path, *, claude_version: str = "2.1.296", **options: Any) -> Any:
@@ -898,3 +901,585 @@ def test_quoted_credential_escape_boundaries(
     assert b"4K8X" not in result.stderr and b"inert" not in result.stderr
     assert b"HTTP 401" in result.stderr and b"HTTP 429 quota" in result.stderr
     assert b"[REDACTED]" in result.stderr
+
+
+# Opt-in native diagnostic bridge (launch/evidence v2). No provider calls.
+
+BRIDGE = {
+    "context_path": "state/native-context.json",
+    "outbox_path": "state/native-diagnostics",
+}
+CONTEXT_ID = "00000000-0000-4000-8000-0000000000aa"
+INPUT_SHA = "a" * 64
+
+
+def write_context(root: Path, **changes: Any) -> None:
+    path = root / BRIDGE["context_path"]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    value = {
+        "format": "millrace-native-context/v1",
+        "context_id": CONTEXT_ID,
+        "input_sha256": INPUT_SHA,
+        **changes,
+    }
+    path.write_text(json.dumps(value))
+
+
+def bridged(
+    tmp: Path, *, version: str = "2.1.296", context: bool = True, **options: Any
+) -> Any:
+    if "executable" in options:
+        executable = options.pop("executable")
+    else:
+        native = f"{version} (Claude Code)\n".encode()
+        executable = str(fake(tmp / "peer", version=native, **options))
+    req = request(tmp, executable=executable, claude_version=version)
+    req = replace(req, node_config={**req.node_config, "diagnostic_bridge": BRIDGE})
+    if context:
+        write_context(tmp)
+    return c.ClaudePrintAdapter().plan(req)
+
+
+def bridged_run(plan: Any, tmp: Path, **kwargs: Any) -> tuple[Any, CompletionFacts]:
+    pids: list[int] = []
+    result = run(plan, tmp, started=pids.append, **kwargs)
+    facts = CompletionFacts(
+        plan.invocation_id,
+        pids[-1] if pids else None,
+        result.stdout,
+        result.stderr,
+        result.classification,
+        result.writer_state,
+        result.diagnostic,
+        result.exit_code,
+        result.adapter_evidence,
+        "adapter",
+    )
+    return result, facts
+
+
+def published(plan: Any, tmp: Path, result: Any) -> nd.NativeDiagnostic:
+    """Verify the actual sidecar against the retained launch and evidence."""
+    e = result.adapter_evidence
+    ref = nd.DiagnosticBridgeRef(**e["diagnostic_bridge"])
+    assert ref.path == f"{BRIDGE['outbox_path']}/{CONTEXT_ID}/{plan.invocation_id}.json"
+    raw = (tmp / ref.path).read_bytes()
+    return nd.verify_record(
+        raw,
+        ref,
+        nd.BridgeConfig.load(BRIDGE),
+        {
+            "context_id": CONTEXT_ID,
+            "input_sha256": INPUT_SHA,
+            "invocation_id": plan.invocation_id,
+            "plane_id": "main",
+            "node_id": "draft",
+            "producing_revision": "revision",
+            "adapter_id": "claude_print",
+            "adapter_contract": "millrace-claude-print/v1",
+            "evidence_format": c.RESULT_FORMAT_V2,
+            "launch_sha256": hashlib.sha256(nd.canonical(plan.details)).hexdigest(),
+            "transport": result.classification,
+            "writer_state": result.writer_state,
+            "failure_code": e["failure_code"],
+            "native_diagnostic": e["native_diagnostic"],
+        },
+    )
+
+
+def test_bridge_disabled_launch_and_evidence_stay_legacy_v1(tmp_path: Path) -> None:
+    plan = prepared(tmp_path)
+    req = request(tmp_path)
+    assert plan.details == {
+        "format": "millrace-claude-print-launch/v1",
+        "profile_path": "claude.json",
+        "profile_sha256": hashlib.sha256(req.files["claude.json"]).hexdigest(),
+        "prompt_source": "task.txt",
+        "prompt_source_sha256": hashlib.sha256(b"Review.").hexdigest(),
+        "prompt_path": str(tmp_path / "invocation" / c.PROMPT_NAME),
+        "prompt_sha256": hashlib.sha256(
+            plan.generated_controls[c.PROMPT_NAME]
+        ).hexdigest(),
+        "schema_sha256": hashlib.sha256(
+            plan.generated_controls[c.SCHEMA_NAME]
+        ).hexdigest(),
+        "expected_version": "2.1.296",
+        "native_inheritance": True,
+    }
+    result, facts = bridged_run(plan, tmp_path)
+    assert result.classification == "completed"
+    e = result.adapter_evidence
+    assert e["format"] == "millrace-claude-print-result/v1"
+    assert set(e) == c.EVIDENCE_FIELDS
+    assert not (tmp_path / "state").exists()
+    c.ClaudePrintAdapter().validate_completion(plan, facts)
+    # A legacy capture never accepts, and is never reinterpreted with, v2 members.
+    for evidence in (
+        {**e, "native_diagnostic": None, "diagnostic_bridge": None},
+        {**e, "format": c.RESULT_FORMAT_V2},
+        {
+            **e,
+            "format": c.RESULT_FORMAT_V2,
+            "native_diagnostic": None,
+            "diagnostic_bridge": None,
+        },
+    ):
+        with pytest.raises(RouterError, match="completion_integrity"):
+            c.ClaudePrintAdapter().validate_completion(
+                plan, replace(facts, evidence=evidence)
+            )
+
+
+@pytest.mark.parametrize(
+    "bridge",
+    [
+        None,
+        {"context_path": "state/native-context.json"},
+        {**BRIDGE, "outbox_path": "/abs"},
+        {**BRIDGE, "context_path": "../context.json"},
+        {**BRIDGE, "outbox_path": BRIDGE["context_path"]},
+        {**BRIDGE, "extra": "x"},
+    ],
+)
+def test_bridge_configuration_is_strict(tmp_path: Path, bridge: object) -> None:
+    req = request(tmp_path)
+    req = replace(req, node_config={**req.node_config, "diagnostic_bridge": bridge})
+    with pytest.raises(RouterError):
+        c.ClaudePrintAdapter().validate_configuration(config(req))
+    with pytest.raises(RouterError):
+        c.ClaudePrintAdapter().plan(req)
+
+
+def test_bridge_launch_v2_is_pure_and_extends_v1_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = c.ClaudePrintAdapter().plan(request(tmp_path))
+    req = request(tmp_path)
+    req = replace(req, node_config={**req.node_config, "diagnostic_bridge": BRIDGE})
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("planning touched the bridge filesystem")
+
+    with monkeypatch.context() as patch:
+        for name in ("preflight", "publish", "_read", "_walk", "_file"):
+            patch.setattr(nd, name, forbidden)
+        patch.setattr(os, "open", forbidden)
+        c.ClaudePrintAdapter().validate_configuration(config(req))
+        plan = c.ClaudePrintAdapter().plan(req)
+    assert plan.details == {
+        **legacy.details,
+        "format": "millrace-claude-print-launch/v2",
+        "diagnostic_bridge": BRIDGE,
+        "plane_id": "main",
+        "node_id": "draft",
+        "producing_revision": "revision",
+    }
+    assert (plan.argv, plan.environment, plan.settings) == (
+        legacy.argv,
+        legacy.environment,
+        legacy.settings,
+    )
+    assert plan.generated_controls == legacy.generated_controls
+    assert not (tmp_path / "state").exists()
+    for details in (
+        {**plan.details, "format": c.LAUNCH_FORMAT},
+        {**plan.details, "diagnostic_bridge": {**BRIDGE, "outbox_path": "/abs"}},
+        {**plan.details, "plane_id": ""},
+        {**plan.details, "extra": 1},
+        {k: v for k, v in plan.details.items() if k != "producing_revision"},
+        {**legacy.details, "format": "millrace-claude-print-launch/v3"},
+    ):
+        with pytest.raises(RouterError):
+            c._details(replace(plan, details=details))
+
+
+@pytest.mark.parametrize("version", ["2.1.296", "2.1.305"])
+@pytest.mark.parametrize("shape", ["claude_native_error", "claude_native_exit"])
+@pytest.mark.parametrize("status", [429, 500, 529, 401, 403])
+def test_bridge_exports_typed_status_for_both_terminal_error_shapes(
+    tmp_path: Path, version: str, shape: str, status: int
+) -> None:
+    secret = "sk-provider-secret-value"
+    value = envelope(
+        is_error=True,
+        api_error_status=status,
+        result=f"API Error: {status} rate limited {secret}",
+        structured_output=None,
+    )
+    plan = bridged(
+        tmp_path,
+        version=version,
+        wire=json.dumps(value).encode(),
+        stderr=f"HTTP {status} {secret}".encode(),
+        exit_code=1 if shape == "claude_native_exit" else 0,
+    )
+    result, facts = bridged_run(plan, tmp_path)
+    transport = c.STATUS_FAILURES[shape]
+    assert (result.classification, result.diagnostic) == (transport, shape)
+    assert result.writer_state == "stopped" and result.stdout == b""
+    e = result.adapter_evidence
+    assert e["format"] == c.RESULT_FORMAT_V2
+    assert set(e) == c.EVIDENCE_FIELDS | {"native_diagnostic", "diagnostic_bridge"}
+    assert e["native_diagnostic"] == {
+        "protocol": "claude-print-json/v1",
+        "api_error_status": status,
+    }
+    record = published(plan, tmp_path, result)
+    assert record.api_error_status == status
+    raw = (tmp_path / e["diagnostic_bridge"]["path"]).read_bytes()
+    # Only finite structured facts are retained; no prose, stderr or secret.
+    for text in (raw, json.dumps(e).encode()):
+        assert b"rate limited" not in text and secret.encode() not in text
+    c.ClaudePrintAdapter().validate_completion(plan, facts)
+
+
+@pytest.mark.parametrize("shape", ["claude_native_error", "claude_native_exit"])
+@pytest.mark.parametrize("status", [99, 600, 777])
+def test_bridge_retains_unknown_integer_status_as_data(
+    tmp_path: Path, shape: str, status: int
+) -> None:
+    """Unknown integers are retained, never capped or given positive meaning."""
+    value = envelope(is_error=True, api_error_status=status, structured_output=None)
+    plan = bridged(
+        tmp_path,
+        wire=json.dumps(value).encode(),
+        exit_code=1 if shape == "claude_native_exit" else 0,
+    )
+    result, facts = bridged_run(plan, tmp_path)
+    assert result.diagnostic == shape
+    assert result.adapter_evidence["native_diagnostic"] == {
+        "protocol": "claude-print-json/v1",
+        "api_error_status": status,
+    }
+    assert published(plan, tmp_path, result).api_error_status == status
+    c.ClaudePrintAdapter().validate_completion(plan, facts)
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "success",
+        "absent",
+        "null",
+        "string",
+        "bool",
+        "float",
+        "not_is_error",
+        "is_error_string",
+        "wrong_type",
+        "prose_only",
+        "stderr_only",
+        "unparseable_exit",
+        "array_envelope",
+    ],
+)
+def test_bridge_status_is_typed_null_without_selected_envelope(
+    tmp_path: Path, case: str
+) -> None:
+    value = envelope(is_error=True, structured_output=None, api_error_status=429)
+    options: dict[str, Any] = {}
+    if case == "success":
+        value = envelope()
+    elif case == "absent":
+        value.pop("api_error_status")
+    elif case == "null":
+        value["api_error_status"] = None
+    elif case == "string":
+        value["api_error_status"] = "429"
+    elif case == "bool":
+        value["api_error_status"] = True
+    elif case == "float":
+        value["api_error_status"] = 429.0
+    elif case == "not_is_error":
+        value = envelope(api_error_status=429)
+    elif case == "is_error_string":
+        value["is_error"] = "true"
+    elif case == "wrong_type":
+        value["type"] = "assistant"
+    elif case == "prose_only":
+        value.update(api_error_status=None, result="API Error: 429 rate limit")
+        value["errors"] = ["429 Too Many Requests"]
+    elif case == "stderr_only":
+        value["api_error_status"] = None
+        options.update(stderr=b"HTTP 429 quota rate_limit_error", exit_code=1)
+    wire = json.dumps([value] if case == "array_envelope" else value).encode()
+    if case == "unparseable_exit":
+        wire = b"429 Too Many Requests"
+        options["exit_code"] = 1
+    plan = bridged(tmp_path, wire=wire, **options)
+    result, facts = bridged_run(plan, tmp_path)
+    assert (result.classification == "completed") == (case == "success")
+    e = result.adapter_evidence
+    assert e["native_diagnostic"] == {
+        "protocol": "claude-print-json/v1",
+        "api_error_status": None,
+    }
+    assert published(plan, tmp_path, result).api_error_status is None
+    c.ClaudePrintAdapter().validate_completion(plan, facts)
+
+
+@pytest.mark.parametrize("case", ["timeout", "cancel", "spawn", "probe_mismatch"])
+def test_bridge_stop_and_spawn_failures_keep_lifecycle_and_null_status(
+    tmp_path: Path, case: str
+) -> None:
+    value = envelope(is_error=True, structured_output=None, api_error_status=429)
+    options: dict[str, Any] = {"wire": json.dumps(value).encode()}
+    kwargs: dict[str, Any] = {}
+    if case == "spawn":
+        options = {"executable": str(tmp_path / "missing-claude")}
+    elif case == "probe_mismatch":
+        options["exit_code"] = 1
+    else:
+        options["before"] = "time.sleep(10)"
+    plan = bridged(tmp_path, **options)
+    if case == "probe_mismatch":
+        plan = replace(plan, details={**plan.details, "expected_version": "2.1.305"})
+    if case == "timeout":
+        kwargs["timeout"] = 1
+    if case == "cancel":
+        started: list[int] = []
+        kwargs["poll"] = lambda: bool(started)
+        result = run(plan, tmp_path, started=started.append, **kwargs)
+        facts = CompletionFacts(
+            plan.invocation_id,
+            started[-1],
+            result.stdout,
+            result.stderr,
+            result.classification,
+            result.writer_state,
+            result.diagnostic,
+            result.exit_code,
+            result.adapter_evidence,
+            "adapter",
+        )
+    else:
+        result, facts = bridged_run(plan, tmp_path, **kwargs)
+    expected = {
+        "timeout": ("timeout", "claude_timeout"),
+        "cancel": ("cancelled", "claude_cancelled"),
+        "spawn": ("execution_failure", "claude_spawn_failed"),
+        "probe_mismatch": ("execution_failure", "claude_version_mismatch"),
+    }[case]
+    assert (result.classification, result.diagnostic) == expected
+    e = result.adapter_evidence
+    assert e["native_diagnostic"]["api_error_status"] is None
+    record = published(plan, tmp_path, result)
+    assert (record.transport, record.writer_state) == (
+        result.classification,
+        result.writer_state,
+    )
+    if case != "probe_mismatch":
+        c.ClaudePrintAdapter().validate_completion(plan, facts)
+    if case == "cancel":
+        # Positive cancelled/stopped still needs the existing confirmed cleanup.
+        assert result.writer_state == "stopped"
+        assert e["cleanup"]["return_reason"] == "confirmed"
+        legacy = {k: v for k, v in e.items() if k != "cleanup"}
+        with pytest.raises(RouterError, match="completion_integrity"):
+            c.ClaudePrintAdapter().validate_completion(
+                plan, replace(facts, evidence=legacy)
+            )
+        renamed = replace(facts, diagnostic="claude_timeout")
+        with pytest.raises(RouterError, match="completion_integrity"):
+            c.ClaudePrintAdapter().validate_completion(
+                plan,
+                replace(renamed, evidence={**e, "failure_code": "claude_timeout"}),
+            )
+
+
+@pytest.mark.parametrize(
+    "case,code",
+    [
+        ("missing", "claude_bridge_context_missing"),
+        ("invalid_json", "claude_bridge_context_invalid"),
+        ("extra_field", "claude_bridge_context_invalid"),
+        ("wrong_format", "claude_bridge_context_invalid"),
+        ("unsafe_id", "claude_bridge_context_invalid"),
+        ("symlink", "claude_bridge_context_invalid"),
+        ("directory", "claude_bridge_context_invalid"),
+        ("outbox_symlink", "claude_bridge_outbox_invalid"),
+    ],
+)
+def test_bridge_preflight_refusal_is_stopped_failure_before_native_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str, code: str
+) -> None:
+    plan = bridged(tmp_path, context=case not in {"missing", "symlink", "directory"})
+    context = tmp_path / BRIDGE["context_path"]
+    context.parent.mkdir(parents=True, exist_ok=True)
+    if case == "invalid_json":
+        context.write_text("{")
+    elif case == "extra_field":
+        write_context(tmp_path, extra=1)
+    elif case == "wrong_format":
+        write_context(tmp_path, format="millrace-native-context/v0")
+    elif case == "unsafe_id":
+        write_context(tmp_path, context_id="../escape")
+    elif case == "symlink":
+        (tmp_path / "elsewhere.json").write_text("{}")
+        context.symlink_to(tmp_path / "elsewhere.json")
+    elif case == "directory":
+        context.mkdir()
+    elif case == "outbox_symlink":
+        (tmp_path / "outside").mkdir()
+        (tmp_path / BRIDGE["outbox_path"]).symlink_to(tmp_path / "outside")
+    monkeypatch.setattr(
+        subprocess, "Popen", lambda *a, **k: pytest.fail("native process started")
+    )
+    result, facts = bridged_run(plan, tmp_path)
+    assert (result.stdout, result.stderr, result.exit_code) == (b"", b"", None)
+    assert (result.classification, result.writer_state, result.diagnostic) == (
+        "execution_failure",
+        "stopped",
+        code,
+    )
+    e = result.adapter_evidence
+    assert e == {
+        **c._evidence(plan.invocation_id),
+        "format": c.RESULT_FORMAT_V2,
+        "failure_code": code,
+        "native_diagnostic": None,
+        "diagnostic_bridge": None,
+    }
+    assert facts.pid is None
+    c.ClaudePrintAdapter().validate_completion(plan, facts)
+    if case == "outbox_symlink":
+        assert not list((tmp_path / "outside").iterdir())
+    else:
+        assert not (tmp_path / BRIDGE["outbox_path"]).exists()
+
+
+def test_bridge_publication_replays_and_conflict_never_overwrites(
+    tmp_path: Path,
+) -> None:
+    plan = bridged(tmp_path)
+    first, facts = bridged_run(plan, tmp_path)
+    ref = first.adapter_evidence["diagnostic_bridge"]
+    path = tmp_path / ref["path"]
+    raw = path.read_bytes()
+    # The same terminal facts for the same invocation replay the same record.
+    second, _ = bridged_run(plan, tmp_path)
+    assert second.adapter_evidence["diagnostic_bridge"] == ref
+    assert [p.name for p in path.parent.iterdir()] == [path.name]
+    # Conflicting retained bytes are never overwritten and never referenced.
+    path.unlink()
+    path.write_bytes(raw.replace(b'"stopped"', b'"unknown"'))
+    conflicted = path.read_bytes()
+    third, third_facts = bridged_run(plan, tmp_path)
+    assert third.classification == "completed" and json.loads(third.stdout) == FINAL
+    assert third.adapter_evidence["diagnostic_bridge"] is None
+    assert third.adapter_evidence["native_diagnostic"] == {
+        "protocol": "claude-print-json/v1",
+        "api_error_status": None,
+    }
+    assert path.read_bytes() == conflicted
+    assert [p.name for p in path.parent.iterdir()] == [path.name]
+    c.ClaudePrintAdapter().validate_completion(plan, third_facts)
+    c.ClaudePrintAdapter().validate_completion(plan, facts)
+
+
+def test_bridge_completion_validation_reads_no_sidecar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    value = envelope(is_error=True, structured_output=None, api_error_status=429)
+    plan = bridged(tmp_path, wire=json.dumps(value).encode())
+    result, facts = bridged_run(plan, tmp_path)
+    assert result.adapter_evidence["diagnostic_bridge"] is not None
+    shutil.rmtree(tmp_path / "state")
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("completion validation touched the bridge filesystem")
+
+    with monkeypatch.context() as patch:
+        for name in ("preflight", "publish", "_read", "_walk", "_file"):
+            patch.setattr(nd, name, forbidden)
+        patch.setattr(os, "open", forbidden)
+        c.ClaudePrintAdapter().validate_completion(plan, facts)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "v1_format",
+        "missing_native",
+        "missing_ref",
+        "extra_member",
+        "protocol",
+        "bool_status",
+        "string_status",
+        "float_status",
+        "other_status_rule",
+        "status_without_stdout",
+        "native_extra",
+        "ref_extra",
+        "ref_other_invocation",
+        "ref_escape",
+        "ref_other_outbox",
+        "ref_sha",
+        "ref_without_native",
+        "bridge_code_with_native",
+        "launch_v1",
+        "launch_other_bridge",
+        "launch_extra",
+    ],
+)
+def test_bridge_evidence_v2_corruption_refuses(tmp_path: Path, mutation: str) -> None:
+    value = envelope(is_error=True, structured_output=None, api_error_status=429)
+    plan = bridged(tmp_path, wire=json.dumps(value).encode())
+    result, facts = bridged_run(plan, tmp_path)
+    adapter = c.ClaudePrintAdapter()
+    adapter.validate_completion(plan, facts)
+    e = dict(result.adapter_evidence)
+    native = dict(e["native_diagnostic"])
+    ref = dict(e["diagnostic_bridge"])
+    details = dict(plan.details)
+    if mutation == "v1_format":
+        e["format"] = c.RESULT_FORMAT
+    elif mutation == "missing_native":
+        e.pop("native_diagnostic")
+    elif mutation == "missing_ref":
+        e.pop("diagnostic_bridge")
+    elif mutation == "extra_member":
+        e["provider_class"] = "provider_usage"
+    elif mutation == "protocol":
+        e["native_diagnostic"] = {**native, "protocol": "codex-exec-jsonl/v1"}
+    elif mutation == "bool_status":
+        e["native_diagnostic"] = {**native, "api_error_status": True}
+    elif mutation == "string_status":
+        e["native_diagnostic"] = {**native, "api_error_status": "429"}
+    elif mutation == "float_status":
+        e["native_diagnostic"] = {**native, "api_error_status": 429.0}
+    elif mutation == "other_status_rule":
+        facts = replace(facts, diagnostic="claude_native_exit")
+        e["failure_code"] = "claude_native_exit"
+    elif mutation == "status_without_stdout":
+        e.update(native_stdout_bytes=0, native_stdout_sha256=None)
+    elif mutation == "native_extra":
+        e["native_diagnostic"] = {**native, "message": "rate limited"}
+    elif mutation == "ref_extra":
+        e["diagnostic_bridge"] = {**ref, "size": 1}
+    elif mutation == "ref_other_invocation":
+        path = ref["path"].replace(plan.invocation_id, "2" * 32)
+        e["diagnostic_bridge"] = {**ref, "path": path}
+    elif mutation == "ref_escape":
+        path = f"{BRIDGE['outbox_path']}/../{plan.invocation_id}.json"
+        e["diagnostic_bridge"] = {**ref, "path": path}
+    elif mutation == "ref_other_outbox":
+        e["diagnostic_bridge"] = {**ref, "path": "other/" + ref["path"]}
+    elif mutation == "ref_sha":
+        e["diagnostic_bridge"] = {**ref, "sha256": "Z" * 64}
+    elif mutation == "ref_without_native":
+        e["native_diagnostic"] = None
+    elif mutation == "bridge_code_with_native":
+        facts = replace(facts, diagnostic="claude_bridge_context_missing")
+        e["failure_code"] = "claude_bridge_context_missing"
+    elif mutation == "launch_v1":
+        details = {k: v for k, v in details.items() if k not in nd.LAUNCH_FIELDS}
+        details["format"] = c.LAUNCH_FORMAT
+    elif mutation == "launch_other_bridge":
+        details["diagnostic_bridge"] = {**BRIDGE, "outbox_path": "state/elsewhere"}
+    else:
+        details["unexpected"] = True
+    with pytest.raises(RouterError, match="completion_integrity"):
+        adapter.validate_completion(
+            replace(plan, details=details), replace(facts, evidence=e)
+        )

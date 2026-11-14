@@ -419,6 +419,145 @@ guard, with native model/effort inherited. Production supports native API/provid
 configuration without that guard. Every native qualification claim remains
 limited to its exact accepted source, artifacts, CLI and selected route receipts.
 
+## Native diagnostic bridge (opt-in, Claude and Codex)
+
+`claude_print` and `codex_exec` nodes can export one finite terminal diagnostic
+record. The bridge is a generic local export. It does not route, retry, wait or
+classify, and it knows no workflow, role or service. Nodes without the setting
+keep the launch-v1 and result-v1 formats byte for byte. Captures from before the
+bridge reload unchanged and are never reclassified.
+
+Opt in with node config:
+
+```json
+{"prompt":"prompts/step.md",
+ "diagnostic_bridge":{"context_path":"state/native-context.json",
+                      "outbox_path":"state/native-diagnostics"}}
+```
+
+Both paths are normalized relative paths. They resolve against the node's actual
+working directory (the plane workspace plus the node `cwd`) and must stay beneath
+it. Neither path may contain the other. Symlinks and special files are refused at
+every component.
+
+**Launch format.** A bridge-enabled plan selects
+`millrace-claude-print-launch/v2` or `millrace-codex-exec-launch/v2`. That is
+the complete v1 details object plus exactly four members:
+
+- `diagnostic_bridge`;
+- `plane_id`, `node_id` and `producing_revision`, copied from Core's
+  `InvocationRequest`.
+
+Planning stays pure: it reads no workspace file, so Core can re-plan during
+completion validation. Validators dispatch on the exact format string.
+
+**Context preflight.** `invoke` reads the context before any native process,
+including the version probe. The context is the strict
+`millrace-native-context/v1` record with exactly `format`, `context_id` and
+`input_sha256`. Its contents are never executed. Any valid strict JSON form is
+accepted, including whitespace and key order; callers need not canonicalize it.
+Duplicate keys, non-finite numbers and unknown or missing keys refuse.
+
+Two input guards keep the read and the path safe:
+
+- **Context read.** The read uses the router's existing 1 MiB captured-control
+  bound, so a hostile file cannot force an unbounded read. A valid context is a
+  few hundred bytes.
+- **Identifiers.** `context_id` and the invocation ID each become one path
+  component. They use the existing Claude safe-ID form, `[A-Za-z0-9_-]{1,128}`:
+  no separator, dot component or control character. At 128 characters,
+  `<id>.json` stays under the common 255-byte file-name limit.
+
+Neither guard limits invocations, records, time or workflow behavior.
+
+A missing context, an invalid context or an unsafe outbox returns an ordinary
+stopped failure. It is never an adapter exception:
+
+| Field | Value |
+| --- | --- |
+| Transport | `execution_failure` |
+| Writer | `stopped` |
+| Process, exit code, stdout, stderr | none |
+| Phase | `preflight` |
+| Diagnostic | `claude_` / `codex_` + `bridge_context_missing`, `bridge_context_invalid` or `bridge_outbox_invalid` |
+| `native_diagnostic`, `diagnostic_bridge` | both explicit `null` |
+
+Core routes this failure through the node's ordinary error edge.
+
+**Terminal export.** After a successful preflight, the adapter publishes
+`<outbox_path>/<context_id>/<invocation_id>.json` before returning its result.
+The record is canonical `millrace-native-diagnostic/v1` JSON with exactly these
+fields:
+
+- `format`, `context_id`, `input_sha256`;
+- `invocation_id`, `plane_id`, `node_id`, `producing_revision`;
+- `adapter_id`, `adapter_contract`, `evidence_format`;
+- `launch_sha256`: SHA-256 of the canonical retained launch `details`;
+- `transport`, `writer_state`, `failure_code`;
+- `native_diagnostic`: `{protocol, api_error_status}`.
+
+Publication links a complete temporary file and never overwrites. Identical bytes
+already at the path are reused, and the read-back compares only the expected byte
+count. Publication never changes the native transport, writer state, diagnostic or
+result bytes, and a publication failure never raises into Core
+`adapter_exception` or unknown-writer recovery.
+
+If publication cannot complete, `diagnostic_bridge` is `null` while
+`native_diagnostic` is kept. The cause can be any of:
+
+- different existing bytes at the path, which stay untouched;
+- an I/O failure;
+- no record file at all.
+
+Any post-preflight evidence with a non-null `native_diagnostic` and a `null`
+`diagnostic_bridge` means the auxiliary handoff is unavailable. It is not
+verified bridge evidence and grants no retry authority. A consumer that depends
+on the record must hold or reconcile. It must never infer anything from the
+native status alone or blindly resend.
+
+**Evidence format.** The result format is `millrace-claude-print-result/v2` or
+`millrace-codex-exec-result/v2`. It is the complete v1 evidence, including the
+optional Claude `cleanup` proof and every existing rule, plus exactly:
+
+- `native_diagnostic`;
+- `diagnostic_bridge`: `{path, sha256}` naming the published record, or `null`.
+
+Positive Claude cancellation with writer `stopped` still requires confirmed
+cleanup and `claude_cancelled`.
+
+**Completion validation** is pure over the retained launch and evidence. It
+checks the member shapes, the protocol and the record path for this invocation
+and outbox. It does not read the sidecar. A later consumer must verify the actual
+bytes against the retained reference, for example with
+`native_diagnostic.verify_record`, before treating them as evidence. A missing
+export after a crash or adapter exception is never diagnostic evidence.
+
+**Status extraction.**
+
+- **Claude** (`claude-print-json/v1`, pinned 2.1.296 and 2.1.305). The status is
+  retained only when all of these hold:
+  - the failure is `claude_native_exit` (nonzero exit with a parseable JSON
+    envelope) or `claude_native_error` (exit 0 error envelope);
+  - the envelope has `type: "result"` and `is_error: true`;
+  - `api_error_status` is a JSON integer that is not a boolean.
+
+  Any such integer is retained as structured data, including codes outside the
+  usual HTTP range. Retention gives an unknown code no meaning. A consumer applies
+  its own finite table and infers nothing from codes outside it.
+
+  Anything else gives `null`, including:
+  - an absent, string, boolean or float status;
+  - a timeout, cancellation, spawn, probe or output-limit failure;
+  - an invalid envelope;
+  - prose in `result`, `errors` or stderr.
+- **Codex** (`codex-exec-jsonl/v1`, pinned 0.163.0). The status is always `null`.
+  Its `error.message` and `turn.failed.error.message` events carry no structured
+  cause, and no message text is inspected.
+
+Neither record keeps error prose, stderr or stdout. A typed status is an
+observation, not a classification. Policy over these records belongs to the
+consuming workflow, which must re-verify the actual bytes.
+
 ## OpenCode finite run
 
 `opencode_run` / `millrace-opencode-run/v1` selects public OpenCode 1.19.3,
