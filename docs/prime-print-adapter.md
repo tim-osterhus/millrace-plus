@@ -11,6 +11,8 @@ This contract pins upstream commit
 [v0.10.2 release](https://github.com/PrimeIntellect-ai/prime-agent/releases/tag/v0.10.2).
 Source and inert-process checks do not qualify a native executable, provider,
 account, model, operating system or production workflow.
+One native route has a separate, bounded result. See
+[Scoped native qualification](#scoped-native-qualification).
 
 ## Captured profile and task
 
@@ -145,3 +147,97 @@ Native detached processes and remote effects remain unknown.
 A closed foreground group proves neither rollback nor external-effect closure.
 Pure configuration, planning and historical completion validation require no
 native executable, live filesystem, environment or credential probes.
+
+## Scoped native qualification
+
+One native route passed a bounded live qualification on 2026-11-13.
+The result applies only to the identities in this table.
+
+| Item | Qualified identity |
+| --- | --- |
+| Platform | Linux x86_64, one host |
+| Prime Agent | Official 0.10.2 `linux-x64` archive, SHA-256 `09659961dfde201cc39f1e69b607385d708da3e591f267a4fea04970afb8b005` |
+| Prime executable | SHA-256 `f13e3e5ebcb1aa044bd4d5f8375479dbd1ca0210ded37db0d4a360a2be103b23` |
+| Requested settings | Provider `deepseek`, model `deepseek-v4-flash`, thinking `off` |
+| Core wheel | `millrace-ai` 0.23.2, SHA-256 `829e837e0ff03cf972c23e9d292cbc3a8d29f3d8bec3dace15e66c0f8ac8cfc3` |
+| Plus wheel | `millrace-plus` 0.23.2, SHA-256 `502a751fc575a35397c6b45ccda69b48a759807a94b45f4c941cc0de85d4170d` |
+| Kernel | Private Python environment, tree SHA-256 `329620b37c29aa5668248f344f1186f75d55308cd33d39d8717098c95539cdc5` |
+
+The Plus wheel carries the adapter from commit
+`4b3c96f6c75527ca76d4808a77462140d51d6557`.
+The installed adapter, configuration, resolver and control modules equal that
+commit's source bytes. Six installed Core router modules, compared by hash,
+equal Core commit `6114929b30241604e65c53081e8d9ab2bd32cad6`.
+Later Plus commits are not part of this result.
+
+### Observed phases
+
+A driver ran three workflows in sequence. Each workflow allowed one
+invocation. The driver retried no phase.
+
+1. **Useful task.** Prime wrote an audit file from fixture invoices. The file
+   matched an independently computed decimal total, and Core recorded `READY`.
+2. **Main cancellation.** The driver sent a public `cancel_run` request while
+   the Prime main ran. Core returned `queued` and later recorded the same
+   request as `applied`. The adapter stopped the main with forced cleanup and
+   reported a closed foreground group. Core recorded transport `cancelled` and
+   writer `may_live`.
+
+   The driver then confirmed that the main and the identified tool process no
+   longer existed. One public `reconcile_invocation` request recorded the
+   writer as stopped. The run reached `cancelled` and quiescent. The original
+   completion stayed unchanged apart from `effective_writer`.
+3. **Recovery.** A fresh run with a new invocation completed a second audit.
+   That file also matched its independently computed total.
+
+The retained cancel receipt, final control page and reconciliation receipt
+agree on the run, invocation and request identities.
+
+### Counts
+
+The route used three Prime main processes and three adapter `--version` probes.
+These numbers count local processes. They are not a provider request count, a
+cost figure or a spending limit. One main can send several provider requests.
+No record counts provider requests for this run.
+
+### Kernel setup in this route
+
+Prime owns kernel bootstrap, and this adapter sets no kernel requirement.
+The qualified route supplied a prepared interpreter through Prime's override
+variable.
+Core and Plus do not bundle, install or pin kernel dependencies.
+
+The route's workflow declared six environment names, which Core passed to
+Prime:
+
+- `HOME`, a private directory for the job.
+- `PRIME_AGENT_KERNEL_PYTHON`, the absolute path of the prepared interpreter.
+- `PYTHONDONTWRITEBYTECODE`, set to `1`.
+- `DEEPSEEK_API_KEY`, `PRIME_AGENT_CODING_AGENT_DIR` and `TMPDIR`.
+
+These names describe this route only. Another route can declare other names.
+The kernel tree hash was equal before and after the run, with no bytecode
+files. A static reading of the pinned Prime source shows that the kernel
+process inherits Prime's environment. No run record shows which interpreter
+Prime selected for a tool call.
+
+### Claim limits
+
+- **Settings.** The provider, model and thinking values are the requested
+  values that the adapter launched. No provider record attests the served
+  model, the thinking level, a stop reason, billing or a provider-side abort.
+- **Tool termination.** The cancellation phase shows that Core cancelled the
+  main and that the tool process later no longer existed. The phase does not
+  show that the cancellation stopped the tool.
+- **Key handling.** An exact-byte scan of the job directory found no copy of
+  the provider key in retained output. The driver then deleted the key file.
+  The scan is not a sandbox, a secure erase or a check of the whole host.
+- **Effects.** Provider-side and other external effects of the cancelled main
+  remain unknown.
+- **Scope.** This result does not qualify another operating system,
+  architecture, provider, model, Prime version or kernel environment. It is
+  not a security, production or release claim. It does not qualify the whole
+  Plus package.
+
+Raw run state and model output stay in private task records. The published
+identities are the hashes and commits in this section.
