@@ -558,6 +558,13 @@ BRIDGE = {
 CONTEXT_ID = "00000000-0000-4000-8000-0000000000cc"
 
 
+def _canonical_sha(value: object) -> str:
+    raw = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    return hashlib.sha256(raw).hexdigest()
+
+
 @pytest.mark.parametrize(
     "case", ["success", "turn_failed", "error_nonzero_exit", "missing_context"]
 )
@@ -650,8 +657,38 @@ def test_bridge_v2_codex_status_is_typed_null_and_reload_is_pure(
                 "native_diagnostic": evidence["native_diagnostic"],
             },
         )
-        assert record.api_error_status is None
+        assert isinstance(record, nd.NativeDiagnosticV2)
+        assert record.diagnostic.api_error_status is None
         assert b"Too Many" not in raw and b"Service Unavailable" not in raw
+        # v2 binding facts recomputed from the actual Store-backed invocation.
+        settings = invocation["launch"]["settings"]
+        assert record.settings_sha256 == _canonical_sha(settings)
+        with sqlite3.connect(store_path(instance, home)) as db:
+            body = json.loads(db.execute("SELECT body FROM invocations").fetchone()[0])
+        assert body["launch_settings"]["adapter"] == settings
+        assert record.settings_sha256 != _canonical_sha(body["launch_settings"])
+        effective, requested = settings["effective"], settings["requested"]
+        assert (record.requested_model, record.requested_effort) == (
+            requested["model"],
+            requested["reasoning_effort"],
+        )
+        assert (record.resolved_model, record.resolved_effort) == (
+            effective["model"],
+            effective["reasoning_effort"],
+        )
+        assert None not in (record.resolved_model, record.resolved_effort)
+        assert record.observed_version == evidence["observed_version"] == "0.163.0"
+        executable = graph["bindings"]["codex"]["executable"]
+        assert record.host_route_sha256 == _canonical_sha(
+            {
+                "adapter_id": ADAPTER_ID,
+                "adapter_contract": ADAPTER_CONTRACT,
+                "executable": executable,
+                "native_home": details["codex_home"],
+            }
+        )
+        for private in (executable, str(details["codex_home"]), "provenance"):
+            assert private.encode() not in raw
         shutil.rmtree(project / "state")
     # Reload never reads the sidecar or spawns the native CLI.
     with monkeypatch.context() as patch:

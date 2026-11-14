@@ -4,9 +4,13 @@ A native node may opt in with ``diagnostic_bridge: {context_path, outbox_path}``
 Both paths are relative to the node's actual working directory and must stay
 beneath it. Only ``invoke`` touches the filesystem: it reads one strict
 ``millrace-native-context/v1`` record before any native process starts, and it
-publishes one ``millrace-native-diagnostic/v1`` record before returning its
+publishes one ``millrace-native-diagnostic/v2`` record before returning its
 result. Planning and completion validation stay pure over retained launch and
 evidence data. Later consumers verify the actual published bytes themselves.
+
+Historical ``millrace-native-diagnostic/v1`` records stay readable with their
+exact original bytes and meaning; ``load_record`` dispatches on the exact format
+and never upgrades, migrates or fills v2 facts into a v1 record.
 
 The bridge exports facts and does not route. It knows no workflow, role or
 service, and it never derives a status from prose or stderr.
@@ -46,6 +50,7 @@ from .configuration import (  # noqa: E402
 
 CONTEXT_FORMAT = "millrace-native-context/v1"
 DIAGNOSTIC_FORMAT = "millrace-native-diagnostic/v1"
+DIAGNOSTIC_V2_FORMAT = "millrace-native-diagnostic/v2"
 CONFIG_KEY = "diagnostic_bridge"
 CLAUDE_PROTOCOL = "claude-print-json/v1"
 CODEX_PROTOCOL = "codex-exec-jsonl/v1"
@@ -70,6 +75,22 @@ RECORD_FIELDS = {
     "failure_code",
     "native_diagnostic",
 }
+# The seven required members v2 adds to the exact v1 field set. Each is an actual
+# producer fact: digests of the actual plan settings and selected host route, the
+# actual terminal observed version, and the actual requested/effective
+# model/effort configuration (not a provider-reported model attestation).
+BINDING_FIELDS = {
+    "settings_sha256",
+    "observed_version",
+    "requested_model",
+    "requested_effort",
+    "resolved_model",
+    "resolved_effort",
+    "host_route_sha256",
+}
+RECORD_V2_FIELDS = RECORD_FIELDS | BINDING_FIELDS
+# Exact member names of the canonical object whose digest is host_route_sha256.
+HOST_ROUTE_FIELDS = {"adapter_id", "adapter_contract", "executable", "native_home"}
 # Extra launch-details members carried only by bridge-enabled v2 launch formats.
 LAUNCH_FIELDS = {CONFIG_KEY, "plane_id", "node_id", "producing_revision"}
 # Extra evidence members carried only by bridge-enabled v2 evidence formats.
@@ -342,6 +363,113 @@ class NativeDiagnostic:
         return record
 
 
+def _optional_label(value: object, code: str) -> str | None:
+    return None if value is None else _label(value, code)
+
+
+@dataclass(frozen=True)
+class NativeDiagnosticV2:
+    """A v2 terminal record: one exact v1 record plus seven binding facts.
+
+    Composition, not inheritance: a v2 record is never a v1 record, and the v1
+    loader and bytes are untouched. ``resolved_*`` is effective adapter
+    configuration; ``host_route_sha256`` fences the selected executable and
+    native home only. Neither attests an account, binary, endpoint or a
+    provider-reported model.
+    """
+
+    diagnostic: NativeDiagnostic
+    settings_sha256: str
+    observed_version: str | None
+    requested_model: str | None
+    requested_effort: str | None
+    resolved_model: str | None
+    resolved_effort: str | None
+    host_route_sha256: str
+
+    def __post_init__(self) -> None:
+        code = "invalid_native_diagnostic"
+        if type(self.diagnostic) is not NativeDiagnostic:
+            raise RouterError(code)
+        _sha(self.settings_sha256, code)
+        _sha(self.host_route_sha256, code)
+        for value in (
+            self.observed_version,
+            self.requested_model,
+            self.requested_effort,
+            self.resolved_model,
+            self.resolved_effort,
+        ):
+            _optional_label(value, code)
+
+    @property
+    def context_id(self) -> str:
+        return self.diagnostic.context_id
+
+    @property
+    def invocation_id(self) -> str:
+        return self.diagnostic.invocation_id
+
+    def to_json(self) -> dict[str, object]:
+        result = self.diagnostic.to_json()
+        result.update(
+            format=DIAGNOSTIC_V2_FORMAT,
+            settings_sha256=self.settings_sha256,
+            observed_version=self.observed_version,
+            requested_model=self.requested_model,
+            requested_effort=self.requested_effort,
+            resolved_model=self.resolved_model,
+            resolved_effort=self.resolved_effort,
+            host_route_sha256=self.host_route_sha256,
+        )
+        return result
+
+    def to_bytes(self) -> bytes:
+        return canonical(self.to_json())
+
+    @classmethod
+    def load(cls, raw: bytes) -> NativeDiagnosticV2:
+        """Strict canonical v2 reload: exact keys, format, types and bytes."""
+        try:
+            obj = fields(strict_json(raw), RECORD_V2_FIELDS)
+            if obj["format"] != DIAGNOSTIC_V2_FORMAT:
+                raise RouterError("invalid_native_diagnostic")
+            base = {key: obj[key] for key in RECORD_FIELDS}
+            base["format"] = DIAGNOSTIC_FORMAT
+            record = cls(
+                diagnostic=NativeDiagnostic.load(canonical(base)),
+                settings_sha256=cast(str, obj["settings_sha256"]),
+                observed_version=cast("str | None", obj["observed_version"]),
+                requested_model=cast("str | None", obj["requested_model"]),
+                requested_effort=cast("str | None", obj["requested_effort"]),
+                resolved_model=cast("str | None", obj["resolved_model"]),
+                resolved_effort=cast("str | None", obj["resolved_effort"]),
+                host_route_sha256=cast(str, obj["host_route_sha256"]),
+            )
+        except (RouterError, TypeError) as exc:
+            raise RouterError("invalid_native_diagnostic") from exc
+        if record.to_bytes() != raw:
+            raise RouterError("invalid_native_diagnostic")
+        return record
+
+
+DiagnosticRecord = NativeDiagnostic | NativeDiagnosticV2
+
+
+def load_record(raw: bytes) -> DiagnosticRecord:
+    """Exact-format dispatch to the strict v1 or v2 reader; nothing is upgraded."""
+    try:
+        obj = mapping(strict_json(raw))
+    except RouterError as exc:
+        raise RouterError("invalid_native_diagnostic") from exc
+    selected = obj.get("format")
+    if selected == DIAGNOSTIC_FORMAT:
+        return NativeDiagnostic.load(raw)
+    if selected == DIAGNOSTIC_V2_FORMAT:
+        return NativeDiagnosticV2.load(raw)
+    raise RouterError("invalid_native_diagnostic")
+
+
 # Pure launch and evidence shapes.
 
 
@@ -379,6 +507,69 @@ def launch_bridge(details: Mapping[str, object]) -> BridgeConfig:
 def launch_sha256(plan: LaunchPlan) -> str:
     """Digest of the retained launch details, recomputable from public reads."""
     return digest(canonical(mapping(plan.details)))
+
+
+def settings_sha256(plan: LaunchPlan) -> str:
+    """Digest of the complete actual ``plan.settings`` (public ``launch.settings``).
+
+    The adapter settings are hashed as planned, top-level requested/effective/
+    provenance/warnings included. Core's separate common settings and its
+    ``launch_settings`` wrapper are not part of this value.
+    """
+    return digest(canonical(mapping(plan.settings)))
+
+
+def _setting(settings: Mapping[str, object], layer: str, key: str) -> str | None:
+    """One actual configured value; null only when the key is genuinely absent.
+
+    ``layer`` is a top-level member of ``plan.settings`` (``requested`` or
+    ``effective``); there is no wrapped-form fallback. A present value is never
+    replaced by null: a non-string present value refuses instead.
+    """
+    if layer not in settings:
+        raise RouterError("invalid_native_diagnostic")
+    values = mapping(settings[layer])
+    if key not in values:
+        return None
+    return _label(values[key], "invalid_native_diagnostic")
+
+
+def binding_facts(plan: LaunchPlan) -> dict[str, str | None]:
+    """The four requested/effective model and effort projections of the plan."""
+    settings = mapping(plan.settings)
+    return {
+        "requested_model": _setting(settings, "requested", "model"),
+        "requested_effort": _setting(settings, "requested", "reasoning_effort"),
+        "resolved_model": _setting(settings, "effective", "model"),
+        "resolved_effort": _setting(settings, "effective", "reasoning_effort"),
+    }
+
+
+def host_route_sha256(plan: LaunchPlan, protocol: str) -> str:
+    """Digest of the selected executable and native home; neither is exported.
+
+    ``native_home`` is the actual Codex ``codex_home`` launch detail for the Codex
+    protocol and null otherwise. This fences a route, not an account or binary.
+    """
+    code = "invalid_native_diagnostic"
+    details = mapping(plan.details)
+    native_home = None
+    if protocol == CODEX_PROTOCOL:
+        if "codex_home" not in details:
+            raise RouterError(code)
+        native_home = _label(details["codex_home"], code)
+    if not plan.argv:
+        raise RouterError(code)
+    return digest(
+        canonical(
+            {
+                "adapter_id": _label(plan.adapter_id, code),
+                "adapter_contract": _label(plan.adapter_contract, code),
+                "executable": _label(plan.argv[0], code),
+                "native_home": native_home,
+            }
+        )
+    )
 
 
 def evidence_links(
@@ -430,16 +621,18 @@ def verify_record(
     ref: DiagnosticBridgeRef,
     bridge: BridgeConfig,
     expected: Mapping[str, object],
-) -> NativeDiagnostic:
+) -> DiagnosticRecord:
     """Pure check of actual published bytes against a retained ref and facts.
 
-    ``expected`` names record members (for example ``context_id``,
-    ``input_sha256``, ``launch_sha256`` or ``native_diagnostic``) that a consumer
-    has independently established; every one must match exactly.
+    The bytes must be an exact v1 or v2 record (``load_record``). ``expected``
+    names record members (for example ``context_id``, ``input_sha256``,
+    ``launch_sha256`` or ``native_diagnostic``) that a consumer has independently
+    established; every one must be present and match exactly, so a v2-only
+    member never matches a v1 record.
     """
     if digest(raw) != ref.sha256:
         raise RouterError("native_diagnostic_mismatch")
-    record = NativeDiagnostic.load(raw)
+    record = load_record(raw)
     if ref.path != bridge.record_path(record.context_id, record.invocation_id):
         raise RouterError("native_diagnostic_mismatch")
     actual = record.to_json()
@@ -477,7 +670,10 @@ def _walk(root: Path, rel: str, *, create: bool) -> Path:
 
 def _read(path: Path, limit: int) -> bytes:
     """One bounded regular-file read that never follows a link or waits on a FIFO."""
-    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+    # Both flags are POSIX; where a platform lacks one, the explicit link and
+    # regular-file checks around this read remain the defined behavior.
+    flags = getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, os.O_RDONLY | flags)
     with os.fdopen(fd, "rb") as stream:
         if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
             raise RouterError("unsafe_bridge_path")
@@ -528,7 +724,7 @@ def preflight(cwd: Path, bridge: BridgeConfig) -> NativeContext:
 
 
 def publish(
-    cwd: Path, bridge: BridgeConfig, record: NativeDiagnostic
+    cwd: Path, bridge: BridgeConfig, record: DiagnosticRecord
 ) -> DiagnosticBridgeRef:
     """Immutable no-overwrite publication; matching bytes replay, others refuse."""
     raw = record.to_bytes()
@@ -586,8 +782,10 @@ def export_result(
     protocol: str,
     api_error_status: int | None,
 ) -> AdapterResult:
-    """Attach v2 evidence and publish the terminal record before returning.
+    """Attach v2 evidence and publish the terminal v2 record before returning.
 
+    The record's binding facts come from this same actual ``plan`` and terminal
+    ``result.adapter_evidence``; nothing is reconstructed from graph defaults.
     Native transport, writer state, diagnostic and bytes are never changed, and a
     publication failure never raises into Core uncertainty. If publication cannot
     complete (a conflicting record, which is never overwritten, any I/O failure, or
@@ -607,7 +805,7 @@ def export_result(
     }
     evidence[CONFIG_KEY] = None
     try:
-        record = NativeDiagnostic(
+        diagnostic = NativeDiagnostic(
             context_id=context.context_id,
             input_sha256=context.input_sha256,
             invocation_id=plan.invocation_id,
@@ -623,6 +821,17 @@ def export_result(
             failure_code=failure if isinstance(failure, str) else None,
             protocol=protocol,
             api_error_status=typed_status(api_error_status),
+        )
+        facts = binding_facts(plan)
+        record = NativeDiagnosticV2(
+            diagnostic=diagnostic,
+            settings_sha256=settings_sha256(plan),
+            observed_version=cast("str | None", evidence.get("observed_version")),
+            requested_model=facts["requested_model"],
+            requested_effort=facts["requested_effort"],
+            resolved_model=facts["resolved_model"],
+            resolved_effort=facts["resolved_effort"],
+            host_route_sha256=host_route_sha256(plan, protocol),
         )
         evidence[CONFIG_KEY] = publish(cwd, bridge, record).to_json()
     except (RouterError, OSError, ValueError, TypeError):

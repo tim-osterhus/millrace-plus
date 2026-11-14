@@ -548,3 +548,121 @@ def test_bridge_v2_completion_is_typed_null_and_format_exact(tmp_path: Path) -> 
     ):
         with pytest.raises(RouterError, match="completion_integrity"):
             c.validate_completion(plan, replace(facts, **changes))
+
+
+def _canonical_sha(value: object) -> str:
+    import hashlib
+
+    raw = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _inheriting_request(tmp: Path, **changes: Any) -> InvocationRequest:
+    """A Codex profile naming no model/effort, so only runtime can supply them."""
+    req = request(tmp)
+    profile = json.loads(req.files["codex.json"])
+    del profile["model"], profile["reasoning_effort"]
+    return replace(
+        req,
+        files={**req.files, "codex.json": json.dumps(profile).encode()},
+        runtime={"model": "runtime-model-sentinel", "reasoning_effort": "high"},
+        node_config={**req.node_config, "diagnostic_bridge": BRIDGE},
+        **changes,
+    )
+
+
+@pytest.mark.parametrize("observed", ["0.163.0", None])
+def test_bridge_v2_export_binds_actual_codex_settings_version_and_route(
+    tmp_path: Path, observed: str | None
+) -> None:
+    from millrace.router.execution import AdapterResult
+
+    from millrace_plus.router import codex_configuration as c
+    from millrace_plus.router import native_diagnostic as nd
+
+    req = _inheriting_request(tmp_path)
+    plan = c.plan(req)
+    assert plan.settings["effective"] == {
+        "model": "runtime-model-sentinel",
+        "reasoning_effort": "high",
+    }
+    context = tmp_path / BRIDGE["context_path"]
+    context.parent.mkdir(parents=True)
+    context.write_text(
+        json.dumps(
+            {
+                "format": "millrace-native-context/v1",
+                "context_id": "ctx-1",
+                "input_sha256": "e" * 64,
+            }
+        )
+    )
+    bridge = nd.BridgeConfig.load(BRIDGE)
+    evidence = {
+        **c.evidence(plan.invocation_id),
+        "failure_code": "invalid_codex_credentials",
+        "observed_version": observed,
+    }
+    result = AdapterResult(
+        b"",
+        b"",
+        "execution_failure",
+        "stopped",
+        "invalid_codex_credentials",
+        1,
+        evidence,
+    )
+    exported = nd.export_result(
+        result,
+        plan=plan,
+        cwd=tmp_path,
+        bridge=bridge,
+        context=nd.preflight(tmp_path, bridge),
+        evidence_format=c.RESULT_FORMAT_V2,
+        protocol=nd.CODEX_PROTOCOL,
+        api_error_status=None,
+    )
+    e = exported.adapter_evidence
+    ref = nd.DiagnosticBridgeRef(**e["diagnostic_bridge"])
+    raw = (tmp_path / ref.path).read_bytes()
+    expected = {"launch_sha256": nd.launch_sha256(plan)}
+    record = nd.verify_record(raw, ref, bridge, expected)
+    assert isinstance(record, nd.NativeDiagnosticV2)
+    assert record.settings_sha256 == _canonical_sha(plan.settings)
+    # Codex requires both effective settings: all four projections are nonnull.
+    assert (record.requested_model, record.requested_effort) == (
+        "runtime-model-sentinel",
+        "high",
+    )
+    assert (record.resolved_model, record.resolved_effort) == (
+        "runtime-model-sentinel",
+        "high",
+    )
+    # Actual terminal evidence only: never the launch's expected version pin.
+    assert record.observed_version == observed
+    assert plan.details["expected_version"] == "0.163.0"
+    assert record.host_route_sha256 == _canonical_sha(
+        {
+            "adapter_id": ADAPTER_ID,
+            "adapter_contract": ADAPTER_CONTRACT,
+            "executable": plan.argv[0],
+            "native_home": plan.details["codex_home"],
+        }
+    )
+    for private in (plan.argv[0], str(plan.details["codex_home"]), str(tmp_path)):
+        assert private.encode() not in raw
+    # Same route for another prompt; another selected native home changes it.
+    prompt = c.plan(replace(req, files={**req.files, "task.txt": b"Another prompt."}))
+    assert prompt.generated_controls != plan.generated_controls
+    home = c.plan(replace(req, host_paths={"native": str(tmp_path / "other")}))
+    assert home.details["codex_home"] != plan.details["codex_home"]
+    route = nd.host_route_sha256(plan, nd.CODEX_PROTOCOL)
+    assert route == record.host_route_sha256
+    assert nd.host_route_sha256(prompt, nd.CODEX_PROTOCOL) == route
+    assert nd.host_route_sha256(home, nd.CODEX_PROTOCOL) != route
+    # A Codex plan without its actual native home cannot bind a route.
+    details = {k: v for k, v in plan.details.items() if k != "codex_home"}
+    with pytest.raises(RouterError, match="invalid_native_diagnostic"):
+        nd.host_route_sha256(replace(plan, details=details), nd.CODEX_PROTOCOL)

@@ -486,8 +486,10 @@ Core routes this failure through the node's ordinary error edge.
 
 **Terminal export.** After a successful preflight, the adapter publishes
 `<outbox_path>/<context_id>/<invocation_id>.json` before returning its result.
-The record is canonical `millrace-native-diagnostic/v1` JSON with exactly these
-fields:
+New exports are canonical `millrace-native-diagnostic/v2` JSON. Canonical means
+sorted keys, compact separators, UTF-8 (`ensure_ascii` false), finite numbers and
+no trailing newline. The record has exactly the complete v1 field set, with
+`format` set to the v2 string. The v1 field set is:
 
 - `format`, `context_id`, `input_sha256`;
 - `invocation_id`, `plane_id`, `node_id`, `producing_revision`;
@@ -495,6 +497,44 @@ fields:
 - `launch_sha256`: SHA-256 of the canonical retained launch `details`;
 - `transport`, `writer_state`, `failure_code`;
 - `native_diagnostic`: `{protocol, api_error_status}`.
+
+v2 adds seven required members. None is optional. Each comes from the same
+actual launch plan and terminal adapter evidence the exporter already receives.
+Nothing is reconstructed from graph, profile or default bytes:
+
+| v2 member | Source |
+| --- | --- |
+| `settings_sha256` | SHA-256 of canonical actual `plan.settings`. This equals the public Core `launch.settings`, top-level `requested`/`effective`/`provenance`/`warnings` included. It is not Core's separate `launch_settings` wrapper or its common settings. |
+| `observed_version` | Actual terminal `adapter_evidence.observed_version`. `null` only when the native probe did not establish it, for example on a spawn or probe-mismatch failure. The profile's expected pin is never substituted. |
+| `requested_model`, `requested_effort` | `plan.settings.requested.model` and `.reasoning_effort`. `null` exactly when the key is absent. |
+| `resolved_model`, `resolved_effort` | `plan.settings.effective.model` and `.reasoning_effort`. `null` exactly when the key is absent. |
+| `host_route_sha256` | SHA-256 of canonical `{adapter_id, adapter_contract, executable, native_home}`. `executable` is actual `plan.argv[0]`. `native_home` is the actual Codex `details.codex_home`, or `null` for Claude. |
+
+Runtime-inherited values are retained as actual values. Claude may omit either
+setting to keep native inheritance, which gives `null`. Codex requires both
+effective settings, so its projections are nonnull. A present value is never
+replaced by `null`. A malformed fact, such as a non-string present setting or
+observed version, leaves the handoff unavailable (see below).
+
+These facts have limits:
+
+- `resolved_*` is effective adapter configuration. It does not claim the provider
+  reported that model or effort.
+- `host_route_sha256` is stable across prompts and occurrences. It changes with
+  the selected executable or native home. It does not attest an account, binary
+  contents, provider endpoint or billing.
+- The record exports only these digests and the four model/effort values. Raw
+  settings, provenance, warnings, argv, environment, executable or native-home
+  paths, account locators and credentials are never exported.
+
+**Record versions.** `NativeDiagnostic.load` stays the strict v1 reader. v1
+bytes and their meaning are unchanged. `NativeDiagnosticV2.load` is the strict
+v2 reader. `load_record` dispatches on the exact `format` string, and
+`verify_record` uses it. Unknown formats, missing or extra members, wrong types
+and noncanonical bytes refuse. A v1 record is never migrated, upgraded or filled
+with v2 values. A consumer that requires a v2 fact gets a mismatch from a v1
+record, because that member is absent. That consumer takes its own guarded
+recovery instead.
 
 Publication links a complete temporary file and never overwrites. Identical bytes
 already at the path are reused, and the read-back compares only the expected byte
@@ -505,8 +545,10 @@ result bytes, and a publication failure never raises into Core
 If publication cannot complete, `diagnostic_bridge` is `null` while
 `native_diagnostic` is kept. The cause can be any of:
 
-- different existing bytes at the path, which stay untouched;
+- different existing bytes at the path, which stay untouched. This includes an
+  earlier v1 record at the same path, which is never replaced;
 - an I/O failure;
+- a malformed binding fact;
 - no record file at all.
 
 Any post-preflight evidence with a non-null `native_diagnostic` and a `null`

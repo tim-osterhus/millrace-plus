@@ -926,14 +926,22 @@ def write_context(root: Path, **changes: Any) -> None:
 
 
 def bridged(
-    tmp: Path, *, version: str = "2.1.296", context: bool = True, **options: Any
+    tmp: Path,
+    *,
+    version: str = "2.1.296",
+    context: bool = True,
+    changes: dict[str, Any] | None = None,
+    **options: Any,
 ) -> Any:
     if "executable" in options:
         executable = options.pop("executable")
     else:
         native = f"{version} (Claude Code)\n".encode()
         executable = str(fake(tmp / "peer", version=native, **options))
-    req = request(tmp, executable=executable, claude_version=version)
+    req = replace(
+        request(tmp, executable=executable, claude_version=version),
+        **(changes or {}),
+    )
     req = replace(req, node_config={**req.node_config, "diagnostic_bridge": BRIDGE})
     if context:
         write_context(tmp)
@@ -958,13 +966,48 @@ def bridged_run(plan: Any, tmp: Path, **kwargs: Any) -> tuple[Any, CompletionFac
     return result, facts
 
 
-def published(plan: Any, tmp: Path, result: Any) -> nd.NativeDiagnostic:
+def canonical_sha(value: object) -> str:
+    """Independent canonical digest (sorted, compact, UTF-8, finite)."""
+    raw = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode()
+    return hashlib.sha256(raw).hexdigest()
+
+
+def binding(plan: Any, evidence: Any) -> dict[str, object]:
+    """The seven v2 facts recomputed from the actual plan and terminal evidence."""
+    requested, effective = plan.settings["requested"], plan.settings["effective"]
+    return {
+        "settings_sha256": canonical_sha(plan.settings),
+        "observed_version": evidence["observed_version"],
+        "requested_model": requested.get("model"),
+        "requested_effort": requested.get("reasoning_effort"),
+        "resolved_model": effective.get("model"),
+        "resolved_effort": effective.get("reasoning_effort"),
+        "host_route_sha256": canonical_sha(
+            {
+                "adapter_id": "claude_print",
+                "adapter_contract": "millrace-claude-print/v1",
+                "executable": plan.argv[0],
+                "native_home": None,
+            }
+        ),
+    }
+
+
+def published(plan: Any, tmp: Path, result: Any) -> nd.NativeDiagnosticV2:
     """Verify the actual sidecar against the retained launch and evidence."""
     e = result.adapter_evidence
     ref = nd.DiagnosticBridgeRef(**e["diagnostic_bridge"])
     assert ref.path == f"{BRIDGE['outbox_path']}/{CONTEXT_ID}/{plan.invocation_id}.json"
     raw = (tmp / ref.path).read_bytes()
-    return nd.verify_record(
+    assert set(json.loads(raw)) == nd.RECORD_V2_FIELDS
+    assert json.loads(raw)["format"] == "millrace-native-diagnostic/v2"
+    record = nd.verify_record(
         raw,
         ref,
         nd.BridgeConfig.load(BRIDGE),
@@ -983,8 +1026,11 @@ def published(plan: Any, tmp: Path, result: Any) -> nd.NativeDiagnostic:
             "writer_state": result.writer_state,
             "failure_code": e["failure_code"],
             "native_diagnostic": e["native_diagnostic"],
+            **binding(plan, e),
         },
     )
+    assert isinstance(record, nd.NativeDiagnosticV2)
+    return record
 
 
 def test_bridge_disabled_launch_and_evidence_stay_legacy_v1(tmp_path: Path) -> None:
@@ -1125,7 +1171,9 @@ def test_bridge_exports_typed_status_for_both_terminal_error_shapes(
         "api_error_status": status,
     }
     record = published(plan, tmp_path, result)
-    assert record.api_error_status == status
+    assert record.diagnostic.api_error_status == status
+    # The actual exact banner probe established the observed version.
+    assert record.observed_version == version == e["observed_version"]
     raw = (tmp_path / e["diagnostic_bridge"]["path"]).read_bytes()
     # Only finite structured facts are retained; no prose, stderr or secret.
     for text in (raw, json.dumps(e).encode()):
@@ -1151,7 +1199,7 @@ def test_bridge_retains_unknown_integer_status_as_data(
         "protocol": "claude-print-json/v1",
         "api_error_status": status,
     }
-    assert published(plan, tmp_path, result).api_error_status == status
+    assert published(plan, tmp_path, result).diagnostic.api_error_status == status
     c.ClaudePrintAdapter().validate_completion(plan, facts)
 
 
@@ -1214,7 +1262,7 @@ def test_bridge_status_is_typed_null_without_selected_envelope(
         "protocol": "claude-print-json/v1",
         "api_error_status": None,
     }
-    assert published(plan, tmp_path, result).api_error_status is None
+    assert published(plan, tmp_path, result).diagnostic.api_error_status is None
     c.ClaudePrintAdapter().validate_completion(plan, facts)
 
 
@@ -1264,10 +1312,14 @@ def test_bridge_stop_and_spawn_failures_keep_lifecycle_and_null_status(
     e = result.adapter_evidence
     assert e["native_diagnostic"]["api_error_status"] is None
     record = published(plan, tmp_path, result)
-    assert (record.transport, record.writer_state) == (
+    assert (record.diagnostic.transport, record.diagnostic.writer_state) == (
         result.classification,
         result.writer_state,
     )
+    if case in {"spawn", "probe_mismatch"}:
+        # No established probe: null, never the launch's expected version pin.
+        assert record.observed_version is None
+        assert isinstance(plan.details["expected_version"], str)
     if case != "probe_mismatch":
         c.ClaudePrintAdapter().validate_completion(plan, facts)
     if case == "cancel":
@@ -1375,6 +1427,68 @@ def test_bridge_publication_replays_and_conflict_never_overwrites(
     assert [p.name for p in path.parent.iterdir()] == [path.name]
     c.ClaudePrintAdapter().validate_completion(plan, third_facts)
     c.ClaudePrintAdapter().validate_completion(plan, facts)
+
+
+@pytest.mark.parametrize("case", ["inherited_runtime", "node_override", "omitted"])
+def test_bridge_exports_actual_binding_facts_not_graph_defaults(
+    tmp_path: Path, case: str
+) -> None:
+    runtime = {"model": "runtime-model-sentinel", "reasoning_effort": "high"}
+    changes: dict[str, Any] = {
+        "inherited_runtime": {"runtime": runtime},
+        "node_override": {
+            "runtime": runtime,
+            "node_config": {"prompt": "task.txt", "reasoning_effort": "low"},
+        },
+        "omitted": {},
+    }[case]
+    plan = bridged(tmp_path, version="2.1.305", changes=changes)
+    # The captured graph (workflow/node bytes) names no model; only the actual
+    # inherited runtime layer can supply these values.
+    graph = request(tmp_path)
+    assert graph.workflow == {} and set(graph.node_config) == {"prompt"}
+    result, facts = bridged_run(plan, tmp_path)
+    assert result.classification == "completed"
+    record = published(plan, tmp_path, result)
+    expected = {
+        "inherited_runtime": ("runtime-model-sentinel", "high"),
+        "node_override": ("runtime-model-sentinel", "low"),
+        "omitted": (None, None),
+    }[case]
+    assert (record.requested_model, record.requested_effort) == expected
+    assert (record.resolved_model, record.resolved_effort) == expected
+    assert record.settings_sha256 == canonical_sha(plan.settings)
+    assert record.settings_sha256 != canonical_sha({})
+    assert record.observed_version == "2.1.305"
+    raw = (tmp_path / result.adapter_evidence["diagnostic_bridge"]["path"]).read_bytes()
+    # Only digests and the four named values leave the plan: no raw settings,
+    # provenance, warnings, argv, executable path or host path.
+    for private in (plan.argv[0], str(tmp_path), "provenance", "warnings", "--model"):
+        assert private.encode() not in raw
+    c.ClaudePrintAdapter().validate_completion(plan, facts)
+
+
+def test_bridge_host_route_is_stable_across_prompt_but_tracks_executable(
+    tmp_path: Path,
+) -> None:
+    first = bridged(tmp_path / "a")
+    other_prompt = bridged(
+        tmp_path / "b",
+        executable=first.argv[0],
+        changes={"files": {**request(tmp_path).files, "task.txt": b"Other."}},
+    )
+    assert first.generated_controls != other_prompt.generated_controls
+    other_route = bridged(tmp_path / "c")
+    assert other_route.argv[0] != first.argv[0]
+    routes = []
+    for root, plan in (
+        (tmp_path / "a", first),
+        (tmp_path / "b", other_prompt),
+        (tmp_path / "c", other_route),
+    ):
+        result, _ = bridged_run(plan, root)
+        routes.append(published(plan, root, result).host_route_sha256)
+    assert routes[0] == routes[1] != routes[2]
 
 
 def test_bridge_completion_validation_reads_no_sidecar(

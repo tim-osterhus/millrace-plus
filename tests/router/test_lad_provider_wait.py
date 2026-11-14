@@ -92,8 +92,10 @@ def bridge(
     inv: str,
     status: object = 429,
     failure: str = "claude_native_exit",
+    *,
+    version: int = 1,
 ) -> tuple[dict[str, object], dict]:
-    """Publish a genuine C1 bridge record and return (ref, record json)."""
+    """Publish a genuine C1 (v1) or C1b (v2) record; return (ref, record json)."""
     from millrace_plus.router import native_diagnostic as nd
 
     record = nd.NativeDiagnostic(
@@ -113,6 +115,21 @@ def bridge(
         protocol=CLAUDE[2],
         api_error_status=status if type(status) is int else None,
     )
+    if version == 2:
+        # C1b binding facts: actual launch.settings digest and actual configured
+        # model/effort, matching this fixture's Core view and authority binding.
+        v2 = nd.NativeDiagnosticV2(
+            diagnostic=record,
+            settings_sha256=ef.sha256(ef.encode(SETTINGS)),
+            observed_version="2.1.305",
+            requested_model=SETTINGS["model"],
+            requested_effort=SETTINGS["reasoning_effort"],
+            resolved_model=SETTINGS["model"],
+            resolved_effort=SETTINGS["reasoning_effort"],
+            host_route_sha256="5" * 64,
+        )
+        ref = nd.publish(fg, nd.BridgeConfig.load(BRIDGE), v2)
+        return ref.to_json(), v2.to_json()
     ref = nd.publish(fg, nd.BridgeConfig.load(BRIDGE), record)
     return ref.to_json(), record.to_json()
 
@@ -223,6 +240,7 @@ class Flow:
         self.authority = authority(**changes)
         self.op = str(self.authority["operation_id"])
         self.count = 0
+        self.record_version = 1
         self.occurrence = "occ1"
         self.observation = ""
         # C3 owns the semantic reconciliation; C2 needs real bytes and digests.
@@ -234,7 +252,9 @@ class Flow:
     ) -> tuple[str, dict | None]:
         self.count += 1
         self.inv, self.status = f"inv{self.count}", status
-        self.ref, self.record = bridge(self.fg, self.occurrence, self.inv, status)
+        self.ref, self.record = bridge(
+            self.fg, self.occurrence, self.inv, status, version=self.record_version
+        )
         found = pw.classify(**facts(self.record, self.ref, writer_state=writer))
         return pw.classify_failure(
             self.fg,
@@ -1139,6 +1159,105 @@ def test_provider_observation_view_refusals_publish_nothing(tmp_path, monkeypatc
     )
     with pytest.raises(pw.ProviderWaitError, match="provider_locator_mismatch"):
         pw.observe_provider(flow.fg, operation_id=flow.op, facts=moved, observed_at=T0)
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_provider_v1_and_v2_records_classify_and_observe_by_dispatch(
+    tmp_path, monkeypatch, version
+):
+    """C1b consumer compatibility: no C2 source change, both exact formats."""
+    from millrace_plus.router import control
+    from millrace_plus.router import native_diagnostic as nd
+
+    flow = Flow(tmp_path)
+    flow.record_version = version
+    phase, _ = flow.fail(T0)
+    assert flow.record["format"] == f"millrace-native-diagnostic/v{version}"
+    binding = flow.authority["binding"]
+    if version == 2:
+        # Actual v2 facts project exactly onto the immutable authority binding.
+        assert flow.record["settings_sha256"] == binding["config_sha256"]
+        assert flow.record["settings_sha256"] == ef.sha256(ef.encode(SETTINGS))
+        for key in ("requested_model", "requested_effort"):
+            assert flow.record[key] == binding[key]
+        for key in ("resolved_model", "resolved_effort", "host_route_sha256"):
+            assert flow.record[key] == binding[key]
+    else:
+        assert "settings_sha256" not in flow.record
+    raw = (flow.fg / flow.ref["path"]).read_bytes()
+    loaded = nd.load_record(raw)
+    exact = nd.NativeDiagnosticV2 if version == 2 else nd.NativeDiagnostic
+    assert type(loaded) is exact
+    # Legitimate pure classification over the validated mapping is unchanged.
+    (tmp_path / "v1").mkdir()
+    v1_ref, v1_record = bridge(tmp_path / "v1", "occ1", "inv1", version=1)
+    assert pw.classify(**facts(flow.record, flow.ref)) == pw.classify(
+        **facts(v1_record, v1_ref)
+    )
+    found = pw.classify(**facts(flow.record, flow.ref))
+    assert (found.classification, found.outcome) == ("provider_usage", "PROVIDER_WAIT")
+    # Strict actual Core launch.settings comparison is unchanged for both formats.
+    operation = pw.load_operation(flow.fg, flow.op)
+    failure = pw._latest_failure(operation)
+    drifted = view(flow.fg, flow.inv, flow.ref)
+    drifted["invocations"][0]["launch"]["settings"] = {**SETTINGS, "model": "other"}
+    before = tree(flow.fg)
+    with pytest.raises(pw.ProviderWaitError, match="provider_observation_mismatch"):
+        pw.observation_facts(
+            drifted,
+            authority=flow.authority,
+            failure=failure,
+            instance_id="inst",
+            run_id="run",
+            state_home="/state",
+            plane_id="foreground",
+            invocation_id=flow.inv,
+            expected_state_version=7,
+            foreground=flow.fg,
+        )
+    assert tree(flow.fg) == before
+    # The actual observe_snapshot -> _observe_locked -> observation_facts ->
+    # verify_record route accepts either exact format (Core seam injected).
+    project = tmp_path
+    (project / "context").mkdir()
+    (project / "context/provider-policy.json").write_bytes(POLICY)
+    snapshot = view(flow.fg, flow.inv, flow.ref)
+
+    @contextmanager
+    def exclusive(*args, **kwargs):
+        yield snapshot
+
+    monkeypatch.setattr(control, "exclusive_run_snapshot", exclusive)
+    monkeypatch.setattr(
+        control,
+        "inspect_instance",
+        lambda *a, **k: {
+            "project_root": str(project),
+            "workflow_file": str(project / "workflow.json"),
+        },
+    )
+    verified: list[object] = []
+    real = nd.verify_record
+
+    def recording(*args, **kwargs):
+        verified.append(real(*args, **kwargs))
+        return verified[-1]
+
+    monkeypatch.setattr(nd, "verify_record", recording)
+    result = pw.observe_snapshot(
+        project,
+        state_home=tmp_path / "state",
+        instance_id="inst",
+        run_id="run",
+        plane_id="foreground",
+        operation_id=flow.op,
+        invocation_id=flow.inv,
+        expected_state_version=7,
+        observed_at=T0 + timedelta(seconds=1),
+    )
+    assert phase is not None and result["operation_id"] == flow.op
+    assert result["observation_id"] and result["observed_state_version"] == 7
+    assert verified == [loaded]
 
 
 def test_provider_observation_crash_reuses_published_bytes(tmp_path, monkeypatch):

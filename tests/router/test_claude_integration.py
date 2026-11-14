@@ -355,6 +355,13 @@ def _bridged_flow(
     return workflow, project, home
 
 
+def _canonical_sha(value: object) -> str:
+    raw = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    return hashlib.sha256(raw).hexdigest()
+
+
 def _invocation_body(instance: str, home: Path) -> dict[str, Any]:
     with sqlite3.connect(store_path(instance, home)) as db:
         raw = db.execute("SELECT body FROM invocations").fetchone()[0]
@@ -414,7 +421,15 @@ def test_bridge_v2_store_roundtrip_reload_and_corruption(
             "native_diagnostic": evidence["native_diagnostic"],
         },
     )
-    assert record.producing_revision == invocation["launch"]["producing_revision"]
+    assert isinstance(record, nd.NativeDiagnosticV2)
+    assert set(json.loads(raw)) == nd.RECORD_V2_FIELDS
+    assert (
+        record.diagnostic.producing_revision
+        == (invocation["launch"]["producing_revision"])
+    )
+    # The exported digest is the actual public Core launch.settings digest.
+    assert record.settings_sha256 == _canonical_sha(invocation["launch"]["settings"])
+    assert record.observed_version == version
     # A well-formed but forged status is caught only against the actual sidecar.
     forged = {**evidence["native_diagnostic"], "api_error_status": 503}
     with pytest.raises(RouterError, match="native_diagnostic_mismatch"):
@@ -444,6 +459,60 @@ def test_bridge_v2_store_roundtrip_reload_and_corruption(
         control.inspect_run(instance, str(run["id"]), state_home=home)
     with sqlite3.connect(path) as db:
         assert list(db.iterdump()) == before
+
+
+def test_bridge_v2_exports_actual_inherited_runtime_settings_from_store(
+    single_flow: tuple[Path, Path, Path],
+) -> None:
+    workflow, project, home = _bridged_flow(single_flow)
+    graph = json.loads(workflow.read_text())
+    captured = graph["planes"]["main"]["nodes"]["draft"]["invoke"]["config"]
+    # The captured graph names no model/effort; only the actual runtime layer does.
+    assert not {"model", "reasoning_effort"} & set(captured)
+    runtime = {"model": "runtime-model-sentinel", "reasoning_effort": "high"}
+    instance = create_instance(
+        workflow,
+        project,
+        state_home=home,
+        runtime_defaults={
+            "adapter_settings": {
+                "claude_print": {
+                    "contract": "millrace-claude-print/v1",
+                    "config": runtime,
+                }
+            }
+        },
+    )["instance_id"]
+    run = start_run(instance, state_home=home)
+    assert run["status"] == "succeeded"
+    current = control.inspect_run(instance, str(run["id"]), state_home=home)
+    invocation = current["invocations"][0]
+    settings = invocation["launch"]["settings"]
+    assert settings["requested"] == runtime and settings["effective"] == runtime
+    evidence = invocation["adapter_evidence"]
+    ref = nd.DiagnosticBridgeRef(**evidence["diagnostic_bridge"])
+    raw = (project / ref.path).read_bytes()
+    record = nd.verify_record(raw, ref, nd.BridgeConfig.load(BRIDGE), {})
+    assert isinstance(record, nd.NativeDiagnosticV2)
+    assert record.settings_sha256 == _canonical_sha(settings)
+    body = _invocation_body(instance, home)
+    # Core's separate wrapper carries the same adapter settings plus common
+    # settings; it corroborates but is never what the record hashes.
+    assert body["launch_settings"]["adapter"] == settings
+    assert record.settings_sha256 != _canonical_sha(body["launch_settings"])
+    assert (record.requested_model, record.requested_effort) == (
+        "runtime-model-sentinel",
+        "high",
+    )
+    assert (record.resolved_model, record.resolved_effort) == (
+        "runtime-model-sentinel",
+        "high",
+    )
+    assert record.observed_version == evidence["observed_version"] == "2.1.296"
+    # Raw settings/provenance and the executable path are not exported.
+    executable = graph["bindings"]["claude"]["executable"]
+    for private in (executable, "provenance", "runtime_defaults", str(home)):
+        assert private.encode() not in raw
 
 
 def test_bridge_missing_context_is_ordinary_stopped_failure(
