@@ -598,3 +598,145 @@ def test_lad_parent_control_cli_forwards_one_request_file(
         cli.cli()
     assert result.value.code == 0 and calls == [path]
     assert json.loads(capsys.readouterr().out)["holder_joined"] is False
+
+
+def test_lad_provider_cli_flags_are_thin_dispatch(tmp_path, monkeypatch, capsys):
+    from millrace_plus import provider_wait
+
+    calls = []
+
+    def observe(project, **kwargs):
+        calls.append(("observe", project, kwargs))
+        return {"operation_id": "o", "operator_return_required": True}
+
+    def due(project, **kwargs):
+        calls.append(("due", project, kwargs))
+        return {
+            "operation_id": "o",
+            "operator_return_required": True,
+            "eligible": False,
+        }
+
+    monkeypatch.setattr(provider_wait, "observe_snapshot", observe)
+    monkeypatch.setattr(provider_wait, "provider_due", due)
+    base = ["millrace-plus", "lad"]
+    observe_argv = base + [
+        "provider-observe",
+        "--project-root",
+        str(tmp_path / "copy"),
+        "--state-home",
+        str(tmp_path / "state"),
+        "--instance",
+        "i1",
+        "--run",
+        "r1",
+        "--plane",
+        "foreground",
+        "--operation",
+        "a" * 64,
+        "--invocation",
+        "v1",
+        "--expected-state-version",
+        "7",
+        "--service-home",
+        str(tmp_path / "service"),
+        "--task",
+        "t1",
+    ]
+    due_argv = base + [
+        "provider-due",
+        "--project-root",
+        str(tmp_path / "copy"),
+        "--operation",
+        "a" * 64,
+        "--observation",
+        "b" * 64,
+        "--restoration",
+        str(tmp_path / "restoration.json"),
+    ]
+    for argv in (observe_argv, due_argv):
+        monkeypatch.setattr(sys, "argv", argv)
+        with pytest.raises(SystemExit) as result:
+            cli.cli()
+        assert result.value.code == 0
+        output = capsys.readouterr()
+        assert json.loads(output.out)["operator_return_required"] is True
+        assert output.err == ""
+    (kind, project, kwargs), (due_kind, due_project, due_kwargs) = calls
+    assert (kind, due_kind) == ("observe", "due")
+    assert project == due_project == tmp_path / "copy"
+    now = kwargs.pop("observed_at")
+    assert now.utcoffset().total_seconds() == 0
+    assert kwargs == {
+        "state_home": tmp_path / "state",
+        "instance_id": "i1",
+        "run_id": "r1",
+        "plane_id": "foreground",
+        "operation_id": "a" * 64,
+        "invocation_id": "v1",
+        "expected_state_version": 7,
+        "service_home": tmp_path / "service",
+        "task": "t1",
+    }
+    assert due_kwargs.pop("now").utcoffset().total_seconds() == 0
+    assert due_kwargs == {
+        "operation_id": "a" * 64,
+        "observation_id": "b" * 64,
+        "restoration": tmp_path / "restoration.json",
+    }
+
+
+def test_lad_provider_cli_refusal_is_json_exit_2(tmp_path, monkeypatch, capsys):
+    from millrace_plus import provider_wait
+
+    def refuse(project, **kwargs):
+        raise provider_wait.ProviderWaitError("provider_observation_required")
+
+    monkeypatch.setattr(provider_wait, "provider_due", refuse)
+    argv = [
+        "millrace-plus",
+        "lad",
+        "provider-due",
+        "--project-root",
+        str(tmp_path),
+        "--operation",
+        "a" * 64,
+        "--observation",
+        "b" * 64,
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit) as result:
+        cli.cli()
+    assert result.value.code == 2
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert json.loads(output.err)["code"] == "provider_observation_required"
+    observe = [
+        "millrace-plus",
+        "lad",
+        "provider-observe",
+        "--project-root",
+        str(tmp_path),
+        "--state-home",
+        str(tmp_path),
+        "--instance",
+        "i",
+        "--run",
+        "r",
+        "--operation",
+        "a" * 64,
+        "--invocation",
+        "v",
+        "--expected-state-version",
+        "1",
+    ]
+    for extra in (
+        ["--plane", "learning"],
+        ["--plane", "foreground", "--task", "t1"],
+        [],
+    ):
+        monkeypatch.setattr(sys, "argv", observe + extra)
+        with pytest.raises(SystemExit) as result:
+            cli.cli()
+        assert result.value.code == 2
+        assert json.loads(capsys.readouterr().err)["code"] == "usage_error"

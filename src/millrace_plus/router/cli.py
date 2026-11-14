@@ -7,11 +7,15 @@ import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import NoReturn
+from typing import TYPE_CHECKING, NoReturn
 
 from millrace_plus import catalog
 
 from . import CoreContractError, require_core
+
+if TYPE_CHECKING:
+    # Typing only: Core stays a lazy runtime import inside the subcommands.
+    from millrace.router.execution import RouterError as _CoreRouterError
 
 
 class _CatalogParser(argparse.ArgumentParser):
@@ -80,7 +84,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _subworkflow_main(argv: Sequence[str]) -> int:
     from millrace_plus import subworkflows
-    from millrace_plus.subworkflow_records import SubworkflowError, _id
+    from millrace_plus.subworkflow_records import Journal, SubworkflowError, _id
 
     parser = _CatalogParser(prog="millrace-plus subworkflow")
     commands = parser.add_subparsers(dest="operation", required=True)
@@ -93,7 +97,9 @@ def _subworkflow_main(argv: Sequence[str]) -> int:
         if name == "cancel":
             child.add_argument("--request-id", required=True)
     args = parser.parse_args(argv)
-    errors = (SubworkflowError,)
+    errors: tuple[type[SubworkflowError] | type[_CoreRouterError], ...] = (
+        SubworkflowError,
+    )
     try:
         if args.operation == "cancel":
             _id(args.request_id)
@@ -101,7 +107,7 @@ def _subworkflow_main(argv: Sequence[str]) -> int:
         if args.operation in {"inspect", "cancel", "reconcile"}:
             ordinary_v1 = not subworkflows._uses_v2(args.call_home, args.call_key)
             if ordinary_v1:
-                path = subworkflows.Journal(args.call_home, args.call_key).path
+                path = Journal(args.call_home, args.call_key).path
                 with path.open("rb") as stream:
                     retained = catalog.strict_json(stream.read(2097153))
                 if (
@@ -160,6 +166,22 @@ def _lad_main(argv: Sequence[str]) -> int:
         child.add_argument("--expected-state-version", required=True, type=int)
         child.add_argument("--service-home", type=Path)
         child.add_argument("--task")
+    observe = commands.add_parser("provider-observe")
+    for option in ("project-root", "state-home"):
+        observe.add_argument("--" + option, required=True, type=Path)
+    for option in ("instance", "run", "invocation"):
+        observe.add_argument("--" + option, required=True)
+    # `--operation` names a provider operation; the subcommand keeps `operation`.
+    observe.add_argument("--operation", required=True, dest="operation_id")
+    observe.add_argument("--plane", required=True, choices=("foreground",))
+    observe.add_argument("--expected-state-version", required=True, type=int)
+    observe.add_argument("--service-home", type=Path)
+    observe.add_argument("--task")
+    due = commands.add_parser("provider-due")
+    due.add_argument("--project-root", required=True, type=Path)
+    due.add_argument("--operation", required=True, dest="operation_id")
+    due.add_argument("--observation", required=True)
+    due.add_argument("--restoration", type=Path)
     for name in (
         "init",
         "submit",
@@ -209,6 +231,12 @@ def _lad_main(argv: Sequence[str]) -> int:
         and args.decision != "continue"
     ):
         parser.error("--resume-plane requires --decision continue")
+    if args.operation.startswith("provider-"):
+        if args.operation == "provider-observe" and (
+            (args.service_home is None) != (args.task is None)
+        ):
+            parser.error("--service-home and --task are selected together")
+        return _provider_main(args)
     if args.operation.startswith("engineering-"):
         if args.operation == "engineering-publish" and (
             (args.service_home is None) != (args.task is None)
@@ -261,9 +289,10 @@ def _lad_main(argv: Sequence[str]) -> int:
         print(json.dumps({"code": "io_error", "message": "io_error"}), file=sys.stderr)
         return 2
     except Exception as exc:
-        if not isinstance(getattr(exc, "code", None), str):
+        code = getattr(exc, "code", None)
+        if not isinstance(code, str):
             raise
-        print(json.dumps({"code": exc.code, "message": exc.code}), file=sys.stderr)
+        print(json.dumps({"code": code, "message": code}), file=sys.stderr)
         return 2
 
 
@@ -305,6 +334,50 @@ def _engineering_main(args: argparse.Namespace) -> int:
         return 2
 
 
+def _provider_main(args: argparse.Namespace) -> int:
+    """Thin L-R2 parsing; the wall clock is read once here and injected."""
+    from datetime import UTC, datetime
+
+    from millrace_plus import provider_wait as pw
+
+    now = datetime.now(UTC)
+    try:
+        if args.operation == "provider-due":
+            result = pw.provider_due(
+                args.project_root,
+                operation_id=args.operation_id,
+                observation_id=args.observation,
+                now=now,
+                restoration=args.restoration,
+            )
+        else:
+            result = pw.observe_snapshot(
+                args.project_root,
+                state_home=args.state_home,
+                instance_id=args.instance,
+                run_id=args.run,
+                plane_id=args.plane,
+                operation_id=args.operation_id,
+                invocation_id=args.invocation,
+                expected_state_version=args.expected_state_version,
+                observed_at=now,
+                service_home=args.service_home,
+                task=args.task,
+            )
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    except OSError:
+        print(json.dumps({"code": "io_error", "message": "io_error"}), file=sys.stderr)
+        return 2
+    except Exception as exc:
+        # Typed refusals: ProviderWaitError, Core RouterError, service IntakeError.
+        code = getattr(exc, "code", None)
+        if not isinstance(code, str):
+            raise
+        print(json.dumps({"code": code, "message": code}), file=sys.stderr)
+        return 2
+
+
 def _views_main(argv: Sequence[str]) -> int:
     """Publish one saved exact record; its bytes and timestamp are used as given."""
     from millrace_plus import workflow_views as views
@@ -329,9 +402,10 @@ def _views_main(argv: Sequence[str]) -> int:
         return 2
     except Exception as exc:
         # Typed refusals: WorkflowViewsError, Core RouterError, CoreContractError.
-        if not isinstance(getattr(exc, "code", None), str):
+        code = getattr(exc, "code", None)
+        if not isinstance(code, str):
             raise
-        print(json.dumps({"code": exc.code, "message": exc.code}), file=sys.stderr)
+        print(json.dumps({"code": code, "message": code}), file=sys.stderr)
         return 2
 
 

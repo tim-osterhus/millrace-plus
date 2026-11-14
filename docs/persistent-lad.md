@@ -64,6 +64,95 @@ source/guidance/route and conflicting records hold. L-R1 changes no service
 continuation, ownership, join, FIFO or terminal CLOSE/ACK behavior; Native14
 acceptance remains evidence for its original artifacts only.
 
+## Provider wait commands and operator return (L-R2)
+
+`millrace_plus.provider_wait` keeps strict provider-wait records under the
+foreground workspace's `lad-state/provider/`. Stock graphs do not route to them
+yet, so no current copy creates a provider operation. The two commands below
+read and write only those records. Neither sleeps, wakes a run, launches a native
+process or calls a Core control.
+
+```
+millrace-plus lad provider-observe --project-root PATH --state-home PATH --instance ID --run ID --plane foreground --operation ID --invocation ID --expected-state-version V [--service-home PATH --task ID]
+millrace-plus lad provider-due --project-root PATH --operation ID --observation ID [--restoration PATH]
+```
+
+`provider-observe` opens Core's `exclusive_run_snapshot` through the normal Plus
+resolver, using the exact instance, run and expected state version you pass. The
+snapshot must show the following, or the command refuses:
+
+- the paused foreground plane resumes at `provider_due_<node>`;
+- the named invocation is the operation's role node on its producing revision,
+  with the captured adapter, contract and settings digest;
+- its completion's effective writer is `stopped`, and its transition targets
+  `classify_provider_<node>`;
+- Core's completion evidence names a bridge record, and those bytes match the
+  operation's recorded failure exactly.
+
+Only after those checks pass does it write an immutable observation and bind the
+run locator once. Snapshot refusals (busy locks, `stale_state_version`,
+`queued_controls`, `run_nonterminal`) and any mismatch publish nothing. A
+service-owned copy must name its service home and task. The command first takes
+the existing nonblocking `target_lock`, which refuses with `target_busy`, then
+revalidates the active task and claim.
+
+`provider-due` prints
+`{operation_id, observation_id, phase, due_at, operator_return_required: true, eligible}`.
+The first and second known usage/availability failures are due at the failure
+time plus the captured `first_retry_seconds` (stock 900) or
+`second_retry_seconds` (stock 3600). These delays are selected Factory policy,
+not measured backoff. A valid later provider floor is a minimum. No selected rule
+supplies one today. A wall clock that reads earlier than the persisted absolute
+due time is simply not due. Repeating a check reuses the recorded fact.
+
+`--restoration` takes a strict `millrace-lad-provider-restoration/v1` record: an
+explicit operator confirmation or a reference to a public observation. It counts
+as your authority, not provider attestation. It can waive the local delay but
+never a provider floor. Editing `context/provider-policy.json` stales the
+operation, and restoring the captured bytes clears that.
+
+The third known failure makes the operation eligible for exactly one diagnosis.
+Access (401) and permission (403) failures hold for a person. So do an unresolved
+diagnosis and any provider failure after a diagnosis. Unknown writers or effects
+hold and are never counted. Diagnosis, Learning and unrelated successes never end
+a pending streak.
+
+Run `provider-due` only while the run is paused, with no concurrent execution or
+service maintenance on that copy. It updates the provider records without a lock
+of its own, and no new lock is added.
+
+`eligible: true` reports time and recorded authority only. It is neither effect
+clearance nor a resume. Before a new attempt starts, the graph's own guards still
+revalidate the current run and reconcile the old owner's file and external
+effects. Return to the run yourself: a standalone copy uses the existing
+version-fenced Core control. A service child uses only the journaled
+`lad decide --decision continue --resume-plane foreground` after the parent
+`parent-control` pause. Graph routing of these records is a later change.
+
+What the records check, and what the later graph helpers must prove:
+
+- **Checked by the records:**
+  - exact fields, digests and chain links;
+  - that every referenced reconciliation file exists with its stated digest;
+  - that a reservation follows the latest recorded failure and uses a new
+    occurrence.
+- **Proved by the graph helpers:**
+  - what those references mean (stopped writer, scoped file delta, settled
+    external effects);
+  - occurrence and replacement lineage;
+  - the reconciled current source;
+  - guidance and continuation;
+  - the applied control receipts.
+
+A success after an ordinary replacement may carry a changed current source, since
+an intervening failure can leave partial edits. That source rests on the same
+replacement links. A success after a provider retry must match a source already
+recorded for the operation.
+
+The retained completion fact keeps only Core's completion metadata. Raw native
+output (`stdout`, `stderr`, `stdout_base64`) is never copied into
+`lad-state/provider/`.
+
 ## Historical qualification evidence
 
 The earlier candidate passed 201 runtime cases, seven unaffected corrective
