@@ -245,6 +245,7 @@ def test_lad_package_inventory_matches_admitted_workflow_assets() -> None:
         "context/routes.md",
         "context/harness.md",
         "context/routing-policy.json",
+        "context/provider-policy.json",
         "templates/goal.md",
         "templates/bootstrap.md",
         "templates/state.md",
@@ -260,6 +261,7 @@ def test_lad_package_inventory_matches_admitted_workflow_assets() -> None:
         "scripts/learning_seam.py",
         "scripts/session_compat.py",
         "scripts/presentation.py",
+        "scripts/provider_wait.py",
         "scripts/engineering_feedback.py",
         "context/engineering-profile.example.json",
         *(f"prompts/{role}.md" for role in roles),
@@ -269,7 +271,7 @@ def test_lad_package_inventory_matches_admitted_workflow_assets() -> None:
         for path in root.rglob("*")
         if path.is_file() and "__pycache__" not in path.parts
     }
-    assert len(expected) == 42
+    assert len(expected) == 44
     assert actual == expected
     assert not any(path.is_symlink() for path in root.rglob("*"))
     graph = json.loads((root / "workflow.json").read_text())

@@ -218,6 +218,8 @@ def view(fg: Path, inv: str, ref: dict | None, status: object = 429) -> dict:
                 "version": 6,
             }
         ],
+        # The public control receipts list of a complete Core run view.
+        "controls": [],
     }
 
 
@@ -1222,6 +1224,7 @@ def test_provider_v1_and_v2_records_classify_and_observe_by_dispatch(
     (project / "context").mkdir()
     (project / "context/provider-policy.json").write_bytes(POLICY)
     snapshot = view(flow.fg, flow.inv, flow.ref)
+    del snapshot["controls"]  # first a malformed snapshot: strict refusal
 
     @contextmanager
     def exclusive(*args, **kwargs):
@@ -1236,6 +1239,21 @@ def test_provider_v1_and_v2_records_classify_and_observe_by_dispatch(
             "workflow_file": str(project / "workflow.json"),
         },
     )
+    unpublished = tree(flow.fg)
+    with pytest.raises(pw.ProviderWaitError, match="provider_observation_mismatch"):
+        pw.observe_snapshot(
+            project,
+            state_home=tmp_path / "state",
+            instance_id="inst",
+            run_id="run",
+            plane_id="foreground",
+            operation_id=flow.op,
+            invocation_id=flow.inv,
+            expected_state_version=7,
+            observed_at=T0 + timedelta(seconds=1),
+        )
+    assert tree(flow.fg) == unpublished
+    snapshot["controls"] = []
     verified: list[object] = []
     real = nd.verify_record
 
@@ -1580,3 +1598,172 @@ def test_provider_malformed_api_values_refuse_before_publication(tmp_path):
     with pytest.raises(pw.ProviderWaitError, match="provider_unsafe_path"):
         pw.initialize_index(other, session_id=SESSION, policy_raw=POLICY)
     assert not (other / pw.ROOT / "index.json").exists()
+
+
+def test_provider_pending_operation_lookup_and_control_refs(tmp_path):
+    """C3 caller seams: role lookup, observation/due control lineage pins."""
+    flow = Flow(tmp_path)
+    assert pw.pending_operation(flow.fg, role=flow.authority["role"]) is None
+    with pytest.raises(pw.ProviderWaitError, match="provider_role_excluded"):
+        pw.pending_operation(flow.fg, role="learning")
+    flow.fail(T0)
+    found = pw.pending_operation(flow.fg, role=flow.authority["role"])
+    assert found is not None and found.id == flow.op
+    assert pw.pending_operation(flow.fg, role="arbiter") is None
+    before = tree(flow.fg)
+    # Lookup is read-only: it never recovers or republishes an index tip.
+    assert pw.pending_operation(flow.fg, role=flow.authority["role"]).id == flow.op
+    assert tree(flow.fg) == before
+    pause = {"request_id": "p1", "operation": "pause_plane", "status": "applied"}
+    operation = pw.load_operation(flow.fg, flow.op)
+    observed = pw.observe_provider(
+        flow.fg,
+        operation_id=flow.op,
+        observed_at=T0 + timedelta(seconds=1),
+        controls=[pause],
+        facts=pw.observation_facts(
+            view(flow.fg, flow.inv, flow.ref, flow.status),
+            authority=flow.authority,
+            failure=pw._latest_failure(operation),
+            instance_id="inst",
+            run_id="run",
+            state_home="/state",
+            plane_id="foreground",
+            invocation_id=flow.inv,
+            expected_state_version=7,
+            foreground=flow.fg,
+        ),
+    )
+    flow.observation = str(observed["observation"]["observation_id"])
+    pinned = observed["event"]["control_refs"]
+    assert pinned == [
+        {
+            "path": f"{pw.ROOT}/facts/{ef.sha256(ef.encode(pause))}.json",
+            "sha256": ef.sha256(ef.encode(pause)),
+        }
+    ]
+    assert (flow.fg / pinned[0]["path"]).read_bytes() == ef.encode(pause)
+    # The operator CLI due check keeps the inherited observation refs.
+    early = flow.due(T0 + timedelta(seconds=2))
+    assert early["eligible"] is False and flow.tip()["control_refs"] == pinned
+    resume = {"request_id": "r1", "operation": "resume_plane", "status": "applied"}
+    ready = pw.check_provider_due(
+        flow.fg,
+        operation_id=flow.op,
+        observation_id=flow.observation,
+        now=T0 + timedelta(seconds=900),
+        policy=policy(),
+        controls=[resume],
+    )
+    assert ready["eligible"] is True
+    tip = flow.tip()
+    assert tip["kind"] == "due_checked"
+    assert [ref["sha256"] for ref in tip["control_refs"]] == [
+        ef.sha256(ef.encode(resume))
+    ]
+    sequence = tip["sequence"]
+    # Exact replay with the same applied lineage reuses the fact.
+    pw.check_provider_due(
+        flow.fg,
+        operation_id=flow.op,
+        observation_id=flow.observation,
+        now=T0 + timedelta(seconds=901),
+        policy=policy(),
+        controls=[resume],
+    )
+    assert flow.tip()["sequence"] == sequence
+
+
+def test_provider_cli_policy_follows_core_workflow_root(tmp_path, monkeypatch):
+    """Separate workflow/project roots (a service child): provider-observe and
+    provider-due read the captured policy beside Core's actual instance
+    workflow file, keep the project root for records and refuse a foreign
+    identity or a changed policy without publishing anything."""
+    from millrace_plus.router import control
+
+    project = tmp_path / "project"
+    flow = Flow(project)
+    flow.fail(T0)
+    workflow = tmp_path / "workflow"
+    (workflow / "context").mkdir(parents=True)
+    (workflow / "workflow.json").write_text("{}")
+    policy = workflow / "context/provider-policy.json"
+    policy.write_bytes(POLICY)
+    identity = {
+        "project_root": str(project),
+        "workflow_file": str(workflow / "workflow.json"),
+    }
+    snapshot = view(flow.fg, flow.inv, flow.ref)
+
+    @contextmanager
+    def exclusive(*args, **kwargs):
+        yield snapshot
+
+    monkeypatch.setattr(control, "exclusive_run_snapshot", exclusive)
+    monkeypatch.setattr(control, "inspect_instance", lambda *a, **k: dict(identity))
+
+    def observe() -> dict:
+        return pw.observe_snapshot(
+            project,
+            state_home=tmp_path / "state",
+            instance_id="inst",
+            run_id="run",
+            plane_id="foreground",
+            operation_id=flow.op,
+            invocation_id=flow.inv,
+            expected_state_version=7,
+            observed_at=T0 + timedelta(seconds=1),
+        )
+
+    def refused(call, code: str, **changes: str) -> None:
+        saved = dict(identity)
+        identity.update(changes)
+        before = tree(flow.fg)
+        with pytest.raises(pw.ProviderWaitError, match=code):
+            call()
+        assert tree(flow.fg) == before  # no observation, event, count or index
+        identity.clear()
+        identity.update(saved)
+
+    assert not (project / "context").exists()  # no copied control files
+    # A foreign instance identity, a non-workflow.json graph path, a policy
+    # changed under pending authority, or the old project-root assumption
+    # (policy only under project/context) all refuse before publication.
+    refused(observe, "provider_project_identity", project_root=str(tmp_path / "other"))
+    refused(
+        observe,
+        "provider_project_identity",
+        workflow_file=str(workflow / "other.json"),
+    )
+    relative = "workflow/workflow.json"
+    refused(observe, "provider_project_identity", workflow_file=relative)
+    policy.write_bytes(POLICY.replace(b"900", b"60"))
+    refused(observe, "provider_authority_stale")
+    policy.unlink()
+    (project / "context").mkdir()
+    (project / "context/provider-policy.json").write_bytes(POLICY)
+    refused(observe, "provider_policy_invalid")
+    policy.write_bytes(POLICY)
+    observed = observe()
+    assert observed["phase"] == "waiting"
+    assert pw.load_operation(flow.fg, flow.op).tip["core_locator"] == {
+        "instance_id": "inst",
+        "run_id": "run",
+        "state_home": str(tmp_path / "state"),
+        "plane_id": "foreground",
+    }
+
+    def due() -> dict:
+        return pw.provider_due(
+            project,
+            operation_id=flow.op,
+            observation_id=str(observed["observation_id"]),
+            now=T0 + timedelta(seconds=900),
+        )
+
+    refused(due, "provider_project_identity", project_root=str(tmp_path / "other"))
+    policy.write_bytes(POLICY.replace(b"900", b"60"))
+    refused(due, "provider_authority_stale")
+    policy.write_bytes(POLICY)
+    ready = due()
+    assert ready["phase"] == "retry_ready" and ready["eligible"] is True

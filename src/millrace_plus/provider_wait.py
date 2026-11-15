@@ -37,6 +37,8 @@ Public functions (exact arguments are their keyword signatures):
   restoration_ref)``
 - ``reconcile_provider_success(foreground, *, operation_id, success)``
 - ``load_operation(foreground, operation_id)`` for strict reload.
+- ``pending_operation(foreground, *, role)`` - the one unfinished operation of a
+  role, or None; used by the C3 graph helpers to find existing authority.
 """
 
 from __future__ import annotations
@@ -747,6 +749,27 @@ def load_operation(foreground: Path, op: str, *, recover: bool = True) -> Operat
     return Operation(authority, _sha(authority_raw), tuple(events), raws[-1])
 
 
+def pending_operation(foreground: Path, *, role: str) -> Operation | None:
+    """The single unfinished operation whose authority role is ``role``.
+
+    Every indexed operation is strictly reloaded (read-only: no index recovery).
+    More than one unfinished operation for one role refuses as a conflict.
+    """
+    if not isinstance(role, str) or role not in ROLES:
+        raise ProviderWaitError("provider_role_excluded")
+    found: list[Operation] = []
+    for op in sorted(cast(dict[str, object], _index(foreground)["operations"])):
+        operation = load_operation(foreground, op, recover=False)
+        if operation.authority["role"] == role and operation.tip["phase"] not in {
+            "succeeded",
+            "cancelled",
+        }:
+            found.append(operation)
+    if len(found) > 1:
+        raise ProviderWaitError("provider_operation_conflict")
+    return found[0] if found else None
+
+
 def _append(
     foreground: Path, operation: Operation, **changes: object
 ) -> tuple[Operation, dict[str, object]]:
@@ -1196,8 +1219,13 @@ def observe_provider(
     facts: Mapping[str, object],
     claim: object = None,
     observed_at: datetime,
+    controls: Sequence[object] = (),
 ) -> dict[str, object]:
     """Publish one immutable observation plus an ``observed`` event (replayable).
+
+    ``controls`` are the public Core control receipts present in the same view;
+    each is retained and pinned in the event's ``control_refs`` so a later due
+    guard can name exactly the controls applied after this observation.
 
     Returns ``{"observation", "event", "tip"}``: the exact observation and its
     ``observed`` event, plus the operation's current tip for status reporting.
@@ -1285,6 +1313,7 @@ def observe_provider(
         core_locator=locator,
         phase=phase,
         occurrence_id=failure["occurrence_id"],
+        control_refs=[_retain(foreground, item) for item in controls],
     )
     return {"observation": observation, "event": event, "tip": event}
 
@@ -1378,6 +1407,28 @@ def observe_snapshot(
     )
 
 
+def _workflow_policy(
+    project: Path, identity: Mapping[str, object]
+) -> dict[str, object]:
+    """The captured provider policy beside the instance's actual workflow file.
+
+    ``identity`` is Core's public ``inspect_instance`` view. Its project root must
+    be exactly this copy; the policy is read beneath the workflow file's own
+    directory. A unified copy has ``workflow_file == project/workflow.json``; a
+    service child keeps separate workflow and project roots. Nothing is
+    searched for or taken from a caller-supplied path.
+    """
+    workflow = Path(str(identity.get("workflow_file")))
+    if (
+        Path(str(identity.get("project_root"))) != project
+        or not workflow.is_absolute()
+        or workflow.name != "workflow.json"
+    ):
+        raise ProviderWaitError("provider_project_identity")
+    relative = "context/provider-policy.json"
+    return load_policy(_read(workflow.parent, relative, "provider_policy_invalid"))
+
+
 def _observe_locked(
     project: Path,
     foreground: Path,
@@ -1393,11 +1444,6 @@ def _observe_locked(
 ) -> dict[str, object]:
     from .router import control
 
-    policy = load_policy(
-        _read(project, "context/provider-policy.json", "provider_policy_invalid")
-    )
-    if policy["sha256"] != authority["policy_sha256"]:
-        raise ProviderWaitError("provider_authority_stale")
     with control.exclusive_run_snapshot(
         instance_id,
         run_id,
@@ -1405,11 +1451,9 @@ def _observe_locked(
         expected_state_version=expected_state_version,
     ) as view:
         identity = control.inspect_instance(instance_id, state_home=state_home)
-        if (
-            Path(str(identity["project_root"])) != project
-            or Path(str(identity["workflow_file"])) != project / "workflow.json"
-        ):
-            raise ProviderWaitError("provider_project_identity")
+        policy = _workflow_policy(project, identity)
+        if policy["sha256"] != authority["policy_sha256"]:
+            raise ProviderWaitError("provider_authority_stale")
         operation = load_operation(foreground, cast(str, authority["operation_id"]))
         facts = observation_facts(
             view,
@@ -1423,12 +1467,16 @@ def _observe_locked(
             expected_state_version=expected_state_version,
             foreground=foreground,
         )
+        controls = view.get("controls")
+        if not isinstance(controls, list):
+            raise ProviderWaitError("provider_observation_mismatch")
         result = observe_provider(
             foreground,
             operation_id=operation.id,
             facts=facts,
             claim=claim,
             observed_at=observed_at,
+            controls=controls,
         )
     tip = cast(dict[str, object], result["tip"])
     observation = cast(dict[str, object], result["observation"])
@@ -1480,8 +1528,15 @@ def check_provider_due(
     now: datetime,
     policy: Mapping[str, object],
     restoration: bytes | None = None,
+    controls: Sequence[object] | None = None,
 ) -> dict[str, object]:
-    """Read/record-only due check; no native call and no Core control."""
+    """Read/record-only due check; no native call and no Core control.
+
+    ``controls`` (graph due guard only) are the public Core control receipts the
+    caller validated as the legitimate lineage since the observation. Each is
+    retained and pinned in the ``due_checked`` event's ``control_refs``; None
+    (the operator CLI) keeps the inherited refs.
+    """
     operation = load_operation(foreground, operation_id)
     when = _time(stamp(now), "provider_clock_invalid")
     if operation.authority["policy_sha256"] != policy.get("sha256"):
@@ -1578,10 +1633,16 @@ def check_provider_due(
             timed or restoration_ref is not None or phase == "retry_ready"
         )
         phase = "retry_ready" if eligible else "waiting"
+    refs = (
+        tip["control_refs"]
+        if controls is None
+        else [_retain(foreground, item) for item in controls]
+    )
     if (
         tip["kind"] == "due_checked"
         and tip["phase"] == phase
         and tip["observation_ref"] == observation_ref
+        and tip["control_refs"] == refs
     ):
         return _due_result(operation, tip, observation_id, eligible=eligible)
     _, event = _append(
@@ -1591,6 +1652,7 @@ def check_provider_due(
         phase=phase,
         observation_ref=observation_ref,
         restoration_ref=restoration_ref,
+        control_refs=refs,
     )
     return _due_result(operation, event, observation_id, eligible=eligible)
 
@@ -1620,11 +1682,22 @@ def provider_due(
     now: datetime,
     restoration: Path | None = None,
 ) -> dict[str, object]:
-    """``lad provider-due`` with the copy's captured policy bytes."""
+    """``lad provider-due`` with the copy's captured policy bytes.
+
+    The policy is located through the operation's bound Core locator (set once
+    by ``provider-observe``) and Core's public instance identity, as in observe.
+    That read is the only Core access; no control is issued.
+    """
     project = project.expanduser().absolute()
-    policy = load_policy(
-        _read(project, "context/provider-policy.json", "provider_policy_invalid")
+    locator = load_operation(project / "foreground", operation_id).tip["core_locator"]
+    if not isinstance(locator, dict):
+        raise ProviderWaitError("provider_observation_required")
+    from .router import control
+
+    identity = control.inspect_instance(
+        str(locator["instance_id"]), state_home=Path(str(locator["state_home"]))
     )
+    policy = _workflow_policy(project, identity)
     raw = None
     if restoration is not None:
         try:

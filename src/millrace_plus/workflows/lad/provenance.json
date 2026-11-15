@@ -606,8 +606,8 @@
     "destination_hashes": [
       {
         "path": "README.md",
-        "sha256": "ec52924040a5533a1d5f4eba5b331b53730fd14ab8157e9804c5d94ae37338d2",
-        "bytes": 6105
+        "sha256": "da25b7aff60c3e4e6c6c9185eedc5c961a78d30d65a86dd8f71b33798f34c3bc",
+        "bytes": 7181
       },
       {
         "path": "context/contracts.md",
@@ -621,13 +621,18 @@
       },
       {
         "path": "context/harness.md",
-        "sha256": "398c9a7e25547c8bb2d7e3345fabd969711cd836b040d3ed7d5dbdb277e9f096",
-        "bytes": 5412
+        "sha256": "de7201541973c33bf5576188349994dfc1e81e7d7e61fb044cc103651a10261b",
+        "bytes": 5828
+      },
+      {
+        "path": "context/provider-policy.json",
+        "sha256": "a1484f9f00f447775d1bde55f75fa04b0522a4479a4a4f01f11e66160919d93e",
+        "bytes": 182
       },
       {
         "path": "context/role-contracts.md",
-        "sha256": "a6fe11ee8635b3227793846b7ae1c7480d7003a715d22bf4da60e6f56db6df2d",
-        "bytes": 28887
+        "sha256": "7bcfe7c4a553a4d816bbca2276cec855336e40510cc74d731854d4976c6a7529",
+        "bytes": 29975
       },
       {
         "path": "context/routes.md",
@@ -636,8 +641,8 @@
       },
       {
         "path": "context/routing-policy.json",
-        "sha256": "430433a3fca296d11d4a57136c8b8f9ac4cda6c5867ad93da26157d723c83036",
-        "bytes": 193
+        "sha256": "273dbffcbb763ca04f0f5f0df6517b5038d3860b28c274b5bc3be5138a0d4627",
+        "bytes": 245
       },
       {
         "path": "foreground/README.md",
@@ -721,8 +726,8 @@
       },
       {
         "path": "scripts/accept_role.py",
-        "sha256": "01667ee729c0cf9a373258f36a0923a08594ed979dc91e5e4d27223a6b8c43e6",
-        "bytes": 34504
+        "sha256": "affc4f6e07aaa335073fab58ffcdc0df1f5264bd9a7f02318f966a6b48c97403",
+        "bytes": 40663
       },
       {
         "path": "scripts/boundaries.py",
@@ -736,13 +741,13 @@
       },
       {
         "path": "scripts/init_session.py",
-        "sha256": "7cc9c8f6a9e3f5c36804ab26cdcd06ed1fb077497703f3f81cbedb1f3b01d544",
-        "bytes": 7034
+        "sha256": "a518c856539fb413ff16dc6174e22738e8b2c708c904b21d6d0b49a1b9194d19",
+        "bytes": 9495
       },
       {
         "path": "scripts/lad_state.py",
-        "sha256": "f9c4be29a34e3b0e076ce0b19f277a57cf8805a3c93c2d55c0aaeecfb5e81d1c",
-        "bytes": 43366
+        "sha256": "e86d37a1096f069477dc7234cc3012cb247f77c27a5aa444b91d1dc914006b9f",
+        "bytes": 45370
       },
       {
         "path": "scripts/learning_seam.py",
@@ -751,13 +756,18 @@
       },
       {
         "path": "scripts/prepare_role.py",
-        "sha256": "b25c255d1755ee518ef8e89d3570b9a9a4395473ee0583b5eb7b9e282d284f06",
-        "bytes": 19777
+        "sha256": "cc8dbf1f04a36131b419ceff2a2e13c445fabffa52e46e8ed3b1bb139fad0df4",
+        "bytes": 27802
       },
       {
         "path": "scripts/presentation.py",
         "sha256": "86056d92a6a6b9ae9b78aa4f7f3e8dbd1deaa8c8f29645c65ea0f86a6bbca2dd",
         "bytes": 15410
+      },
+      {
+        "path": "scripts/provider_wait.py",
+        "sha256": "adcafe49c000a71a5f057c0be777146d37afe8c08ee133c52911df9494bceac5",
+        "bytes": 28626
       },
       {
         "path": "scripts/session_compat.py",
@@ -801,8 +811,8 @@
       },
       {
         "path": "workflow.json",
-        "sha256": "776473d359124ad28e336a29fdb7676399473f7375c269f3deb0b8ffdbb9b71c",
-        "bytes": 156382
+        "sha256": "2deeb6619560f35cd8c391bc4a914c9e2e30379af495d1e520d46497026a6101",
+        "bytes": 252943
       }
     ]
   },

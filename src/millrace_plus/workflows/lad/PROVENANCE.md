@@ -45,8 +45,11 @@ The v0.23.2 routing follow-up (L-R1) consulted Factory `context/transitions.md`,
 `e4d587290ceeaa886c6486ae03bd9a15831cf691`, compared from the corrected reference.
 `provenance.json` records their exact hashes under `routing_followup_reference`.
 They are semantic inputs only. Millrace adopts a finite deterministic
-presentation view and one nonrecursive Learning assessment per packet; it does
-not adopt Factory's prose interpretation, Orchestrator or provider waiting.
+presentation view and one nonrecursive Learning assessment per packet; L-R1
+does not adopt Factory's prose interpretation, Orchestrator or provider waiting.
+The later L-R2 provider-wait routes (`scripts/provider_wait.py`,
+`context/provider-policy.json` and the generated provider nodes) are
+Millrace-authored; they adopt no Factory provider-waiting text or Orchestrator.
 
 The v0.23.2 engineering feedback packet (L-Q1) adds Millrace-authored opt-in
 engineering capture, deterministic check phases/guards and requirement history

@@ -140,6 +140,16 @@ POLICY = {
     "learning": "once-per-packet",
     "provider_recovery": "disabled",
 }
+# Exact routing-policy/v2: new captures only. v1 copies keep the v1 object above.
+PROVIDER_POLICY_PATH = "context/provider-policy.json"
+POLICY_V2 = {
+    "format": "millrace-lad-routing-policy/v2",
+    "revision": 2,
+    "presentation_revision": "millrace-lad-presentation/v1",
+    "learning": "once-per-packet",
+    "provider_recovery": "enabled",
+    "provider_policy": PROVIDER_POLICY_PATH,
+}
 
 
 class LadError(Exception):
@@ -913,17 +923,49 @@ def _source_at(
 
 
 def routing_policy() -> dict:
-    """Strict captured new-copy policy; any missing or unknown form refuses."""
+    """Strict captured new-copy policy; any missing or unknown form refuses.
+
+    Exactly the v1 or v2 object is accepted. v1 keeps provider recovery disabled
+    and never reads or imports provider code; v2 names its provider policy path.
+    """
     root = Path(__file__).resolve().parent.parent
     try:
         raw = read(root, POLICY_PATH)
-        policy = fields(load_json(raw), set(POLICY))
-    except (LadError, ValueError):
+        value = load_json(raw)
+        expected_policy = (
+            POLICY_V2 if value.get("format") == POLICY_V2["format"] else POLICY
+        )
+        policy = fields(value, set(expected_policy))
+    except (LadError, ValueError, AttributeError):
         raise LadError("routing_policy_invalid") from None
-    for key, expected in POLICY.items():
+    for key, expected in expected_policy.items():
         if type(policy[key]) is not type(expected) or policy[key] != expected:
             raise LadError("routing_policy_unsupported_" + key)
     return {"path": POLICY_PATH, "sha256": digest(raw), "revision": policy["revision"]}
+
+
+def provider_recovery() -> bool:
+    """True only for an exact captured routing-policy/v2 copy."""
+    revision: int = routing_policy()["revision"]  # strict exact v1/v2 value
+    return revision == POLICY_V2["revision"]
+
+
+def provider_policy() -> tuple[dict[str, object], bytes]:
+    """Strict captured provider-policy/v1 of a v2 copy; requires installed Plus.
+
+    Imported lazily so v1 copies and disabled paths never depend on it.
+    """
+    if not provider_recovery():
+        raise LadError("provider_recovery_disabled")
+    try:
+        from millrace_plus import provider_wait as pw
+    except ImportError as exc:
+        raise LadError("provider_recovery_requires_plus") from exc
+    raw = read(Path(__file__).resolve().parent.parent, PROVIDER_POLICY_PATH)
+    try:
+        return pw.load_policy(raw), raw
+    except pw.ProviderWaitError as exc:
+        raise LadError(exc.code) from exc
 
 
 def presentation_path(oid: str, raw: bytes) -> str:
@@ -967,7 +1009,16 @@ def captured_policy(occurrence: dict) -> dict:
     checksum = occurrence["guidance_files"].get(POLICY_PATH)
     if not isinstance(checksum, str) or not SHA.fullmatch(checksum):
         raise LadError("routing_policy_not_captured")
-    return {"path": POLICY_PATH, "sha256": checksum, "revision": POLICY["revision"]}
+    revision = POLICY["revision"]
+    root = Path(__file__).resolve().parent.parent
+    try:
+        raw = read(root, POLICY_PATH)
+    except LadError:
+        raw = b""
+    if digest(raw) == checksum and load_json(raw).get("format") == POLICY_V2["format"]:
+        # Exact captured v2 bytes report their own revision; v1 is unchanged.
+        revision = POLICY_V2["revision"]
+    return {"path": POLICY_PATH, "sha256": checksum, "revision": revision}
 
 
 def presentation_record(

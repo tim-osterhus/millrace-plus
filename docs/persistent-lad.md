@@ -67,9 +67,19 @@ acceptance remains evidence for its original artifacts only.
 ## Provider wait commands and operator return (L-R2)
 
 `millrace_plus.provider_wait` keeps strict provider-wait records under the
-foreground workspace's `lad-state/provider/`. Stock graphs do not route to them
-yet, so no current copy creates a provider operation. The two commands below
-read and write only those records. Neither sleeps, wakes a run, launches a native
+foreground workspace's `lad-state/provider/`. New stock copies capture
+`context/routing-policy.json` format `millrace-lad-routing-policy/v2`, which names
+`context/provider-policy.json` (stock: 900 and 3,600 seconds, Troubleshooter
+binding `claude`, `automatic_wait: optional`). Copies that captured the v1 policy
+keep provider recovery disabled and their ordinary recovery routes unchanged; they
+are never migrated. In a v2 copy, the `python3` that runs command nodes must import
+both Plus and Core: the provider guards and the success check use Plus router modules
+that require Core. Initialization checks only the Plus import, and a layout with
+Plus but not Core is not qualified. A v2 copy refuses at initialization, before any role, when
+`troubleshooter_binding` names no graph binding or any `provider_diagnosis_<role>`
+node uses another binding. With `automatic_wait: required` it also refuses unless
+every foreground native role uses the supported `claude_print` binding. The two
+commands below read and write only those records. Neither sleeps, wakes a run, launches a native
 process or calls a Core control.
 
 ```
@@ -78,7 +88,14 @@ millrace-plus lad provider-due --project-root PATH --operation ID --observation 
 ```
 
 `provider-observe` opens Core's `exclusive_run_snapshot` through the normal Plus
-resolver, using the exact instance, run and expected state version you pass. The
+resolver, using the exact instance, run and expected state version you pass.
+`--project-root` is the copy that holds `foreground/` and its provider records.
+Both commands read the captured `context/provider-policy.json` beside the
+instance's actual workflow file as Core's public instance identity reports it.
+That is the project root for a unified copy and the separate workflow root for a
+service child. The identity's project root must equal `--project-root`, and
+`provider-due` locates the instance through the locator that `provider-observe`
+bound. Nothing else is searched. The
 snapshot must show the following, or the command refuses:
 
 - the paused foreground plane resumes at `provider_due_<node>`;
@@ -127,9 +144,10 @@ revalidate the current run and reconcile the old owner's file and external
 effects. Return to the run yourself: a standalone copy uses the existing
 version-fenced Core control. A service child uses only the journaled
 `lad decide --decision continue --resume-plane foreground` after the parent
-`parent-control` pause. Graph routing of these records is a later change.
+`parent-control` pause. If the run gate remains, a second distinct
+`lad decide --decision continue` (without `--resume-plane`) releases it.
 
-What the records check, and what the later graph helpers must prove:
+What the records check, and what the graph helpers prove:
 
 - **Checked by the records:**
   - exact fields, digests and chain links;
@@ -152,6 +170,83 @@ recorded for the operation.
 The retained completion fact keeps only Core's completion metadata. Raw native
 output (`stdout`, `stderr`, `stdout_base64`) is never copied into
 `lad-state/provider/`.
+
+### Graph routing
+
+Each of the eleven foreground native roles routes its native `on_error` edge to
+`classify_provider_<role>`; `on_unknown` and every success edge are unchanged and
+Learning is excluded. Seven declared nodes per role (77 in total, 172 foreground
+nodes) carry the whole provider path, all through `scripts/provider_wait.py`:
+
+- `classify_provider_<role>` reads only this occurrence's
+  `lad-state/native-context.json` and its `lad-state/native-diagnostics/<occurrence>/`
+  export. No export means ordinary recovery with no count. Duplicate, malformed or
+  conflicting evidence, or a later failure whose binding facts, observed version or
+  attempt input differ from the operation, pauses for reconciliation. Only an exact
+  typed Claude status counts.
+- A usage/availability failure pauses with `provider_wait_operator_return`;
+  access/permission failures pause with `provider_human_resolution_required`.
+  Both resume at `provider_due_<role>`, which LAD's continuation also names.
+- `provider_due_<role>` re-reads the observed run with public `inspect_run`. It
+  admits only the observed revision, the unchanged failed completion and its
+  transition, no operator move, and new applied pause/resume/recover receipts,
+  which it pins. It makes no native call.
+- `prepare_provider_retry_<role>` reserves exactly one occurrence through the
+  provider-intent preparation mode. That mode never uses ordinary replacement
+  intents. A crash rematerializes the same occurrence; an occurrence already
+  marked READY refuses.
+- After the third failure, `prepare_provider_diagnosis_<role>` runs the stock
+  Troubleshooter once. Its input pending names the failed occurrence and, as
+  `cause_id`, the operation. The result counts as resolved only as
+  `PASS_PREREQUISITE_REPAIRED` echoing `trigger_occurrence_id`, `cause_id`,
+  `resume_role` and `repair_verified: true`, and only if a restoration was
+  already recorded for the operation after its latest failure. Record it with
+  `provider-due --restoration` before resuming into the diagnosis. Anything
+  else, including a native error of the diagnosis itself, holds for a person.
+- Accepting the same operation's role result, after a provider retry or through
+  the existing ordinary replacement links, records `succeeded` once. A crash
+  after acceptance is repaired by the exact accepted replay. A conflict refuses
+  as `provider_success_*` (`lad_reconciliation_required`), never as an invalid
+  result.
+
+Operator guidance for holds:
+
+- A restoration whose `observed_at` is later than the due check's reading is
+  refused. Record it again when it is true.
+- A restoration recorded before a diagnosis does not survive an unresolved
+  diagnosis. Only a fresh restoration recorded after that hold can release it,
+  and only through the existing guards.
+- For uncertainty without a bridge ref, keep the actual retained ref if one
+  exists, or leave the copy paused for reconciliation. Never invent a ref or proof.
+- Observe after every provider failure before resuming. Resuming an unobserved
+  later failure re-pauses at `provider_due_<role>` for observation; a corrupt or
+  unreadable retained observation holds for reconciliation instead.
+- A crash between a provider event and its index tip makes the graph guards
+  and the success check refuse. They reload read-only. Any recovering reload,
+  `provider-observe` or `provider-due` with the operation's latest observation,
+  publishes the unique matching tip. That repairs the index only; continuing
+  the held run still needs its own existing supported path.
+
+Unresolved operations are retained, never cancelled or forgotten. No phase or
+operator command ends one without its own success, and the record format's
+`cancelled` phase has no writer in this release. If a success lacks its exact
+export, or a later occurrence of the role succeeds outside the operation's
+retry or replacement lineage, the accepted result routes normally and the
+operation stays pending. The pending record alone pauses nothing. Later in the
+same copy, a bridged native error of that role holds for reconciliation
+(`lad_reconciliation_required`) instead of ordinary recovery and appends an
+uncertainty fact. Ordinary errors without an export, successes and other roles
+are unaffected.
+
+Only such an actual hold stops the child. In a service, a held child holds its
+task and the FIFO under the existing service rules. Distinct tasks use their own
+fresh project and provider index, so another task's records never see the
+operation. The existing exits abandon; they do not resolve. A service task can
+be abandoned with `lad cancel` followed by
+`lad decide --decision acknowledge-cancelled`, under all existing closure, join
+and evidence guards. A standalone copy is abandoned with the public `cancel_run`
+control and a fresh copy. In both cases the retained operation and its evidence
+stay unresolved.
 
 ## Historical qualification evidence
 

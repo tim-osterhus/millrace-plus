@@ -24,13 +24,70 @@ from lad_state import (
 def _engineering():
     """The engineering module only for an explicitly captured profile."""
     root = Path(__file__).resolve().parent.parent
-    if not (root / "context/engineering-profile.json").exists() and not (
-        root / "context/engineering-profile.json"
-    ).is_symlink():
+    if (
+        not (root / "context/engineering-profile.json").exists()
+        and not (root / "context/engineering-profile.json").is_symlink()
+    ):
         return None
     import engineering_feedback
 
     return engineering_feedback
+
+
+def _provider_capture() -> bytes | None:
+    """v2 only: strict provider policy, its references and the capability matrix.
+
+    Every v2 capture refuses before any role unless the policy's
+    ``troubleshooter_binding`` names an existing graph binding and every
+    ``provider_diagnosis_<role>`` node uses exactly that binding. Required
+    automatic waiting also refuses unless every foreground native role and the
+    diagnosis binding are the supported ``claude_print`` binding; optional
+    unsupported bindings keep ordinary recovery.
+    """
+    from lad_state import load_json, provider_policy, provider_recovery, read
+
+    if not provider_recovery():
+        return None
+    policy, raw = provider_policy()
+    root = Path(__file__).resolve().parent.parent
+    graph = load_json(read(root, "workflow.json"))
+    bindings = graph["bindings"]
+    nodes = graph["planes"]["foreground"]["nodes"]
+    selected = policy["troubleshooter_binding"]
+    if selected not in bindings:
+        raise LadError("provider_troubleshooter_binding_missing")
+    if any(
+        node["invoke"]["binding"] != selected
+        for name, node in nodes.items()
+        if name.startswith("provider_diagnosis_")
+    ):
+        raise LadError("provider_troubleshooter_binding_mismatch")
+    if policy["automatic_wait"] == "required":
+        prefix = "classify_provider_"
+        names = {
+            nodes[name[len(prefix) :]]["invoke"]["binding"]
+            for name in nodes
+            if name.startswith(prefix)
+        } | {policy["troubleshooter_binding"]}
+        if any(
+            name not in bindings
+            or (bindings[name]["adapter"], bindings[name]["contract"])
+            != ("claude_print", "millrace-claude-print/v1")
+            for name in names
+        ):
+            raise LadError("provider_classification_unsupported")
+    return raw
+
+
+def _provider_index(foreground: Path, session_id: str, raw: bytes | None) -> None:
+    if raw is None:
+        return
+    from millrace_plus import provider_wait as pw
+
+    try:
+        pw.initialize_index(foreground, session_id=session_id, policy_raw=raw)
+    except pw.ProviderWaitError as exc:
+        raise LadError(exc.code) from exc
 
 
 def main() -> None:
@@ -46,6 +103,7 @@ def main() -> None:
     args = parser.parse_args()
     foreground, project = roots(args.project_root)
     routing_policy()  # Refuse unknown or missing captured policy before any role.
+    provider_raw = _provider_capture()
     if args.upgrade_session:
         captured, _, _ = manifest(project)
         if captured is not None and "lad_target" in captured["inputs"]:
@@ -93,6 +151,8 @@ def main() -> None:
             foreground / "lad-state/engineering.json"
         ).is_symlink():
             raise LadError("engineering_capture_missing")
+        # Validated, never reset: a missing index over provider history refuses.
+        _provider_index(foreground, state["session_id"], provider_raw)
         used = bool(
             state["events"]
             or state["occurrences"]
@@ -184,6 +244,7 @@ def main() -> None:
         engineering.initialize(foreground, state, staging=staging)
     # Rename publishes the complete directory. No role can run before this exits.
     os.rename(staging, directory)
+    _provider_index(foreground, state["session_id"], provider_raw)
     atomic(
         foreground,
         "lad-work-marker.json",

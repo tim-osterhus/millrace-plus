@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Any
 
 from boundaries import _recover, choose
 from lad_state import (
@@ -58,10 +59,8 @@ def validate(
             "findings",
             "human_evidence",
             "data",
-        } | (
-            {"helper_mode", "helper_evidence"}
-            if current_contract else set()
-        ),
+        }
+        | ({"helper_mode", "helper_evidence"} if current_contract else set()),
     )
     for key in (
         "session_id",
@@ -74,9 +73,8 @@ def validate(
         if result[key] != occurrence[key]:
             raise LadError("result_identity_" + key)
     if (
-        result["format"] != (
-            "millrace-lad-result/v2" if current_contract else "millrace-lad-result/v1"
-        )
+        result["format"]
+        != ("millrace-lad-result/v2" if current_contract else "millrace-lad-result/v1")
         or result["outcome"] != expected
         or (current_contract and guidance() != occurrence["guidance_sha256"])
     ):
@@ -101,13 +99,15 @@ def validate(
     engineering = _engineering() if current_contract else None
     records = (
         engineering.ROLE_RECORDS.get(occurrence["role"], set())
-        if engineering is not None else set()
+        if engineering is not None
+        else set()
     )
     for artifact in artifacts:
         fields(artifact, {"path", "sha256"})
         name = text(artifact["path"])
         if name in names or (
-            not name.endswith(".md") and name != "baseline-freeze.json"
+            not name.endswith(".md")
+            and name != "baseline-freeze.json"
             and name not in records
         ):
             raise LadError("duplicate_or_nonmarkdown_artifact")
@@ -120,8 +120,10 @@ def validate(
             # Retained v1 occurrences keep their original literal interpretation.
             content = raw.decode("utf-8")
             if name != "baseline-freeze.json" and (
-                oid not in content or len(content.strip()) < 100
-                or "## Evidence" not in content or "## Outcome" not in content
+                oid not in content
+                or len(content.strip()) < 100
+                or "## Evidence" not in content
+                or "## Outcome" not in content
             ):
                 raise LadError("incomplete_or_wrong_occurrence_artifact")
         raws.append((name, raw))
@@ -203,14 +205,14 @@ def current_source(
         except LadError as exc:
             raise LadError("shared_target_" + str(exc)) from exc
         current, context = _prepare_source(foreground, selected_target)
-        if (occurrence["source_context"]["outside"]
-            != context["outside"]):
+        if occurrence["source_context"]["outside"] != context["outside"]:
             raise LadError("out_of_scope_source_change")
         previous = occurrence["source_context"]["git"]
         observed = context["git"]
-        if (previous is None) != (observed is None) or (previous is not None and any(
-            previous[key] != observed[key] for key in ("base", "index")
-        )):
+        if (previous is None) != (observed is None) or (
+            previous is not None
+            and any(previous[key] != observed[key] for key in ("base", "index"))
+        ):
             raise LadError("source_git_base_or_index_changed")
     else:
         from session_compat import source_v1
@@ -294,9 +296,12 @@ def guard_baseline(foreground: Path, role: str, *, preparing: bool = False) -> b
     assert_foreground(state)
     if not preparing and role != current["role"]:
         raise LadError("baseline_owner_mismatch")
-    if preparing and not record_exists and state["continuation"]["node"] not in {
-        "prepare_" + role, "prepare_" + role + "_replacement"
-    }:
+    if (
+        preparing
+        and not record_exists
+        and state["continuation"]["node"]
+        not in {"prepare_" + role, "prepare_" + role + "_replacement"}
+    ):
         raise LadError("baseline_owner_mismatch")
     if current["format"] != "millrace-lad-input/v2" or (
         current["helper_mode"] != "direct"
@@ -310,18 +315,25 @@ def guard_baseline(foreground: Path, role: str, *, preparing: bool = False) -> b
         raise LadError("baseline_parent_pin_changed")
     checker = state["occurrences"].get(baseline["occurrence_id"])
     accepted = state["accepted"].get(baseline["occurrence_id"])
-    if (not checker or checker["role"] != "checker" or not accepted
-        or checker["lineage"] != current["lineage"]):
+    if (
+        not checker
+        or checker["role"] != "checker"
+        or not accepted
+        or checker["lineage"] != current["lineage"]
+    ):
         raise LadError("baseline_owner_mismatch")
-    freeze_ref = fields(accepted["result"]["data"].get("baseline_freeze"),
-                        {"path", "sha256"})
+    freeze_ref = fields(
+        accepted["result"]["data"].get("baseline_freeze"), {"path", "sha256"}
+    )
     freeze_raw = read(
         foreground, f"lad-results/{checker['occurrence_id']}/" + freeze_ref["path"]
     )
     if digest(freeze_raw) != freeze_ref["sha256"] or load_json(freeze_raw) != {
         "format": "millrace-lad-baseline-freeze/v1",
-        "occurrence_id": checker["occurrence_id"], "criteria": baseline["criteria"],
-        "path": baseline["path"], "sha256": baseline["sha256"],
+        "occurrence_id": checker["occurrence_id"],
+        "criteria": baseline["criteria"],
+        "path": baseline["path"],
+        "sha256": baseline["sha256"],
     }:
         raise LadError("baseline_freeze_mismatch")
     backup_path = "lad-state/baseline-pins/" + baseline["occurrence_id"] + ".md"
@@ -330,18 +342,23 @@ def guard_baseline(foreground: Path, role: str, *, preparing: bool = False) -> b
         raise LadError("baseline_backup_changed")
     # Validate every other accepted byte and the original freeze/result identity
     # BEFORE preserving an observation or changing the damaged projection.
-    _validate_state(
-        foreground, state, baseline_projection=(baseline["path"], backup)
-    )
+    _validate_state(foreground, state, baseline_projection=(baseline["path"], backup))
     if record_exists:
         record = load_json(read(foreground, record_path))
-        fields(record, {"format", "session_id", "owner", "input_sha256",
-                        "baseline", "observed"})
-        if any(record[key] != value for key, value in {
-            "format": "millrace-lad-baseline-restoration/v1",
-            "session_id": state["session_id"], "owner": owner,
-            "input_sha256": current["input_sha256"], "baseline": baseline,
-        }.items()):
+        fields(
+            record,
+            {"format", "session_id", "owner", "input_sha256", "baseline", "observed"},
+        )
+        if any(
+            record[key] != value
+            for key, value in {
+                "format": "millrace-lad-baseline-restoration/v1",
+                "session_id": state["session_id"],
+                "owner": owner,
+                "input_sha256": current["input_sha256"],
+                "baseline": baseline,
+            }.items()
+        ):
             raise LadError("baseline_restoration_conflict")
         bad_ref = record["observed"]
         if bad_ref is not None:
@@ -360,9 +377,11 @@ def guard_baseline(foreground: Path, role: str, *, preparing: bool = False) -> b
             bad_ref = {"path": bad_path, "sha256": digest(observed)}
         record = {
             "format": "millrace-lad-baseline-restoration/v1",
-            "session_id": state["session_id"], "owner": owner,
+            "session_id": state["session_id"],
+            "owner": owner,
             "input_sha256": current["input_sha256"],
-            "baseline": baseline, "observed": bad_ref,
+            "baseline": baseline,
+            "observed": bad_ref,
         }
         atomic(foreground, record_path, canonical(record) + b"\n", immutable=True)
     if changed:
@@ -370,11 +389,14 @@ def guard_baseline(foreground: Path, role: str, *, preparing: bool = False) -> b
     load(foreground)  # Ordinary strict validation remains the publication check.
     cause = digest(canonical(record))
     pending = {
-        "kind": "baseline_tamper", "target": "checker",
-        "lineage": current["lineage"], "occurrence_id": owner,
+        "kind": "baseline_tamper",
+        "target": "checker",
+        "lineage": current["lineage"],
+        "occurrence_id": owner,
         "cause_id": cause,
         "restoration": {
-            "path": record_path, "sha256": digest(canonical(record) + b"\n")
+            "path": record_path,
+            "sha256": digest(canonical(record) + b"\n"),
         },
     }
     if state["pending"] == pending and preparing and role == "consultant":
@@ -409,14 +431,18 @@ def accept(foreground: Path, workspace: Path, role: str, expected: str) -> str:
                 raise LadError("accepted_presentation_missing") from None
             if retained != presentation[1]:
                 raise LadError("accepted_presentation_conflict")
+        # Exact accepted replay repairs a crash after save, without native rerun.
+        reconcile_provider_success(foreground, state, occurrence)
         return existing["route"]
     if plane == "learning" and (
         state["continuation"]["node"] != "learning"
         or state["continuation"]["occurrence_id"] != oid
     ):
         raise LadError("learning_assessment_not_selected")
-    if state["pending"] and state["pending"]["kind"] == "invalid_result" and (
-        state["pending"]["occurrence_id"] == oid
+    if (
+        state["pending"]
+        and state["pending"]["kind"] == "invalid_result"
+        and (state["pending"]["occurrence_id"] == oid)
     ):
         state["pending"] = None
     route = choose(state, occurrence, result, foreground)
@@ -455,7 +481,93 @@ def accept(foreground: Path, workspace: Path, role: str, expected: str) -> str:
     if route == "REPLACE_ARBITER":
         mark(state, "prepare_arbiter_replacement", oid)
     save(foreground, state)
+    reconcile_provider_success(foreground, state, occurrence)
     return route
+
+
+def reconcile_provider_success(
+    foreground: Path, state: dict[str, Any], occurrence: dict[str, Any]
+) -> None:
+    """End a pending same-operation provider streak after durable acceptance.
+
+    Runs only for routing-policy/v2 foreground input-v2 occurrences. It matches
+    the operation's role, packet lineage, saved pending route and binding, the
+    original captured source, the exact provider retry preparation or existing
+    ordinary replacement chain, and this occurrence's own successful native
+    export. Diagnosis, Learning and unrelated success, or a success without its
+    export, leave the operation unresolved. Conflicts refuse with a distinct
+    ``provider_success_*`` code (the existing REFUSED reconciliation route), never
+    an invalid-result replacement. The returned semantic route is unchanged.
+    """
+    oid = occurrence["occurrence_id"]
+    if (
+        occurrence["role"] == "learning"
+        or occurrence["format"] != "millrace-lad-input/v2"
+        or oid not in state["accepted"]
+    ):
+        return
+    from lad_state import provider_recovery
+
+    if not provider_recovery():
+        return
+    import provider_wait as helper
+
+    try:
+        from millrace_plus import provider_wait as pw
+        from millrace_plus.router import native_diagnostic as nd
+    except ImportError as exc:
+        raise LadError("provider_success_requires_plus") from exc
+    try:
+        operation = pw.pending_operation(foreground, role=occurrence["role"])
+        if operation is None:
+            return
+        lineage = helper.attempt_lineage(foreground, state, operation, oid)
+        if lineage is None:
+            return  # unrelated or diagnosis success: the streak stays pending
+        published = helper.exports(foreground, oid)
+        if not published:
+            return  # missing verified success evidence: unresolved, route proceeds
+        if len(published) != 1:
+            raise LadError("provider_success_conflict")
+        ref, raw = published[0]
+        record, facts = helper._record(ref, raw, oid, occurrence)
+        if not isinstance(record, nd.NativeDiagnosticV2):
+            raise LadError("provider_success_conflict")
+        _, value = lineage
+        if isinstance(value, list):
+            head = state["occurrences"][value[0]]
+            evidence: dict[str, object] = {"kind": "replacement", "chain": value}
+        else:
+            head = occurrence
+            evidence = {"kind": "retry", "preparation_ref": value}
+        original = state["occurrences"].get(operation.authority["original_occurrence"])
+        if original is None:
+            raise LadError("provider_success_conflict")
+        pw.reconcile_provider_success(
+            foreground,
+            operation_id=operation.id,
+            success={
+                "role": occurrence["role"],
+                "packet_lineage": helper.packet_lineage(occurrence),
+                "pending_route": helper.pending_route(head),
+                "binding": helper._authority_facts(facts),
+                "source_sha256": original["source_sha256"],
+                "current_source_sha256": occurrence["source_sha256"],
+                "occurrence_id": oid,
+                "input_sha256": occurrence["input_sha256"],
+                "lineage": evidence,
+                "native_owner": {key: facts[key] for key in helper.OWNER},
+                "transport": facts["transport"],
+                "writer_state": facts["writer_state"],
+                "accepted": oid in state["accepted"],
+            },
+        )
+    except (helper.Hold, LadError, pw.ProviderWaitError, KeyError, TypeError) as exc:
+        # Never a recoverable invalid-result code: accepted bytes are preserved.
+        code = getattr(exc, "code", None) or str(exc) or type(exc).__name__
+        raise LadError(
+            code if code.startswith("provider_success_") else "provider_success_" + code
+        ) from None
 
 
 def restore_history(workspace: Path, occurrence: dict) -> bool:
@@ -500,19 +612,48 @@ def restore_history(workspace: Path, occurrence: dict) -> bool:
 
 
 def record_invalid(foreground: Path, workspace: Path, role: str, code: str) -> str:
-    recoverable = code.startswith((
-        "result_identity_", "result_contract_", "historylog_", "missing_role_",
-        "missing_required_", "incomplete_or_wrong_", "duplicate_or_nonmarkdown_",
-        "finding_", "pass_with_", "actionable_", "invalid_failure_",
-        "presentation_", "packet_development_check_",
-    )) or code in {
-        "missing_file", "JSONDecodeError", "ValueError", "KeyError", "TypeError",
-        "UnicodeDecodeError", "invalid_fields", "object_required", "nonfinite_json",
-        "duplicate_json_key", "stale_source",
-    } or (role == "learning" and code in {
-        # Invalid assessment evidence is a failed assessment, never a hold.
-        "learning_changed_pending_route", "unresolved_replacement_prerequisite",
-    })
+    recoverable = (
+        code.startswith(
+            (
+                "result_identity_",
+                "result_contract_",
+                "historylog_",
+                "missing_role_",
+                "missing_required_",
+                "incomplete_or_wrong_",
+                "duplicate_or_nonmarkdown_",
+                "finding_",
+                "pass_with_",
+                "actionable_",
+                "invalid_failure_",
+                "presentation_",
+                "packet_development_check_",
+            )
+        )
+        or code
+        in {
+            "missing_file",
+            "JSONDecodeError",
+            "ValueError",
+            "KeyError",
+            "TypeError",
+            "UnicodeDecodeError",
+            "invalid_fields",
+            "object_required",
+            "nonfinite_json",
+            "duplicate_json_key",
+            "stale_source",
+        }
+        or (
+            role == "learning"
+            and code
+            in {
+                # Invalid assessment evidence is a failed assessment, never a hold.
+                "learning_changed_pending_route",
+                "unresolved_replacement_prerequisite",
+            }
+        )
+    )
     if not recoverable:
         raise LadError(code)
     state = load(foreground)
@@ -530,22 +671,37 @@ def record_invalid(foreground: Path, workspace: Path, role: str, code: str) -> s
     ):
         raise LadError("invalid_result_authority_changed")
     current = current_source(foreground, occurrence)
-    last = next((row["id"] for row in reversed(state["events"])
-                 if row["kind"] == "role" and row["id"] in state["accepted"]), None)
-    fingerprint = digest(canonical({
-        "role": role, "diagnostic": code, "source": digest(canonical(current)),
-        "guidance": occurrence["guidance_sha256"],
-    }))
-    cause = digest(canonical({"role": role, "diagnostic": code,
-                              "lineage": occurrence["lineage"]}))
+    last = next(
+        (
+            row["id"]
+            for row in reversed(state["events"])
+            if row["kind"] == "role" and row["id"] in state["accepted"]
+        ),
+        None,
+    )
+    fingerprint = digest(
+        canonical(
+            {
+                "role": role,
+                "diagnostic": code,
+                "source": digest(canonical(current)),
+                "guidance": occurrence["guidance_sha256"],
+            }
+        )
+    )
+    cause = digest(
+        canonical({"role": role, "diagnostic": code, "lineage": occurrence["lineage"]})
+    )
     repaired_cause = any(
         state["occurrences"][old_id]["role"] == "troubleshooter"
         and accepted["result"]["data"].get("cause_id") == cause
         and accepted["result"]["data"].get("repair_verified") is True
         for old_id, accepted in state["accepted"].items()
     )
-    repeated = any(old_id != oid and intent.get("invalid_fingerprint") == fingerprint
-                   for old_id, intent in state["replacement_intents"].items())
+    repeated = any(
+        old_id != oid and intent.get("invalid_fingerprint") == fingerprint
+        for old_id, intent in state["replacement_intents"].items()
+    )
     decision = "INVALID_RESULT"
     if role == "learning":
         # One assessment only: a rejected result selects the failed-disposition
@@ -557,7 +713,8 @@ def record_invalid(foreground: Path, workspace: Path, role: str, code: str) -> s
     elif repeated or repaired_cause:
         route = _recover(state, occurrence, kind="invalid_result", cause=cause)
         decision = (
-            "INVALID_CONSULT" if route == "CONSULTANT" or role == "troubleshooter"
+            "INVALID_CONSULT"
+            if route == "CONSULTANT" or role == "troubleshooter"
             else "INVALID_REPEAT"
         )
         if role == "consultant":
@@ -570,10 +727,16 @@ def record_invalid(foreground: Path, workspace: Path, role: str, code: str) -> s
             raise
         rejected = None
     intent = {
-        "old_occurrence_id": oid, "role": role, "reason": "invalid_semantic_result",
-        "diagnostic": code, "result_path": relative, "result_sha256": rejected,
-        "invalid_fingerprint": fingerprint, "decision": decision,
-        "source_sha256": digest(canonical(current)), "guidance_sha256": guidance(),
+        "old_occurrence_id": oid,
+        "role": role,
+        "reason": "invalid_semantic_result",
+        "diagnostic": code,
+        "result_path": relative,
+        "result_sha256": rejected,
+        "invalid_fingerprint": fingerprint,
+        "decision": decision,
+        "source_sha256": digest(canonical(current)),
+        "guidance_sha256": guidance(),
         "last_accepted_occurrence": last,
     }
     if state["replacement_intents"].get(oid) == intent:
@@ -585,14 +748,23 @@ def record_invalid(foreground: Path, workspace: Path, role: str, code: str) -> s
     state["replacement_intents"][oid] = intent
     if role != "learning":
         state["pending"] = {
-            "kind": "invalid_result", "target": role, "lineage": occurrence["lineage"],
-            "occurrence_id": oid, "cause_id": cause,
+            "kind": "invalid_result",
+            "target": role,
+            "lineage": occurrence["lineage"],
+            "occurrence_id": oid,
+            "cause_id": cause,
         }
-    target = ("prepare_consultant" if decision == "INVALID_CONSULT" else
-              "prepare_troubleshooter" if decision == "INVALID_REPEAT" else
-              "human_pause" if decision == "INVALID_HOLD" else
-              "record_learning_failure" if role == "learning" else
-              "prepare_" + role + "_replacement")
+    target = (
+        "prepare_consultant"
+        if decision == "INVALID_CONSULT"
+        else "prepare_troubleshooter"
+        if decision == "INVALID_REPEAT"
+        else "human_pause"
+        if decision == "INVALID_HOLD"
+        else "record_learning_failure"
+        if role == "learning"
+        else "prepare_" + role + "_replacement"
+    )
     mark(state, target, oid)
     save(foreground, state)
     # Core's selected graph and writer barriers alone permit the next invocation.
@@ -608,8 +780,10 @@ def main() -> None:
     if args.outcome not in ROLES[args.role]:
         raise LadError("undeclared_role_outcome")
     foreground, _ = roots()
-    emit(accept_checked(foreground, foreground, args.role, args.outcome),
-         "Deterministic role evidence/invalid-result observation.")
+    emit(
+        accept_checked(foreground, foreground, args.role, args.outcome),
+        "Deterministic role evidence/invalid-result observation.",
+    )
 
 
 def accept_checked(foreground: Path, workspace: Path, role: str, expected: str) -> str:
@@ -652,16 +826,24 @@ def validate_execution_evidence(
         except Exception as exc:
             raise LadError("helper_closure_unresolved") from exc
     expected = "historylog/" + history_name(occurrence)
-    history = next((row for row in result["artifacts"]
-                    if row.get("path") == expected), None)
+    history = next(
+        (row for row in result["artifacts"] if row.get("path") == expected), None
+    )
     if history is None:
         raise LadError("historylog_identity")
     fields(history, {"path", "sha256"})
     raw = read(workspace, f"lad-results/{occurrence['occurrence_id']}/" + expected)
     content = raw.decode("utf-8", "strict")
-    if len(raw) >= 5120 or digest(raw) != history["sha256"] or any(
-        identity not in content for identity in (
-            occurrence["occurrence_id"], occurrence["session_id"], occurrence["role"]
+    if (
+        len(raw) >= 5120
+        or digest(raw) != history["sha256"]
+        or any(
+            identity not in content
+            for identity in (
+                occurrence["occurrence_id"],
+                occurrence["session_id"],
+                occurrence["role"],
+            )
         )
     ):
         raise LadError("historylog_identity_or_size")
@@ -677,10 +859,17 @@ def referenced(root: Path, value: object) -> tuple[dict, bytes]:
 
 def helper_qualification(workspace: Path, ref: dict) -> tuple[dict, dict]:
     _, raw = referenced(workspace, ref)
-    qualification = fields(load_json(raw), {
-        "format", "scope", "binding", "facility_version", "parent_task_id",
-        "inventory_ref"
-    })
+    qualification = fields(
+        load_json(raw),
+        {
+            "format",
+            "scope",
+            "binding",
+            "facility_version",
+            "parent_task_id",
+            "inventory_ref",
+        },
+    )
     if qualification["format"] != "millrace-lad-helper-qualification/v1" or (
         qualification["scope"] != "offline_validator_fixture"
     ):
@@ -688,14 +877,26 @@ def helper_qualification(workspace: Path, ref: dict) -> tuple[dict, dict]:
     for key in ("binding", "facility_version", "parent_task_id"):
         text(qualification[key])
     _, inventory_raw = referenced(workspace, qualification["inventory_ref"])
-    inventory = fields(load_json(inventory_raw), {
-        "format", "binding", "facility_version", "parent_task_id", "complete", "tasks"
-    })
-    if inventory["format"] != "millrace-lad-facility-inventory/v1" or (
-        inventory["complete"] is not True
-    ) or any(inventory[key] != qualification[key] for key in (
-        "binding", "facility_version", "parent_task_id"
-    )) or not isinstance(inventory["tasks"], list):
+    inventory = fields(
+        load_json(inventory_raw),
+        {
+            "format",
+            "binding",
+            "facility_version",
+            "parent_task_id",
+            "complete",
+            "tasks",
+        },
+    )
+    if (
+        inventory["format"] != "millrace-lad-facility-inventory/v1"
+        or (inventory["complete"] is not True)
+        or any(
+            inventory[key] != qualification[key]
+            for key in ("binding", "facility_version", "parent_task_id")
+        )
+        or not isinstance(inventory["tasks"], list)
+    ):
         raise LadError("helper_inventory_authority")
     return qualification, inventory
 
@@ -707,15 +908,33 @@ def validate_helpers(workspace: Path, occurrence: dict, result: dict) -> None:
         workspace, occurrence["helper_qualification"]
     )
     _, raw = referenced(workspace, result["helper_evidence"])
-    evidence = fields(load_json(raw), {
-        "format", "occurrence_id", "parent_task_id", "binding", "facility_version",
-        "inventory_ref", "tasks", "integration_ref",
-    })
-    if evidence["format"] != "millrace-lad-helper-evidence/v1" or (
-        evidence["occurrence_id"] != occurrence["occurrence_id"]
-    ) or any(evidence[key] != qualification[key] for key in (
-        "binding", "facility_version", "parent_task_id", "inventory_ref"
-    )) or evidence["tasks"] != inventory["tasks"]:
+    evidence = fields(
+        load_json(raw),
+        {
+            "format",
+            "occurrence_id",
+            "parent_task_id",
+            "binding",
+            "facility_version",
+            "inventory_ref",
+            "tasks",
+            "integration_ref",
+        },
+    )
+    if (
+        evidence["format"] != "millrace-lad-helper-evidence/v1"
+        or (evidence["occurrence_id"] != occurrence["occurrence_id"])
+        or any(
+            evidence[key] != qualification[key]
+            for key in (
+                "binding",
+                "facility_version",
+                "parent_task_id",
+                "inventory_ref",
+            )
+        )
+        or evidence["tasks"] != inventory["tasks"]
+    ):
         raise LadError("helper_inventory_mismatch")
     tasks = evidence["tasks"]
     for row in tasks:
@@ -730,10 +949,20 @@ def validate_helpers(workspace: Path, occurrence: dict, result: dict) -> None:
     areas = []
     ancestry = {}
     for task in tasks:
-        fields(task, {
-            "task_id", "parent_task_id", "role", "work_area", "model", "effort",
-            "result_ref", "terminal_state", "terminal_observation_ref",
-        })
+        fields(
+            task,
+            {
+                "task_id",
+                "parent_task_id",
+                "role",
+                "work_area",
+                "model",
+                "effort",
+                "result_ref",
+                "terminal_state",
+                "terminal_observation_ref",
+            },
+        )
         for key in ("task_id", "parent_task_id", "role", "work_area"):
             text(task[key])
         for key in ("model", "effort"):
@@ -742,18 +971,25 @@ def validate_helpers(workspace: Path, occurrence: dict, result: dict) -> None:
         ancestors = set()
         ancestor = task["parent_task_id"]
         while ancestor != parent:
-            if (ancestor not in indexed or ancestor in ancestors
-                or ancestor == task["task_id"]):
+            if (
+                ancestor not in indexed
+                or ancestor in ancestors
+                or ancestor == task["task_id"]
+            ):
                 raise LadError("helper_parent_chain")
             ancestors.add(ancestor)
             ancestor = indexed[ancestor]["parent_task_id"]
         ancestry[task["task_id"]] = ancestors
         area = safe(workspace, task["work_area"], missing=True)
         for previous_id, previous in areas:
-            if area == previous or (
-                previous in area.parents and previous_id not in ancestors
-            ) or (area in previous.parents
-                  and task["task_id"] not in ancestry[previous_id]):
+            if (
+                area == previous
+                or (previous in area.parents and previous_id not in ancestors)
+                or (
+                    area in previous.parents
+                    and task["task_id"] not in ancestry[previous_id]
+                )
+            ):
                 raise LadError("helper_work_area_overlap")
         areas.append((task["task_id"], area))
         if task["terminal_state"] not in {"completed", "failed", "cancelled"}:
@@ -762,32 +998,52 @@ def validate_helpers(workspace: Path, occurrence: dict, result: dict) -> None:
         if not result_ref["path"].startswith(task["work_area"].rstrip("/") + "/"):
             raise LadError("helper_result_ownership")
         _, terminal_raw = referenced(workspace, task["terminal_observation_ref"])
-        terminal = fields(load_json(terminal_raw), {
-            "format", "binding", "facility_version", "task_id", "parent_task_id",
-            "terminal_state", "result_ref", "collected", "started_at", "historylog_ref",
-        })
-        if terminal["format"] != "millrace-lad-facility-terminal/v1" or (
-            terminal["collected"] is not True
-        ) or any(terminal[key] != task[key] for key in (
-            "task_id", "parent_task_id", "terminal_state", "result_ref"
-        )) or any(terminal[key] != qualification[key]
-                  for key in ("binding", "facility_version")):
+        terminal = fields(
+            load_json(terminal_raw),
+            {
+                "format",
+                "binding",
+                "facility_version",
+                "task_id",
+                "parent_task_id",
+                "terminal_state",
+                "result_ref",
+                "collected",
+                "started_at",
+                "historylog_ref",
+            },
+        )
+        if (
+            terminal["format"] != "millrace-lad-facility-terminal/v1"
+            or (terminal["collected"] is not True)
+            or any(
+                terminal[key] != task[key]
+                for key in ("task_id", "parent_task_id", "terminal_state", "result_ref")
+            )
+            or any(
+                terminal[key] != qualification[key]
+                for key in ("binding", "facility_version")
+            )
+        ):
             raise LadError("helper_terminal_conflict")
         history_ref, history_raw = referenced(workspace, terminal["historylog_ref"])
-        expected_name = history_name({"role": occurrence["role"],
-                                      "created_at": terminal["started_at"]})
+        expected_name = history_name(
+            {"role": occurrence["role"], "created_at": terminal["started_at"]}
+        )
         expected_path = task["work_area"].rstrip("/") + "/historylog/" + expected_name
         if history_ref["path"] != expected_path:
             raise LadError("helper_historylog_identity")
         content = history_raw.decode("utf-8", "strict")
-        if len(history_raw) >= 5120 or any(value not in content for value in (
-            task["task_id"], task["parent_task_id"], task["role"]
-        )):
+        if len(history_raw) >= 5120 or any(
+            value not in content
+            for value in (task["task_id"], task["parent_task_id"], task["role"])
+        ):
             raise LadError("helper_historylog_identity_or_size")
     _, integrated = referenced(workspace, evidence["integration_ref"])
     summary = integrated.decode("utf-8", "strict")
-    if any(value not in summary
-           for value in [occurrence["occurrence_id"], parent, *ids]):
+    if any(
+        value not in summary for value in [occurrence["occurrence_id"], parent, *ids]
+    ):
         raise LadError("helper_integration_incomplete")
 
 

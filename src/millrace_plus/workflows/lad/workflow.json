@@ -57,7 +57,9 @@
     "templates/state.md",
     "scripts/session_compat.py",
     "scripts/engineering_feedback.py",
-    "context/engineering-profile.example.json"
+    "context/engineering-profile.example.json",
+    "context/provider-policy.json",
+    "scripts/provider_wait.py"
   ],
   "planes": {
     "foreground": {
@@ -478,7 +480,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/recon.md"
+              "prompt": "prompts/recon.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -506,10 +512,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_recon_replacement"
+            "goto": "classify_provider_recon"
           },
           "on_unknown": {
             "goto": "prepare_recon_replacement"
+          }
+        },
+        "classify_provider_recon": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "recon"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_recon_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_recon"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_recon"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_recon": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "recon"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_recon"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_recon"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_recon"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_recon"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_recon": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "recon"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "recon"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_recon"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_recon": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "recon"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_recon"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_recon"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_recon": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_recon"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_recon"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_recon"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_recon"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_recon"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_recon"
+          },
+          "on_unknown": {
+            "goto": "provider_human_recon"
+          }
+        },
+        "accept_provider_diagnosis_recon": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "recon"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_recon"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_recon"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_recon": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "recon"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_recon"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_recon_pass": {
@@ -848,7 +1166,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/planner.md"
+              "prompt": "prompts/planner.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -876,10 +1198,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_planner_replacement"
+            "goto": "classify_provider_planner"
           },
           "on_unknown": {
             "goto": "prepare_planner_replacement"
+          }
+        },
+        "classify_provider_planner": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "planner"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_planner_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_planner"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_planner"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_planner": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "planner"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_planner"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_planner"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_planner"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_planner"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_planner": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "planner"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "planner"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_planner"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_planner": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "planner"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_planner"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_planner"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_planner": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_planner"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_planner"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_planner"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_planner"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_planner"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_planner"
+          },
+          "on_unknown": {
+            "goto": "provider_human_planner"
+          }
+        },
+        "accept_provider_diagnosis_planner": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "planner"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_planner"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_planner"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_planner": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "planner"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_planner"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_planner_pass": {
@@ -1218,7 +1852,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/manager.md"
+              "prompt": "prompts/manager.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -1246,10 +1884,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_manager_replacement"
+            "goto": "classify_provider_manager"
           },
           "on_unknown": {
             "goto": "prepare_manager_replacement"
+          }
+        },
+        "classify_provider_manager": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "manager"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_manager_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_manager"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_manager"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_manager": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "manager"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_manager"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_manager"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_manager"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_manager"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_manager": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "manager"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "manager"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_manager"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_manager": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "manager"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_manager"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_manager"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_manager": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_manager"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_manager"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_manager"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_manager"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_manager"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_manager"
+          },
+          "on_unknown": {
+            "goto": "provider_human_manager"
+          }
+        },
+        "accept_provider_diagnosis_manager": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "manager"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_manager"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_manager"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_manager": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "manager"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_manager"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_manager_pass": {
@@ -1592,7 +2542,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/builder.md"
+              "prompt": "prompts/builder.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -1624,10 +2578,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_builder_replacement"
+            "goto": "classify_provider_builder"
           },
           "on_unknown": {
             "goto": "prepare_builder_replacement"
+          }
+        },
+        "classify_provider_builder": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "builder"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_builder_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_builder"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_builder"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_builder": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "builder"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_builder"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_builder"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_builder"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_builder"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_builder": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "builder"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "builder"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_builder"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_builder": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "builder"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_builder"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_builder"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_builder": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_builder"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_builder"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_builder"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_builder"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_builder"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_builder"
+          },
+          "on_unknown": {
+            "goto": "provider_human_builder"
+          }
+        },
+        "accept_provider_diagnosis_builder": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "builder"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_builder"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_builder"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_builder": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "builder"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_builder"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_builder_pass": {
@@ -2032,7 +3298,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/checker.md"
+              "prompt": "prompts/checker.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -2064,10 +3334,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_checker_replacement"
+            "goto": "classify_provider_checker"
           },
           "on_unknown": {
             "goto": "prepare_checker_replacement"
+          }
+        },
+        "classify_provider_checker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "checker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_checker_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_checker"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_checker"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_checker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "checker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_checker"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_checker"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_checker"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_checker"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_checker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "checker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "checker"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_checker"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_checker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "checker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_checker"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_checker"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_checker": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_checker"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_checker"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_checker"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_checker"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_checker"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_checker"
+          },
+          "on_unknown": {
+            "goto": "provider_human_checker"
+          }
+        },
+        "accept_provider_diagnosis_checker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "checker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_checker"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_checker"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_checker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "checker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_checker"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_checker_pass": {
@@ -2468,7 +4050,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/fixer.md"
+              "prompt": "prompts/fixer.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -2500,10 +4086,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_fixer_replacement"
+            "goto": "classify_provider_fixer"
           },
           "on_unknown": {
             "goto": "prepare_fixer_replacement"
+          }
+        },
+        "classify_provider_fixer": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "fixer"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_fixer_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_fixer"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_fixer"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_fixer": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "fixer"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_fixer"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_fixer"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_fixer"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_fixer"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_fixer": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "fixer"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "fixer"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_fixer"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_fixer": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "fixer"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_fixer"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_fixer"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_fixer": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_fixer"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_fixer"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_fixer"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_fixer"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_fixer"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_fixer"
+          },
+          "on_unknown": {
+            "goto": "provider_human_fixer"
+          }
+        },
+        "accept_provider_diagnosis_fixer": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "fixer"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_fixer"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_fixer"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_fixer": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "fixer"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_fixer"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_fixer_pass": {
@@ -2908,7 +4806,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/doublechecker.md"
+              "prompt": "prompts/doublechecker.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -2940,10 +4842,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_doublechecker_replacement"
+            "goto": "classify_provider_doublechecker"
           },
           "on_unknown": {
             "goto": "prepare_doublechecker_replacement"
+          }
+        },
+        "classify_provider_doublechecker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "doublechecker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_doublechecker_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_doublechecker"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_doublechecker"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_doublechecker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "doublechecker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_doublechecker"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_doublechecker"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_doublechecker"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_doublechecker"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_doublechecker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "doublechecker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "doublechecker"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_doublechecker"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_doublechecker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "doublechecker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_doublechecker"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_doublechecker"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_doublechecker": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_doublechecker"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_doublechecker"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_doublechecker"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_doublechecker"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_doublechecker"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_doublechecker"
+          },
+          "on_unknown": {
+            "goto": "provider_human_doublechecker"
+          }
+        },
+        "accept_provider_diagnosis_doublechecker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "doublechecker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_doublechecker"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_doublechecker"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_doublechecker": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "doublechecker"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_doublechecker"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_doublechecker_pass": {
@@ -3356,7 +5570,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/troubleshooter.md"
+              "prompt": "prompts/troubleshooter.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -3388,10 +5606,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_troubleshooter_replacement"
+            "goto": "classify_provider_troubleshooter"
           },
           "on_unknown": {
             "goto": "prepare_troubleshooter_replacement"
+          }
+        },
+        "classify_provider_troubleshooter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "troubleshooter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_troubleshooter_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_troubleshooter"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_troubleshooter"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_troubleshooter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "troubleshooter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_troubleshooter"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_troubleshooter"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_troubleshooter"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_troubleshooter"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_troubleshooter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "troubleshooter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "troubleshooter"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_troubleshooter"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_troubleshooter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "troubleshooter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_troubleshooter"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_troubleshooter"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_troubleshooter": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_troubleshooter"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_troubleshooter"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_troubleshooter"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_troubleshooter"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_troubleshooter"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_troubleshooter"
+          },
+          "on_unknown": {
+            "goto": "provider_human_troubleshooter"
+          }
+        },
+        "accept_provider_diagnosis_troubleshooter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "troubleshooter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_troubleshooter"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_troubleshooter"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_troubleshooter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "troubleshooter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_troubleshooter"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_troubleshooter_pass_review_repaired": {
@@ -3824,7 +6354,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/consultant.md"
+              "prompt": "prompts/consultant.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -3864,10 +6398,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_consultant_replacement"
+            "goto": "classify_provider_consultant"
           },
           "on_unknown": {
             "goto": "prepare_consultant_replacement"
+          }
+        },
+        "classify_provider_consultant": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "consultant"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_consultant_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_consultant"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_consultant"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_consultant": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "consultant"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_consultant"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_consultant"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_consultant"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_consultant"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_consultant": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "consultant"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "consultant"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_consultant"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_consultant": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "consultant"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_consultant"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_consultant"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_consultant": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_consultant"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_consultant"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_consultant"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_consultant"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_consultant"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_consultant"
+          },
+          "on_unknown": {
+            "goto": "provider_human_consultant"
+          }
+        },
+        "accept_provider_diagnosis_consultant": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "consultant"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_consultant"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_consultant"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_consultant": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "consultant"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_consultant"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_consultant_repair_spec": {
@@ -4424,7 +7270,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/updater.md"
+              "prompt": "prompts/updater.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -4460,10 +7310,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_updater_replacement"
+            "goto": "classify_provider_updater"
           },
           "on_unknown": {
             "goto": "prepare_updater_replacement"
+          }
+        },
+        "classify_provider_updater": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "updater"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_updater_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_updater"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_updater"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_updater": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "updater"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_updater"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_updater"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_updater"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_updater"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_updater": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "updater"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "updater"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_updater"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_updater": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "updater"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_updater"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_updater"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_updater": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_updater"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_updater"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_updater"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_updater"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_updater"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_updater"
+          },
+          "on_unknown": {
+            "goto": "provider_human_updater"
+          }
+        },
+        "accept_provider_diagnosis_updater": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "updater"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_updater"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_updater"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_updater": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "updater"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_updater"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_updater_pass": {
@@ -4930,7 +8092,11 @@
             "binding": "claude",
             "timeout_seconds": 1800,
             "config": {
-              "prompt": "prompts/arbiter.md"
+              "prompt": "prompts/arbiter.md",
+              "diagnostic_bridge": {
+                "context_path": "lad-state/native-context.json",
+                "outbox_path": "lad-state/native-diagnostics"
+              }
             },
             "inputs": [
               "lad-state/active-role.json"
@@ -4962,10 +8128,322 @@
             }
           },
           "on_error": {
-            "goto": "prepare_arbiter_replacement"
+            "goto": "classify_provider_arbiter"
           },
           "on_unknown": {
             "goto": "prepare_arbiter_replacement"
+          }
+        },
+        "classify_provider_arbiter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "classify",
+                "arbiter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "ORDINARY_ERROR",
+            "PROVIDER_WAIT",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "ORDINARY_ERROR": {
+              "goto": "prepare_arbiter_replacement"
+            },
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_arbiter"
+              }
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_arbiter"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_due_arbiter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "due",
+                "arbiter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PROVIDER_WAIT",
+            "RETRY_READY",
+            "DIAGNOSIS_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "PROVIDER_WAIT": {
+              "pause": {
+                "reason": "provider_wait_operator_return",
+                "resume": "provider_due_arbiter"
+              }
+            },
+            "RETRY_READY": {
+              "goto": "prepare_provider_retry_arbiter"
+            },
+            "DIAGNOSIS_READY": {
+              "goto": "prepare_provider_diagnosis_arbiter"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_arbiter"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_retry_arbiter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-retry",
+                "arbiter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "arbiter"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_arbiter"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "prepare_provider_diagnosis_arbiter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "prepare-diagnosis",
+                "arbiter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "READY": {
+              "goto": "provider_diagnosis_arbiter"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_arbiter"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_diagnosis_arbiter": {
+          "invoke": {
+            "binding": "claude",
+            "timeout_seconds": 1800,
+            "config": {
+              "prompt": "prompts/troubleshooter.md"
+            },
+            "inputs": [
+              "lad-state/active-role.json"
+            ]
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "PASS_REVIEW_REPAIRED",
+            "PASS_PREREQUISITE_REPAIRED",
+            "FINDINGS",
+            "ERROR",
+            "HUMAN_BLOCKED"
+          ],
+          "on": {
+            "PASS_REVIEW_REPAIRED": {
+              "goto": "accept_provider_diagnosis_arbiter"
+            },
+            "PASS_PREREQUISITE_REPAIRED": {
+              "goto": "accept_provider_diagnosis_arbiter"
+            },
+            "FINDINGS": {
+              "goto": "accept_provider_diagnosis_arbiter"
+            },
+            "ERROR": {
+              "goto": "accept_provider_diagnosis_arbiter"
+            },
+            "HUMAN_BLOCKED": {
+              "goto": "accept_provider_diagnosis_arbiter"
+            }
+          },
+          "on_error": {
+            "goto": "provider_human_arbiter"
+          },
+          "on_unknown": {
+            "goto": "provider_human_arbiter"
+          }
+        },
+        "accept_provider_diagnosis_arbiter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "accept-diagnosis",
+                "arbiter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "RETRY_READY",
+            "PROVIDER_HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "RETRY_READY": {
+              "goto": "provider_due_arbiter"
+            },
+            "PROVIDER_HUMAN_REQUIRED": {
+              "goto": "provider_human_arbiter"
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
+          }
+        },
+        "provider_human_arbiter": {
+          "invoke": {
+            "binding": "command",
+            "timeout_seconds": 90,
+            "config": {
+              "script": "scripts/provider_wait.py",
+              "args": [
+                "human",
+                "arbiter"
+              ]
+            }
+          },
+          "result": "json-v1",
+          "outcomes": [
+            "HUMAN_REQUIRED",
+            "UNCERTAIN"
+          ],
+          "on": {
+            "HUMAN_REQUIRED": {
+              "pause": {
+                "reason": "provider_human_resolution_required",
+                "resume": "provider_due_arbiter"
+              }
+            },
+            "UNCERTAIN": {
+              "pause": {
+                "reason": "lad_reconciliation_required"
+              }
+            }
+          },
+          "on_error": {
+            "pause": {
+              "reason": "lad_deterministic_failure"
+            }
+          },
+          "on_unknown": {
+            "pause": {
+              "reason": "lad_unknown_deterministic_outcome"
+            }
           }
         },
         "accept_arbiter_pass": {

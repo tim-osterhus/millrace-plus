@@ -8,7 +8,7 @@ The stock graph selects Plus `claude_print` with profile `millrace-claude-print-
 
 The adapter appends an instruction to use Claude Code’s StructuredOutput tool with the schema for that invocation. The `outcome` enum comes from the exact runtime-selected markers. The schema also requires string `summary` and an array of project-relative `refs`, with no extra fields. The generated `claude-prompt.txt` and `claude-result-schema.json` live in the invocation root. These are adapter files, not workflow workspace authority. Do not infer or access a temporary invocation path.
 
-The graph’s native role timeout is 1,800 seconds. The 96 deterministic command nodes use an explicit 90-second timeout for new stock copies. The workflow adds no total invocation or elapsed-time cap. Finite Core limits explicitly selected at startup remain in force. This finite operating allowance establishes no performance or retained-history fit; existing copies keep their captured settings. It grants no additional provider allowance.
+The graph’s native role timeout is 1,800 seconds, including the 11 provider-diagnosis Troubleshooter nodes. The 162 deterministic command nodes, including the 66 provider-wait guards, use an explicit 90-second timeout for new stock copies. These counts are a route inventory, not an execution budget. The workflow adds no total invocation or elapsed-time cap. Finite Core limits explicitly selected at startup remain in force. This finite operating allowance establishes no performance or retained-history fit; existing copies keep their captured settings. It grants no additional provider allowance.
 
 ## Direct work and optional helper evidence
 
@@ -26,7 +26,7 @@ Qualification refs bind `binding`, `facility_version`, `parent_task_id`, and an 
 
 ## Legacy session upgrade
 
-Ordinary copied commands remain standard-library-only under `python3 -S`. A v1 session is read under its original contract. Inspection, role preparation, and a new run never upgrade it. The explicit initializer path with `--upgrade-session` lazily loads the installed Plus facade. It requires the exact `--project-root`, `--session-id`, `--instance-id`, `--run-id`, `--state-home`, and `--expected-state-version` values. `--catalog-home` is optional. There is no `--joined` assertion.
+Ordinary copied commands remain standard-library-only under `python3 -S`. A captured routing-policy/v2 copy lazily loads installed Plus only for provider-wait records and guards (`scripts/provider_wait.py`, the provider index at initialization, provider preparation and the same-operation success check); v1 copies never load it. A v1 session is read under its original contract. Inspection, role preparation, and a new run never upgrade it. The explicit initializer path with `--upgrade-session` lazily loads the installed Plus facade. It requires the exact `--project-root`, `--session-id`, `--instance-id`, `--run-id`, `--state-home`, and `--expected-state-version` values. `--catalog-home` is optional. There is no `--joined` assertion.
 
 The caller owns and joins the exact caller lifecycles and excludes other writers before upgrade. A paused run, a Core lock, or a quiescent-looking plane does not attest that OS or native helper callers have joined. Upgrade preserves the existing v1 session ID and archived source/history references. It does not revalidate old checks, permit stale guidance dispatch, auto-resume a seam, or qualify actual used-copy operations.
 

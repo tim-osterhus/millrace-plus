@@ -42,7 +42,7 @@ Each artifact ref has only `path` and `sha256`. Paths are relative to the occurr
 
 ## Presentation view
 
-Captured `context/routing-policy.json` (`millrace-lad-routing-policy/v1`) selects one finite, deterministic presentation check. Acceptance first verifies the result identity, contract, declared outcome, request/source/guidance authority, containment and every raw artifact SHA-256. A digest mismatch is an integrity failure, not formatting. Only then does it read a view of each Markdown artifact: BOM removed, CRLF as LF, outer blank lines trimmed and canonical label spelling. Raw bytes, their digests and the accepted result are never rewritten. Acceptance retains an immutable `millrace-lad-presentation/v1` record under `lad-state/presentation/<occurrence>/` with raw and view hashes and applied rule IDs; views are never role artifacts. Every later load recomputes that complete record from the raw bytes, the prepared input and the occurrence's captured policy, and refuses any difference.
+Captured `context/routing-policy.json` (`millrace-lad-routing-policy/v1`, or `millrace-lad-routing-policy/v2` for new copies with provider recovery enabled and the path-only `context/provider-policy.json` reference) selects one finite, deterministic presentation check. Both versions select the same presentation view and once-per-packet Learning; v1 copies keep provider recovery disabled. Acceptance first verifies the result identity, contract, declared outcome, request/source/guidance authority, containment and every raw artifact SHA-256. A digest mismatch is an integrity failure, not formatting. Only then does it read a view of each Markdown artifact: BOM removed, CRLF as LF, outer blank lines trimmed and canonical label spelling. Raw bytes, their digests and the accepted result are never rewritten. Acceptance retains an immutable `millrace-lad-presentation/v1` record under `lad-state/presentation/<occurrence>/` with raw and view hashes and applied rule IDs; views are never role artifacts. Every later load recomputes that complete record from the raw bytes, the prepared input and the occurrence's captured policy, and refuses any difference.
 
 A section label begins a logical line after optional indentation, a list marker and bold. It is outside fenced code and blockquotes, including fences or quotes opened inside a list item. Recognized labels are case-insensitive `Evidence` and `Outcome` as ATX headings of any level (optional closing hashes, an inline `: body`, or a legacy title suffix such as `## Evidence and observed checks`) or as plain `Evidence:`/`Outcome:` lines. A heading section ends at the next Evidence/Outcome label or an equal/shallower heading; a plain section ends at any heading, the next label or the end. Each section body must be nonblank; the previous 100-character floor is removed. Identical repeats are accepted; different bodies refuse. Labels only in fenced code or blockquotes, mid-line label text and prose such as “the evidence is good” are not sections.
 
@@ -206,6 +206,17 @@ Before its baseline freeze, Checker receives requirements and profile refs only.
   checks and their accepted evidence. A verified repair returns
   `PASS_PREREQUISITE_REPAIRED` with `resume_role` equal to that target; never
   install tools or edit the captured profile.
+- Provider diagnosis: when `input.pending.cause_id` names a provider operation
+  under `lad-state/provider/operations/<cause_id>/`, this is that operation's one
+  provider diagnosis of the failed `input.pending.occurrence_id`. Inspect or
+  correct only already-permitted local configuration. Never change model,
+  effort, provider, account, credentials, billing, permissions or security
+  policy, and never rerun the native role yourself. A verified restoration
+  returns `PASS_PREREQUISITE_REPAIRED` with all four fields above
+  (`trigger_occurrence_id`, `cause_id`, `resume_role`, `repair_verified=true`).
+  The retry is resumed only if the operator has already recorded a
+  restoration for that operation. Without one, or with any other outcome, the
+  operation holds for a person. Your prose is not restoration evidence.
 - Arbiter writes `retained-verdict.json` (`millrace-lad-retained-verdict/v1`:
   `format`, `occurrence_id`, `requirements_sha256`, `source_sha256`, `verdict`)
   keyed by exactly the retained active requirement IDs, each `{status,

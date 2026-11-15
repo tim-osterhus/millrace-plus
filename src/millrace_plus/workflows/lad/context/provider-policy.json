@@ -1,0 +1,7 @@
+{
+  "format": "millrace-lad-provider-policy/v1",
+  "first_retry_seconds": 900,
+  "second_retry_seconds": 3600,
+  "troubleshooter_binding": "claude",
+  "automatic_wait": "optional"
+}

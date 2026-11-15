@@ -44,8 +44,7 @@ def frozen_source(tmp_path: Path) -> tuple[Path, dict]:
     assert hashlib.sha256(manifest_file.read_bytes()).hexdigest() == MANIFEST_SHA256
     manifest = json.loads(manifest_file.read_bytes())
     rows = [
-        dict(row, path="workflow/" + row["path"])
-        for row in manifest["workflow_files"]
+        dict(row, path="workflow/" + row["path"]) for row in manifest["workflow_files"]
     ] + manifest["reference_files"]
     assert len(rows) == 40
     assert {"manifest.json", *(row["path"] for row in rows)} == {
@@ -84,18 +83,23 @@ def test_frozen_v1_bootstrap_and_reload_are_byte_stable(
     shutil.copyfile(old / "reference/lad_peer.py", project / "scripts/lad_peer.py")
     request = b"Original request: answer() returns 42.\n"
     (project / "request.md").write_bytes(request)
-    assert old_command(project, "init_session.py", "--project-root", "..")[
-        "outcome"
-    ] == "NEW_SESSION"
+    assert (
+        old_command(project, "init_session.py", "--project-root", "..")["outcome"]
+        == "NEW_SESSION"
+    )
     if used:
-        assert old_command(project, "setup_intake.py", "--project-root", "..")[
-            "outcome"
-        ] == "INTAKE_READY_EXISTING"
+        assert (
+            old_command(project, "setup_intake.py", "--project-root", "..")["outcome"]
+            == "INTAKE_READY_EXISTING"
+        )
         assert old_command(project, "prepare_role.py", "recon")["outcome"] == "READY"
         result = old_command(project, "lad_peer.py", "recon", "clean")
-        assert old_command(project, "accept_role.py", "recon", result["outcome"])[
-            "outcome"
-        ] != "REFUSED"
+        assert (
+            old_command(project, "accept_role.py", "recon", result["outcome"])[
+                "outcome"
+            ]
+            != "REFUSED"
+        )
         assert (project / "foreground/request.md").read_bytes() == request
     session = project / "foreground/lad-state/session.json"
     before = session.read_bytes()
@@ -107,9 +111,7 @@ def test_frozen_v1_bootstrap_and_reload_are_byte_stable(
     if used:
         assert len(state["accepted"]) == 1
         assert state["occurrences"]
-    outcome = old_command(project, "init_session.py", "--project-root", "..")[
-        "outcome"
-    ]
+    outcome = old_command(project, "init_session.py", "--project-root", "..")["outcome"]
     assert outcome == (
         "EXISTING_SESSION_WITH_WORK" if used else "EXISTING_SESSION_PRISTINE"
     )
@@ -118,15 +120,25 @@ def test_frozen_v1_bootstrap_and_reload_are_byte_stable(
 
 def genuine_v7(tmp_path: Path, scenario: str) -> tuple[Path, dict]:
     names = (
-        "MILLRACE_LAD_OLD_PYTHON", "MILLRACE_LAD_OLD_WHEEL",
-        "MILLRACE_LAD_V1_MANIFEST", "MILLRACE_LAD_V7_GENERATOR",
+        "MILLRACE_LAD_OLD_PYTHON",
+        "MILLRACE_LAD_OLD_WHEEL",
+        "MILLRACE_LAD_V1_MANIFEST",
+        "MILLRACE_LAD_V7_GENERATOR",
     )
     if not all(os.environ.get(name) for name in names):
         pytest.skip("Exact retained old Core inputs required for v7 integration")
     case = tmp_path / ("genuine-v7-" + scenario)
     child = subprocess.run(
-        [os.environ[names[0]], "-B", "-I", os.environ[names[3]],
-         os.environ[names[1]], os.environ[names[2]], str(case), scenario],
+        [
+            os.environ[names[0]],
+            "-B",
+            "-I",
+            os.environ[names[3]],
+            os.environ[names[1]],
+            os.environ[names[2]],
+            str(case),
+            scenario,
+        ],
         env={"PATH": "/usr/bin:/bin"},
         capture_output=True,
         timeout=90,
@@ -139,17 +151,41 @@ def genuine_v7(tmp_path: Path, scenario: str) -> tuple[Path, dict]:
     return case, manifest
 
 
+# The exact approved stock routing-policy/v1 bytes (pre-L-R2 stock, 193 bytes).
+LEGACY_ROUTING_POLICY = (
+    json.dumps(
+        {
+            "format": "millrace-lad-routing-policy/v1",
+            "revision": 1,
+            "presentation_revision": "millrace-lad-presentation/v1",
+            "learning": "once-per-packet",
+            "provider_recovery": "disabled",
+        },
+        indent=2,
+    )
+    + "\n"
+).encode()
+LEGACY_ROUTING_POLICY_SHA256 = (
+    "430433a3fca296d11d4a57136c8b8f9ac4cda6c5867ad93da26157d723c83036"
+)
+
+
 def install_candidate_scripts(project: Path) -> None:
     from millrace_plus import catalog
 
     for script in (catalog.bundled_root() / "lad/scripts").glob("*.py"):
         shutil.copyfile(script, project / "scripts" / script.name)
     # Candidate scripts require their explicit captured routing policy; it is
-    # installed with them, never inferred for a retained copy.
-    shutil.copyfile(
-        catalog.bundled_root() / "lad/context/routing-policy.json",
-        project / "context/routing-policy.json",
-    )
+    # installed with them, never inferred for a retained copy. A retained v1
+    # graph keeps the approved routing-policy/v1: stock v2 needs its own
+    # complete provider policy, bindings and graph capture, so it is never
+    # activated on a retained graph here and nothing is migrated.
+    policy = project / "context/routing-policy.json"
+    if not policy.exists():
+        assert hashlib.sha256(LEGACY_ROUTING_POLICY).hexdigest() == (
+            LEGACY_ROUTING_POLICY_SHA256
+        )
+        policy.write_bytes(LEGACY_ROUTING_POLICY)
 
 
 def explicit_upgrade(
@@ -168,13 +204,25 @@ def explicit_upgrade(
         # Installed-package qualification repeats without this test-only path.
         environment["PYTHONPATH"] = str(Path(catalog.__file__).parents[1])
     child = subprocess.run(
-        [sys.executable, "-B", *(["-S"] if isolated else []),
-         str(case / manifest["project"] / "scripts/init_session.py"),
-         "--project-root", "..", "--upgrade-session",
-         "--session-id", manifest["session_id"],
-         "--instance-id", manifest["instance_id"], "--run-id", manifest["run_id"],
-         "--state-home", str(home), "--expected-state-version",
-         str(view["state_version"] if version is None else version)],
+        [
+            sys.executable,
+            "-B",
+            *(["-S"] if isolated else []),
+            str(case / manifest["project"] / "scripts/init_session.py"),
+            "--project-root",
+            "..",
+            "--upgrade-session",
+            "--session-id",
+            manifest["session_id"],
+            "--instance-id",
+            manifest["instance_id"],
+            "--run-id",
+            manifest["run_id"],
+            "--state-home",
+            str(home),
+            "--expected-state-version",
+            str(view["state_version"] if version is None else version),
+        ],
         cwd=case / manifest["project"] / "foreground",
         env=environment,
         capture_output=True,
@@ -195,28 +243,38 @@ def test_explicit_upgrade_preserves_genuine_original_v7_seams(
     file = project / "foreground/lad-state/session.json"
     old_raw = file.read_bytes()
     old = json.loads(old_raw)
-    payloads = [(case / row["path"], (case / row["path"]).read_bytes())
-                for row in manifest["payloads"]]
+    payloads = [
+        (case / row["path"], (case / row["path"]).read_bytes())
+        for row in manifest["payloads"]
+    ]
     home = case / manifest["state_home"]
     before = control.inspect_run(
         manifest["instance_id"], manifest["run_id"], state_home=home
     )
     assert before["startup_cap"] == 40 and before["startup_elapsed"] == 1200
     install_candidate_scripts(project)
-    assert explicit_upgrade(case, manifest)["outcome"] == "SESSION_UPGRADED"
+    upgrade_reply = explicit_upgrade(case, manifest)
+    assert upgrade_reply["outcome"] == "SESSION_UPGRADED", upgrade_reply
     upgraded = json.loads(file.read_bytes())
     assert upgraded["format"] == "millrace-lad-session/v2"
     assert upgraded["occurrences"] == old["occurrences"]
     for key in (
-        "session_id", "accepted", "criteria", "pending", "request", "seam_seen"
+        "session_id",
+        "accepted",
+        "criteria",
+        "pending",
+        "request",
+        "seam_seen",
     ):
         assert upgraded[key] == old[key]
-    assert upgraded["events"] == [{"id": row["id"], "kind": row["kind"]}
-                                    for row in old["events"]]
+    assert upgraded["events"] == [
+        {"id": row["id"], "kind": row["kind"]} for row in old["events"]
+    ]
     assert (project / "foreground" / upgraded["legacy"]["path"]).read_bytes() == old_raw
     record = project / "foreground" / upgraded["migration"]["path"]
-    assert hashlib.sha256(record.read_bytes()).hexdigest() == (
-        upgraded["migration"]["sha256"]
+    assert (
+        hashlib.sha256(record.read_bytes()).hexdigest()
+        == (upgraded["migration"]["sha256"])
     )
     assert all(path.read_bytes() == raw for path, raw in payloads)
     stable = file.read_bytes()
@@ -237,25 +295,33 @@ def test_explicit_upgrade_preserves_genuine_original_v7_seams(
     # Explicit adoption declares every candidate control file the scripts read.
     # Without the captured policy/presentation files, preparation refuses with
     # routing_policy_invalid before Learning runs (no silent adoption).
-    graph["control_files"].extend([
-        "scripts/session_compat.py", "scripts/presentation.py",
-        "context/routing-policy.json",
-    ])
+    graph["control_files"].extend(
+        [
+            "scripts/session_compat.py",
+            "scripts/presentation.py",
+            "context/routing-policy.json",
+        ]
+    )
     assert graph["format"] == "millrace-router/v3"
     assert graph["limits"]["max_invocations"] == 40
     graph_file.write_text(json.dumps(graph))
     submitted = control.submit_revision(
-        manifest["instance_id"], manifest["run_id"], state_home=home,
-        request_id=uuid.uuid4().hex, expected_state_version=after["state_version"],
+        manifest["instance_id"],
+        manifest["run_id"],
+        state_home=home,
+        request_id=uuid.uuid4().hex,
+        expected_state_version=after["state_version"],
     )
     assert submitted["status"] == "applied", submitted
     current = control.inspect_run(
         manifest["instance_id"], manifest["run_id"], state_home=home
     )
     accepted = control.accept_revision(
-        manifest["instance_id"], manifest["run_id"],
+        manifest["instance_id"],
+        manifest["run_id"],
         candidate_id=submitted["candidate_id"],
-        state_home=home, request_id=uuid.uuid4().hex,
+        state_home=home,
+        request_id=uuid.uuid4().hex,
         expected_state_version=current["state_version"],
     )
     assert accepted["status"] == "applied", accepted
@@ -264,8 +330,11 @@ def test_explicit_upgrade_preserves_genuine_original_v7_seams(
             manifest["instance_id"], manifest["run_id"], state_home=home
         )
         resumed = control.resume_plane(
-            manifest["instance_id"], manifest["run_id"], plane_id="learning",
-            state_home=home, request_id=uuid.uuid4().hex,
+            manifest["instance_id"],
+            manifest["run_id"],
+            plane_id="learning",
+            state_home=home,
+            request_id=uuid.uuid4().hex,
             expected_state_version=current["state_version"],
         )
         assert resumed["status"] == "applied", resumed
@@ -275,9 +344,10 @@ def test_explicit_upgrade_preserves_genuine_original_v7_seams(
     progressed = json.loads(file.read_bytes())
     assert progressed["request"] is None
     assert progressed["pending"] is None
-    assert all(progressed["accepted"].get(oid) == row
-               for oid, row in old["accepted"].items())
-    assert progressed["events"][:len(old["events"])] == upgraded["events"]
+    assert all(
+        progressed["accepted"].get(oid) == row for oid, row in old["accepted"].items()
+    )
+    assert progressed["events"][: len(old["events"])] == upgraded["events"]
     assert completed["id"] == before["id"] and completed["count"] == 7
     assert completed["started_at"] == before["started_at"]
     assert completed["startup_deadline"] == before["startup_deadline"]
@@ -335,12 +405,14 @@ def finite_old_domain_project(tmp_path: Path) -> Path:
                 )
     file.write_text(json.dumps(graph))  # Before any old guidance capture.
     (project / "request.md").write_text("Original request: answer() returns 42.\n")
-    assert old_command(project, "init_session.py", "--project-root", "..")[
-        "outcome"
-    ] == "NEW_SESSION"
-    assert old_command(project, "setup_intake.py", "--project-root", "..")[
-        "outcome"
-    ] == "INTAKE_READY_EXISTING"
+    assert (
+        old_command(project, "init_session.py", "--project-root", "..")["outcome"]
+        == "NEW_SESSION"
+    )
+    assert (
+        old_command(project, "setup_intake.py", "--project-root", "..")["outcome"]
+        == "INTAKE_READY_EXISTING"
+    )
     return project
 
 
@@ -349,13 +421,18 @@ def paused_current_core_for_old_domain(tmp_path: Path, project: Path) -> dict:
 
     home = tmp_path / "state-home"
     made = control.create_instance(
-        project / "workflow.json", project, state_home=home,
-        request_id=uuid.uuid4().hex, expected_state_version=0,
+        project / "workflow.json",
+        project,
+        state_home=home,
+        request_id=uuid.uuid4().hex,
+        expected_state_version=0,
     )
     assert made["status"] == "applied", made
     instance = made["instance_id"]
     started = control.start_run(
-        instance, state_home=home, request_id=uuid.uuid4().hex,
+        instance,
+        state_home=home,
+        request_id=uuid.uuid4().hex,
         expected_state_version=control.inspect_instance(instance, state_home=home)[
             "state_version"
         ],
@@ -366,9 +443,13 @@ def paused_current_core_for_old_domain(tmp_path: Path, project: Path) -> dict:
     assert view["inflight_invocations"] == []
     assert all(row["effective_writer"] == "stopped" for row in view["completions"])
     state = json.loads((project / "foreground/lad-state/session.json").read_bytes())
-    return {"state_home": "state-home", "project": "project",
-            "instance_id": instance, "run_id": started["run_id"],
-            "session_id": state["session_id"]}
+    return {
+        "state_home": "state-home",
+        "project": "project",
+        "instance_id": instance,
+        "run_id": started["run_id"],
+        "session_id": state["session_id"],
+    }
 
 
 @pytest.mark.parametrize("available", [False, True], ids=["unavailable", "restorable"])
@@ -395,19 +476,23 @@ def test_interrupted_legacy_guidance_restores_only_available_matching_bytes(
         (project / "context/contracts.md").write_text("Changed authored contracts.\n")
     manifest = paused_current_core_for_old_domain(tmp_path, project)
     install_candidate_scripts(project)
-    assert explicit_upgrade(tmp_path, manifest)["outcome"] == "SESSION_UPGRADED"
+    upgrade_reply = explicit_upgrade(tmp_path, manifest)
+    assert upgrade_reply["outcome"] == "SESSION_UPGRADED", upgrade_reply
     before = json.loads(file.read_bytes())
     child = subprocess.run(
         [sys.executable, "-B", "-S", str(project / "scripts/prepare_role.py"), "recon"],
-        cwd=project / "foreground", env={"PATH": "/usr/bin:/bin"},
-        capture_output=True, timeout=20,
+        cwd=project / "foreground",
+        env={"PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        timeout=20,
     )
     assert child.returncode == 0, child.stdout + child.stderr
     reply = json.loads(child.stdout)
     assert reply["outcome"] == "REFUSED", reply  # Evidence is not a dispatch grant.
     if available:
-        assert hashlib.sha256(missing.read_bytes()).hexdigest() == (
-            item["guidance_files"]["context/contracts.md"]
+        assert (
+            hashlib.sha256(missing.read_bytes()).hexdigest()
+            == (item["guidance_files"]["context/contracts.md"])
         )
         assert "legacy_fresh_replacement_required" in reply["summary"]
     else:
@@ -469,13 +554,26 @@ else:
     raise AssertionError('fault window not exercised')
 """
     child = subprocess.run(
-        [sys.executable, "-B", "-c", program, str(project / "foreground"), window,
-         manifest["session_id"], manifest["instance_id"], manifest["run_id"],
-         str(home), str(view["state_version"])],
+        [
+            sys.executable,
+            "-B",
+            "-c",
+            program,
+            str(project / "foreground"),
+            window,
+            manifest["session_id"],
+            manifest["instance_id"],
+            manifest["run_id"],
+            str(home),
+            str(view["state_version"]),
+        ],
         cwd=project / "scripts",
-        env={"PATH": "/usr/bin:/bin",
-             "PYTHONPATH": str(Path(catalog.__file__).parents[1])},
-        capture_output=True, timeout=30,
+        env={
+            "PATH": "/usr/bin:/bin",
+            "PYTHONPATH": str(Path(catalog.__file__).parents[1]),
+        },
+        capture_output=True,
+        timeout=30,
     )
     assert child.returncode == 0, child.stdout + child.stderr
     if window != "postpublication":
@@ -484,7 +582,8 @@ else:
         assert json.loads(file.read_bytes())["format"] == "millrace-lad-session/v2"
     result = explicit_upgrade(case, manifest)
     assert result["outcome"] == (
-        "SESSION_ALREADY_UPGRADED" if window == "postpublication"
+        "SESSION_ALREADY_UPGRADED"
+        if window == "postpublication"
         else "SESSION_UPGRADED"
     ), result
     stable = file.read_bytes()
@@ -503,9 +602,10 @@ def test_old_reader_positive_but_invalid_conversion_never_replaces_v1(
     rewrite_checksum(file, state)
     before = file.read_bytes()
     # The literal old reader's permissive kind semantics remain unchanged.
-    assert old_command(project, "init_session.py", "--project-root", "..")[
-        "outcome"
-    ] == "EXISTING_SESSION_WITH_WORK"
+    assert (
+        old_command(project, "init_session.py", "--project-root", "..")["outcome"]
+        == "EXISTING_SESSION_WITH_WORK"
+    )
     assert file.read_bytes() == before
     install_candidate_scripts(project)
     result = explicit_upgrade(case, manifest)
@@ -520,7 +620,8 @@ def test_migrated_old_accepted_subset_cannot_be_removed(tmp_path: Path) -> None:
     case, manifest = genuine_v7(tmp_path, "request")
     project = case / manifest["project"]
     install_candidate_scripts(project)
-    assert explicit_upgrade(case, manifest)["outcome"] == "SESSION_UPGRADED"
+    upgrade_reply = explicit_upgrade(case, manifest)
+    assert upgrade_reply["outcome"] == "SESSION_UPGRADED", upgrade_reply
     file = project / "foreground/lad-state/session.json"
     state = json.loads(file.read_bytes())
     state["accepted"].pop(next(iter(state["accepted"])))
@@ -555,54 +656,69 @@ def test_migrated_nonrole_history_survives_new_progress_and_refuses_deletion(
                 )
     graph_file.write_text(json.dumps(graph))  # Before any old guidance is captured.
     (project / "request.md").write_text("Original request: answer() returns 42.\n")
-    assert old_command(project, "init_session.py", "--project-root", "..")[
-        "outcome"
-    ] == "NEW_SESSION"
-    assert old_command(project, "setup_intake.py", "--project-root", "..")[
-        "outcome"
-    ] == "INTAKE_READY_EXISTING"
+    assert (
+        old_command(project, "init_session.py", "--project-root", "..")["outcome"]
+        == "NEW_SESSION"
+    )
+    assert (
+        old_command(project, "setup_intake.py", "--project-root", "..")["outcome"]
+        == "INTAKE_READY_EXISTING"
+    )
     for role, outcome in (("recon", "FINDINGS"), ("consultant", "REPAIR_SPEC")):
         assert old_command(project, "prepare_role.py", role)["outcome"] == "READY"
         old_command(project, "lad_peer.py", role, "clean", outcome)
-        assert old_command(
-            project, "accept_role.py", role, outcome
-        )["outcome"] != "REFUSED"
+        assert (
+            old_command(project, "accept_role.py", role, outcome)["outcome"]
+            != "REFUSED"
+        )
     file = project / "foreground/lad-state/session.json"
     old_state = json.loads(file.read_bytes())
     assert any(row["kind"] == "planning_repair" for row in old_state["events"])
     home = tmp_path / "state-home"
     made = control.create_instance(
-        graph_file, project, state_home=home, request_id=uuid.uuid4().hex,
+        graph_file,
+        project,
+        state_home=home,
+        request_id=uuid.uuid4().hex,
         expected_state_version=0,
     )
     assert made["status"] == "applied", made
     instance = made["instance_id"]
     started = control.start_run(
-        instance, state_home=home, request_id=uuid.uuid4().hex,
+        instance,
+        state_home=home,
+        request_id=uuid.uuid4().hex,
         expected_state_version=control.inspect_instance(instance, state_home=home)[
             "state_version"
         ],
     )
     assert started["status"] == "applied", started
-    manifest = {"state_home": "state-home", "project": "project",
-                "instance_id": instance, "run_id": started["run_id"],
-                "session_id": old_state["session_id"]}
+    manifest = {
+        "state_home": "state-home",
+        "project": "project",
+        "instance_id": instance,
+        "run_id": started["run_id"],
+        "session_id": old_state["session_id"],
+    }
     # This is genuine old domain-v1 over fresh current finite-v3/store-v8,
     # separate from the retained-wheel genuine-v7 REQUEST/ACK integration.
     install_candidate_scripts(project)
-    assert explicit_upgrade(tmp_path, manifest)["outcome"] == "SESSION_UPGRADED"
+    upgrade_reply = explicit_upgrade(tmp_path, manifest)
+    assert upgrade_reply["outcome"] == "SESSION_UPGRADED", upgrade_reply
     shutil.copyfile(
         Path(__file__).parent / "fixtures/lad_peer.py", project / "scripts/lad_peer.py"
     )
     assert old_command(project, "prepare_role.py", "planner")["outcome"] == "READY"
     old_command(project, "lad_peer.py", "planner", "clean")
-    assert old_command(
-        project, "accept_role.py", "planner", "PASS"
-    )["outcome"] == "MANAGER"
+    assert (
+        old_command(project, "accept_role.py", "planner", "PASS")["outcome"]
+        == "MANAGER"
+    )
     progressed = json.loads(file.read_bytes())
     assert len(progressed["events"]) == len(old_state["events"]) + 1
-    progressed["events"] = [row for row in progressed["events"]
-                            if row["kind"] != "planning_repair"]
+    progressed["events"] = [
+        row for row in progressed["events"] if row["kind"] != "planning_repair"
+    ]
     rewrite_checksum(file, progressed)
     before = file.read_bytes()
     result = old_command(project, "init_session.py", "--project-root", "..")
@@ -693,10 +809,19 @@ def test_frozen_v1_debit_primitive_retains_original_ceiling(
     assert json.dumps(state, sort_keys=True) == before
 
 
-@pytest.mark.parametrize("fact", [
-    "missing_quiescent", "active", "inflight", "unknown_writer",
-    "unknown_completion", "missing_draft", "validation_version", "wrong_project",
-])
+@pytest.mark.parametrize(
+    "fact",
+    [
+        "missing_quiescent",
+        "active",
+        "inflight",
+        "unknown_writer",
+        "unknown_completion",
+        "missing_draft",
+        "validation_version",
+        "wrong_project",
+    ],
+)
 def test_upgrade_refuses_missing_or_contradictory_held_public_facts(
     tmp_path: Path, fact: str
 ) -> None:
@@ -715,7 +840,7 @@ def test_upgrade_refuses_missing_or_contradictory_held_public_facts(
     # Exercise the domain's refusal of missing/unknown/contradictory facts at
     # its real public seam. The real context still owns both locks; the altered
     # projection is a negative validator fixture, not fabricated Core evidence.
-    program = '''
+    program = """
 import copy,sys
 from contextlib import contextmanager
 from pathlib import Path
@@ -764,14 +889,28 @@ else:
 with real_guard(sys.argv[4],sys.argv[5],state_home=Path(sys.argv[6]),
                 expected_state_version=int(sys.argv[7])):
     pass
-'''
+"""
     child = subprocess.run(
-        [sys.executable, "-B", "-c", program, str(project / "foreground"), fact,
-         manifest["session_id"], manifest["instance_id"], manifest["run_id"],
-         str(home), str(view["state_version"])],
-        cwd=project / "scripts", capture_output=True, timeout=30,
-        env={"PATH": "/usr/bin:/bin",
-             "PYTHONPATH": str(Path(catalog.__file__).parents[1])},
+        [
+            sys.executable,
+            "-B",
+            "-c",
+            program,
+            str(project / "foreground"),
+            fact,
+            manifest["session_id"],
+            manifest["instance_id"],
+            manifest["run_id"],
+            str(home),
+            str(view["state_version"]),
+        ],
+        cwd=project / "scripts",
+        capture_output=True,
+        timeout=30,
+        env={
+            "PATH": "/usr/bin:/bin",
+            "PYTHONPATH": str(Path(catalog.__file__).parents[1]),
+        },
     )
     assert child.returncode == 0, child.stdout + child.stderr
     assert file.read_bytes() == before

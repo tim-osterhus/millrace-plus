@@ -4998,3 +4998,547 @@ def test_parent_retention_skips_valid_scope_less_child_maintenance(setup, monkey
     assert (
         lane._expected_receipts == {}
     )  # No child row was treated as parent authority.
+
+
+# ------------------------------------------- provider wait: actual service child
+
+from public_runtime_support import runtime as public_runtime  # noqa: E402,F401
+
+
+def test_provider_wait_service_child_resumes_only_through_decide(request, monkeypatch):
+    """Offline B5B seam evidence: actual OS/Core lifecycle, real claude_print
+    adapter with an inert fake CLI. Not native/provider-route qualification."""
+    import hashlib
+    import json
+    import shutil
+    import sys
+    import threading
+    import time
+    from datetime import UTC, datetime
+
+    import lad_provider_support as support
+    from public_runtime_support import write_json
+    from test_lad_service_journeys import (
+        _release_unrelated_fixture_parent,
+        _terminal_proof,
+    )
+
+    from millrace_plus import lad_service_disposition as disposition
+    from millrace_plus import lad_service_runtime as service_runtime
+    from millrace_plus import provider_wait as pw
+    from millrace_plus import workflow_os_client as os_client
+    from millrace_plus.lad_service_runtime import initialize
+    from millrace_plus.router import control
+    from millrace_plus.subworkflow_v2 import closed, has_join_proof
+
+    try:
+        public = request.getfixturevalue("public_runtime")
+    except pytest.FixtureLookupError:
+        public = request.getfixturevalue("runtime")
+    # Actual serialized OS response sizes at the existing client read seam:
+    # WorkflowOSClient._request reads the exact response bytes and decodes them
+    # with _utf8_json(raw, 2097152). Only this process's client calls are seen;
+    # only byte counts, digests and a nonsecret method/path category are kept.
+    # The wrapped calls keep their exact arguments, results and exceptions.
+    measured: list[dict[str, object]] = []
+    local = threading.local()  # per-thread call category stack
+    real_request = os_client.WorkflowOSClient._request
+    real_decode = os_client._utf8_json
+
+    def request_seam(self, method, path, *, deadline, body=None, call=False):
+        parts = path.split("?", 1)[0].split("/")
+        named = [
+            part if part in {"requests", "instances", "runs"} else "<id>"
+            for part in parts
+        ]
+        stack = local.__dict__.setdefault("stack", [])
+        stack.append(method + " " + "/".join(named))
+        try:
+            value = real_request(
+                self, method, path, deadline=deadline, body=body, call=call
+            )
+        finally:
+            label = stack.pop()
+            if body is not None:
+                measured.append(
+                    {
+                        "category": label,
+                        "direction": "request",
+                        "bytes": len(body),
+                        "sha256": hashlib.sha256(body).hexdigest(),
+                    }
+                )
+        return value
+
+    def decode_seam(raw, limit):
+        stack = local.__dict__.get("stack")
+        if limit == 2097152 and stack:  # the response path only
+            measured.append(
+                {
+                    "category": stack[-1],
+                    "direction": "response",
+                    "bytes": len(raw),
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                }
+            )
+        return real_decode(raw, limit)
+
+    monkeypatch.setattr(os_client.WorkflowOSClient, "_request", request_seam)
+    monkeypatch.setattr(os_client, "_utf8_json", decode_seam)
+
+    def await_state(observe, problem):
+        """Poll actual public state until it holds; fail on a concrete problem.
+
+        No elapsed-time acceptance window: product transport/invocation
+        deadlines and the owned cleanup safeguards below remain in force.
+        """
+        while True:
+            value = observe()
+            if value:
+                return value
+            found = problem()
+            if found:
+                pytest.fail(found)
+            time.sleep(0.05)
+
+    _release_unrelated_fixture_parent(public)
+    definition = public.catalog / "public-lad-provider"
+    shutil.copytree(catalog.bundled_root() / "lad", definition)
+    executable = support.fake_cli(
+        public.root / "native", [429, "success"], scripts=definition / "scripts"
+    )
+    graph = json.loads((definition / "workflow.json").read_bytes())
+    graph["bindings"]["claude"]["executable"] = str(executable)
+    graph["bindings"]["command"]["executable"] = sys.executable
+    (definition / "workflow.json").write_text(json.dumps(graph, indent=2) + "\n")
+    # Small positive captured *test* policy before any operation exists.
+    (definition / "context/provider-policy.json").write_text(
+        json.dumps(support.TEST_POLICY, indent=2) + "\n"
+    )
+    sha = catalog.workflow_fingerprint(definition)
+    pin = public.root / "public-lad-provider-pin.json"
+    write_json(
+        pin,
+        {
+            "selector": "local:public-lad-provider",
+            "version": "sha256:" + sha,
+            "sha256": sha,
+        },
+    )
+    original_settings = service_runtime._settings
+    monkeypatch.setattr(
+        service_runtime,
+        "_settings",
+        lambda target: (
+            original_settings(target) | {"env_allowlist": ["HOME", "PYTHONPATH"]}
+        ),
+    )
+    home = public.root / "provider-service"
+    initialized = initialize(
+        home, public.target, Path(public.profile["path"]), pin, public.home
+    )
+    service = Service(home)
+    path = public.root / "provider-request.md"
+    path.write_bytes(b"Original request: answer() returns 42.\n")
+    service.submit("provider-0", path)
+    started = public.send_parent(initialized["start_request"])
+    assert started["status"] == "applied", started
+    parent, parent_run = initialized["instance_id"], started["run_id"]
+
+    def parent_problem():
+        view = control.inspect_run(parent, parent_run, state_home=public.home)
+        if view["status"] in {"succeeded", "failed", "cancelled"}:
+            return "service parent ended: " + str(view["status"])
+        return None
+
+    # Let the graph bind its exact start receipt before operator-side reads.
+    await_state(
+        lambda: Service(home).intake.lifecycle()[1]["run_id"] == parent_run,
+        parent_problem,
+    )
+
+    def finite():
+        """A fresh Runtime per public operation, as the CLI and service do.
+
+        Runtime is one finite operation: it loads the lifecycle record once and
+        its lifecycle CAS rejects that snapshot after any competing writer.
+        """
+        return runtime.Runtime(Service(home))
+
+    finite().parent()
+    stop_id = uuid.uuid4().hex
+    stopped = False
+    try:
+
+        def task_problem():
+            rows = Service(home).intake.tasks()
+            if rows and rows[0]["status"] in {"failed", "cancelled", "abandoned"}:
+                return "task ended: " + str(rows[0]["status"])
+            return parent_problem()
+
+        def provider_paused():
+            rows = Service(home).intake.tasks()
+            if len(rows) != 1 or rows[0]["status"] not in {"held", "running"}:
+                return None
+            reader = finite()
+            try:
+                _, record = reader.call(rows[0])
+            except Exception:
+                return None  # the child call is not bound yet
+            child = control.inspect_run(
+                record["instance_id"], record["run_id"], state_home=public.home
+            )
+            plane = child["planes"]["foreground"]
+            if child["status"] in {"succeeded", "failed", "cancelled"}:
+                pytest.fail("child ended before provider pause: " + child["status"])
+            if child["status"] == "paused" and (
+                plane.get("resume_target") != "provider_due_recon"
+            ):
+                pytest.fail(
+                    "child paused elsewhere: "
+                    + str(plane.get("resume_target"))
+                    + " "
+                    + str(child.get("pause_reason"))
+                )
+            return (
+                (rows[0], record, child)
+                if child["status"] == "paused"
+                and plane.get("resume_target") == "provider_due_recon"
+                else None
+            )
+
+        task, record, child = await_state(provider_paused, task_problem)
+        instance, run = record["instance_id"], record["run_id"]
+        project = Path(record["paths"]["project"])
+        operation = support.pending(project, "recon")
+        assert operation.tip["kind"] == "failure_classified"
+        assert operation.authority["service"]["task_id"] == task["task_id"]
+        state = disposition._load_worker(record)
+        assert state["continuation"]["node"] == "provider_due_recon"
+        assert state["continuation"]["cleanup_required"] is True
+        assert state["request"] is None and state["terminal"] is None
+        # Explicit journaled parent pause at the observed child pause (the idle
+        # pause pattern): the same saved request is re-sent until applied, the
+        # parent is closed with attention and its control holder has joined.
+        pause = public.root / "provider-parent-pause.json"
+        write_json(
+            pause,
+            service_runtime._env(
+                "pause_run", uuid.uuid4().hex, instance=parent, run=parent_run
+            ),
+        )
+
+        def parent_paused():
+            answer = finite().parent_control(pause)
+            receipt = answer["receipt"]
+            if receipt is not None and receipt["status"] == "refused":
+                pytest.fail(str(receipt))
+            view = control.inspect_run(parent, parent_run, state_home=public.home)
+            return (
+                answer
+                if receipt is not None
+                and receipt["status"] == "applied"
+                and view["status"] == "paused"
+                and closed(view, attention=True)
+                else None
+            )
+
+        applied_pause = await_state(parent_paused, task_problem)
+        await_state(
+            lambda: finite().parent_control(pause)["holder_joined"],
+            task_problem,
+        )
+        # Exact replay of the journaled envelope is a read of the same receipt.
+        replayed = finite().parent_control(pause)
+        assert replayed["receipt"] == applied_pause["receipt"]
+        assert json.loads(pause.read_bytes())["operation"] == "pause_run"
+        # Exact public observation under the service target lock.
+        observed = pw.observe_snapshot(
+            project,
+            state_home=public.home,
+            instance_id=instance,
+            run_id=run,
+            plane_id="foreground",
+            operation_id=operation.id,
+            invocation_id=support.failed_invocation(operation),
+            expected_state_version=int(child["state_version"]),
+            observed_at=datetime.now(UTC),
+            service_home=home,
+            task=task["task_id"],
+        )
+        assert observed["phase"] == "waiting"
+        from millrace.router.execution import RouterError
+
+        unpublished = support.events(project, "recon")
+        with pytest.raises(RouterError) as stale:
+            # Core's public snapshot refuses a stale version without publication.
+            pw.observe_snapshot(
+                project,
+                state_home=public.home,
+                instance_id=instance,
+                run_id=run,
+                plane_id="foreground",
+                operation_id=operation.id,
+                invocation_id=support.failed_invocation(operation),
+                expected_state_version=int(child["state_version"]) - 1,
+                observed_at=datetime.now(UTC),
+                service_home=home,
+                task=task["task_id"],
+            )
+        assert stale.value.code == "stale_state_version"
+        assert support.events(project, "recon") == unpublished
+        due = support.restore(project, operation.id, str(observed["observation_id"]))
+        assert due["eligible"] is True
+        # Journaled service continuation only; no raw child control.
+        evidence = public.root / "provider-continue.txt"
+        evidence.write_text("same child only: provider restoration confirmed")
+
+        def continue_decision(request_id, **plane):
+            """One finite continue decision with its own immutable request.
+
+            ``child_resume_pending`` is the supported in-flight receipt state:
+            re-running the same request ID, evidence and plane only observes
+            the saved calls (Runtime._send), never sends a new action.
+            """
+
+            def attempt():
+                try:
+                    return finite().decide(
+                        task["task_id"], "continue", request_id, evidence, **plane
+                    )
+                except IntakeError as exc:
+                    if exc.code != "child_resume_pending":
+                        raise
+                    return None
+
+            return await_state(attempt, task_problem)
+
+        plane_request = uuid.uuid4().hex
+        try:
+            answer = continue_decision(plane_request, resume_plane="foreground")
+        except IntakeError as exc:
+            # Only an actual child run gate needs the separate run continuation,
+            # a distinct run-level decision with its own request ID.
+            assert exc.code == "separate_run_resume_required", exc
+            gated = control.inspect_run(instance, run, state_home=public.home)
+            assert gated["run_gate"] is not None, gated
+            answer = continue_decision(uuid.uuid4().hex)
+        assert answer is not None
+        # The plane continuation's exact control and applied receipt persist.
+        resumed = Service(home).intake.lifecycle()[1]["maintenance"][plane_request][
+            "resume"
+        ]
+        assert resumed["envelope"]["operation"] == "resume_plane"
+        assert resumed["envelope"]["plane_id"] == "foreground"
+        assert resumed["receipt"]["request_id"] == resumed["envelope"]["request_id"]
+        assert resumed["receipt"]["status"] == "applied"
+        # Resume the explicitly paused parent from its retained current version.
+        version = control.inspect_run(parent, parent_run, state_home=public.home)[
+            "state_version"
+        ]
+        resume = public.root / "provider-parent-resume.json"
+        write_json(
+            resume,
+            service_runtime._env(
+                "resume_run",
+                uuid.uuid4().hex,
+                instance=parent,
+                run=parent_run,
+                expected=version,
+            ),
+        )
+
+        def parent_resumed():
+            answer = finite().parent_control(resume)
+            receipt = answer["receipt"]
+            if receipt is not None and receipt["status"] == "refused":
+                pytest.fail(str(receipt))
+            return answer if receipt and receipt["status"] == "applied" else None
+
+        applied_resume = await_state(parent_resumed, task_problem)
+        # resume_run restarts the long-lived service cursor: its holder joins
+        # only at lawful stop/closure. Here only the exact replay is asserted;
+        # the join proof for this same control identity follows the stop.
+        resume_id = json.loads(resume.read_bytes())["request_id"]
+        assert applied_resume["request_id"] == resume_id
+        assert finite().parent_control(resume)["receipt"] == applied_resume["receipt"]
+
+        def settled():
+            rows = Service(home).intake.tasks()
+            return rows[0] if rows[0]["status"] == "succeeded" else None
+
+        def service_hold(view):
+            """The stock lad-service operator hold (WAIT_OPERATOR): the service
+            plane paused at its ``reconcile`` resume target, no run gate."""
+            plane = view["planes"].get("service", {})
+            return (
+                view["status"] == "paused"
+                and view.get("run_gate") is None
+                and plane.get("status") == "paused"
+                and plane.get("resume_target") == "reconcile"
+                and plane.get("active_invocation") is None
+            )
+
+        def settlement_problem(*, hold_allowed):
+            current = control.inspect_run(instance, run, state_home=public.home)
+            if current["status"] in {"failed", "cancelled"}:
+                return "child ended: " + str(current["status"])
+            if current["status"] == "paused":
+                return "child paused: " + str(
+                    current["planes"]["foreground"].get("resume_target")
+                )
+            outer = control.inspect_run(parent, parent_run, state_home=public.home)
+            if outer["status"] == "paused" and not (
+                hold_allowed and service_hold(outer)
+            ):
+                return (
+                    "service parent paused: "
+                    + str(outer.get("pause_reason"))
+                    + " at "
+                    + str(outer["planes"].get("service", {}).get("resume_target"))
+                )
+            return task_problem()
+
+        def settled_or_held():
+            row = settled()
+            if row:
+                return "settled", row
+            outer = control.inspect_run(parent, parent_run, state_home=public.home)
+            return ("held", outer) if service_hold(outer) else None
+
+        phase, value = await_state(
+            settled_or_held, lambda: settlement_problem(hold_allowed=True)
+        )
+        plane_resume, plane_receipt = None, None
+        if phase == "held":
+            # The child attention reached the service graph's operator hold,
+            # which paused the service plane itself; resume_run cleared only the
+            # run gate. After the operator decision, release that hold through
+            # the journaled version-fenced public resume_plane(service), with
+            # its own immutable request identity.
+            plane_resume = public.root / "provider-parent-plane-resume.json"
+            selected = service_runtime._env(
+                "resume_run",
+                uuid.uuid4().hex,
+                instance=parent,
+                run=parent_run,
+                expected=value["state_version"],
+            )
+            selected.update(operation="resume_plane", plane_id="service")
+            write_json(plane_resume, selected)
+
+            # Journal and send it once, at the quiescent hold. parent_control
+            # releases the target lock before sending; a resumed parent's
+            # advance then needs that lock (materialize_task), so no further
+            # parent_control runs while the parent graph is active.
+            sent_plane = finite().parent_control(plane_resume)
+            assert sent_plane["request_id"] == selected["request_id"] != resume_id
+            plane_receipt = sent_plane["receipt"]
+            if plane_receipt is None or plane_receipt["status"] != "applied":
+                # Observe the same saved public call, GET-only, validated against
+                # its exact immutable envelope (no lock, lifecycle write or new
+                # request), using the service's own OS profile and home.
+                saved_plane = json.loads(plane_resume.read_bytes())
+                observer = os_client.WorkflowOSClient(
+                    service.config["os_profile"], str(service.config["os_home"])
+                )
+
+                def plane_applied():
+                    found = observer.observe(
+                        saved_plane, deadline=time.monotonic() + 30
+                    )["core_receipt"]
+                    if found is not None and found["status"] == "refused":
+                        pytest.fail(str(found))
+                    return found if found and found["status"] == "applied" else None
+
+                plane_receipt = await_state(plane_applied, task_problem)
+            assert plane_receipt["request_id"] == selected["request_id"]
+            value = await_state(settled, lambda: settlement_problem(hold_allowed=False))
+        final = value
+        _, again = finite().call(final)
+        assert (again["instance_id"], again["run_id"]) == (instance, run)
+        view = control.inspect_run(instance, run, state_home=public.home)
+        assert view["status"] == "succeeded" and closed(view), view
+        kinds = [event["kind"] for event in support.events(project, "recon")]
+        assert kinds.count("retry_reserved") == 1 and kinds[-1] == "succeeded"
+        assert [row["node"] for row in view["invocations"]].count("recon") == 2
+        assert all(has_join_proof(again, name) for name in ("create", "start"))
+        assert disposition.domain_evidence(service, again, view)["missing"] == []
+        proof = _terminal_proof(service, final)
+        assert proof["domain_evidence"]["missing"] == []
+        physical = proof["physical_evidence"]
+        assert physical["view_proof"] is True and physical["sent_calls"]
+        for pair in physical["sent_calls"]:
+            # Every sent child call, including maintenance pause/resume, joined.
+            sent = json.loads(disposition.read_ref(service, pair["envelope"]))
+            joined = json.loads(disposition.read_ref(service, pair["joined"]))
+            assert any(
+                row["request_id"] == sent["request_id"] and row["holder_joined"] is True
+                for row in joined
+            )
+        worker = disposition._load_worker(again)
+        assert worker["terminal"] == "succeeded"
+        assert worker["continuation"]["cleanup_required"] is False
+
+        def stopping():
+            answer = finite().stop(stop_id)
+            return answer if answer["status"] == "stopped" else None
+
+        assert await_state(stopping, lambda: None)["status"] == "stopped"
+        stopped = True
+        assert closed(control.inspect_run(parent, parent_run, state_home=public.home))
+        # Deferred join proof: the same resume control identity, GET-only replay.
+        joined_resume = finite().parent_control(resume)
+        assert joined_resume["request_id"] == resume_id
+        assert joined_resume["receipt"] == applied_resume["receipt"]
+        assert joined_resume["holder_joined"] is True
+        if plane_resume is not None:
+            # After stop refreshed and joined every parent row: the same
+            # plane-resume control identity, exact replay, identical receipt.
+            joined_plane = finite().parent_control(plane_resume)
+            assert joined_plane["request_id"] == selected["request_id"]
+            assert joined_plane["receipt"] == plane_receipt
+            assert joined_plane["holder_joined"] is True
+        controls = json.loads((definition / "workflow.json").read_bytes())[
+            "control_files"
+        ]
+        responses = [row for row in measured if row["direction"] == "response"]
+        sizes = {
+            "workflow_json_bytes": len((definition / "workflow.json").read_bytes()),
+            "control_files_bytes": sum(
+                len((definition / name).read_bytes()) for name in controls
+            ),
+            "init_session_bytes": len(
+                (definition / "scripts/init_session.py").read_bytes()
+            ),
+            "os_client_response_limit": 2097152,
+            "observed": measured,
+            "max_response_bytes": max(
+                (int(row["bytes"]) for row in responses), default=None
+            ),
+            "categories": sorted({str(row["category"]) for row in responses}),
+            "unobserved": "OS client calls made by other processes (service parent "
+            "graph workers and child processes) are outside this in-process seam",
+        }
+        write_json(public.root / "provider-sizes.json", sizes)
+        assert responses, "no in-process OS client response was observed"
+        assert int(sizes["max_response_bytes"]) <= 2097152
+    finally:
+        primary_error = sys.exc_info()[1]
+        try:
+            try:
+                if not stopped:
+
+                    def cleanup_stop():
+                        answer = finite().stop(stop_id)
+                        return answer if answer["status"] == "stopped" else None
+
+                    public.until(cleanup_stop, seconds=90)
+            finally:
+                write_json(
+                    public.root / "provider-aftermath.json", Service(home).status()
+                )
+        except BaseException as cleanup_error:
+            if primary_error is not None:
+                raise primary_error from cleanup_error
+            raise

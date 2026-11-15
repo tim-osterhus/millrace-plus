@@ -30,15 +30,21 @@ def engineering_records(
     rows = []
     if role == "updater":
         baseline = baseline_files(workspace)
-        current = source(workspace, sorted({
-            path for row in load(workspace)["plan"] for path in row["paths"]
-        }))
+        current = source(
+            workspace,
+            sorted({path for row in load(workspace)["plan"] for path in row["paths"]}),
+        )
         entries = [
-            {"path": name, "sha256": value, "class": "deliverable",
-             "authority_ref": "packet " + item["packet"]["id"],
-             "disposition": "admit",
-             "reason": "Requested implementation file for the original criterion."}
-            for name, value in sorted(current.items()) if baseline.get(name) != value
+            {
+                "path": name,
+                "sha256": value,
+                "class": "deliverable",
+                "authority_ref": "packet " + item["packet"]["id"],
+                "disposition": "admit",
+                "reason": "Requested implementation file for the original criterion.",
+            }
+            for name, value in sorted(current.items())
+            if baseline.get(name) != value
         ]
         body = {
             "format": "millrace-lad-artifact-admission/v1",
@@ -56,16 +62,24 @@ def engineering_records(
         sidecar = json.loads(
             (workspace / f"lad-state/engineering/occurrences/{oid}.json").read_bytes()
         )
-        rows.append(("retained-verdict.json", {
-            "format": "millrace-lad-retained-verdict/v1",
-            "occurrence_id": oid,
-            "requirements_sha256": context["requirements_ref"]["sha256"],
-            "source_sha256": digest(canonical(source(workspace))),
-            "verdict": {
-                identity: {"status": "pass", "evidence_refs": [context["profile_ref"]]}
-                for identity in sidecar["retained_requirements"]
-            },
-        }))
+        rows.append(
+            (
+                "retained-verdict.json",
+                {
+                    "format": "millrace-lad-retained-verdict/v1",
+                    "occurrence_id": oid,
+                    "requirements_sha256": context["requirements_ref"]["sha256"],
+                    "source_sha256": digest(canonical(source(workspace))),
+                    "verdict": {
+                        identity: {
+                            "status": "pass",
+                            "evidence_refs": [context["profile_ref"]],
+                        }
+                        for identity in sidecar["retained_requirements"]
+                    },
+                },
+            )
+        )
     pinned = []
     for name, body in rows:
         path = output / name
@@ -111,11 +125,7 @@ def result_for(
     output = workspace / "lad-results" / oid
     output.mkdir(parents=True, exist_ok=True)
     multi = scenario == "many_packets" or scenario.startswith("two_gates")
-    function = (
-        item["packet"]["criteria"][0]
-        if multi and item["packet"]
-        else "answer"
-    )
+    function = item["packet"]["criteria"][0] if multi and item["packet"] else "answer"
     if role == "checker":
         (output / "baseline.md").write_text(
             "# Frozen requirement-side expectations\n\n"
@@ -218,11 +228,7 @@ def result_for(
             scenario.startswith("two_gates")
         )
         (target / (function + ".py")).write_text(
-            "def "
-            + function
-            + "():\n    return "
-            + ("0" if gated else "42")
-            + "\n"
+            "def " + function + "():\n    return " + ("0" if gated else "42") + "\n"
         )
     if role == "fixer":
         data.update(baseline=item["baseline"], finding_ids=item["finding_ids"])
@@ -259,18 +265,22 @@ def result_for(
                 }
             ]
     if role == "troubleshooter":
+        # The role contract names input.pending: equal to the saved pending for
+        # ordinary diagnosis, and the provider operation's execution pending for
+        # a provider diagnosis.
+        pending = item["pending"]
         data.update(
-            resume_role=state["pending"]["target"],
+            resume_role=pending["target"],
             repair_verified=True,
-            trigger_occurrence_id=state["pending"]["occurrence_id"],
-            cause_id=state["pending"].get("cause_id"),
+            trigger_occurrence_id=pending["occurrence_id"],
+            cause_id=pending.get("cause_id"),
         )
         outcome = outcome or (
             "PASS_REVIEW_REPAIRED"
-            if state["pending"]["kind"] == "review"
+            if pending["kind"] == "review"
             else "PASS_PREREQUISITE_REPAIRED"
         )
-        if state["pending"]["kind"] == "review":
+        if pending["kind"] == "review":
             (target / "answer.py").write_text("def answer():\n    return 42\n")
     if role == "consultant":
         if scenario == "baseline_tamper":
@@ -381,8 +391,10 @@ def result_for(
         "alone is insufficient. Per-criterion current-source verdict: "
         + json.dumps(data.get("verdict"), sort_keys=True),
     }
-    invalid = role == "learning" and scenario == "two_gates_invalid" and (
-        not state["learning"]
+    invalid = (
+        role == "learning"
+        and scenario == "two_gates_invalid"
+        and (not state["learning"])
     )
     for name in names:
         content = (
@@ -471,9 +483,11 @@ def result_for(
 
 if __name__ == "__main__":
     role, scenario = sys.argv[1:3]
-    first_learning = scenario.startswith("two_gates_") and role in {
-        "learning", "prepare_learning"
-    } and not load(Path.cwd().parent / "foreground")["learning"]
+    first_learning = (
+        scenario.startswith("two_gates_")
+        and role in {"learning", "prepare_learning"}
+        and not load(Path.cwd().parent / "foreground")["learning"]
+    )
     if role == "prepare_learning":
         # Test graph slice: fail before any reservation on the first REQUEST only.
         if first_learning and scenario == "two_gates_prepare":
