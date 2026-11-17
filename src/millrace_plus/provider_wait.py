@@ -37,8 +37,8 @@ Public functions (exact arguments are their keyword signatures):
   restoration_ref)``
 - ``reconcile_provider_success(foreground, *, operation_id, success)``
 - ``load_operation(foreground, operation_id)`` for strict reload.
-- ``pending_operation(foreground, *, role)`` - the one unfinished operation of a
-  role, or None; used by the C3 graph helpers to find existing authority.
+- ``pending_operation(foreground, *, role, recover=False)`` - the one unfinished
+  operation of a role, or None; the C3 graph helpers pass ``recover=True``.
 """
 
 from __future__ import annotations
@@ -749,17 +749,23 @@ def load_operation(foreground: Path, op: str, *, recover: bool = True) -> Operat
     return Operation(authority, _sha(authority_raw), tuple(events), raws[-1])
 
 
-def pending_operation(foreground: Path, *, role: str) -> Operation | None:
+def pending_operation(
+    foreground: Path, *, role: str, recover: bool = False
+) -> Operation | None:
     """The single unfinished operation whose authority role is ``role``.
 
-    Every indexed operation is strictly reloaded (read-only: no index recovery).
-    More than one unfinished operation for one role refuses as a conflict.
+    Every indexed operation is strictly reloaded. By default this is read-only
+    and an index behind its chain refuses. A graph helper that owns the
+    foreground writer passes ``recover=True``: ``load_operation`` then
+    publishes only a unique matching unpublished next event, as for every
+    other record transition. More than one unfinished operation for one role
+    refuses as a conflict.
     """
     if not isinstance(role, str) or role not in ROLES:
         raise ProviderWaitError("provider_role_excluded")
     found: list[Operation] = []
     for op in sorted(cast(dict[str, object], _index(foreground)["operations"])):
-        operation = load_operation(foreground, op, recover=False)
+        operation = load_operation(foreground, op, recover=recover)
         if operation.authority["role"] == role and operation.tip["phase"] not in {
             "succeeded",
             "cancelled",

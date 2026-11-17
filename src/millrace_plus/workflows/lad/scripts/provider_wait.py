@@ -270,8 +270,15 @@ def classify(foreground: Path, project: Path, role: str) -> str:
         or occurrence["role"] != role
         or occurrence["format"] != "millrace-lad-input/v2"
         or oid in state["accepted"]
-        or _continuation(state, role) != oid
     ):
+        raise Hold("provider_attempt_owner")
+    continuation = state["continuation"]
+    if continuation and continuation["node"] in {
+        f"provider_due_{role}",
+        f"provider_human_{role}",
+    }:
+        return classify_replay(foreground, state, occurrence, role, policy)
+    if _continuation(state, role) != oid:
         raise Hold("provider_attempt_owner")
     path = safe(foreground, CONTEXT, missing=True)
     if not os.path.lexists(path):
@@ -286,7 +293,7 @@ def classify(foreground: Path, project: Path, role: str) -> str:
         raise Hold("provider_context_invalid") from exc
     if (context.context_id, context.input_sha256) != (oid, occurrence["input_sha256"]):
         raise Hold("provider_context_mismatch")
-    operation = pw.pending_operation(foreground, role=role)
+    operation = pw.pending_operation(foreground, role=role, recover=True)
     current_source = digest(canonical(source(foreground)))
     published = exports(foreground, oid)
 
@@ -362,6 +369,14 @@ def classify(foreground: Path, project: Path, role: str) -> str:
         # crash before save() replays its exact recorded failure idempotently.
         original_replay = oid == authority["original_occurrence"]
         if (
+            lineage is None
+            and not original_replay
+            and found.outcome == "ORDINARY_ERROR"
+        ):
+            # An unrelated same-role failure keeps its ordinary route; the
+            # unfinished operation is not recorded, changed or cleared.
+            return found.outcome
+        if (
             _authority_facts(facts) != authority["binding"]
             or not isinstance(prior, nd.NativeDiagnosticV2)
             or prior.observed_version != facts["observed_version"]
@@ -389,13 +404,59 @@ def classify(foreground: Path, project: Path, role: str) -> str:
     return outcome
 
 
+def classify_replay(
+    foreground: Path,
+    state: dict[str, Any],
+    occurrence: dict[str, Any],
+    role: str,
+    policy: dict[str, object],
+) -> str:
+    """Exact re-run of ``classify`` after its own session save.
+
+    The continuation must be the mark this node saved for the operation's tip:
+    the recorded failure of this occurrence, pinned to its single retained
+    export, with unchanged context, guidance and policy. Anything else holds.
+    Nothing is recorded, marked or saved.
+    """
+    from millrace_plus import provider_wait as pw
+    from millrace_plus.router import native_diagnostic as nd
+
+    oid = occurrence["occurrence_id"]
+    operation = pw.pending_operation(foreground, role=role, recover=True)
+    published = exports(foreground, oid)
+    try:
+        context = nd.NativeContext.load(read(foreground, CONTEXT))
+    except Exception as exc:
+        raise Hold("provider_context_invalid") from exc
+    if operation is None or len(published) != 1:
+        raise Hold("provider_replay_conflict")
+    tip = operation.tip
+    held = tip["phase"] == "human_required"
+    expected = f"provider_human_{role}" if held else f"provider_due_{role}"
+    continuation = state["continuation"]
+    selected = (continuation["node"], continuation["occurrence_id"])
+    pinned = (context.context_id, context.input_sha256)
+    if (
+        tip["kind"] not in {"failure_classified", "human_required"}
+        or tip["occurrence_id"] != oid
+        or tip["diagnostic_ref"] != published[0][0]
+        or pinned != (oid, occurrence["input_sha256"])
+        or selected != (expected, oid)
+        or occurrence["guidance_sha256"] != guidance()
+        or operation.authority["guidance_sha256"] != occurrence["guidance_sha256"]
+        or operation.authority["policy_sha256"] != policy["sha256"]
+    ):
+        raise Hold("provider_replay_conflict")
+    return "PROVIDER_HUMAN_REQUIRED" if held else "PROVIDER_WAIT"
+
+
 # ----------------------------------------------------------------------- due
 
 
 def _pending(foreground: Path, role: str) -> Operation:
     from millrace_plus import provider_wait as pw
 
-    operation = pw.pending_operation(foreground, role=role)
+    operation = pw.pending_operation(foreground, role=role, recover=True)
     if operation is None:
         raise Hold("provider_operation_missing")
     return operation
@@ -696,6 +757,15 @@ def human(foreground: Path, role: str) -> str:
             resolved=False,
             restoration_ref=None,
         )
+    elif (
+        tip["kind"] == "diagnosis_recorded"
+        and tip["phase"] == "human_required"
+        and tip["restoration_ref"] is None
+        and continuation["node"] == f"provider_diagnosis_{role}"
+        and continuation["occurrence_id"] == tip["occurrence_id"]
+        and tip["occurrence_id"] not in state["accepted"]
+    ):
+        pass  # exact re-run after this node's own failed-diagnosis record
     elif tip["phase"] != "human_required":
         raise Hold("provider_human_cause_missing")
     elif continuation["node"] not in {

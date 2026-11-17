@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -1181,12 +1182,14 @@ def test_catalog_copy_and_stdlib_only_scripts(tmp_path: Path) -> None:
     assert (destination / "workflow.json").read_bytes() == (
         LAD / "workflow.json"
     ).read_bytes()
-    # Package boundary only: copied scripts depend on the Python stdlib, their
-    # own sibling scripts and, for the v2 provider policy and other explicitly
-    # enabled paths, the Plus package. No other third-party package. Private
-    # Core imports are checked by the separate package boundary test; the
-    # policy-specific behavior is proved at runtime below.
-    allowed = sys.stdlib_module_names | {
+    # Package boundary: copied scripts import the Python stdlib and their own
+    # sibling scripts at module scope. A Plus import is always a lazy
+    # ``from millrace_plus... import NAME`` inside the exact function that
+    # needs it (or a module-level ``if TYPE_CHECKING:`` block), with the exact
+    # module, name and alias listed here. A routing-policy/v1 copy never
+    # reaches these functions (proved in isolated mode below). Scripts never
+    # import Core or another third-party package directly.
+    siblings = {
         "lad_state",
         "boundaries",
         "prepare_role",
@@ -1194,17 +1197,87 @@ def test_catalog_copy_and_stdlib_only_scripts(tmp_path: Path) -> None:
         "session_compat",
         "engineering_feedback",
         "provider_wait",
-        "millrace_plus",
+    }
+    pw = ("millrace_plus", "provider_wait", "pw")
+    nd = ("millrace_plus.router", "native_diagnostic", "nd")
+    ef = ("millrace_plus", "engineering_feedback", "ef")
+    cc = ("millrace_plus", "check_contracts", "cc")
+    plus_imports = {
+        ("accept_role.py", "reconcile_provider_success"): {pw, nd},
+        ("engineering_feedback.py", "_plus"): {cc, ef},
+        ("init_session.py", "_provider_index"): {pw},
+        ("lad_state.py", "_source_path"): {cc},
+        ("lad_state.py", "engineering_policy"): {cc, ef},
+        ("lad_state.py", "provider_policy"): {pw},
+        ("lad_state.py", "shared_target"): {
+            ("millrace_plus.lad_service", "validate_shared_target", None),
+            ("millrace_plus.local_intake", "IntakeError", None),
+            ("millrace_plus.subworkflow_records", "SubworkflowError", None),
+        },
+        ("prepare_role.py", "_prepare_provider"): {pw},
+        ("provider_wait.py", "TYPE_CHECKING"): {
+            ("millrace_plus.provider_wait", "Operation", None),
+            ("millrace_plus.router.native_diagnostic", "DiagnosticRecord", None),
+        },
+        ("provider_wait.py", "_record"): {nd},
+        ("provider_wait.py", "_service"): {ef},
+        ("provider_wait.py", "classify"): {pw, nd},
+        ("provider_wait.py", "classify_replay"): {pw, nd},
+        ("provider_wait.py", "_pending"): {pw},
+        ("provider_wait.py", "due"): {pw, ("millrace_plus.router", "control", None)},
+        ("provider_wait.py", "accept_diagnosis"): {pw},
+        ("provider_wait.py", "human"): {pw},
+        ("session_compat.py", "upgrade_session"): {
+            ("millrace_plus.router", "control", "public")
+        },
     }
     for script in (destination / "scripts").glob("*.py"):
-        for node in ast.walk(ast.parse(script.read_text())):
+        tree = ast.parse(script.read_text())
+        parents = {
+            child: parent
+            for parent in ast.walk(tree)
+            for child in ast.iter_child_nodes(parent)
+        }
+        for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                names = {item.name.split(".")[0] for item in node.names}
+                roots = {item.name.split(".")[0] for item in node.names}
             elif isinstance(node, ast.ImportFrom):
-                names = {(node.module or "").split(".")[0]}
+                roots = {(node.module or "").split(".")[0]}
             else:
                 continue
-            assert names <= allowed, (script.name, sorted(names - allowed))
+            if "millrace_plus" not in roots:
+                assert roots <= sys.stdlib_module_names | siblings, (
+                    script.name,
+                    sorted(roots - sys.stdlib_module_names - siblings),
+                )
+                continue
+            assert isinstance(node, ast.ImportFrom) and roots == {"millrace_plus"}, (
+                script.name,
+                node.lineno,
+            )
+            parent = parents.get(node)
+            while parent is not None and not isinstance(
+                parent, ast.FunctionDef | ast.AsyncFunctionDef
+            ):
+                parent = parents.get(parent)
+            if parent is not None:
+                scope = parent.name
+            else:
+                guard = parents.get(node)
+                assert (
+                    isinstance(guard, ast.If)
+                    and isinstance(guard.test, ast.Name)
+                    and guard.test.id == "TYPE_CHECKING"
+                    and parents.get(guard) is tree
+                ), (script.name, node.lineno, "module-level Plus import")
+                scope = "TYPE_CHECKING"
+            found = {(node.module, item.name, item.asname) for item in node.names}
+            expected = plus_imports.get((script.name, scope))
+            assert expected is not None and found <= expected, (
+                script.name,
+                scope,
+                sorted(found, key=str),
+            )
     # Ordinary isolated Python mode proves a copy with an explicit captured
     # routing-policy/v1 imports only its own modules, without Plus or a
     # service on sys.path. A new stock v2 copy requires installed Plus and
@@ -5209,3 +5282,705 @@ def test_provider_diagnosis_contract_fields(tmp_path: Path) -> None:
         " for o, d in cases]))\n",
     )
     assert found == [True, False, False, False, False, False]
+
+
+# ------------------------------------------- L-R2 correctness closeout (D1-D3)
+
+
+def _provider_index_bytes(project: Path) -> bytes:
+    return (project / "foreground/lad-state/provider/index.json").read_bytes()
+
+
+def _session_bytes(project: Path) -> bytes:
+    return (project / "foreground/lad-state/session.json").read_bytes()
+
+
+def _orphaned_builder_operation(tmp_path: Path) -> tuple[Path, str, str, str]:
+    """Packet 1 Builder 429 opens an operation. Its ordinary replacement then
+    succeeds without a bridge export, so the operation stays unfinished (the
+    accepted hook has no verified success evidence) while the session moves
+    on to an unrelated packet 2 Builder occurrence. Commands only."""
+    import lad_provider_support as support
+
+    project = copied(tmp_path)
+    names = ["answer"] + ["answer_" + str(index) for index in range(1, 61)]
+    request = (
+        "Original required functions:\n"
+        + "\n".join(name + "() returns 42" for name in names)
+        + "\n"
+    ).encode()
+    bootstrap(project, request=request)
+    assert step(project, "recon") == "PLANNER"
+    assert step(project, "planner", scenario="many_packets") == "MANAGER"
+    assert step(project, "manager", scenario="many_packets") == "BUILDER"
+    assert command(project, "prepare_role.py", "builder")["outcome"] == "READY"
+    first = ledger(project)["active"]["foreground"]
+    operation = support.seed_failure(project, first)
+    assert (
+        command(project, "prepare_role.py", "builder", "--replacement")["outcome"]
+        == "READY"
+    )
+    peer = command(project, "lad_peer.py", "builder", "many_packets")
+    accepted = command(project, "accept_role.py", "builder", peer["outcome"])
+    assert accepted["outcome"] not in {"REFUSED", "INVALID_RESULT"}, accepted
+    for role in ("checker", "updater"):
+        step(project, role, scenario="many_packets")
+    assert ledger(project)["packet_index"] == 1
+    assert command(project, "prepare_role.py", "builder")["outcome"] == "READY"
+    later = ledger(project)["active"]["foreground"]
+    rows = ledger(project)["occurrences"]
+    assert rows[later]["replacement_of"] is None
+    assert rows[later]["lineage"] != rows[first]["lineage"]
+    pending = support.pending(project, "builder")
+    assert pending.id == operation
+    assert pending.tip["kind"] == "failure_classified"
+    return project, operation, first, later
+
+
+UNRELATED_FAILURES = {
+    # case: (transport, api_error_status, expected classifier outcome)
+    "timeout": ("timeout", None, "ORDINARY_ERROR"),
+    "cancelled": ("cancelled", None, "ORDINARY_ERROR"),
+    "unclassified_status": ("execution_failure", 418, "ORDINARY_ERROR"),
+    "absent_status": ("execution_failure", None, "ORDINARY_ERROR"),
+    "provider_usage": ("execution_failure", 429, "UNCERTAIN"),
+    "provider_access": ("execution_failure", 401, "UNCERTAIN"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(UNRELATED_FAILURES))
+def test_provider_stale_operation_keeps_unrelated_ordinary_routing(
+    tmp_path: Path, case: str
+) -> None:
+    """D1: an unfinished operation does not capture a later unrelated failure.
+
+    A same-role occurrence outside the operation's lineage with a nonpositive
+    class keeps today's ordinary route; the old operation is neither recorded,
+    changed nor cleared. A positive provider class on that occurrence still
+    holds without counting or retry authority.
+    """
+    import lad_provider_support as support
+
+    project, operation, _, later = _orphaned_builder_operation(tmp_path)
+    transport, status, expected = UNRELATED_FAILURES[case]
+    support.export(project, later, transport=transport, status=status)
+    events = support.pending(project, "builder").events
+    index = _provider_index_bytes(project)
+    session = _session_bytes(project)
+    reply = command(project, "provider_wait.py", "classify", "builder")
+    assert reply["outcome"] == expected, reply
+    assert _session_bytes(project) == session  # no provider mark or save
+    after = support.pending(project, "builder")
+    assert after.id == operation
+    if expected == "UNCERTAIN":
+        added = after.events[len(events) :]
+        assert after.events[: len(events)] == events
+        assert [event["kind"] for event in added] == ["uncertainty_recorded"]
+        assert added[0]["occurrence_id"] == later
+        assert added[0]["streak"] == events[-1]["streak"]
+        return
+    assert after.events == events
+    assert _provider_index_bytes(project) == index
+    # The ordinary replacement route proceeds; the old operation stays as it was.
+    assert (
+        command(project, "prepare_role.py", "builder", "--replacement")["outcome"]
+        == "READY"
+    )
+    replacement = ledger(project)["active"]["foreground"]
+    assert ledger(project)["occurrences"][replacement]["replacement_of"] == later
+    peer = command(project, "lad_peer.py", "builder", "many_packets")
+    accepted = command(project, "accept_role.py", "builder", peer["outcome"])
+    assert accepted["outcome"] not in {"REFUSED", "INVALID_RESULT"}, accepted
+    assert support.pending(project, "builder").events == events
+    assert _provider_index_bytes(project) == index
+
+
+@pytest.mark.parametrize("binding", ["same", "mutated"])
+def test_provider_linked_attempt_ordinary_error_keeps_identity_fence(
+    tmp_path: Path, binding: str
+) -> None:
+    """A later failure inside the operation's own lineage still compares the
+    pinned binding: an ordinary error with the same binding routes ordinarily
+    without a provider fact; a mutated binding holds."""
+    import lad_provider_support as support
+
+    project, operation, _, second, _ = _hook_fixture(tmp_path, "recon")
+    support.export(
+        project,
+        second,
+        transport="timeout",
+        settings=support.SETTINGS_SHA if binding == "same" else "6" * 64,
+    )
+    events = support.pending(project, "recon").events
+    reply = command(project, "provider_wait.py", "classify", "recon")
+    after = support.pending(project, "recon")
+    assert after.id == operation
+    if binding == "same":
+        assert reply["outcome"] == "ORDINARY_ERROR", reply
+        assert after.events == events
+    else:
+        assert reply["outcome"] == "UNCERTAIN", reply
+        assert [e["kind"] for e in after.events[len(events) :]] == [
+            "uncertainty_recorded"
+        ]
+        assert after.tip["streak"] == events[-1]["streak"]
+
+
+SUCCESS_INTERRUPTION = """import json, accept_role
+from millrace_plus import provider_wait as pw
+class Crash(BaseException):
+    pass
+real = pw._publish_index
+def interrupted(foreground, index, op, event, raw):
+    if event["kind"] == "succeeded":
+        raise Crash()  # after the immutable event write, before the index write
+    return real(foreground, index, op, event, raw)
+pw._publish_index = interrupted
+try:
+    accept_role.accept_checked(foreground, foreground, "recon", OUTCOME)
+    print(json.dumps({"result": "returned"}))
+except Crash:
+    print(json.dumps({"result": "crashed"}))
+"""
+
+
+@pytest.mark.parametrize("case", ["accepted_replay", "next_guard", "corrupt_tip"])
+def test_provider_interrupted_index_publication_recovers_in_graph_helpers(
+    tmp_path: Path, case: str
+) -> None:
+    """D2: an interrupted event-then-index publication is repaired by the
+    graph helpers' own lookup (accepted-result replay or the next guard),
+    without an operator ``provider-due``. Only the unique valid next event is
+    adopted; a corrupt unindexed tip still holds. The public read-only lookup
+    keeps refusing an index-behind store without writing."""
+    import lad_provider_support as support
+
+    from millrace_plus import provider_wait as pw
+
+    project, operation, first, second, outcome = _hook_fixture(tmp_path, "recon")
+    support.export(project, second, transport="completed")
+    crashed = support.script(
+        project, SUCCESS_INTERRUPTION.replace("OUTCOME", repr(outcome))
+    )
+    assert crashed == {"result": "crashed"}
+    foreground = project / "foreground"
+    folder = foreground / f"lad-state/provider/operations/{operation}/events"
+    unindexed = folder / "2.json"
+    assert json.loads(unindexed.read_bytes())["kind"] == "succeeded"
+    index = _provider_index_bytes(project)
+    assert json.loads(index)["operations"][operation]["sequence"] == 1
+    state = ledger(project)
+    accepted = state["accepted"][second]
+    intents = state["replacement_intents"]
+    for lookup in (
+        lambda: pw.load_operation(foreground, operation, recover=False),
+        lambda: pw.pending_operation(foreground, role="recon"),
+    ):
+        with pytest.raises(pw.ProviderWaitError) as behind:
+            lookup()
+        assert behind.value.code == "provider_index_behind"
+        assert _provider_index_bytes(project) == index
+    if case == "corrupt_tip":
+        tampered = json.loads(unindexed.read_bytes())
+        tampered["streak"] = 0
+        raw = json.dumps(tampered, sort_keys=True, separators=(",", ":")).encode()
+        unindexed.unlink()
+        unindexed.write_bytes(raw)
+        for _ in range(2):
+            replay = command(project, "accept_role.py", "recon", outcome)
+            assert replay["outcome"] == "REFUSED", replay
+            assert "provider_success_" in replay["summary"]
+            assert _provider_index_bytes(project) == index
+            assert unindexed.read_bytes() == raw
+        assert ledger(project)["accepted"][second] == accepted
+        return
+    if case == "accepted_replay":
+        routes = [
+            command(project, "accept_role.py", "recon", outcome)["outcome"]
+            for _ in range(2)
+        ]
+        assert routes == [accepted["route"]] * 2, routes
+    else:
+        # The next guard's own operation lookup repairs the index first.
+        assert command(project, "prepare_role.py", "planner")["outcome"] == "READY"
+        planner = ledger(project)["active"]["foreground"]
+        support.export(project, planner, transport="timeout")
+        reply = command(project, "provider_wait.py", "classify", "planner")
+        assert reply["outcome"] == "ORDINARY_ERROR", reply
+    loaded = pw.load_operation(foreground, operation, recover=False)
+    kinds = [event["kind"] for event in loaded.events]
+    assert kinds == ["failure_classified", "succeeded"]
+    assert loaded.tip["occurrence_id"] == second
+    assert sorted(os.listdir(folder)) == ["1.json", "2.json"]
+    tip = json.loads(_provider_index_bytes(project))["operations"][operation]
+    assert tip["sequence"] == 2
+    assert tip["sha256"] == hashlib.sha256(unindexed.read_bytes()).hexdigest()
+    assert pw.pending_operation(foreground, role="recon") is None
+    after = ledger(project)
+    assert after["accepted"][second] == accepted
+    assert after["replacement_intents"] == intents
+    assert first not in after["accepted"]
+
+
+CLASSIFY_REPLAYS = ("wait", "human", "second_export", "changed_export", "guidance")
+
+
+@pytest.mark.parametrize("case", [*CLASSIFY_REPLAYS, "advanced"])
+def test_provider_classifier_replay_after_own_save(tmp_path: Path, case: str) -> None:
+    """D3: re-running ``classify`` after its own session save returns the exact
+    saved outcome with no new fact, count, mark or save. A conflicting
+    retained export, changed guidance or a later operation fact holds."""
+    from datetime import UTC, datetime
+
+    import lad_provider_support as support
+
+    from millrace_plus import provider_wait as pw
+
+    project = copied(tmp_path)
+    bootstrap(project)
+    assert command(project, "prepare_role.py", "recon")["outcome"] == "READY"
+    oid = ledger(project)["active"]["foreground"]
+    status = 401 if case == "human" else 429
+    ref, _ = support.export(project, oid, transport="execution_failure", status=status)
+    expected = "PROVIDER_HUMAN_REQUIRED" if case == "human" else "PROVIDER_WAIT"
+    first = command(project, "provider_wait.py", "classify", "recon")
+    assert first["outcome"] == expected, first
+    continuation = ledger(project)["continuation"]
+    assert continuation["node"] == (
+        "provider_human_recon" if case == "human" else "provider_due_recon"
+    )
+    assert continuation["occurrence_id"] == oid
+    foreground = project / "foreground"
+    if case == "second_export":
+        support.export(project, oid, transport="execution_failure", status=status)
+    elif case == "changed_export":
+        path = foreground / ref["path"]
+        original = path.read_bytes()
+        changed = original.replace(b'"api_error_status":429', b'"api_error_status":503')
+        assert changed != original
+        path.unlink()
+        path.write_bytes(changed)
+    elif case == "guidance":
+        prompt = project / "prompts/recon.md"
+        prompt.write_bytes(prompt.read_bytes() + b"\nEdited after classification.\n")
+    elif case == "advanced":
+        operation = support.pending(project, "recon")
+        reference = dict(operation.events[0]["diagnostic_ref"])
+        invocation = Path(reference["path"]).stem
+        pw.observe_provider(
+            foreground,
+            operation_id=operation.id,
+            observed_at=datetime.now(UTC),
+            facts={
+                "instance_id": "instance",
+                "run_id": "run",
+                "state_home": "/state",
+                "workspace": str(foreground),
+                "expected_state_version": 7,
+                "observed_state_version": 7,
+                "active_revision": "revision-1",
+                "plane_id": "foreground",
+                "invocation_id": invocation,
+                "completion": {"invocation_id": invocation},
+                "transition": {"completion_id": invocation},
+                "bridge_ref": reference,
+                "writer_state": "stopped",
+            },
+        )
+    events = support.pending(project, "recon").events
+    index = _provider_index_bytes(project)
+    session = _session_bytes(project)
+    replies = [
+        command(project, "provider_wait.py", "classify", "recon") for _ in range(2)
+    ]
+    if case in {"wait", "human"}:
+        assert [reply["outcome"] for reply in replies] == [expected] * 2, replies
+    else:
+        assert [reply["outcome"] for reply in replies] == ["UNCERTAIN"] * 2, replies
+    assert support.pending(project, "recon").events == events
+    assert _provider_index_bytes(project) == index
+    assert _session_bytes(project) == session
+
+
+def _hold_diagnosis_error(project: Path) -> None:
+    """Test-owned graph edit before any run: pause after the provider diagnosis
+    node's native error, keeping its original human target as the resume."""
+    workflow = project / "workflow.json"
+    graph = json.loads(workflow.read_bytes())
+    node = graph["planes"]["foreground"]["nodes"]["provider_diagnosis_recon"]
+    assert node["on_error"] == {"goto": "provider_human_recon"}
+    node["on_error"] = {
+        "pause": {"reason": "test_hold_before_human", "resume": "provider_human_recon"}
+    }
+    workflow.write_text(json.dumps(graph, indent=2) + "\n")
+
+
+HUMAN_INTERRUPTION = """import json, provider_wait as helper
+class Crash(BaseException):
+    pass
+def interrupted(*args, **kwargs):
+    raise Crash()  # after the provider diagnosis fact, before the session save
+helper.save = interrupted
+try:
+    helper.human(foreground, "recon")
+    print(json.dumps({"result": "returned"}))
+except Crash:
+    print(json.dumps({"result": "crashed"}))
+"""
+
+
+@pytest.mark.parametrize("case", ["interrupted", "resolved_conflict"])
+def test_provider_diagnosis_failure_human_replay_after_record(
+    tmp_path: Path, case: str
+) -> None:
+    """D3: the diagnosis branch of ``human`` re-run after its own provider
+    record returns the saved HUMAN_REQUIRED once, without another diagnosis
+    fact, and the graph then pauses for the person. A recorded resolved
+    diagnosis is conflicting authority for this native error and holds."""
+    import lad_provider_support as support
+
+    from millrace_plus import provider_wait as pw
+
+    project = support.provider_project(
+        tmp_path, [429, 503, 529, "ordinary-error", "success"]
+    )
+    _hold_diagnosis_error(project)
+    home = tmp_path / "state"
+    instance, run, view = support.start(project, home)
+    for _ in range(2):
+        assert support.paused_at(view, "provider_due_recon"), view
+        observed = support.observe(project, home, instance, run, view, "recon")
+        operation = support.pending(project, "recon")
+        due = support.restore(project, operation.id, str(observed["observation_id"]))
+        assert due["eligible"] is True
+        view = support.resume(
+            instance, run, home, control.inspect_run(instance, run, state_home=home)
+        )
+    operation = support.pending(project, "recon")
+    assert operation.tip["streak"] == 3 and operation.tip["due_at"] is None
+    observed = support.observe(project, home, instance, run, view, "recon")
+    assert observed["phase"] == "diagnosis_required"
+    if case == "resolved_conflict":
+        support.restore(project, operation.id, str(observed["observation_id"]))
+    view = support.resume(
+        instance, run, home, control.inspect_run(instance, run, state_home=home)
+    )
+    assert support.paused_at(view, "provider_human_recon"), view
+    state = ledger(project)
+    diagnosis = state["continuation"]["occurrence_id"]
+    assert state["continuation"]["node"] == "provider_diagnosis_recon"
+    assert state["occurrences"][diagnosis]["role"] == "troubleshooter"
+    failed = role_occurrences(state, "recon")[2]["occurrence_id"]
+    assert support.pending(project, "recon").tip["kind"] == "diagnosis_reserved"
+    if case == "interrupted":
+        crashed = support.script(project, HUMAN_INTERRUPTION)
+        assert crashed == {"result": "crashed"}
+    else:
+        restoration = [
+            e
+            for e in support.events(project, "recon")
+            if e["kind"] == "restoration_recorded"
+        ][-1]
+        pw.record_diagnosis(
+            project / "foreground",
+            operation_id=operation.id,
+            occurrence_id=diagnosis,
+            resolved=True,
+            restoration_ref=restoration["restoration_ref"],
+        )
+    events = support.events(project, "recon")
+    assert [e["kind"] for e in events].count("diagnosis_recorded") == 1
+    assert ledger(project)["continuation"]["node"] == "provider_diagnosis_recon"
+    session = _session_bytes(project)
+    first = command(project, "provider_wait.py", "human", "recon")
+    if case == "resolved_conflict":
+        again = command(project, "provider_wait.py", "human", "recon")
+        for reply in (first, again):
+            assert reply["outcome"] == "UNCERTAIN", reply
+            assert "provider_human_cause_missing" in reply["summary"]
+        assert support.events(project, "recon") == events
+        assert _session_bytes(project) == session
+        return
+    assert first["outcome"] == "HUMAN_REQUIRED", first
+    assert support.events(project, "recon") == events
+    state = ledger(project)
+    assert state["continuation"]["node"] == "provider_due_recon"
+    assert state["continuation"]["occurrence_id"] == failed
+    assert diagnosis not in state["accepted"]
+    saved = _session_bytes(project)
+    again = command(project, "provider_wait.py", "human", "recon")
+    assert again["outcome"] == "HUMAN_REQUIRED", again
+    assert _session_bytes(project) == saved
+    assert support.events(project, "recon") == events
+    final = support.resume(
+        instance, run, home, control.inspect_run(instance, run, state_home=home)
+    )
+    assert support.paused_at(final, "provider_due_recon"), final
+    nodes = [row["node"] for row in final["invocations"]]
+    assert nodes.count("provider_diagnosis_recon") == 1
+    assert nodes.count("provider_human_recon") == 1
+    assert not any(node.startswith("prepare_consultant") for node in nodes)
+    assert support.events(project, "recon") == events
+    assert support.pending(project, "recon").tip["phase"] == "human_required"
+
+
+def test_provider_third_failure_with_troubleshooter_pending_diagnoses_once(
+    tmp_path: Path,
+) -> None:
+    """§7.4: a pending Troubleshooter generation's third known failure gets
+    exactly one separately identified diagnosis Troubleshooter; its failure
+    goes to the human hold, never a classifier, replacement or Consultant."""
+    import lad_provider_support as support
+
+    project = support.provider_project(
+        tmp_path,
+        [
+            "success",
+            "success",
+            "success",
+            {"outcome": "ERROR"},
+            429,
+            503,
+            529,
+            "ordinary-error",
+            "success",
+        ],
+    )
+    home = tmp_path / "state"
+    instance, run, view = support.start(project, home)
+    for _ in range(2):
+        assert support.paused_at(view, "provider_due_troubleshooter"), view
+        observed = support.observe(project, home, instance, run, view, "troubleshooter")
+        operation = support.pending(project, "troubleshooter")
+        due = support.restore(project, operation.id, str(observed["observation_id"]))
+        assert due["eligible"] is True
+        view = support.resume(
+            instance, run, home, control.inspect_run(instance, run, state_home=home)
+        )
+    assert support.paused_at(view, "provider_due_troubleshooter"), view
+    operation = support.pending(project, "troubleshooter")
+    assert operation.tip["streak"] == 3 and operation.tip["due_at"] is None
+    observed = support.observe(project, home, instance, run, view, "troubleshooter")
+    assert observed["phase"] == "diagnosis_required"
+    view = support.resume(
+        instance, run, home, control.inspect_run(instance, run, state_home=home)
+    )
+    assert support.paused_at(view, "provider_due_troubleshooter"), view
+    events = support.events(project, "troubleshooter")
+    kinds = [event["kind"] for event in events]
+    assert kinds.count("diagnosis_reserved") == 1
+    assert kinds.count("diagnosis_recorded") == 1
+    assert kinds.count("retry_reserved") == 2 and "succeeded" not in kinds
+    recorded = next(e for e in events if e["kind"] == "diagnosis_recorded")
+    assert recorded["phase"] == "human_required"
+    assert recorded["restoration_ref"] is None
+    nodes = [row["node"] for row in view["invocations"]]
+    assert nodes.count("troubleshooter") == 3
+    assert nodes.count("classify_provider_troubleshooter") == 3
+    assert nodes.count("prepare_provider_diagnosis_troubleshooter") == 1
+    assert nodes.count("provider_diagnosis_troubleshooter") == 1
+    assert nodes.count("provider_human_troubleshooter") == 1
+    assert "prepare_troubleshooter_replacement" not in nodes
+    assert not any(node.startswith("prepare_consultant") for node in nodes)
+    state = ledger(project)
+    rows = role_occurrences(state, "troubleshooter")
+    assert len(rows) == 4
+    route = operation.authority["pending_route"]
+    assert route == {"node": "troubleshooter", "pending": rows[0]["pending"]}
+    for retry in rows[1:3]:
+        assert retry["replacement_of"] is None
+        assert retry["pending"] == route["pending"]
+    diagnosis = rows[3]
+    assert diagnosis["pending"] == {
+        "kind": "execution",
+        "target": "troubleshooter",
+        "lineage": rows[2]["lineage"],
+        "occurrence_id": rows[2]["occurrence_id"],
+        "cause_id": operation.id,
+    }
+    assert diagnosis["occurrence_id"] not in state["accepted"]
+    assert state["continuation"]["node"] == "provider_due_troubleshooter"
+    assert state["continuation"]["occurrence_id"] == rows[2]["occurrence_id"]
+    assert support.pending(project, "troubleshooter").tip["phase"] == "human_required"
+
+
+LINEAGE_PROGRAM = """import json, provider_wait as helper
+from lad_state import canonical, digest
+completion = {"invocation_id": "inv-1", "effective_writer": "stopped"}
+transition = {"completion_id": "inv-1", "node": "recon", "revision_id": "rev-1"}
+for name, value in (("completion.json", completion), ("transition.json", transition)):
+    (foreground / name).write_bytes(canonical(value))
+def ref(name, value):
+    return {"path": name, "sha256": digest(canonical(value))}
+observation = {
+    "active_revision": "rev-1",
+    "invocation_id": "inv-1",
+    "observed_state_version": 5,
+    "instance_id": "instance-1",
+    "run_id": "run-1",
+    "completion_ref": ref("completion.json", completion),
+    "transition_ref": ref("transition.json", transition),
+}
+pinned = {"request_id": "p", "operation": "pause_plane", "status": "applied",
+          "instance_id": "instance-1", "run_id": "run-1", "plane_id": "foreground"}
+event = {"control_refs": [ref("pinned.json", pinned)]}
+def receipt(**changes):
+    value = {"request_id": "q", "operation": "resume_plane", "status": "applied",
+             "instance_id": "instance-1", "run_id": "run-1", "plane_id": "foreground"}
+    value.update(changes)
+    return value
+def view(*controls, moves=(), node="provider_due_recon"):
+    return {
+        "active_revision": "rev-1",
+        "planes": {"foreground": {"active_invocation": "guard-1"}},
+        "invocations": [{"id": "guard-1", "node": node}],
+        "completions": [dict(completion)],
+        "transitions": [dict(transition)],
+        "operator_moves": list(moves),
+        "controls": [pinned, *controls],
+    }
+cases = {
+    "pinned_only": view(),
+    "raw_resume_plane": view(receipt()),
+    "refused_resume": view(receipt(status="refused")),
+    "run_resume": view(receipt(operation="resume_run", plane_id=None)),
+    "recover_run": view(receipt(operation="recover_run", plane_id=None)),
+    "cancel_run": view(receipt(operation="cancel_run", plane_id=None)),
+    "redirect_plane": view(receipt(operation="redirect_plane")),
+    "queued": view(receipt(status="queued")),
+    "other_run": view(receipt(run_id="run-2")),
+    "other_instance": view(receipt(instance_id="instance-2")),
+    "learning_plane": view(receipt(plane_id="learning")),
+    "move_before": view(moves=[{"version": 5}]),
+    "move_after": view(moves=[{"version": 6}]),
+    "not_due_guard": view(node="provider_human_recon"),
+}
+found = {}
+for name, value in cases.items():
+    try:
+        found[name] = len(helper.lineage_controls(
+            foreground, value, event, observation, "recon"))
+    except helper.Hold as exc:
+        found[name] = str(exc)
+print(json.dumps(found))
+"""
+
+
+def test_provider_due_lineage_checks_run_controls_not_service_journal(
+    tmp_path: Path,
+) -> None:
+    """§7.6 boundary: the due guard checks only resume/receipt lineage of the
+    observed run. It admits any applied or refused pause/resume/recover
+    receipt of that run, including an unjournaled raw resume, and refuses
+    other operations, targets and later operator moves. Service journal
+    legality stays with ``known_controls`` at settlement (generic service
+    tests), which rejects an unjournaled child control as
+    ``unknown_child_control``."""
+    import lad_provider_support as support
+
+    found = support.script(copied(tmp_path), LINEAGE_PROGRAM)
+    assert found == {
+        "pinned_only": 0,
+        "raw_resume_plane": 1,
+        "refused_resume": 1,
+        "run_resume": 1,
+        "recover_run": 1,
+        "cancel_run": "provider_unknown_control",
+        "redirect_plane": "provider_unknown_control",
+        "queued": "provider_unknown_control",
+        "other_run": "provider_unknown_control",
+        "other_instance": "provider_unknown_control",
+        "learning_plane": "provider_unknown_control",
+        "move_before": 0,
+        "move_after": "provider_operator_move",
+        "not_due_guard": "provider_guard_invocation",
+    }
+
+
+def test_provider_pause_meets_unchanged_service_continuation_gate(
+    tmp_path: Path,
+) -> None:
+    """The actual provider wait pause satisfies the unchanged service
+    ``_unfinished_continuation_ready`` gate only at its exact cursor; a cursor
+    mismatch, live writer, nonquiescent run or other continuation refuses. A
+    separate child run gate is accepted only for the run-level decision."""
+    import copy
+
+    import lad_provider_support as support
+
+    from millrace_plus.lad_service_runtime import _unfinished_continuation_ready
+
+    project = support.provider_project(tmp_path, [429])
+    _, _, view = support.start(project, tmp_path / "state")
+    assert support.paused_at(view, "provider_due_recon"), view
+    assert view["quiescent"] is True and view.get("run_gate") is None
+    state = ledger(project)
+    assert state["continuation"]["node"] == "provider_due_recon"
+    assert _unfinished_continuation_ready(state, view, "foreground") is True
+
+    def changed_view(**plane: object) -> dict:
+        value = copy.deepcopy(view)
+        value["planes"]["foreground"].update(plane)
+        return value
+
+    def changed_state(**continuation: object) -> dict:
+        value = copy.deepcopy(state)
+        value["continuation"].update(continuation)
+        return value
+
+    gated = changed_view(
+        status="ready", resume_target=None, cursor="provider_due_recon"
+    )
+    gated["run_gate"] = {"reason": "operator_pause", "request_id": uuid.uuid4().hex}
+    other_cursor = copy.deepcopy(gated)
+    other_cursor["planes"]["foreground"]["cursor"] = "recon"
+    quiet = copy.deepcopy(view)
+    quiet["quiescent"] = False
+    refusals = {
+        "default_without_run_gate": (state, view, None),
+        "other_plane": (state, view, "learning"),
+        "cursor_mismatch": (
+            state,
+            changed_view(resume_target="provider_human_recon"),
+            "foreground",
+        ),
+        "live_writer": (
+            state,
+            changed_view(active_invocation=uuid.uuid4().hex),
+            "foreground",
+        ),
+        "not_quiescent": (state, quiet, "foreground"),
+        "classifier_continuation": (
+            changed_state(node="classify_provider_recon"),
+            view,
+            "foreground",
+        ),
+        "cleanup_not_required": (
+            changed_state(cleanup_required=False),
+            view,
+            "foreground",
+        ),
+        "gated_plane_resume": (state, gated, "foreground"),
+        "gated_other_cursor": (state, other_cursor, None),
+    }
+    for name, (selected, run, plane) in refusals.items():
+        assert _unfinished_continuation_ready(selected, run, plane) is False, name
+    assert _unfinished_continuation_ready(state, gated, None) is True
+
+
+def test_captured_contracts_state_command_python_imports() -> None:
+    """Captured guidance names the actual import boundary: routing-policy/v1
+    commands are standard-library-only, while v2 command Python must import
+    installed Plus and Core."""
+    contracts = " ".join((LAD / "context/contracts.md").read_text().split())
+    harness = " ".join((LAD / "context/harness.md").read_text().split())
+    both = "must import both `millrace_plus` and Core (`millrace`)"
+    assert "They run without importing Plus or OS." not in contracts
+    assert "Ordinary copied commands remain standard-library-only" not in harness
+    for text in (contracts, harness):
+        assert both in text
+        assert "`provider_recovery_requires_plus`" in text
+        assert "A layout with Plus but not Core is not qualified." in text
+    assert "routing-policy/v1 run with `python3 -S`" in contracts
+    assert "They do not import Plus, Core or OS." in contracts
+    assert "never load Plus or Core" in harness

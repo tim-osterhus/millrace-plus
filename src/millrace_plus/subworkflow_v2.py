@@ -1025,7 +1025,8 @@ def _advance_bytes(
                     )
                     _save(journal, record)
                 outcome, diagnostic = _outcome(record)
-                if outcome != "CHILD_RUNNING":
+                # A saved pause is not current: the refresh below decides it.
+                if outcome not in {"CHILD_RUNNING", "CHILD_ATTENTION"}:
                     outcome, diagnostic = _join_tail(
                         journal, record, connection, deadline, clock, sleep
                     )

@@ -518,7 +518,9 @@ def reconcile_provider_success(
     except ImportError as exc:
         raise LadError("provider_success_requires_plus") from exc
     try:
-        operation = pw.pending_operation(foreground, role=occurrence["role"])
+        operation = pw.pending_operation(
+            foreground, role=occurrence["role"], recover=True
+        )
         if operation is None:
             return
         lineage = helper.attempt_lineage(foreground, state, operation, oid)

@@ -140,6 +140,60 @@ def test_exact_closed_core_facts_and_join(status, outcome, fixture):
     assert not any("lad" in key or "queue" in key for key in result)
 
 
+@pytest.mark.parametrize(
+    "current,outcome",
+    [
+        ("running", "CHILD_RUNNING"),
+        ("succeeded", "CHILD_SUCCEEDED"),
+        ("failed", "CHILD_FAILED"),
+        ("paused", "CHILD_ATTENTION"),
+    ],
+)
+def test_saved_pause_is_rechecked_before_attention(fixture, current, outcome):
+    """A saved paused observation is not current authority. The next window
+    reads the child again before routing attention, without another send."""
+    client = FakeClient(fixture)
+    client.status = "paused"
+    assert advance(fixture, client)["outcome"] == "CHILD_ATTENTION"
+    assert journal(fixture).load()["observation"]["status"] == "paused"
+    sent = copy.deepcopy(client.sent)
+    client.status = current
+    result = advance(fixture, client)
+    assert result["outcome"] == outcome
+    saved = journal(fixture).load()
+    assert saved["observation"]["status"] == current
+    assert saved["saved_result"]["outcome"] == outcome
+    assert client.sent == sent
+    manifest = json.loads((fixture["parent"] / "results/task_1.json").read_bytes())
+    assert manifest["outcome"] == outcome
+
+
+@pytest.mark.parametrize("failure", ["observe", "read"])
+def test_saved_pause_without_current_read_never_runs(fixture, failure):
+    """An unavailable refresh keeps the saved pause as evidence and never
+    reports a running or settled child from it."""
+
+    def unavailable(instance, run=None, *, deadline):
+        raise SubworkflowError("os_unavailable")
+
+    client = FakeClient(fixture)
+    client.status = "paused"
+    assert advance(fixture, client)["outcome"] == "CHILD_ATTENTION"
+    before = journal(fixture).load()
+    sent = copy.deepcopy(client.sent)
+    client.status = "running"
+    if failure == "observe":
+        client.fail_observe = "os_unavailable"
+    else:
+        client.read = unavailable
+    result = advance(fixture, client)
+    assert result["outcome"] in {"CHILD_ATTENTION", "CHILD_UNCERTAIN"}
+    saved = journal(fixture).load()
+    assert saved["observation"] == before["observation"]
+    assert saved["saved_result"]["outcome"] == result["outcome"]
+    assert client.sent == sent
+
+
 @pytest.mark.parametrize("writer", ["running", "may_live", "unknown"])
 def test_join_and_writer_uncertainty_never_settle(fixture, writer):
     client = FakeClient(fixture)

@@ -611,8 +611,8 @@
       },
       {
         "path": "context/contracts.md",
-        "sha256": "6504c8bc8b73d334b69b2b833100b461716f60de902c786776f67d8a4226e38e",
-        "bytes": 14181
+        "sha256": "708b2ac27dd8f97aa372d23dab1706d70a05599ceee86549b1c7e7acdf394f94",
+        "bytes": 14742
       },
       {
         "path": "context/engineering-profile.example.json",
@@ -621,8 +621,8 @@
       },
       {
         "path": "context/harness.md",
-        "sha256": "de7201541973c33bf5576188349994dfc1e81e7d7e61fb044cc103651a10261b",
-        "bytes": 5828
+        "sha256": "c51a3edd8a7e8fd1b0b3a02dda5c75fec71f29c886707d1d5aae3d922c024c3a",
+        "bytes": 6183
       },
       {
         "path": "context/provider-policy.json",
@@ -726,8 +726,8 @@
       },
       {
         "path": "scripts/accept_role.py",
-        "sha256": "affc4f6e07aaa335073fab58ffcdc0df1f5264bd9a7f02318f966a6b48c97403",
-        "bytes": 40663
+        "sha256": "e3358f8bf15df4330662dc1519b6e75871b38f9bb21fb97c7be671db8174523a",
+        "bytes": 40699
       },
       {
         "path": "scripts/boundaries.py",
@@ -766,8 +766,8 @@
       },
       {
         "path": "scripts/provider_wait.py",
-        "sha256": "adcafe49c000a71a5f057c0be777146d37afe8c08ee133c52911df9494bceac5",
-        "bytes": 28626
+        "sha256": "ce04617c5cbebc038facef54529269c252e32c90701aa39c8c5d5e7f3a64fbca",
+        "bytes": 31595
       },
       {
         "path": "scripts/session_compat.py",

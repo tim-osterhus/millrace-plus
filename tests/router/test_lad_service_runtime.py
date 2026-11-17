@@ -2388,17 +2388,19 @@ def unfinished_worker(next_node="next"):
     }
 
 
+@pytest.mark.parametrize("node", ["next", "provider_due_recon"])
 @pytest.mark.parametrize("run_gate", [False, True])
 def test_unfinished_accepted_boundary_continues_exact_plane_without_clearing_cleanup(
-    setup, monkeypatch, run_gate
+    setup, monkeypatch, run_gate, node
 ):
     from millrace_plus import lad_service_disposition as disposition
 
     active, task, call, evidence = plane_child(setup, monkeypatch)
     run = setup.peer.runs[(call["instance_id"], call["run_id"])]
+    run["planes"]["foreground"]["resume_target"] = node
     if run_gate:
         run["run_gate"] = {"reason": "operator_pause", "request_id": uuid.uuid4().hex}
-    state = unfinished_worker()
+    state = unfinished_worker(node)
     monkeypatch.setattr(disposition, "_load_worker", lambda _: copy.deepcopy(state))
     decision = uuid.uuid4().hex
     before = len(setup.peer.sent)
@@ -2413,7 +2415,7 @@ def test_unfinished_accepted_boundary_continues_exact_plane_without_clearing_cle
             )
         assert [r["operation"] for r in setup.peer.sent[before:]] == ["resume_plane"]
         # Core's resume-plane moves the cursor to its saved resume target.
-        run["planes"]["foreground"]["cursor"] = "next"
+        run["planes"]["foreground"]["cursor"] = node
         active.decide(task["task_id"], "continue", uuid.uuid4().hex, evidence)
         assert [r["operation"] for r in setup.peer.sent[before:]] == [
             "resume_plane",
@@ -2446,6 +2448,7 @@ def test_unfinished_accepted_boundary_continues_exact_plane_without_clearing_cle
         "default-with-paused-plane",
         "live-writer",
         "not-quiescent",
+        "provider-due-cursor-mismatch",
     ],
 )
 def test_unfinished_continuation_refuses_wrong_or_unclosed_authority(
@@ -2481,6 +2484,8 @@ def test_unfinished_continuation_refuses_wrong_or_unclosed_authority(
         run["planes"]["foreground"]["active_invocation"] = uuid.uuid4().hex
     elif mutation == "not-quiescent":
         run["quiescent"] = False
+    elif mutation == "provider-due-cursor-mismatch":
+        state["continuation"]["node"] = "provider_due_recon"
     monkeypatch.setattr(disposition, "_load_worker", lambda _: copy.deepcopy(state))
     before = len(setup.peer.sent)
     with pytest.raises((IntakeError, SubworkflowError)):
@@ -5252,6 +5257,34 @@ def test_provider_wait_service_child_resumes_only_through_decide(request, monkey
         replayed = finite().parent_control(pause)
         assert replayed["receipt"] == applied_pause["receipt"]
         assert json.loads(pause.read_bytes())["operation"] == "pause_run"
+        # Busy maintenance: while the owned target lock is held, observation
+        # refuses without publication or any journal or child-control change.
+        from millrace_plus.lad_service import target_lock
+
+        unobserved = support.events(project, "recon")
+        maintenance = Service(home).intake.lifecycle()[1]["maintenance"]
+        owner = Service(home)
+        with target_lock(owner.config, protected_roots=(owner.home,)):
+            with pytest.raises(IntakeError) as busy:
+                pw.observe_snapshot(
+                    project,
+                    state_home=public.home,
+                    instance_id=instance,
+                    run_id=run,
+                    plane_id="foreground",
+                    operation_id=operation.id,
+                    invocation_id=support.failed_invocation(operation),
+                    expected_state_version=int(child["state_version"]),
+                    observed_at=datetime.now(UTC),
+                    service_home=home,
+                    task=task["task_id"],
+                )
+        assert busy.value.code == "target_busy"
+        assert support.events(project, "recon") == unobserved
+        assert Service(home).intake.lifecycle()[1]["maintenance"] == maintenance
+        current = control.inspect_run(instance, run, state_home=public.home)
+        assert current["state_version"] == child["state_version"]
+        assert current["controls"] == child["controls"]
         # Exact public observation under the service target lock.
         observed = pw.observe_snapshot(
             project,
