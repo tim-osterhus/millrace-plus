@@ -13,12 +13,10 @@ Public modules:
 - `millrace_plus.router.prime`: `prime_print` / `millrace-prime-print/v1`,
   official 0.10.2 text print; native qualification is separate.
 - `millrace_plus.router.millforge`: `millforge_run` / `millrace-millforge-run/v1`.
-- `millrace_plus.router.forge`: `forge_runner` / `millrace-forge-runner/v1`, one
-  Forge SDK worker per invocation. Source regressions and a 19-case real-SDK
-  local-peer cohort have run, including on an installed Plus wheel, with Linux
-  x86_64 CPython 3.12.14 and Forge 0.10.1. No live route is qualified.
+- `millrace_plus.router.forge`: `forge_runner` / `millrace-forge-runner/v1` or
+  `millrace-forge-runner/v2`, one Forge SDK worker per invocation.
   `forge_worker.py` and `forge_probe.py` are worker package data, never imported.
-- `millrace_plus.router.resolver`: direct selection of these eight exact pairs.
+- `millrace_plus.router.resolver`: direct selection of these exact pairs.
 - `millrace_plus.router.cli`: `python -m millrace_plus.router` and
   `millrace-plus router`, thin wrappers around the generic Core CLI `main`.
 

@@ -1,4 +1,4 @@
-"""``forge_runner`` / ``millrace-forge-runner/v1``: one Forge SDK worker per invocation.
+"""The v1 and v2 ``forge_runner`` adapters run one SDK worker per invocation.
 
 The parent probes the worker interpreter, then runs one ``forge-worker.py``
 process through Core's public owned-process helper. It never imports ``forge``
@@ -73,10 +73,10 @@ class ForgeRunnerAdapter:
     adapter_contract = c.ADAPTER_CONTRACT
 
     def validate_configuration(self, config: AdapterConfiguration) -> None:
-        c.validate_configuration(config)
+        c.validate_configuration(config, contract=self.adapter_contract)
 
     def plan(self, request: InvocationRequest) -> LaunchPlan:
-        return c.plan(request)
+        return c.plan(request, contract=self.adapter_contract)
 
     def invoke(
         self,
@@ -88,7 +88,7 @@ class ForgeRunnerAdapter:
         poll: Callable[[], bool],
         on_started: Callable[[int], None],
     ) -> AdapterResult:
-        details = c.launch_details(plan)
+        details = c.launch_details(plan, contract=self.adapter_contract)
         if str(cwd) != details["cwd"]:
             raise RouterError("invalid_launch_plan")
         evidence: dict[str, object] = {
@@ -207,4 +207,10 @@ class ForgeRunnerAdapter:
         plan: LaunchPlan,
         completion: CompletionFacts,
     ) -> None:
-        c.validate_completion(plan, completion)
+        c.validate_completion(plan, completion, contract=self.adapter_contract)
+
+
+class ForgeRunnerV2Adapter(ForgeRunnerAdapter):
+    """Forge runner with independent null defaults for read-file windows."""
+
+    adapter_contract = c.ADAPTER_CONTRACT_V2

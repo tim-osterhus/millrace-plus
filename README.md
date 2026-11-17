@@ -42,12 +42,12 @@ The optional [Paperclip bridge](docs/paperclip.md) maps server-owned issue
 descriptions to pinned independent workflow copies through an existing local
 Millrace OS service. Its local adapter reports results without changing issues.
 
-The candidate source also contains an optional `forge_runner` adapter for the
-Forge SDK worker. Source regressions and a 19-case real-SDK local-peer cohort have
-run, including the cohort on an installed Plus wheel. Those runs used Linux
-x86_64 CPython 3.12.14 and Forge 0.10.1. No live backend, model, account or other
-platform is qualified.
-See [Forge runner adapter](docs/forge-runner-adapter.md).
+The optional `forge_runner` adapter selects a v1 or v2 Forge SDK worker. V2 applies
+read-window defaults to explicit `null` arguments. The v1 closeout ran source
+regressions and a 19-case real-SDK loopback cohort on an installed Plus wheel using
+Linux x86_64 CPython 3.12.14 and Forge 0.10.1. Earlier real-SDK source runs apply
+to their checked source. No live backend, model, account or other platform is
+qualified. See the [Forge runner adapter guide](docs/forge-runner-adapter.md).
 
 ## Published 0.23.1 installation
 

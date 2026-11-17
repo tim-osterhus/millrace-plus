@@ -3,7 +3,7 @@
 Module scope imports no Plus source package. Cases that need the source modules
 import them inside the test. ``test_installed_resolver_and_assets`` uses only
 artifacts and interpreters named by a verifier-supplied manifest and performs no
-build or install. The source resolver selects the exact ``forge_runner`` pair; the
+build or install. The source resolver selects the exact ``forge_runner`` pairs. The
 installed proof stays pending until a prebuilt artifact manifest is supplied.
 """
 
@@ -217,6 +217,7 @@ FORGE_MODULES = (
     "forge_configuration.py",
     "forge_worker.py",
     "forge_probe.py",
+    "resolver.py",
 )
 
 
@@ -252,17 +253,18 @@ def supplied_artifacts() -> dict:
 
 
 def pinned_constants(source: bytes) -> dict[str, str]:
-    """Read the two digest constants from module text without importing it."""
+    """Read the script digest constants from module text without importing it."""
+    keys = {"WORKER_SHA256", "WORKER_SHA256_V2", "PROBE_SHA256"}
     found = {}
     for node in ast.parse(source).body:
         if (
             isinstance(node, ast.Assign)
             and len(node.targets) == 1
             and isinstance(node.targets[0], ast.Name)
-            and node.targets[0].id in {"WORKER_SHA256", "PROBE_SHA256"}
+            and node.targets[0].id in keys
         ):
             found[node.targets[0].id] = ast.literal_eval(node.value)
-    assert set(found) == {"WORKER_SHA256", "PROBE_SHA256"}
+    assert set(found) == keys
     return found
 
 
@@ -290,20 +292,54 @@ print(json.dumps({"millrace_loaded": "millrace" in sys.modules,
 """
 INSTALLED = """
 import hashlib, importlib.util, json, sys
+from dataclasses import replace
+from pathlib import Path
 import millrace.router.execution as execution
 from millrace_plus.router import forge_configuration as c
+from millrace_plus.router.resolver import resolve_adapter
+
+adapter = resolve_adapter("forge_runner", "millrace-forge-runner/v1")
+adapter_v2 = resolve_adapter("forge_runner", "millrace-forge-runner/v2")
+root = Path.cwd()
+request = execution.InvocationRequest(
+    invocation_id="1" * 32,
+    plane_id="main",
+    node_id="forge",
+    producing_revision="revision",
+    binding_id="native",
+    adapter_id="forge_runner",
+    adapter_contract=adapter.adapter_contract,
+    executable="/absent/python3.12",
+    binding_config={"profile": "forge.json"},
+    node_config={"prompt": "task.txt"},
+    runtime={}, workflow={}, plane={}, common_settings={}, host_paths={},
+    files={"task.txt": b"Review the project.", "forge.json": json.dumps({
+        "format": "millrace-forge-runner-profile/v1", "forge_version": "0.10.1",
+        "backend": "openai_compat", "base_url": {"kind": "env", "name": "FORGE_URL"},
+        "auth": {"kind": "none"}, "model": "fixture-model",
+    }).encode()},
+    environment_names=("FORGE_URL",), outcomes=("READY",), result_contract="json-v1",
+    project_root=root, invocation_root=root / "invocation",
+)
 worker, probe = c.packaged_scripts()
+first = adapter.plan(request).generated_controls
+second = adapter_v2.plan(replace(request, adapter_contract=adapter_v2.adapter_contract))
+second = second.generated_controls
+assert first[c.WORKER_NAME] == worker and first[c.PROBE_NAME] == probe
+assert first[c.PROBE_NAME] == second[c.PROBE_NAME]
+assert first[c.REQUEST_NAME] == second[c.REQUEST_NAME]
 receipt = {
     "prefix": sys.prefix, "core_origin": execution.__file__,
     "configuration_origin": c.__file__,
     "worker_sha256": hashlib.sha256(worker).hexdigest(),
+    "worker_v2_sha256": hashlib.sha256(second[c.WORKER_NAME]).hexdigest(),
     "probe_sha256": hashlib.sha256(probe).hexdigest(),
-    "pinned": [c.WORKER_SHA256, c.PROBE_SHA256],
+    "pinned": [c.WORKER_SHA256, c.PROBE_SHA256, c.WORKER_SHA256_V2],
 }
-from millrace_plus.router.resolver import resolve_adapter
-adapter = resolve_adapter("forge_runner", "millrace-forge-runner/v1")
 receipt.update(
     adapter_id=adapter.adapter_id, adapter_contract=adapter.adapter_contract,
+    adapter_v2_id=adapter_v2.adapter_id,
+    adapter_v2_contract=adapter_v2.adapter_contract,
     adapter_origin=sys.modules[type(adapter).__module__].__file__,
     forge_loaded="forge" in sys.modules,
     forge_findable=importlib.util.find_spec("forge") is not None,
@@ -368,6 +404,10 @@ def test_installed_resolver_and_assets(tmp_path):
         "forge_runner",
         "millrace-forge-runner/v1",
     )
+    assert (installed["adapter_v2_id"], installed["adapter_v2_contract"]) == (
+        "forge_runner",
+        "millrace-forge-runner/v2",
+    )
     for key in ("core_origin", "configuration_origin", "adapter_origin"):
         assert _outside_source(installed[key]), key
         assert (
@@ -379,6 +419,9 @@ def test_installed_resolver_and_assets(tmp_path):
         installed["worker_sha256"] == installed["pinned"][0] == pinned["WORKER_SHA256"]
     )
     assert installed["probe_sha256"] == installed["pinned"][1] == pinned["PROBE_SHA256"]
+    worker_v2_sha256 = installed["worker_v2_sha256"]
+    assert worker_v2_sha256 == installed["pinned"][2] == pinned["WORKER_SHA256_V2"]
+    assert worker_v2_sha256 != installed["worker_sha256"]
     assert installed["forge_loaded"] is False and installed["forge_findable"] is False
     assert installed["scripts_imported"] == []
     core = child(manifest["core_only_python"], CORE_ONLY, tmp_path)

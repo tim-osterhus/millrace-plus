@@ -264,6 +264,7 @@ def run_worker(
     cwd: Path | None = None,
     argv: list[str] | None = None,
     timeout: float = 90,
+    contract: str = c.ADAPTER_CONTRACT,
     **options: object,
 ) -> Worker:
     """Run the real worker over the fake SDK, directly (no probe, no adapter)."""
@@ -280,10 +281,11 @@ def run_worker(
     req = replace(
         request(ws, executable=str(executable), profile=profile),
         invocation_root=root / "inv",
+        adapter_contract=contract,
     )
     if prompt is not None:
         req = replace(req, files={**req.files, "task.txt": prompt})
-    plan = c.plan(req)
+    plan = resolve_adapter(c.ADAPTER_ID, contract).plan(req)
     materialize(plan)
     now = time.time()
     if start is None:

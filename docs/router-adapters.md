@@ -26,19 +26,22 @@ Offline verification does not qualify a live adapter route.
 
 ## Forge runner
 
-The optional `forge_runner` / `millrace-forge-runner/v1` adapter runs one
-short-lived worker for Antoine Zambelli's Forge SDK (`forge-guardrails` 0.10.1)
-against one OpenAI-compatible endpoint named by environment reference. The binding
-`executable` is a separate CPython 3.12+ worker interpreter. Plus never imports
-`forge`, and the SDK is not a Plus dependency. The worker exposes read-only
-`list_dir`, `read_file` and a sole-call `finish`.
+The optional `forge_runner` adapter accepts `millrace-forge-runner/v1` and
+`millrace-forge-runner/v2`. Each invocation runs one short-lived worker for Antoine
+Zambelli's Forge SDK (`forge-guardrails` 0.10.1) against an OpenAI-compatible endpoint
+named by environment reference. The binding `executable` is a separate CPython
+3.12+ worker interpreter. Plus never imports `forge`, and the SDK is not a Plus
+dependency. The worker exposes read-only `list_dir`, `read_file` and a sole-call
+`finish`. V2 accepts explicit `null` for optional read-window arguments and applies
+the same defaults as omitted arguments. V1 treats explicit `null` as an argument
+error.
 
-Fake-process and fake-SDK tests cover adapter and worker logic. Separately, a
-19-case real-SDK cohort has run against a local loopback peer, including on an
-installed Plus wheel. Those runs used Forge 0.10.1 in one minimal locked Linux
-x86_64 CPython 3.12.14 worker environment. No live backend, model, credential or
-account is qualified. Profile, limits, checked behavior and read-tool limits are in
-[Forge runner adapter](forge-runner-adapter.md).
+The v1 closeout ran source regressions and a 19-case real-SDK cohort against a
+loopback peer on an installed Plus wheel. It used Forge 0.10.1 in one minimal locked
+Linux x86_64 CPython 3.12.14 worker environment. Earlier real-SDK source runs
+apply to their checked source. No live backend, model, credential or account is
+qualified. See the profile, limits and checked behavior in the
+[Forge runner adapter guide](forge-runner-adapter.md).
 
 ## Install And Handshake
 

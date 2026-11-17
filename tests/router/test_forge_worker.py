@@ -601,12 +601,54 @@ def test_tool_exceptions_fixed_messages(tmp_path):
     ]
 
 
-def test_strict_tool_args(tmp_path):
+@pytest.mark.parametrize("contract", [c.ADAPTER_CONTRACT, c.ADAPTER_CONTRACT_V2])
+def test_read_window_defaults_by_contract(tmp_path, contract):
+    data = "abcdefghij" * 110
+    (workspace(tmp_path) / "data.txt").write_text(data)
+    cases = [
+        ({}, 0, 1024),
+        ({"offset": None, "length": None}, 0, 1024),
+        ({"offset": None, "length": 7}, 0, 7),
+        ({"offset": 3, "length": None}, 3, 1024),
+    ]
+    calls = [
+        ["read_file", {"path": "data.txt", **options}] for options, _, _ in cases
+    ]
+    worker = run_worker(
+        tmp_path,
+        {"responses": [{"calls": calls}, {"calls": [finish_call()]}]},
+        profile={**PROFILE, "budgets": {"read_bytes_per_call": 1024}},
+        contract=contract,
+    )
+    ok(worker)
+    reads = results(worker)[:-1]
+    for (options, offset, length), result in zip(cases, reads, strict=True):
+        if contract == c.ADAPTER_CONTRACT and None in options.values():
+            assert result == (
+                "[ToolError] ValueError: read_file arguments invalid: "
+                "expected path and integer offset/length"
+            )
+        else:
+            assert json.loads(result) == {
+                "path": "data.txt",
+                "offset": offset,
+                "length": length,
+                "size": len(data),
+                "eof": False,
+                "text": data[offset : offset + length],
+            }
+
+
+@pytest.mark.parametrize("contract", [c.ADAPTER_CONTRACT, c.ADAPTER_CONTRACT_V2])
+def test_strict_tool_args(tmp_path, contract):
     bad = [
         ["read_file", {"path": "f", "offset": True}],
         ["read_file", {"path": "f", "offset": 1.0}],
         ["read_file", {"path": "f", "offset": "1"}],
         ["read_file", {"path": "f", "offset": -1}],
+        ["read_file", {"path": "f", "length": False}],
+        ["read_file", {"path": "f", "length": 1.0}],
+        ["read_file", {"path": "f", "length": "1"}],
         ["read_file", {"path": "f", "length": 0}],
         ["read_file", {"path": "f", "length": 32769}],
         ["read_file", {"path": "f", "extra": 1}],
@@ -617,7 +659,9 @@ def test_strict_tool_args(tmp_path):
         ["finish", {"outcome": "READY", "summary": "x"}],
     ]
     worker = run_worker(
-        tmp_path, {"responses": [{"calls": bad}, {"calls": [finish_call()]}]}
+        tmp_path,
+        {"responses": [{"calls": bad}, {"calls": [finish_call()]}]},
+        contract=contract,
     )
     ok(worker)
     for text in results(worker)[: len(bad)]:

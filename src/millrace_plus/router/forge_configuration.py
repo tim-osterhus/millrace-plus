@@ -1,9 +1,9 @@
-"""Pure Forge runner rules for ``forge_runner`` / ``millrace-forge-runner/v1``.
+"""Pure Forge runner rules for the v1 and v2 ``forge_runner`` contracts.
 
 Profile, settings, planning, probe grammar, envelope parsing, disposition and
 completion validation. Nothing here reads the environment, runs a process or
-contacts a backend. Planning reads only the two packaged worker scripts through
-``importlib.resources`` and checks them against pinned digests.
+contacts a backend. Planning reads the packaged scripts through
+``importlib.resources`` and checks the generated controls against pinned digests.
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ from .setting_layers import merge_setting_layers  # noqa: E402
 
 ADAPTER_ID = "forge_runner"
 ADAPTER_CONTRACT = "millrace-forge-runner/v1"
+ADAPTER_CONTRACT_V2 = "millrace-forge-runner/v2"
 PROFILE_FORMAT = "millrace-forge-runner-profile/v1"
 LAUNCH_FORMAT = "millrace-forge-runner-launch/v1"
 RESULT_FORMAT = "millrace-forge-runner-result/v1"
@@ -47,6 +48,7 @@ REQUEST_NAME = "forge-request.json"
 # Pinned identity of the packaged scripts. Any change to their bytes needs a
 # new contract version and resolver pair (W-RV-03).
 WORKER_SHA256 = "1205bdd9248be2a15f6f621083e618d9a3536682b47bd96714b8beeecb850afb"
+WORKER_SHA256_V2 = "3af036fe8873e0425323058c5edcdea97a00034f151f3082e36e15347047dde9"
 PROBE_SHA256 = "95ddac9c6ae44fde351c84bfce8a63c9d934959247e8b1ad51f8bdee41d8a629"
 WORKER_SCRIPT_MAX = 65536
 PROBE_SCRIPT_MAX = 16384
@@ -225,8 +227,11 @@ def _utf8(value: str, code: str) -> bytes:
         raise RouterError(code) from exc
 
 
-def _contract(adapter: str, contract: str) -> None:
-    if (adapter, contract) != (ADAPTER_ID, ADAPTER_CONTRACT):
+def _contract(adapter: str, actual: str, expected: str) -> None:
+    if (adapter, actual) != (ADAPTER_ID, expected) or expected not in (
+        ADAPTER_CONTRACT,
+        ADAPTER_CONTRACT_V2,
+    ):
         raise RouterError("unsupported_adapter_contract")
 
 
@@ -388,8 +393,10 @@ def resolve(*layers: tuple[str, Mapping[str, object]]) -> dict[str, object]:
     return selected
 
 
-def validate_configuration(config: AdapterConfiguration) -> None:
-    _contract(config.adapter_id, config.adapter_contract)
+def validate_configuration(
+    config: AdapterConfiguration, *, contract: str = ADAPTER_CONTRACT
+) -> None:
+    _contract(config.adapter_id, config.adapter_contract, contract)
     runtime, workflow = settings_layer(config.runtime), settings_layer(config.workflow)
     planes = {key: settings_layer(value) for key, value in config.planes.items()}
     profiles = {
@@ -462,20 +469,38 @@ def probe_argv(executable: str, root: str) -> tuple[str, ...]:
     return (executable, *PYTHON_ARGS, root + "/" + PROBE_NAME)
 
 
-def _scripts(worker: bytes, probe: bytes) -> None:
+def _worker_sha256(contract: str) -> str:
+    return WORKER_SHA256_V2 if contract == ADAPTER_CONTRACT_V2 else WORKER_SHA256
+
+
+def _scripts(worker: bytes, probe: bytes, worker_sha256: str) -> None:
     if (
         type(worker) is not bytes
         or type(probe) is not bytes
         or len(worker) > WORKER_SCRIPT_MAX
         or len(probe) > PROBE_SCRIPT_MAX
-        or digest(worker) != WORKER_SHA256
+        or digest(worker) != worker_sha256
         or digest(probe) != PROBE_SHA256
     ):
         raise RouterError("forge_control_digest_mismatch")
 
 
-def plan(request: InvocationRequest) -> LaunchPlan:
-    _contract(request.adapter_id, request.adapter_contract)
+def _v2_worker(worker: bytes) -> bytes:
+    # Derive the new standalone control from the verified v1 bytes. The pinned
+    # v2 digest also checks the output of these two replacements.
+    worker = worker.replace(ADAPTER_CONTRACT.encode(), ADAPTER_CONTRACT_V2.encode(), 1)
+    return worker.replace(
+        b'            offset, length = args.get("offset", 0), '
+        b'args.get("length", window)\n',
+        b'            offset, length = args.get("offset"), args.get("length")\n'
+        b"            offset = 0 if offset is None else offset\n"
+        b"            length = window if length is None else length\n",
+        1,
+    )
+
+
+def plan(request: InvocationRequest, *, contract: str = ADAPTER_CONTRACT) -> LaunchPlan:
+    _contract(request.adapter_id, request.adapter_contract, contract)
     if request.seam_input is not None:
         raise RouterError("forge_seam_input_unsupported")
     runtime, workflow, plane = (
@@ -499,12 +524,14 @@ def plan(request: InvocationRequest) -> LaunchPlan:
         ("node", overrides),
     )
     worker, probe = packaged_scripts()
-    _scripts(worker, probe)
+    _scripts(worker, probe, WORKER_SHA256)
+    if contract == ADAPTER_CONTRACT_V2:
+        worker = _v2_worker(worker)
     root = str(request.invocation_root)
     details: dict[str, object] = {
         "format": LAUNCH_FORMAT,
         "adapter": ADAPTER_ID,
-        "contract": ADAPTER_CONTRACT,
+        "contract": contract,
         "invocation_id": request.invocation_id,
         "cwd": str(request.project_root),
         "profile_path": profile_path,
@@ -512,7 +539,7 @@ def plan(request: InvocationRequest) -> LaunchPlan:
         "prompt_source": prompt_source,
         "prompt_source_sha256": digest(task),
         "worker_path": root + "/" + WORKER_NAME,
-        "worker_sha256": WORKER_SHA256,
+        "worker_sha256": _worker_sha256(contract),
         "probe_path": root + "/" + PROBE_NAME,
         "probe_sha256": PROBE_SHA256,
         "request_path": root + "/" + REQUEST_NAME,
@@ -541,14 +568,14 @@ def plan(request: InvocationRequest) -> LaunchPlan:
     result = LaunchPlan(
         request.invocation_id,
         ADAPTER_ID,
-        ADAPTER_CONTRACT,
+        contract,
         worker_argv(request.executable, root),
         {},
         {WORKER_NAME: worker, PROBE_NAME: probe, REQUEST_NAME: request_raw},
         selected,
         details,
     )
-    launch_details(result)
+    launch_details(result, contract=contract)
     return result
 
 
@@ -566,9 +593,12 @@ def _absolute(value: object) -> str:
     return result
 
 
-def launch_details(value: LaunchPlan) -> dict[str, object]:
+def launch_details(
+    value: LaunchPlan, *, contract: str = ADAPTER_CONTRACT
+) -> dict[str, object]:
     """Recheck the frozen projection from plan bytes and adapter constants only."""
-    _contract(value.adapter_id, value.adapter_contract)
+    _contract(value.adapter_id, value.adapter_contract, contract)
+    worker_sha256 = _worker_sha256(contract)
     try:
         obj = fields(value.details, DETAIL_FIELDS)
         root = str(PurePosixPath(_absolute(obj["worker_path"])).parent)
@@ -592,12 +622,12 @@ def launch_details(value: LaunchPlan) -> dict[str, object]:
         if (
             obj["format"] != LAUNCH_FORMAT
             or obj["adapter"] != ADAPTER_ID
-            or obj["contract"] != ADAPTER_CONTRACT
+            or obj["contract"] != contract
             or obj["invocation_id"] != value.invocation_id
             or obj["worker_path"] != root + "/" + WORKER_NAME
             or obj["probe_path"] != root + "/" + PROBE_NAME
             or obj["request_path"] != root + "/" + REQUEST_NAME
-            or obj["worker_sha256"] != WORKER_SHA256
+            or obj["worker_sha256"] != worker_sha256
             or obj["probe_sha256"] != PROBE_SHA256
             or obj["forge_version"] != FORGE_VERSION
             or obj["result_contract"] != "json-v1"
@@ -637,7 +667,7 @@ def launch_details(value: LaunchPlan) -> dict[str, object]:
             or digest(request_raw) != obj["request_sha256"]
         ):
             raise RouterError("invalid_launch_plan")
-        _scripts(generated[WORKER_NAME], generated[PROBE_NAME])
+        _scripts(generated[WORKER_NAME], generated[PROBE_NAME], worker_sha256)
         native = fields(
             strict_json(request_raw),
             {
@@ -1029,10 +1059,12 @@ def _start(value: object, invocation_id: str) -> None:
         raise RouterError("completion_integrity")
 
 
-def validate_completion(plan: LaunchPlan, completion: CompletionFacts) -> None:
+def validate_completion(
+    plan: LaunchPlan, completion: CompletionFacts, *, contract: str = ADAPTER_CONTRACT
+) -> None:
     """W-RV-02 over plan, completion and adapter constants only."""
     try:
-        details = launch_details(plan)  # 1
+        details = launch_details(plan, contract=contract)  # 1
         e = fields(completion.evidence, EVIDENCE_FIELDS)  # 2
         if (
             e != seal(e)

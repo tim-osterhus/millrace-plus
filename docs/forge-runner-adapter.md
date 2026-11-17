@@ -1,17 +1,13 @@
 # Forge runner adapter
 
-Status: source regressions and a 19-case real-SDK local-peer cohort have run,
-including the cohort on an installed Plus wheel. Those runs used Forge 0.10.1 in
-one minimal locked worker environment on Linux x86_64 CPython 3.12.14
-(see [Real-SDK local-peer checks](#real-sdk-local-peer-checks)). Live backends,
-models, credentials and accounts are not qualified. The Plus resolver selects the
-exact `forge_runner` / `millrace-forge-runner/v1` pair.
-
-Plus provides `forge_runner` / `millrace-forge-runner/v1`. The adapter runs one
-short-lived worker process that drives Antoine Zambelli's Forge SDK
+The `forge_runner` adapter accepts the exact contracts `millrace-forge-runner/v1`
+and `millrace-forge-runner/v2`. Each runs one short-lived worker process that drives
+Antoine Zambelli's Forge SDK
 (`forge-guardrails` 0.10.1, commit `45a334d9250d2d72fcbb7ac6b583ca4c82140ecd`)
-against one OpenAI-compatible endpoint. It is not tailcallhq ForgeCode and not
-Millforge's Forge proxy route.
+against one OpenAI-compatible endpoint. The v1 closeout ran source regressions and
+ran the 19-case real-SDK loopback cohort on an installed Plus wheel. Earlier
+real-SDK source runs are historical evidence for their checked source. See
+[Real-SDK local-peer checks](#real-sdk-local-peer-checks).
 
 The adapter requires Core's public `millrace-router-execution/v2` contract and,
 for live dispatch, `millrace-ai>=0.23.2` with `owned-process-v1`. Plus never
@@ -32,24 +28,26 @@ test evidence, not a supported install procedure.
 
 ## Captured profile and task
 
-Declare the profile and prompt in the workflow's `control_files`. Use this binding:
+Declare the profile and prompt in the workflow's `control_files`. To select v2,
+use this binding.
 
 ```json
 {
   "adapter": "forge_runner",
-  "contract": "millrace-forge-runner/v1",
+  "contract": "millrace-forge-runner/v2",
   "executable": "/path/to/forge-env/bin/python3.12",
   "config": {"profile": "profiles/forge.json"}
 }
 ```
 
-The node's `invoke.config` holds `prompt` and may hold `model`:
+The node's `invoke.config` holds `prompt` and may hold `model`.
 
 ```json
 {"binding": "forge", "config": {"prompt": "tasks/review.md"}, "timeout_seconds": 600}
 ```
 
-The profile is strict JSON. Unknown or duplicate keys refuse.
+Both contracts use `millrace-forge-runner-profile/v1`. The profile is strict JSON.
+Unknown or duplicate keys refuse.
 
 ```json
 {
@@ -108,10 +106,11 @@ to each HTTP operation, not to the whole request.
 
 ## Process boundary
 
-Planning writes three generated controls under the invocation root: `forge-worker.py`,
-`forge-probe.py` and `forge-request.json`. The two scripts are pinned by SHA-256.
-Changed script bytes refuse with `forge_control_digest_mismatch`. A historical
-invocation reloads only while those bytes are unchanged.
+Planning produces `forge-worker.py`, `forge-probe.py` and `forge-request.json` for
+Core to write under the invocation root. Each contract has a pinned worker digest.
+Both share the same pinned probe and the same request and result formats. A script
+digest mismatch yields `forge_control_digest_mismatch`. Core reloads a captured v1
+invocation with its original v1 controls after a workflow selects v2 for new runs.
 
 For deadline `D`:
 
@@ -144,12 +143,17 @@ The worker exposes exactly three synchronous tools:
 - `read_file(path, offset, length)` returns one strict UTF-8 byte window.
 - `finish(outcome, summary, refs)` reports the result.
 
-The `read_file` schema has one known mismatch. The worker's tool spec declares
-`offset` and `length` as `integer`. The SDK wire schema advertises both as nullable
-with default `null`. The worker accepts omitted arguments, which take the defaults
-`offset` 0 and `length` equal to `read_bytes_per_call`. It refuses an explicit
-`null` as an argument error and charges the tool-error budget. This is the v1
-worker behavior.
+The SDK wire schema advertises both `offset` and `length` as nullable with
+default `null`. In both contracts, omitted `offset` defaults to 0 and omitted
+`length` defaults to `read_bytes_per_call`. In v2, explicit `null` applies the
+same default independently to either field. The v1 worker treats explicit `null`
+as an argument error that counts toward the tool-error budget.
+
+Both contracts require a path. Supplied non-null window values must be integers.
+Booleans, floats, strings and unknown keys are argument errors. Offset must be
+nonnegative and length must be between 1 and `read_bytes_per_call`, inclusive.
+An offset at EOF returns an empty window. An offset beyond EOF produces a tool
+resolution error.
 
 `finish` succeeds only as the only call in its response. The worker returns
 `completed` only after the SDK run returned normally before the soft deadline and
@@ -184,9 +188,9 @@ only the plan, the completion and adapter constants.
 - Remote effects are UNKNOWN in every outcome, including `stopped`. That covers
   backend receipt, continued generation and tool-output egress.
 
-A backend reply that parses as JSON but is not an object maps to
-`forge_worker_internal`. A reply that fails JSON decoding maps to
-`forge_backend_protocol`. Neither mapping changes the classification table.
+A `json.JSONDecodeError` from a backend reply maps to `forge_backend_protocol`.
+A non-object JSON reply and a `ValueError` from Python's integer string digit limit
+both map to `forge_worker_internal`.
 
 ## Source regression tests
 
@@ -195,16 +199,15 @@ These tests run without the SDK, a loopback peer or a credential.
 - A profile of exactly 1,048,576 bytes is accepted. One more byte refuses with
   `invalid_forge_profile`.
 - The worker and probe parse under CPython 3.11 with `-I -B`.
-- Non-object JSON replies classify as `forge_worker_internal`. Undecodable JSON
-  classifies as `forge_backend_protocol`.
+- Non-object JSON replies classify as `forge_worker_internal`.
+  `json.JSONDecodeError` classifies as `forge_backend_protocol`.
 
 ## Real-SDK local-peer checks
 
-The 19-case cohort has run with the real 0.10.1 SDK against a local loopback peer
-that needs no credential. It has run against source Plus and an installed Plus
-wheel in the environment described above. These results apply to the checked
-artifacts and environment. The child environment held only `PATH` and the declared
-endpoint variable. The cohort covers:
+The v1 closeout ran the 19-case real-SDK cohort on an installed Plus wheel using
+Forge 0.10.1 on Linux x86_64 CPython 3.12.14. The loopback peer needed no credential.
+The child environment held only `PATH` and the declared endpoint variable. The
+installed cohort covered the following behavior.
 
 - The probe and worker start under `-I -B -X utf8`. Python startup, proxy and
   provider-key variables set in the parent do not reach them. All 53 pinned SDK

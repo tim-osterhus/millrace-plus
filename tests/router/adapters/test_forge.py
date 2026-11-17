@@ -135,6 +135,48 @@ def test_plan_is_pure_and_deterministic(tmp_path, monkeypatch):
     }
 
 
+def test_forge_v2_plan_and_exact_control_identities(tmp_path):
+    v1 = resolve_adapter("forge_runner", "millrace-forge-runner/v1")
+    v2 = resolve_adapter("forge_runner", "millrace-forge-runner/v2")
+    req = request(tmp_path)
+    req_v2 = replace(req, adapter_contract=v2.adapter_contract)
+    v2.validate_configuration(configuration(req_v2))
+    first = v1.plan(req)
+    second = v2.plan(req_v2)
+    assert second == v2.plan(req_v2)
+    assert first.argv == second.argv and first.settings == second.settings
+    assert second.details == {
+        **first.details,
+        "contract": v2.adapter_contract,
+        "worker_sha256": c.WORKER_SHA256_V2,
+    }
+    worker, probe = c.packaged_scripts()
+    assert first.generated_controls[c.WORKER_NAME] == worker
+    assert first.generated_controls[c.PROBE_NAME] == probe
+    assert first.details["worker_sha256"] == c.WORKER_SHA256 != c.WORKER_SHA256_V2
+    assert c.digest(second.generated_controls[c.WORKER_NAME]) == c.WORKER_SHA256_V2
+    for name in (c.PROBE_NAME, c.REQUEST_NAME):
+        assert first.generated_controls[name] == second.generated_controls[name]
+    for selected, wrong_request in ((v1, req_v2), (v2, req)):
+        with pytest.raises(RouterError) as error:
+            selected.plan(wrong_request)
+        assert code_of(error) == "unsupported_adapter_contract"
+        with pytest.raises(RouterError) as error:
+            selected.validate_configuration(configuration(wrong_request))
+        assert code_of(error) == "unsupported_adapter_contract"
+    for original, wrong_worker in ((first, second), (second, first)):
+        forged = replace(
+            original,
+            generated_controls={
+                **original.generated_controls,
+                c.WORKER_NAME: wrong_worker.generated_controls[c.WORKER_NAME],
+            },
+        )
+        with pytest.raises(RouterError) as error:
+            c.launch_details(forged, contract=original.adapter_contract)
+        assert code_of(error) == "forge_control_digest_mismatch"
+
+
 @pytest.mark.parametrize(
     "change",
     [
@@ -404,6 +446,42 @@ def test_reload_identical_projection(single_flow, monkeypatch):
     assert before["diagnostic"] is None and before["revision_id"] is not None
     assert draft["diagnostic"] == "missing_executable"
     assert draft["revision_id"] is None and draft["files"] == before["files"]
+
+
+def test_reload_v1_after_selecting_v2(single_flow, monkeypatch):
+    flow_env(monkeypatch)
+    workflow, project, home = forge_flow(single_flow)
+    instance = create(workflow, project, home)
+    first = start(instance, home)
+    assert first["status"] == "succeeded", first
+    graph = json.loads(workflow.read_text())
+    binding = graph["bindings"]["native"]
+    binding["contract"] = c.ADAPTER_CONTRACT_V2
+    workflow.write_text(json.dumps(graph))
+    second = start(instance, home)
+    assert second["status"] == "succeeded", second
+    assert second["revision_id"] != first["revision_id"]
+    for run, contract, worker_sha256 in (
+        (first, c.ADAPTER_CONTRACT, c.WORKER_SHA256),
+        (second, c.ADAPTER_CONTRACT_V2, c.WORKER_SHA256_V2),
+    ):
+        details = run["invocations"][0]["launch"]["details"]
+        assert details["contract"] == contract
+        assert details["worker_sha256"] == worker_sha256
+        assert details["probe_sha256"] == c.PROBE_SHA256
+
+    Path(binding["executable"]).unlink()
+    monkeypatch.delenv(URL_ENV)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("loading a retained v1 invocation started a process")
+
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    reloaded = core.inspect_run(
+        instance, str(first["id"]), state_home=home, adapter_resolver=resolve_adapter
+    )
+    for key in ("status", "revision_id", "invocations", "completions", "transitions"):
+        assert reloaded[key] == first[key], key
 
 
 def test_reload_refuses_changed_script_bytes(single_flow, monkeypatch):
@@ -1914,8 +1992,13 @@ def test_constants_match_contract():
 
 def test_plus_resolver_selects_exact_pair():
     selected = resolve_adapter(c.ADAPTER_ID, c.ADAPTER_CONTRACT)
-    assert isinstance(selected, adapter.ForgeRunnerAdapter)
-    for contract in ("millrace-forge-runner/v2", "millrace-forge-runner"):
+    assert type(selected) is adapter.ForgeRunnerAdapter
+    selected_v2 = resolve_adapter(c.ADAPTER_ID, c.ADAPTER_CONTRACT_V2)
+    assert type(selected_v2) is adapter.ForgeRunnerV2Adapter
+    for contract in ("millrace-forge-runner/v3", "millrace-forge-runner"):
         with pytest.raises(RouterError) as error:
             resolve_adapter(c.ADAPTER_ID, contract)
         assert code_of(error) == "unsupported_adapter_contract"
+    with pytest.raises(RouterError) as error:
+        resolve_adapter("forge", c.ADAPTER_CONTRACT_V2)
+    assert code_of(error) == "unsupported_adapter_contract"
