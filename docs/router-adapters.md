@@ -24,6 +24,22 @@ into existing execution-v2 / `json-v1`. Configuration, timing and conservative
 writer holds are documented in [Millforge adapter](millforge-adapter.md).
 Offline verification does not qualify a live adapter route.
 
+## Forge runner
+
+The optional `forge_runner` / `millrace-forge-runner/v1` adapter runs one
+short-lived worker for Antoine Zambelli's Forge SDK (`forge-guardrails` 0.10.1)
+against one OpenAI-compatible endpoint named by environment reference. The binding
+`executable` is a separate CPython 3.12+ worker interpreter. Plus never imports
+`forge`, and the SDK is not a Plus dependency. The worker exposes read-only
+`list_dir`, `read_file` and a sole-call `finish`.
+
+Fake-process and fake-SDK tests cover adapter and worker logic. Separately, a
+19-case real-SDK cohort has run against a local loopback peer, including on an
+installed Plus wheel. Those runs used Forge 0.10.1 in one minimal locked Linux
+x86_64 CPython 3.12.14 worker environment. No live backend, model, credential or
+account is qualified. Profile, limits, checked behavior and read-tool limits are in
+[Forge runner adapter](forge-runner-adapter.md).
+
 ## Install And Handshake
 
 The base distribution declares no runtime dependencies. The optional `router`

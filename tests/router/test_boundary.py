@@ -84,8 +84,13 @@ def test_production_imports_only_public_core_modules() -> None:
         "control.py",
         "droid.py",
         "droid_configuration.py",
+        "forge.py",
+        "forge_configuration.py",
+        "forge_probe.py",
+        "forge_worker.py",
         "millforge.py",
         "millforge_configuration.py",
+        "native_diagnostic.py",
         "opencode.py",
         "opencode_configuration.py",
         "pi.py",
@@ -115,6 +120,7 @@ def test_production_imports_only_public_core_modules() -> None:
         "opencode_configuration.py",
         "millforge_configuration.py",
         "prime_configuration.py",
+        "forge_configuration.py",
     ):
         _assert_pure_module(SOURCE / name)
 

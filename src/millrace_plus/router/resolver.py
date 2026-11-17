@@ -10,6 +10,7 @@ from millrace.router.execution import ExecutionAdapter, RouterError  # noqa: E40
 from .claude import ClaudePrintAdapter  # noqa: E402
 from .codex import CodexExecAdapter  # noqa: E402
 from .droid import DroidExecAdapter  # noqa: E402
+from .forge import ForgeRunnerAdapter  # noqa: E402
 from .millforge import MillforgeRunAdapter  # noqa: E402
 from .opencode import OpenCodeRunAdapter  # noqa: E402
 from .pi import PiJsonAdapter  # noqa: E402
@@ -31,4 +32,6 @@ def resolve_adapter(adapter_id: str, contract: str) -> ExecutionAdapter:
         return PrimePrintAdapter()
     if (adapter_id, contract) == ("millforge_run", "millrace-millforge-run/v1"):
         return MillforgeRunAdapter()
+    if (adapter_id, contract) == ("forge_runner", "millrace-forge-runner/v1"):
+        return ForgeRunnerAdapter()
     raise RouterError("unsupported_adapter_contract", f"{adapter_id} {contract}")

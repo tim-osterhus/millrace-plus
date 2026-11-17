@@ -42,6 +42,13 @@ The optional [Paperclip bridge](docs/paperclip.md) maps server-owned issue
 descriptions to pinned independent workflow copies through an existing local
 Millrace OS service. Its local adapter reports results without changing issues.
 
+The candidate source also contains an optional `forge_runner` adapter for the
+Forge SDK worker. Source regressions and a 19-case real-SDK local-peer cohort have
+run, including the cohort on an installed Plus wheel. Those runs used Linux
+x86_64 CPython 3.12.14 and Forge 0.10.1. No live backend, model, account or other
+platform is qualified.
+See [Forge runner adapter](docs/forge-runner-adapter.md).
+
 ## Published 0.23.1 installation
 
 Python 3.11 or newer is required. The base package does not transitively install Core or OS.
