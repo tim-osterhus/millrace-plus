@@ -1,9 +1,4 @@
-"""Standalone CI commit intents and exact inspection through trusted argv.
-
-This is the bounded CI-D1a protocol. It supplies no Git effect implementation.
-The graph selects one operation; possible sends survive interruption and may
-only be inspected until exact absence is proven. Core owns process lifecycle.
-"""
+"""Standalone CI commit intents and exact inspection through trusted argv."""
 
 from __future__ import annotations
 
@@ -15,6 +10,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from . import check_contracts as cc
+from . import cicd_git_commit as local_git
 from . import cicd_v2_records as vr
 from .cicd_records import CicdError
 from .cicd_source import (
@@ -47,18 +43,13 @@ def _fields(value: object, fields: tuple[str, ...], code: str) -> dict[str, Any]
 
 def _target(value: object) -> dict[str, Any]:
     code = "invalid_effect_target"
-    obj = _fields(
-        value,
-        (
-            "repository_root",
-            "branch",
-            "base_head",
-            "mode",
-            "patch_sha256",
-            "source_after_sha256",
-        ),
-        code,
+    fields = (
+        "repository_root", "branch", "base_head", "mode", "patch_sha256",
+        "source_after_sha256",
     )
+    if isinstance(value, dict) and "commit_plan_ref" in value:
+        fields += ("commit_plan_ref",)
+    obj = _fields(value, fields, code)
     vr._absolute(obj["repository_root"], code)
     vr._text(obj["branch"], code)
     vr._revision(obj["base_head"], code)
@@ -66,6 +57,8 @@ def _target(value: object) -> dict[str, Any]:
         raise vr.CicdV2Error("unsupported_until_full_ci_d1")
     vr._sha(obj["patch_sha256"], code)
     vr._sha(obj["source_after_sha256"], code)
+    if "commit_plan_ref" in obj:
+        vr._ref(obj["commit_plan_ref"], code)
     return obj
 
 
@@ -121,7 +114,12 @@ def validate_policy(value: object, config: Mapping[str, Any]) -> dict[str, Any]:
         raise vr.CicdV2Error("effect_target_mismatch")
     vr._text(target["branch"], code)
     adapter = _fields(adapters, ("commit",), code)["commit"]
-    adapter = _fields(adapter, ("prepare", "execute", "inspect", "capabilities"), code)
+    adapter_fields = ("prepare", "execute", "inspect", "capabilities")
+    if isinstance(adapter, dict) and "backend" in adapter:
+        adapter_fields += ("backend",)
+        if adapter["backend"] != "local_git":
+            raise vr.CicdV2Error(code)
+    adapter = _fields(adapter, adapter_fields, code)
     commands = {row["id"]: row for row in config["commands"]}
     for operation in ("prepare", "execute", "inspect"):
         command = commands.get(adapter[operation])
@@ -323,6 +321,10 @@ def _result_evidence(
         proof["remote_id"] is not None or proof["observed_head"] is not None
     ):
         raise vr.CicdV2Error("effect_absence_unproven")
+    if result["status"] == "applied" and "commit_plan_ref" in request["target"]:
+        plan = local_git.plan_for(home, request["target"])
+        if {result["observed_head"], result["remote_id"]} != {plan["commit"]}:
+            raise vr.CicdV2Error("effect_evidence_mismatch")
 
 
 def _retain_result(
@@ -365,6 +367,11 @@ def selected(home: Any) -> bool:
     return policy["mode"] == "authorized" and bool(policy["effects"])
 
 
+def is_local_git(home: Any) -> bool:
+    adapter = home.config["external_policy"]["adapters"].get("commit", {})
+    return adapter.get("backend") == "local_git"
+
+
 def git_facts(home: Any, invocation: Mapping[str, Any]) -> dict[str, Any]:
     def read(args: list[str]) -> bytes:
         remaining = invocation["deadline"] - time.time()
@@ -387,11 +394,17 @@ def capture_git(
     remaining = invocation["deadline"] - time.time()
     if remaining <= 0:
         raise vr.CicdV2Error("invocation_deadline_expired")
-    return facts | {
+    baseline = facts | {
         "dirty_paths": foreign_dirty_paths(
             home.target, facts["head"], snapshot, remaining
         )
     }
+    if is_local_git(home):
+        branch = home.config["external_policy"]["effects"][0]["target"]["branch"]
+        baseline["local_git"] = local_git.baseline(
+            home.target, branch, invocation["deadline"]
+        )
+    return baseline
 
 
 def basis_ref(home: Any, input_id: str) -> dict[str, Any] | None:
@@ -431,15 +444,19 @@ def freeze_basis(
     selector = policy["effects"][0]["target"]
     if facts["branch"] != selector["branch"]:
         raise vr.CicdV2Error("effect_target_mismatch")
-    source = source_identity(runtime._source(state, patch["source_after_sha256"]))
-    target = _target(
-        selector
-        | {
-            "base_head": facts["head"],
-            "patch_sha256": patch["patch_ref"]["sha256"],
-            "source_after_sha256": source,
-        }
-    )
+    view = runtime._source(state, patch["source_after_sha256"])
+    source = source_identity(view)
+    target = selector | {
+        "base_head": facts["head"],
+        "patch_sha256": patch["patch_ref"]["sha256"],
+        "source_after_sha256": source,
+    }
+    if is_local_git(home):
+        target["commit_plan_ref"] = local_git.freeze_plan(
+            home, state["input_id"], target, patch, view, initial["local_git"],
+            invocation["deadline"],
+        )
+    _target(target)
     basis = {
         "format": BASIS,
         "input_id": state["input_id"],
@@ -535,10 +552,19 @@ def _basis_authority(
         "patch_sha256": basis["patch_ref"]["sha256"],
         "source_after_sha256": basis["source_after_sha256"],
     }
-    if basis["target"] != expected:
-        raise vr.CicdV2Error("delivery_basis_changed")
     frozen = _frozen(home, state["input_id"])
     initial = frozen["delivery_git"]
+    if is_local_git(home):
+        target = _target(basis["target"])
+        plan = local_git.plan_for(home, target)
+        if (
+            plan["baseline"] != initial.get("local_git")
+            or plan["input_id"] != state["input_id"]
+        ):
+            raise vr.CicdV2Error("delivery_basis_changed")
+        expected["commit_plan_ref"] = target["commit_plan_ref"]
+    if basis["target"] != expected:
+        raise vr.CicdV2Error("delivery_basis_changed")
     if (
         basis["git"]
         != {key: initial[key] for key in ("head", "branch", "index_sha256", "staged")}
@@ -986,9 +1012,17 @@ def current_basis(
         or report["source_after_sha256"] != basis["source_after_sha256"]
     ):
         raise vr.CicdV2Error("delivery_basis_changed")
-    runtime._source(state, basis["source_after_sha256"])
-    if git_facts(home, invocation) != basis["git"]:
-        raise vr.CicdV2Error("delivery_git_changed")
+    if is_local_git(home):
+        if source_identity(home.observe()) != basis["source_after_sha256"]:
+            raise vr.CicdV2Error("source_changed")
+        completed = disposition(home, state) == "complete"
+        expected = "applied" if completed else "not_applied"
+        if local_git.observe(home, basis["target"], invocation["deadline"]) != expected:
+            raise vr.CicdV2Error("delivery_git_changed")
+    else:
+        runtime._source(state, basis["source_after_sha256"])
+        if git_facts(home, invocation) != basis["git"]:
+            raise vr.CicdV2Error("delivery_git_changed")
     if (
         state["check_plan_ref"] != basis["check_plan_ref"]
         or state["review_plan_ref"] != basis["review_plan_ref"]

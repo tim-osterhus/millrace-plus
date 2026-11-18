@@ -1,13 +1,15 @@
-"""Real public CI-v2 graph with fake external effects and retained aftermath.
-
-These journeys also run against the installed package. The fake peer writes
-only its owned ledger. Repository HEAD/index and foreign work stay unchanged.
-"""
+"""Public CI-v2 journeys for local Git and custom commit effects."""
 
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import signal
+import stat
+import sys
+import textwrap
+from pathlib import Path
 
 import pytest
 from cicd_support import event, git, new_id, write_json
@@ -15,15 +17,15 @@ from cicd_v2_support import initialized
 from test_cicd_effects import approval_decision, configure_effects
 from test_cicd_workflow import _resume, _run, _start, drive
 
-from millrace_plus import cicd_cli
+from millrace_plus import cicd_cli, cicd_git_commit
 from millrace_plus import cicd_effects as effects
 from millrace_plus.cicd_v2_records import CicdV2Error
 from millrace_plus.cicd_v2_runtime import Runtime, V2Home
 from millrace_plus.router import control
 
 
-def _checked(root, scenario="normal"):
-    fx = initialized(root, configure=configure_effects(root, scenario))
+def _checked(root, scenario="normal", *, configure=None):
+    fx = initialized(root, configure=configure or configure_effects(root, scenario))
     home = V2Home(fx["home"])
     fx["git_before"] = git(home.target, "rev-parse", "HEAD")
     fx["index_before"] = git(home.target, "ls-files", "--stage", "-z")
@@ -33,6 +35,123 @@ def _checked(root, scenario="normal"):
     assert home.read_ref(state["hold_ref"])["status"] == "checked_patch", _run(fx)
     assert not (root / "effect-ledger").exists()
     return fx, home, accepted["input_id"]
+
+
+def _sigkill_local_git_peer(witness, phase):
+    return textwrap.dedent(f"""\
+        import hashlib
+        import json
+        import os
+        import signal
+        from millrace_plus import cicd_git_commit as peer
+
+        witness = Path({str(witness)!r})
+        phase = {phase!r}
+        if not witness.exists():
+            def kill(git):
+                pid = os.getpid()
+                group = os.getpgrp()
+                assert pid == group == os.getsid(0)
+                names = ["index.lock"]
+                if phase == "prepared_refs":
+                    names += ["HEAD.lock", git.branch + ".lock"]
+                hashes = {{
+                    name: hashlib.sha256(git.location(name).read_bytes()).hexdigest()
+                    for name in names
+                }}
+                with witness.open("x") as evidence:
+                    json.dump({{"pid": pid, "pgid": group, "phase": phase,
+                               "lock_sha256": hashes}}, evidence)
+                os.killpg(group, signal.SIGKILL)
+
+            if phase == "index_lock_only":
+                peer._baseline = kill
+            else:
+                transaction = peer._ref_transaction
+
+                def kill_after_prepare(git, plan, recheck, preserve):
+                    return transaction(git, plan, lambda: kill(git), preserve)
+
+                peer._ref_transaction = kill_after_prepare
+        """)
+
+
+def _checked_local_git(root, *, fault=None):
+    def configure(value):
+        configure_effects(root)(value)
+        adapter = value["external_policy"]["adapters"]["commit"]
+        adapter.update(
+            backend="local_git", prepare="local-git", execute="local-git",
+            inspect="local-git",
+        )
+        target = Path(value["target_root"])
+        git(target, "config", "--local", "user.name", "Fixture CI Operator")
+        git(target, "config", "--local", "user.email", "fixture-ci@example.invalid")
+        (target / "src/notes.txt").write_text("dirty operator notes\n")
+        (target / "src/untracked.txt").write_text("untracked operator notes\n")
+        (target / "millrace_plus.py").write_text(
+            'raise RuntimeError("target import shadowed installed peer")\n'
+        )
+        commands = value["commands"]
+        command = next(row for row in commands if row["id"] == "effect-prepare")
+        command.update(
+            id="local-git",
+            argv=[
+                sys.executable, "-I", "-m", "millrace_plus.cicd_git_commit",
+                "{request_file}", "{result_file}",
+            ],
+        )
+        value["commands"] = [
+            row for row in commands if not row["id"].startswith("effect-")
+        ]
+        wrapper = root / "local_git_fault.py"
+        if fault:
+            before = after = ""
+            if fault == "drop_send":
+                marker = str(root / "dropped-first-send")
+                before = (
+                    f"marker = Path({marker!r})\n"
+                    "if not marker.exists():\n"
+                    "    marker.touch()\n"
+                    "    raise SystemExit(0)\n"
+                )
+            elif fault == "lose_response":
+                after = "if code == 0:\n    Path(sys.argv[2]).unlink()\n"
+            elif fault == "split_index":
+                before = (
+                    "from millrace_plus import cicd_git_commit as peer\n"
+                    "send = peer._ref_transaction\n"
+                    "def fail_after_ref(*args, **kwargs):\n"
+                    "    send(*args, **kwargs)\n"
+                    "    raise OSError('interrupted after ref commit')\n"
+                    "peer._ref_transaction = fail_after_ref\n"
+                )
+            elif fault in {"index_lock_only", "prepared_refs"}:
+                before = _sigkill_local_git_peer(root / "kill-witness.json", fault)
+            elif fault == "stage_after":
+                after = (
+                    "import subprocess\n"
+                    "if code == 0:\n"
+                    "    subprocess.run(['git', 'add', '--', 'src/notes.txt'], "
+                    "check=True)\n"
+                )
+            wrapper.write_text(
+                "import sys\nfrom pathlib import Path\n"
+                "from millrace_plus.cicd_git_commit import main\n"
+                + before + "code = main()\n" + after + "raise SystemExit(code)\n"
+            )
+            adapter["execute"] = "local-git-fault"
+            value["commands"].append(
+                command | {
+                    "id": "local-git-fault",
+                    "argv": [
+                        sys.executable, "-I", str(wrapper),
+                        "{request_file}", "{result_file}",
+                    ],
+                }
+            )
+
+    return _checked(root, configure=configure)
 
 
 def _approve(fx, home, input_id):
@@ -68,6 +187,19 @@ def _unchanged_git(fx):
     assert git(fx["target"], "rev-parse", "HEAD") == fx["git_before"]
     assert git(fx["target"], "ls-files", "--stage", "-z") == fx["index_before"]
     assert (fx["target"] / "src/notes.txt").read_text() == "calculator notes\n"
+
+
+def _backup_stale_git_locks(metadata, backup, stale):
+    backup.mkdir(mode=0o700)
+    for path, raw in stale.items():
+        info = path.lstat()
+        assert stat.S_ISREG(info.st_mode) and info.st_nlink == 1
+        assert path.read_bytes() == raw
+    for path, raw in stale.items():
+        destination = backup / path.relative_to(metadata)
+        destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        path.rename(destination)
+        assert destination.read_bytes() == raw
 
 
 def _cancel(fx, input_id):
@@ -146,6 +278,337 @@ def test_public_approved_fake_commit_completes_and_terminal_replay_advances_fifo
     _next_no_action(fx, reloaded)
     assert V2Home(fx["home"]).task(input_id)["terminal_receipt"] == receipt
     _unchanged_git(fx)
+    _stop(fx)
+
+
+@pytest.mark.parametrize("lose_response", [False, True])
+def test_public_local_git_commit_and_inspect_same_intent(tmp_path, lose_response):
+    fault = "lose_response" if lose_response else None
+    fx, home, input_id = _checked_local_git(tmp_path, fault=fault)
+    target = home.target
+    basis = home.read_ref(home.status(input_id)["inputs"][0]["delivery_basis_ref"])
+    plan = home.read_ref(basis["target"]["commit_plan_ref"])
+    assert plan["changed_paths"] == ["src/calc.py"]
+    loose = target / ".git/objects" / plan["commit"][:2] / plan["commit"][2:]
+    assert not loose.exists()
+    assert git(target, "rev-parse", "HEAD").strip() == fx["head"]
+    assert git(target, "ls-files", "--stage", "-z") == fx["index_before"]
+    _approve(fx, home, input_id)
+    if lose_response:
+        _resume(fx)
+        assert home.task(input_id)["status"] == "held", _run(fx)
+        state = home.load_state(input_id)
+        delivery, operations = effects.history(home, state)
+        assert operations[-1]["operation"] == "execute"
+        assert operations[-1]["result_ref"] is None
+        assert effects.disposition(home, state) == "inspect"
+        assert git(target, "rev-parse", "HEAD").strip() == plan["commit"]
+        index_file = target / ".git/index"
+        before_refresh = index_file.read_bytes()
+        git(target, "status")
+        assert index_file.read_bytes() != before_refresh
+        _stop(fx)
+        view = drive(fx, _start)
+        assert "inspect_effect" in [row["node"] for row in view["invocations"]]
+        assert "execute_effect" not in [row["node"] for row in view["invocations"]]
+    else:
+        view = drive(fx, _resume)
+    reloaded = V2Home(fx["home"])
+    assert reloaded.task(input_id)["status"] == "succeeded", view
+    state = reloaded.load_state(input_id)
+    assert reloaded.read_ref(state["settlement_ref"])["status"] == "published"
+    final_delivery, operations = effects.history(reloaded, state)
+    if lose_response:
+        assert final_delivery["intent_ref"] == delivery["intent_ref"]
+    assert [row["operation"] for row in operations if row["status"] == "reserved"] == (
+        ["prepare", "execute", "inspect"] if lose_response else ["prepare", "execute"]
+    )
+    if not lose_response:
+        assert {row["command_id"] for row in operations} == {"local-git"}
+    assert reloaded.read_ref(operations[-1]["result_ref"])["observed_head"] == (
+        plan["commit"]
+    )
+    assert git(target, "rev-parse", "HEAD", "HEAD^", "HEAD^{tree}").splitlines() == [
+        plan["commit"], fx["head"], plan["tree"],
+    ]
+    branch = "refs/heads/" + basis["target"]["branch"]
+    assert git(target, "symbolic-ref", "HEAD").strip() == branch
+    changed = git(target, "diff", "--name-only", "HEAD^", "HEAD")
+    assert changed.splitlines() == ["src/calc.py"]
+    assert not git(target, "diff", "--cached", "--name-only")
+    index = git(target, "ls-files", "--stage", "-z")
+    assert [r for r in index.split("\0") if not r.endswith("\tsrc/calc.py")] == [
+        r for r in fx["index_before"].split("\0") if not r.endswith("\tsrc/calc.py")
+    ]
+    assert (target / "src/notes.txt").read_text() == "dirty operator notes\n"
+    assert (target / "src/untracked.txt").read_text() == "untracked operator notes\n"
+    assert git(target, "rev-list", "--count", f'{fx["head"]}..HEAD').strip() == "1"
+    _stop(fx)
+
+
+def test_public_local_git_recovers_interrupted_index_install(tmp_path):
+    fx, home, input_id = _checked_local_git(tmp_path, fault="split_index")
+    target = home.target
+    basis = home.read_ref(home.status(input_id)["inputs"][0]["delivery_basis_ref"])
+    plan = home.read_ref(basis["target"]["commit_plan_ref"])
+    branch = "refs/heads/" + basis["target"]["branch"]
+    metadata = target / ".git"
+    lock = metadata / "index.lock"
+    assert not lock.exists()
+    _approve(fx, home, input_id)
+    _resume(fx)
+    assert home.task(input_id)["status"] == "held", _run(fx)
+    state = home.load_state(input_id)
+    delivery, operations = effects.history(home, state)
+    assert operations[-1]["operation"] == "execute"
+    assert operations[-1]["result_ref"] is None
+    paths = [metadata / name for name in ("HEAD", branch, "index", "index.lock")]
+    logs = [metadata / "logs" / name for name in ("HEAD", branch)]
+    metadata_before = {path: path.read_bytes() for path in [*paths, *logs]}
+
+    _resume(fx)
+    assert home.task(input_id)["status"] == "held", _run(fx)
+    state = home.load_state(input_id)
+    unresolved, operations = effects.history(home, state)
+    assert unresolved["intent_ref"] == delivery["intent_ref"]
+    assert operations[-1]["operation"] == "inspect"
+    assert operations[-1]["result_ref"] is None
+    assert effects.disposition(home, state) == "inspect"
+    assert state["settlement_ref"] is None
+    assert {path: path.read_bytes() for path in metadata_before} == metadata_before
+    _stop(fx)
+
+    # Follow the operator's documented read-only checks before restoring the index.
+    assert git(target, "symbolic-ref", "HEAD").strip() == branch
+    assert git(target, "rev-parse", "HEAD", "HEAD^", "HEAD^{tree}").splitlines() == [
+        plan["commit"], fx["head"], plan["tree"],
+    ]
+    initial = plan["baseline"]
+    assert hashlib.sha256(metadata_before[metadata / "index"]).hexdigest() == (
+        initial["index_file_sha256"]
+    )
+    prepared_digest = hashlib.sha256(metadata_before[lock]).hexdigest()
+    assert prepared_digest == plan["index_file_sha256"]
+    line = (
+        f'{fx["head"]} {plan["commit"]} {plan["name"]} <{plan["email"]}> '
+        f'{plan["timestamp"]} +0000\t{cicd_git_commit.REFLOG_MESSAGE}\n'
+    ).encode()
+    for path, expected in zip(logs, initial["reflogs"], strict=True):
+        log = metadata_before[path]
+        assert hashlib.sha256(log[:expected["bytes"]]).hexdigest() == expected["sha256"]
+        assert log[expected["bytes"]:] == line
+    worktree = [target / name for name in (
+        "src/calc.py", "src/notes.txt", "src/untracked.txt", "millrace_plus.py",
+    )]
+    original = {path: path.read_bytes() for path in worktree}
+    _backup_stale_git_locks(metadata, tmp_path / "stale-lock-backup", {
+        lock: metadata_before[lock],
+    })
+    git(target, "read-tree", plan["commit"])
+    assert {path: path.read_bytes() for path in worktree} == original
+    assert not git(target, "diff", "--cached", "--name-only")
+    index = git(target, "ls-files", "--stage", "-z").encode()
+    assert hashlib.sha256(index).hexdigest() == plan["index_sha256"]
+
+    view = drive(fx, _start)
+    assert home.task(input_id)["status"] == "succeeded", view
+    state = home.load_state(input_id)
+    assert home.read_ref(state["settlement_ref"])["status"] == "published"
+    completed, operations = effects.history(home, state)
+    assert completed["intent_ref"] == delivery["intent_ref"]
+    assert [row["operation"] for row in operations if row["status"] == "reserved"] == [
+        "prepare", "execute", "inspect", "inspect",
+    ]
+    result = home.read_ref(operations[-1]["result_ref"])
+    assert result["observed_head"] == plan["commit"]
+    assert git(target, "rev-list", "--count", f'{fx["head"]}..HEAD').strip() == "1"
+    _stop(fx)
+
+
+@pytest.mark.parametrize("phase", ["index_lock_only", "prepared_refs"])
+def test_public_local_git_recovers_pre_ref_commit_sigkill(tmp_path, phase):
+    fx, home, input_id = _checked_local_git(tmp_path, fault=phase)
+    target = home.target
+    basis = home.read_ref(home.status(input_id)["inputs"][0]["delivery_basis_ref"])
+    plan = home.read_ref(basis["target"]["commit_plan_ref"])
+    initial = plan["baseline"]
+    metadata = target / ".git"
+    branch = "refs/heads/" + basis["target"]["branch"]
+    index = metadata / "index"
+    logs = [metadata / "logs" / name for name in ("HEAD", branch)]
+    paths = [metadata / "HEAD", metadata / branch, index, *logs]
+    original = {path: path.read_bytes() for path in paths}
+    lock_names = ["index.lock", "HEAD.lock", branch + ".lock"]
+    assert not any((metadata / name).exists() for name in lock_names)
+
+    _approve(fx, home, input_id)
+    _resume(fx)
+    assert home.task(input_id)["status"] == "held", _run(fx)
+    state = home.load_state(input_id)
+    delivery, operations = effects.history(home, state)
+    stopped = operations[-1]
+    assert stopped["operation"] == "execute" and stopped["result_ref"] is None
+    process = home.read_ref(stopped["process_ref"])
+    witness = json.loads((tmp_path / "kill-witness.json").read_text())
+    assert witness["pid"] == witness["pgid"] == process["pid"]
+    assert witness["phase"] == phase
+    assert process["exit_code"] == -signal.SIGKILL
+    assert process["process_facts"] == {
+        "root_reaped": True, "stdout_eof": True, "stderr_eof": True,
+        "group_state": "closed",
+    }
+    expected_names = lock_names[:1] if phase == "index_lock_only" else lock_names
+    assert list(witness["lock_sha256"]) == expected_names
+    stale = {metadata / name: (metadata / name).read_bytes() for name in expected_names}
+    lock_hashes = {
+        path.relative_to(metadata).as_posix(): hashlib.sha256(raw).hexdigest()
+        for path, raw in stale.items()
+    }
+    assert lock_hashes == witness["lock_sha256"]
+    if phase == "index_lock_only":
+        assert stale[metadata / "index.lock"] == b""
+        assert not any((metadata / name).exists() for name in lock_names[1:])
+    else:
+        prepared = hashlib.sha256(stale[metadata / "index.lock"]).hexdigest()
+        assert prepared == plan["index_file_sha256"]
+
+    _resume(fx)
+    assert home.task(input_id)["status"] == "held", _run(fx)
+    state = home.load_state(input_id)
+    unresolved, operations = effects.history(home, state)
+    assert unresolved["intent_ref"] == delivery["intent_ref"]
+    assert operations[-1]["operation"] == "inspect"
+    assert operations[-1]["result_ref"] is None
+    assert effects.disposition(home, state) == "inspect"
+    assert state["settlement_ref"] is None
+    assert {path: path.read_bytes() for path in original} == original
+    assert {path: path.read_bytes() for path in stale} == stale
+    _stop(fx)
+
+    assert git(target, "symbolic-ref", "HEAD").strip() == branch
+    assert git(target, "rev-parse", "HEAD").strip() == initial["head"]
+    original_index = hashlib.sha256(index.read_bytes()).hexdigest()
+    assert original_index == initial["index_file_sha256"]
+    for log, original_facts in zip(logs, initial["reflogs"], strict=True):
+        assert log.stat().st_size == original_facts["bytes"]
+        assert hashlib.sha256(log.read_bytes()).hexdigest() == original_facts["sha256"]
+    info = metadata.stat()
+    repository = initial["repository"]
+    assert [info.st_dev, info.st_ino] == repository["directory"]
+    config_digest = hashlib.sha256((metadata / "config").read_bytes()).hexdigest()
+    assert config_digest == repository["config_sha256"]
+    _backup_stale_git_locks(metadata, tmp_path / "stale-lock-backup", stale)
+
+    view = drive(fx, _start)
+    assert home.task(input_id)["status"] == "succeeded", view
+    state = home.load_state(input_id)
+    assert home.read_ref(state["settlement_ref"])["status"] == "published"
+    completed, operations = effects.history(home, state)
+    assert completed["intent_ref"] == delivery["intent_ref"]
+    sends = [row for row in operations if row["status"] == "reserved"]
+    assert [row["operation"] for row in sends] == [
+        "prepare", "execute", "inspect", "inspect", "execute",
+    ]
+    assert sends[1]["request_ref"] == sends[4]["request_ref"] == delivery["intent_ref"]
+    inspect = next(
+        row for row in operations
+        if row["operation"] == "inspect" and row["status"] == "accepted"
+    )
+    assert home.read_ref(inspect["result_ref"])["status"] == "not_applied"
+    assert git(target, "rev-parse", "HEAD").strip() == plan["commit"]
+    assert git(target, "rev-list", "--count", f'{fx["head"]}..HEAD').strip() == "1"
+    assert not git(target, "diff", "--cached", "--name-only")
+    _stop(fx)
+
+
+def test_public_local_git_retries_only_after_exact_absence(tmp_path):
+    fx, home, input_id = _checked_local_git(tmp_path, fault="drop_send")
+    _approve(fx, home, input_id)
+    _resume(fx)
+    assert home.task(input_id)["status"] == "held"
+    assert git(home.target, "rev-parse", "HEAD").strip() == fx["head"]
+    view = drive(fx, _resume)
+    assert home.task(input_id)["status"] == "succeeded", view
+    delivery, operations = effects.history(home, home.load_state(input_id))
+    sends = [row for row in operations if row["status"] == "reserved"]
+    assert [row["operation"] for row in sends] == [
+        "prepare", "execute", "inspect", "execute",
+    ]
+    assert sends[1]["request_ref"] == sends[3]["request_ref"] == delivery["intent_ref"]
+    inspection = next(
+        row for row in operations
+        if row["status"] == "accepted" and row["operation"] == "inspect"
+    )
+    assert home.read_ref(inspection["result_ref"])["status"] == "not_applied"
+    assert git(home.target, "rev-list", "--count", f'{fx["head"]}..HEAD').strip() == "1"
+    _stop(fx)
+
+
+def test_public_local_git_holds_applied_commit_when_post_index_changes(tmp_path):
+    fx, home, input_id = _checked_local_git(tmp_path, fault="stage_after")
+    _approve(fx, home, input_id)
+    _resume(fx)
+    assert home.task(input_id)["status"] == "held", _run(fx)
+    state = home.load_state(input_id)
+    assert state["settlement_ref"] is None
+    _, operations = effects.history(home, state)
+    result = home.read_ref(operations[-1]["result_ref"])
+    assert result["status"] == "applied"
+    assert git(home.target, "rev-parse", "HEAD").strip() == result["observed_head"]
+    staged = git(home.target, "diff", "--cached", "--name-only")
+    assert staged.strip() == "src/notes.txt"
+    assert git(home.target, "rev-list", "--count", f'{fx["head"]}..HEAD').strip() == "1"
+    _stop(fx)
+
+
+@pytest.mark.parametrize("drift", ["head", "branch", "index", "config", "source"])
+def test_public_local_git_refuses_drift_before_send(tmp_path, drift):
+    fx, home, input_id = _checked_local_git(tmp_path)
+    _approve(fx, home, input_id)
+    target = home.target
+    if drift == "head":
+        git(target, "commit", "--allow-empty", "-m", "operator commit")
+    elif drift == "branch":
+        git(target, "branch", "another-branch")
+        git(target, "symbolic-ref", "HEAD", "refs/heads/another-branch")
+    elif drift == "index":
+        git(target, "add", "--", "src/notes.txt")
+    elif drift == "config":
+        git(target, "config", "--local", "user.name", "Changed")
+    else:
+        (target / "src/calc.py").write_text("# modified after approval\n")
+    head = git(target, "rev-parse", "HEAD")
+    index = (target / ".git/index").read_bytes()
+    _resume(fx)
+    view = _run(fx)
+    assert home.task(input_id)["status"] == "held", view
+    assert not any(row["node"] == "execute_effect" for row in view["invocations"])
+    assert git(target, "rev-parse", "HEAD") == head
+    assert (target / ".git/index").read_bytes() == index
+    _stop(fx)
+
+
+def test_public_local_git_refuses_mismatched_plan_permission(tmp_path):
+    fx, home, input_id = _checked_local_git(tmp_path)
+    decision = approval_decision(home, input_id)
+    permission = home.read_ref(decision["permission_ref"])
+    for changed in (False, True):
+        mutated = copy.deepcopy(permission)
+        target = mutated["effects"][0]["target"]
+        if changed:
+            target["commit_plan_ref"]["sha256"] = "f" * 64
+        else:
+            del target["commit_plan_ref"]
+        with pytest.raises(CicdV2Error, match="^action_permission_mismatch$"):
+            home.decide(decision | {
+                "request_id": new_id(), "permission_ref": home.retain(mutated),
+            })
+    _resume(fx)
+    view = _run(fx)
+    assert home.task(input_id)["status"] == "held", view
+    assert not any(row["node"].endswith("_effect") for row in view["invocations"])
+    assert not home.load_state(input_id)["delivery_refs"]
+    assert git(home.target, "rev-parse", "HEAD").strip() == fx["head"]
     _stop(fx)
 
 

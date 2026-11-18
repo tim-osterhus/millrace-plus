@@ -1570,7 +1570,17 @@ class Runtime:
                     )
                     return _out("STALE" if node.startswith("guard_review_") else "HOLD")
             if node == "guard_delivery":
-                return self._guard_delivery(state, mine)
+                from .cicd_effects import is_local_git
+
+                if not is_local_git(self.home):
+                    return self._guard_delivery(state, mine)
+                try:
+                    return self._guard_delivery(state, mine)
+                except (OSError, CicdError, CicdV2Error) as exc:
+                    return self._hold(
+                        self._state(input_id),
+                        getattr(exc, "code", "local_git_io_error"),
+                    )
             raise CicdV2Error("unknown_node")
 
     def _freeze(
@@ -1628,10 +1638,17 @@ class Runtime:
             "config_ref": self.home.config_ref,
             "input_ref": self._input_ref(input_id),
         }
-        from .cicd_effects import capture_git, selected
+        from .cicd_effects import capture_git, is_local_git, selected
 
         if selected(self.home):
-            frozen["delivery_git"] = capture_git(self.home, view, mine)
+            try:
+                frozen["delivery_git"] = capture_git(self.home, view, mine)
+            except (OSError, CicdError, CicdV2Error) as exc:
+                if not is_local_git(self.home):
+                    raise
+                return self._hold(
+                    state, getattr(exc, "code", "local_git_io_error"), "held_stale"
+                )
         freeze_ref = self.home.retain(frozen)
         write_exact(
             self.home.workspace / (input_id + ".freeze.json"),
@@ -2578,7 +2595,14 @@ class Runtime:
         self, state: dict[str, object], mine: dict[str, object]
     ) -> dict[str, object]:
         """Recheck the exact post-patch checks and ordered review chain."""
-        source = source_identity(self._source(state))
+        from . import cicd_effects as effects
+
+        view = (
+            self.home.observe()
+            if state["delivery_refs"] and effects.is_local_git(self.home)
+            else self._source(state)
+        )
+        source = source_identity(view)
         check_plan = vr.verify_check_plan(
             self.home.config, self.home.read_ref(state["check_plan_ref"])
         )
@@ -2667,8 +2691,6 @@ class Runtime:
             previous = attempt["attempt_id"]
         if state["current_attempt_id"] != previous:
             raise CicdV2Error("delivery_attempt_mismatch")
-        from . import cicd_effects as effects
-
         if state["delivery_refs"]:
             return effects.guard(self, state, mine)
         if effects.selected(self.home):
@@ -3134,7 +3156,7 @@ class Runtime:
             from .cicd_effects import publication_decision
 
             selected = publication_decision(self.home, state)
-        from .cicd_effects import settlement_guard
+        from .cicd_effects import is_local_git, settlement_guard
 
         settlement_guard(self, state, mine, published=report["status"] == "published")
         if selected is not None and selected["kind"] not in {
@@ -3242,6 +3264,8 @@ class Runtime:
         self._settlement_basis(state, self.home.task(str(state["input_id"])), plan)
         self._settlement_boundary(state, plan)
         self._cleanup_unchanged(plan, self.home.observe(), self._cleanup_git(mine))
+        if report["status"] == "published" and is_local_git(self.home):
+            settlement_guard(self, state, mine, published=True)
         self.home.intake.decide(
             plan["request_id"],
             plan["intent"],

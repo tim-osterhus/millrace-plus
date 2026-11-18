@@ -11,11 +11,13 @@ authority is UNAPPROVED and is never selected automatically. See `docs/cicd.md`.
 
 The graph reproduces before repair, investigates read-only, guards actual scope,
 runs the configured check union and requires every configured reviewer to accept
-with zero unresolved findings. Delivery holds by default. The optional CI-D1a
-standalone working-tree commit protocol requires captured authority, exact
-approval/permission and a trusted argv adapter with exact inspection. The
-package supplies no real Git effect backend. Pending/unknown effects hold for
-explicit inspection; full CI-D1, CI-D2 and Factory delivery remain deferred. There is no overall run, file, line, attempt or reviewer-count default cap.
+with zero unresolved findings. Delivery holds by default. A standalone
+working-tree commit requires captured authority, exact approval and permission,
+and an adapter with exact inspection. Select the built-in `local_git` backend
+to commit the checked repair on the configured local branch. See `docs/cicd.md`
+for setup and recovery. Pending and unknown effects hold for explicit inspection.
+Remote effects, CI-D2 and Factory delivery remain deferred. There is no overall
+run, file, line, attempt or reviewer-count default cap.
 
 Typed feedback uses `millrace-plus cicd submit-report --workflow-home H --report F`.
 The bundled feedback and correlation schemas document exact records. Bug reports

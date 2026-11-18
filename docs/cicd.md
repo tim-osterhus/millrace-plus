@@ -276,7 +276,7 @@ way to stop live processes. `decide --event ID --request-id ID --decision KIND
 --evidence FILE` consumes the exact v2 decision JSON matching those arguments.
 Continue requires an actionable changed cause, the exact held report digest and
 state version; wording changes do not permit another identical failure attempt.
-Close binds the immutable held report. CI-D1a supports the explicit standalone
+Close binds the immutable held report. CI v2 supports the explicit standalone
 commit approval described below. Rollback approval remains unsupported.
 
 Reproduction runs trusted captured argv before repair. Investigation and review
@@ -488,20 +488,14 @@ correlations. Corrupt correlation evidence remains a refusal; correlation never
 changes FIFO, original input identity, source mapping or command authority.
 
 
-## CI-D1a standalone commit intents
+## Standalone commit intents
 
-V2 retains hold mode by default. An optional authorized policy now supports one
+V2 retains hold mode by default. An optional authorized policy supports one
 `commit` selector in `working_tree` mode. It requires an exact operator authority,
 explicit approval/permission and a trusted argv adapter with exact inspection.
-This package supplies no real Git effect backend. Offline fake-peer evidence
-qualifies the protocol mechanics only. Real Git or remote operations require
-separate route qualification and operator authorization.
-
-The current completion guard requires the frozen HEAD, branch and index facts
-to remain unchanged. An ordinary real Git commit advances HEAD and changes the
-index, so this guard would hold. A future Git route must implement and qualify
-post-apply commit identity, expected tree, parent, branch and index validation.
-Configuring a trusted argv command alone does not supply that behavior.
+The built-in `local_git` backend creates one commit on the selected local branch.
+The existing custom adapter contract continues to require the frozen HEAD,
+branch and index at completion.
 
 The pre-init selector contains only fixed target facts:
 
@@ -518,12 +512,52 @@ whole arguments expand to owned files. No shell or event/model-provided command
 is accepted. The policy captures a nonnull `authority_ref` and null
 `wait_policy_ref`. An authorized policy with empty effects still holds.
 
+For a local Git commit, set `external_policy.adapters.commit` before `prepare`.
+The capability reference pins the operator's evidence for the selected route.
+
+```json
+{
+  "backend": "local_git",
+  "prepare": "local-git",
+  "execute": "local-git",
+  "inspect": "local-git",
+  "capabilities": [
+    {"id":"exact_inspection","evidence_ref":{"path":"local-git-inspection.json","sha256":"..."}}
+  ]
+}
+```
+
+Add `local-git` to `commands`. Use the absolute Python executable from the
+environment where `millrace-plus` is installed, `cwd: "."`, exit code `0`, no
+expected products and the captured command timeout and path policy. Python's
+`-I` option isolates peer imports from the target checkout and `PYTHONPATH`.
+
+```json
+["/owned/venv/bin/python", "-I", "-m", "millrace_plus.cicd_git_commit", "{request_file}", "{result_file}"]
+```
+
+Use Git 2.30 or later on the system path and an attached branch in a standalone
+checkout with a `.git` directory. Set repository-local `user.name` and
+`user.email` before submitting the input. Keep Git tools that refresh the index
+out of the checkout from input freeze through settlement. The backend requires
+the files ref store, a full index and local objects. Linked worktrees,
+sparse or split indexes, in-progress merge or rebase,
+and repositories with config includes or custom filters are outside this route.
+The peer writes an unsigned commit and runs Git plumbing with hooks disabled.
+
 After the normal checks and every reviewer accept, `status` exposes the immutable
 `delivery_basis_ref`. It freezes the exact input, patch, checked source, config,
 checks/reviews, target and Git HEAD/branch/index. The realized target adds
 `base_head`, `patch_sha256` and `source_after_sha256` to the selector. Detached
 HEAD, staged changes or a repaired path containing preexisting user edits holds.
 Unchanged foreign dirty files stay preserved and outside the patch.
+
+The local Git target also adds `commit_plan_ref`. Read that evidence before
+approval to see the expected commit, tree, parent, identity, timestamp and
+changed paths. The plan binds the checked patch and the observed repair delta.
+Plus builds the expected tree from retained, checked source bytes in a temporary
+index. Approval and permission must include the exact `commit_plan_ref` in the
+realized target.
 
 The operator supplies two immutable JSON records. Every listed field is required:
 
@@ -577,8 +611,17 @@ the identical saved intent to retry. A different request/effect identity cannot
 bypass uncertainty. Pending and unavailable results hold for explicit inspection;
 this subpacket adds no automatic poll or wait policy.
 
-The trusted adapter uses the strict effect request/result v2 fieldsets from the
-CI specification. Applied/absence results include exact evidence. Their first
+The local Git backend compares the old branch tip under Git's ref lock and
+holds Git's index lock during the update. Settlement checks the attached branch,
+exact commit bytes, tree, parent, staged entries and both reflogs. A Git stat
+refresh may change index bytes while leaving the staged entries unchanged.
+Inspection requires the original tip, raw index and reflogs to prove absence.
+
+The trusted adapter uses the effect request/result v2 fieldsets from the CI
+specification. In the `local_git` route the realized request target includes
+the additional required field `commit_plan_ref`. Custom adapters keep the
+original six-field `working_tree` target. Applied and absence results include
+exact evidence. Their first
 `evidence_refs` entry is `millrace-plus-cicd-effect-evidence/v1` with
 `format,effect_id,intent_sha256,target_sha256,status,remote_id,observed_head`.
 `intent_sha256` hashes the saved execute request, including during inspection.
@@ -606,9 +649,51 @@ candidate facade, these commands require `--execution-home`, `--node`, `--plane`
 and `--script` identifying the actual captured command invocation. An arbitrary
 operator shell cannot impersonate that invocation.
 
-Full CI-D1 remains open: retained-tree object construction/inspection,
-`expected_ref_cas` push semantics, PRs, remote checks, deploy, publication-chain
-rules and shared cooperative waits are deferred. CI-D2 health/rollback and
+Full CI-D1 still includes retained-tree delivery, `expected_ref_cas` push
+semantics, PRs, remote checks, deploy, publication-chain rules and shared
+cooperative waits. These operations remain deferred. CI-D2 health/rollback and
 Factory F2 remain unsupported. Factory `approve-delivery` still refuses with
 `unsupported_until_factory_f2`. Existing v1 homes retain their original hold-only
 behavior, schemas and refusal codes.
+
+### Recover an interrupted local index update
+
+The peer preserves `.git/index.lock` if it could have sent the ref commit
+command. A hard kill can leave an empty or partly written index lock. A kill
+after Git prepares the ref transaction can also leave `.git/HEAD.lock` and
+`.git/refs/heads/<branch>.lock`. Inspection stays read-only and the workflow
+holds while any of those locks remain.
+
+1. Stop the workflow run through Core controls. Verify that its outer and
+   nested writers have stopped and that every other Git writer is quiescent.
+2. Read the saved `commit_plan_ref` for the held input. Verify the checkout,
+   `.git` directory identity and config digest against `baseline.repository`.
+   Verify the raw `.git/index` hash against `baseline.index_file_sha256`.
+3. Verify `git symbolic-ref HEAD` names the approved branch. Read the tip
+   with `git rev-parse HEAD`. Compare `.git/logs/HEAD` and the branch reflog
+   under `.git/logs/refs/heads/` with the plan's `baseline.reflogs`. Each
+   baseline entry gives the byte count and SHA-256 for that log, in that order.
+4. If the tip matches `baseline.head` and both complete logs match, identify
+   which of the three named locks are stale from this interrupted attempt.
+   Use writer-specific evidence, such as observing that attempt create each
+   lock. The index lock may be empty or partial. Move only verified stale locks
+   into a new owned backup directory outside the checkout on the same
+   filesystem. Preserve their paths relative to `.git` and their exact bytes.
+5. If the tip matches `commit`, use `git rev-parse HEAD^ HEAD^{tree}` to verify
+   the planned parent and tree. Verify each reflog has its exact baseline
+   prefix and one appended entry from the parent to `commit`, with the
+   plan's identity and UTC timestamp and message `millrace: approved CI repair`.
+   Verify the stale `.git/index.lock` belongs to this attempt and its raw hash
+   matches the plan's `index_file_sha256`. Back up the verified index lock and
+   any verified stale ref locks from that attempt as in the previous step.
+   Run `git read-tree <approved-commit>` in the authorized checkout to install
+   the approved tree in the index while preserving the working tree. Use the
+   commit OID from the plan and leave Git directory and index overrides unset.
+6. Start a new run through public Core controls. The workflow inspects the same
+   saved intent. Proven absence permits an identical retry. Proven application
+   permits settlement without another execute.
+
+Keep repository files and locks in place if writer closure, ownership or the
+matching Git state remains uncertain. Move locks individually by verified path.
+Each index or lock file used for recovery must be a regular file with a single
+hard link.
