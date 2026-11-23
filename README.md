@@ -42,12 +42,13 @@ The optional [Paperclip bridge](docs/paperclip.md) maps server-owned issue
 descriptions to pinned independent workflow copies through an existing local
 Millrace OS service. Its local adapter reports results without changing issues.
 
-The optional `forge_runner` adapter selects a v1 or v2 Forge SDK worker. V2 applies
-read-window defaults to explicit `null` arguments. The v1 closeout ran source
+The optional `forge_runner` adapter selects a v1, v2 or v3 Forge SDK worker. V2 applies
+read-window defaults to explicit `null` arguments. V3 uses the OpenAI Responses API
+with an explicit model and reasoning effort. The v1 closeout ran source
 regressions and a 19-case real-SDK loopback cohort on an installed Plus wheel using
-Linux x86_64 CPython 3.12.14 and Forge 0.10.1. Earlier real-SDK source runs apply
-to their checked source. No live backend, model, account or other platform is
-qualified. See the [Forge runner adapter guide](docs/forge-runner-adapter.md).
+Linux x86_64 CPython 3.12.14 and Forge 0.10.1. One installed v3 smoke on macOS arm64
+completed a synthetic file task with `gpt-6-luna` at `low` effort. The guide records
+the scope of both checks. [Forge runner adapter guide](docs/forge-runner-adapter.md)
 
 ## Published 0.23.1 installation
 

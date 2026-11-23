@@ -91,8 +91,9 @@ class ForgeRunnerAdapter:
         details = c.launch_details(plan, contract=self.adapter_contract)
         if str(cwd) != details["cwd"]:
             raise RouterError("invalid_launch_plan")
+        responses = self.adapter_contract == c.ADAPTER_CONTRACT_V3
         evidence: dict[str, object] = {
-            "format": c.RESULT_FORMAT,
+            "format": c.RESULT_FORMAT_V3 if responses else c.RESULT_FORMAT,
             "invocation_id": plan.invocation_id,
             "launch_sha256": c.digest(c.encoded(details)),
             "pid": None,
@@ -147,7 +148,7 @@ class ForgeRunnerAdapter:
         probe = _run(
             c.probe_argv(executable, root),
             cwd,
-            dict(env),
+            {} if responses else dict(env),
             min(deadline - c.CLEANUP_RESERVE, time.time() + 5),
             poll,
             lambda pid: None,
@@ -180,10 +181,19 @@ class ForgeRunnerAdapter:
             evidence["pid"] = pid
             on_started(pid)
 
+        if responses:
+            key_name = cast(str, c.mapping(details["auth"])["name"])
+            worker_env = (
+                {"MILLRACE_FORGE_RESPONSES_KEY": env[key_name]}
+                if key_name in env
+                else {}
+            )
+        else:
+            worker_env = dict(env)
         main = _run(
             plan.argv,
             cwd,
-            dict(env),
+            worker_env,
             hard,
             poll,
             announced,
@@ -199,6 +209,7 @@ class ForgeRunnerAdapter:
                 main.stdout,
                 plan.invocation_id,
                 main.exit_code,
+                responses=details if responses else None,
             )
         return finish()
 
@@ -214,3 +225,9 @@ class ForgeRunnerV2Adapter(ForgeRunnerAdapter):
     """Forge runner with independent null defaults for read-file windows."""
 
     adapter_contract = c.ADAPTER_CONTRACT_V2
+
+
+class ForgeRunnerV3Adapter(ForgeRunnerAdapter):
+    """Forge runner using the bounded OpenAI Responses client."""
+
+    adapter_contract = c.ADAPTER_CONTRACT_V3

@@ -1,10 +1,11 @@
 # Forge runner adapter
 
-The `forge_runner` adapter accepts the exact contracts `millrace-forge-runner/v1`
-and `millrace-forge-runner/v2`. Each runs one short-lived worker process that drives
+The `forge_runner` adapter accepts `millrace-forge-runner/v1`,
+`millrace-forge-runner/v2` and `millrace-forge-runner/v3`. Each runs a worker process that drives
 Antoine Zambelli's Forge SDK
-(`forge-guardrails` 0.10.1, commit `45a334d9250d2d72fcbb7ac6b583ca4c82140ecd`)
-against one OpenAI-compatible endpoint. The v1 closeout ran source regressions and
+(`forge-guardrails` 0.10.1, commit `45a334d9250d2d72fcbb7ac6b583ca4c82140ecd`).
+V1 and v2 use the OpenAI-compatible backend. V3 uses the OpenAI Responses API.
+The v1 closeout ran source regressions and
 ran the 19-case real-SDK loopback cohort on an installed Plus wheel. Earlier
 real-SDK source runs are historical evidence for their checked source. See
 [Real-SDK local-peer checks](#real-sdk-local-peer-checks).
@@ -46,7 +47,7 @@ The node's `invoke.config` holds `prompt` and may hold `model`.
 {"binding": "forge", "config": {"prompt": "tasks/review.md"}, "timeout_seconds": 600}
 ```
 
-Both contracts use `millrace-forge-runner-profile/v1`. The profile is strict JSON.
+V1 and v2 use `millrace-forge-runner-profile/v1`. The profile is strict JSON.
 Unknown or duplicate keys refuse.
 
 ```json
@@ -73,12 +74,83 @@ Unknown or duplicate keys refuse.
 
 ### Model setting
 
-`model` is the only setting. It resolves low to high: profile, then
+`model` is the only setting in v1 and v2. It resolves from the profile, then
 `adapter_settings.forge_runner.config` in the runtime, workflow and plane layers,
 then the node. A `model` missing from every layer refuses with
 `forge_model_required`; Forge's client has no native default. Any other key in the
 Forge namespace refuses with `unsupported_setting`, including in planes without a
 Forge node. Other adapters' settings never reach Forge.
+
+### OpenAI Responses
+
+Select `millrace-forge-runner/v3` in the binding. Capture a v3 profile and keep
+the task prompt in the node's `invoke.config.prompt`.
+
+```json
+{
+  "format": "millrace-forge-runner-profile/v3",
+  "forge_version": "0.10.1",
+  "backend": "openai_responses",
+  "auth": {"kind": "env", "name": "OPENAI_API_KEY"},
+  "model": "gpt-6-luna",
+  "reasoning_effort": "low",
+  "budgets": {
+    "max_iterations": 3,
+    "max_retries_per_step": 0,
+    "max_tool_errors": 0,
+    "http_timeout_seconds": 25,
+    "tool_calls_max": 2
+  }
+}
+```
+
+`model` and `reasoning_effort` are required after applying the same setting layers.
+The accepted effort values are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`
+and `max`. OpenAI applies the selected model's effort restrictions. The sample
+budget allows up to two read or list calls followed by `finish`, for up to three
+provider requests total.
+
+Core requires one contract per adapter ID in a graph. All `forge_runner`
+bindings and runtime, workflow and plane `adapter_settings.forge_runner`
+entries must name the same contract. Graphs in the same instance can select
+different Forge contracts when runtime defaults omit `adapter_settings.forge_runner`.
+When that entry is present, it fixes the contract for graphs that configure
+`forge_runner`. Separate instances can have their own runtime defaults. V1 and
+v2 accept only `model` in their settings, so keep `reasoning_effort` in the v3
+profile, node or settings.
+
+V3 validates `model` in each settings layer before merging. Remove or replace
+an inherited slash-form model such as `org/model` when selecting v3. A valid
+model on the node cannot override an invalid value in an earlier layer.
+
+The auth reference must name an environment variable in the instance allowlist.
+V3 sends its `sk-` key only to `https://api.openai.com/v1/responses` over TLS.
+The worker uses direct HTTPS with redirects disabled. The probe receives an
+empty environment. The worker receives only the selected credential under an
+internal environment name.
+
+V3 advertises `read_file`, `list_dir` and `finish` with automatic tool selection.
+It requires one function call per response. A text-only response fails with
+`forge_backend_protocol`. Forge runs the declared tools and checks that `finish`
+ran alone and produced the terminal result. A run that reaches its iteration
+limit without a successful `finish` fails with `forge_max_iterations`. V3 replays the
+provider's call ID, tool result, and any encrypted reasoning returned by OpenAI
+with `store: false`. The worker caps each response body at 128 KiB and each
+request at 1,024 output tokens, including reasoning. Higher reasoning effort can
+exhaust that cap before the model emits a function call. The iteration budget caps
+the number of requests. HTTP and protocol failures stop the worker.
+[OpenAI function calling](https://developers.openai.com/api/docs/guides/function-calling)
+
+A clean v3 envelope records `provider_requests` with the effort submitted to
+the HTTP client, the HTTP status when available, any accepted model and effort
+echoed by OpenAI, and the accepted tool name. The launch plan records the
+requested model and effort. A request entry can exist when delivery is unknown.
+A tool name records the provider's selection. A successful completion also
+requires the Forge worker's terminal checks.
+The completed worker envelope is limited to 65,537 bytes, including the
+newline and `provider_requests`. If the receipts push the result over this cap,
+the worker emits a failed envelope with `forge_result_too_large` and retains the
+receipts.
 
 ### Budgets
 
@@ -108,7 +180,8 @@ to each HTTP operation, not to the whole request.
 
 Planning produces `forge-worker.py`, `forge-probe.py` and `forge-request.json` for
 Core to write under the invocation root. Each contract has a pinned worker digest.
-Both share the same pinned probe and the same request and result formats. A script
+All three share the same pinned probe. V1 and v2 share request and result formats.
+V3 uses separate request, launch, worker envelope and result formats. A script
 digest mismatch yields `forge_control_digest_mismatch`. Core reloads a captured v1
 invocation with its original v1 controls after a workflow selects v2 for new runs.
 
@@ -170,8 +243,8 @@ The tools are read-only, but they are not a sandbox.
 - The tools can read anything the Millrace user can read under the workspace
   except `.git` and `.millrace-router-owner`. That includes `.env` files and any
   state or credential home placed under the workspace.
-- The SDK puts no response size cap on backend replies. Only `http_timeout_seconds`
-  and the deadlines bound them.
+- V1 and v2 rely on `http_timeout_seconds` and the deadlines to bound backend
+  replies. V3 also enforces a response size limit of 128 KiB.
 - The path walk checks each component's type before opening it and its identity
   after. A swap inside that race window is opened once and then refused. A swapped-in
   device file still sees one open call.
@@ -188,7 +261,7 @@ only the plan, the completion and adapter constants.
 - Remote effects are UNKNOWN in every outcome, including `stopped`. That covers
   backend receipt, continued generation and tool-output egress.
 
-A `json.JSONDecodeError` from a backend reply maps to `forge_backend_protocol`.
+In v1 and v2, a `json.JSONDecodeError` from a backend reply maps to `forge_backend_protocol`.
 A non-object JSON reply and a `ValueError` from Python's integer string digit limit
 both map to `forge_worker_internal`.
 
@@ -224,16 +297,29 @@ installed cohort covered the following behavior.
   reaps the worker. A cancelled Core run keeps its project hold until public
   reconciliation, and a fresh run then succeeds.
 
+## Installed v3 live smoke
+
+One live invocation used an installed Plus wheel, Core 0.23.2 and Forge 0.10.1
+on macOS arm64 with CPython 3.12.1. Given a workspace with one synthetic text
+file, `gpt-6-luna` selected `list_dir`, then `read_file`, then a sole `finish`
+with automatic tool selection.
+
+All three Responses requests returned HTTP 200 and echoed `low` reasoning
+effort. The terminal summary exactly matched the file. The adapter validated
+completion, and both the probe and the worker were reaped. A separate invocation
+with a two-request budget stopped after `list_dir` and `read_file` with
+`forge_max_iterations`.
+
 ## Not qualified
 
 These are not qualified:
 
-- any live backend, model, credential or account;
+- live v1 or v2 endpoints, other v3 models or effort settings, and broader v3
+  workloads;
 - other interpreters, platforms or dependency versions;
 - containment: the worker is not a sandbox, and these checks show no general
   environment isolation;
-- remote effects: the test peer is local, so nothing shows that a real provider
-  stops generating after cancellation or timeout.
+- provider behavior after cancellation or timeout.
 
 The fake-process and fake-SDK tests in `tests/router/` cover adapter and worker logic
 and fault injection only.

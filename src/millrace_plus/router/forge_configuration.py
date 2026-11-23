@@ -34,12 +34,18 @@ from .setting_layers import merge_setting_layers  # noqa: E402
 ADAPTER_ID = "forge_runner"
 ADAPTER_CONTRACT = "millrace-forge-runner/v1"
 ADAPTER_CONTRACT_V2 = "millrace-forge-runner/v2"
+ADAPTER_CONTRACT_V3 = "millrace-forge-runner/v3"
 PROFILE_FORMAT = "millrace-forge-runner-profile/v1"
+PROFILE_FORMAT_V3 = "millrace-forge-runner-profile/v3"
 LAUNCH_FORMAT = "millrace-forge-runner-launch/v1"
+LAUNCH_FORMAT_V3 = "millrace-forge-runner-launch/v3"
 RESULT_FORMAT = "millrace-forge-runner-result/v1"
+RESULT_FORMAT_V3 = "millrace-forge-runner-result/v3"
 REQUEST_FORMAT = "millrace-forge-runner-request/v1"
+REQUEST_FORMAT_V3 = "millrace-forge-runner-request/v3"
 START_FORMAT = "millrace-forge-runner-start/v1"
 ENVELOPE_FORMAT = "millrace-forge-runner-worker/v1"
+ENVELOPE_FORMAT_V3 = "millrace-forge-runner-worker/v3"
 PROBE_FORMAT = "millrace-forge-runner-probe/v1"
 FORGE_VERSION = "0.10.1"
 WORKER_NAME = "forge-worker.py"
@@ -49,6 +55,7 @@ REQUEST_NAME = "forge-request.json"
 # new contract version and resolver pair (W-RV-03).
 WORKER_SHA256 = "1205bdd9248be2a15f6f621083e618d9a3536682b47bd96714b8beeecb850afb"
 WORKER_SHA256_V2 = "3af036fe8873e0425323058c5edcdea97a00034f151f3082e36e15347047dde9"
+WORKER_SHA256_V3 = "d074f6baa0c4c3961472a8298f3f03a546f63e6bc449c4f412c05999b0623f9f"
 PROBE_SHA256 = "95ddac9c6ae44fde351c84bfce8a63c9d934959247e8b1ad51f8bdee41d8a629"
 WORKER_SCRIPT_MAX = 65536
 PROBE_SCRIPT_MAX = 16384
@@ -68,6 +75,9 @@ MAIN_RESERVE = 20
 CLEANUP_RESERVE = 5
 SOFT_RESERVE = 3
 SETTINGS = {"model"}
+RESPONSES_SETTINGS = SETTINGS | {"reasoning_effort"}
+RESPONSES_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
+RESPONSES_MODEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}")
 SOURCES = ("profile", "runtime", "workflow", "plane", "node")
 BUDGETS = {
     "max_iterations": (16, 1, 32),
@@ -121,6 +131,13 @@ PARENT_CODES = REFUSALS | {
     "forge_envelope_contradiction",
 }
 ENVELOPE_KEYS = ("format", "invocation_id", "status", "semantic", "failure_code")
+RESPONSES_RECEIPT_KEYS = (
+    "sent_effort",
+    "http_status",
+    "response_model",
+    "echoed_effort",
+    "tool",
+)
 PROBE_KEYS = ("format", "python", "implementation", "forge_guardrails", "files_match")
 PROCESS_FIELDS = (
     "pid",
@@ -231,6 +248,7 @@ def _contract(adapter: str, actual: str, expected: str) -> None:
     if (adapter, actual) != (ADAPTER_ID, expected) or expected not in (
         ADAPTER_CONTRACT,
         ADAPTER_CONTRACT_V2,
+        ADAPTER_CONTRACT_V3,
     ):
         raise RouterError("unsupported_adapter_contract")
 
@@ -284,13 +302,19 @@ def model_value(value: object) -> str:
     return value
 
 
-def settings_layer(value: object) -> dict[str, object]:
+def settings_layer(value: object, *, responses: bool = False) -> dict[str, object]:
     """One explicit Forge namespace layer: only ``model`` is supported."""
     obj = mapping(value)
-    if obj.keys() - SETTINGS:
+    if obj.keys() - (RESPONSES_SETTINGS if responses else SETTINGS):
         raise RouterError("unsupported_setting")
     if "model" in obj:
-        model_value(obj["model"])
+        model = model_value(obj["model"])
+        if responses and not RESPONSES_MODEL.fullmatch(model):
+            raise RouterError("invalid_forge_settings")
+    if "reasoning_effort" in obj:
+        effort = obj["reasoning_effort"]
+        if not isinstance(effort, str) or effort not in RESPONSES_EFFORTS:
+            raise RouterError("invalid_forge_settings")
     return obj
 
 
@@ -310,28 +334,42 @@ def budgets(value: object) -> dict[str, int]:
     return result
 
 
-def profile(raw: bytes, environment_names: tuple[str, ...]) -> dict[str, object]:
+def profile(
+    raw: bytes, environment_names: tuple[str, ...], *, responses: bool = False
+) -> dict[str, object]:
     """Strict captured profile. References only; never endpoint values."""
     if len(raw) > PROFILE_MAX:
         raise RouterError("invalid_forge_profile")
     try:
         obj = fields(
             strict_json(raw),
-            {
-                "format",
-                "forge_version",
-                "backend",
-                "base_url",
-                "auth",
-            },
-            {"model", "budgets"},
+            {"format", "forge_version", "backend", "auth"}
+            | (set() if responses else {"base_url"}),
+            {"model", "budgets", "reasoning_effort"}
+            if responses
+            else {"model", "budgets"},
         )
     except RouterError as exc:
         raise RouterError("invalid_forge_profile") from exc
-    if obj["format"] != PROFILE_FORMAT or obj["backend"] != "openai_compat":
+    format_name, backend = (
+        (PROFILE_FORMAT_V3, "openai_responses")
+        if responses
+        else (PROFILE_FORMAT, "openai_compat")
+    )
+    if obj["format"] != format_name or obj["backend"] != backend:
         raise RouterError("invalid_forge_profile")
     if obj["forge_version"] != FORGE_VERSION:
         raise RouterError("unsupported_forge_version")
+    if responses:
+        auth = _responses_auth(obj["auth"], environment_names)
+        return {
+            "auth": auth,
+            "fallback": settings_layer(
+                {key: obj[key] for key in RESPONSES_SETTINGS & obj.keys()},
+                responses=True,
+            ),
+            "budgets": budgets(obj.get("budgets", {})),
+        }
     try:
         base = fields(obj["base_url"], {"kind", "name"})
         auth = mapping(obj["auth"])
@@ -355,24 +393,48 @@ def profile(raw: bytes, environment_names: tuple[str, ...]) -> dict[str, object]
     }
 
 
+def _responses_auth(value: object, environment_names: tuple[str, ...] | list[str]):
+    try:
+        auth = fields(value, {"kind", "name"})
+        if auth["kind"] == "env":
+            env_name(auth["name"], environment_names)
+            return auth
+    except RouterError as exc:
+        raise RouterError("invalid_forge_backend_reference") from exc
+    raise RouterError("invalid_forge_backend_reference")
+
+
 def binding(
-    config: object, files: Mapping[str, bytes], environment_names: tuple[str, ...]
+    config: object,
+    files: Mapping[str, bytes],
+    environment_names: tuple[str, ...],
+    *,
+    responses: bool = False,
 ) -> tuple[str, bytes, dict[str, object]]:
     path, raw = _control(files, fields(config, {"profile"})["profile"])
-    return path, raw, profile(raw, environment_names)
+    return path, raw, profile(raw, environment_names, responses=responses)
 
 
 def node(
-    config: object, files: Mapping[str, bytes]
+    config: object,
+    files: Mapping[str, bytes],
+    *,
+    responses: bool = False,
 ) -> tuple[str, bytes, dict[str, object]]:
     obj = mapping(config)
     if "prompt" not in obj:
         raise RouterError("missing_control")
-    if obj.keys() - {"prompt"} - SETTINGS:
+    if obj.keys() - {"prompt"} - (RESPONSES_SETTINGS if responses else SETTINGS):
         raise RouterError("unsupported_setting")
     path, raw = _control(files, obj["prompt"])
     prompt_text(raw)
-    return path, raw, settings_layer({k: v for k, v in obj.items() if k != "prompt"})
+    return (
+        path,
+        raw,
+        settings_layer(
+            {k: v for k, v in obj.items() if k != "prompt"}, responses=responses
+        ),
+    )
 
 
 def prompt_text(raw: bytes) -> str:
@@ -385,11 +447,17 @@ def prompt_text(raw: bytes) -> str:
     return value
 
 
-def resolve(*layers: tuple[str, Mapping[str, object]]) -> dict[str, object]:
-    selected = merge_setting_layers(SETTINGS, *layers)
+def resolve(
+    *layers: tuple[str, Mapping[str, object]], responses: bool = False
+) -> dict[str, object]:
+    selected = merge_setting_layers(
+        RESPONSES_SETTINGS if responses else SETTINGS, *layers
+    )
     if "model" not in selected["effective"]:
         raise RouterError("forge_model_required")
     model_value(mapping(selected["effective"])["model"])
+    if responses and "reasoning_effort" not in selected["effective"]:
+        raise RouterError("forge_reasoning_effort_required")
     return selected
 
 
@@ -397,10 +465,17 @@ def validate_configuration(
     config: AdapterConfiguration, *, contract: str = ADAPTER_CONTRACT
 ) -> None:
     _contract(config.adapter_id, config.adapter_contract, contract)
-    runtime, workflow = settings_layer(config.runtime), settings_layer(config.workflow)
-    planes = {key: settings_layer(value) for key, value in config.planes.items()}
+    responses = contract == ADAPTER_CONTRACT_V3
+    runtime = settings_layer(config.runtime, responses=responses)
+    workflow = settings_layer(config.workflow, responses=responses)
+    planes = {
+        key: settings_layer(value, responses=responses)
+        for key, value in config.planes.items()
+    }
     profiles = {
-        key: binding(value, config.files, config.environment_names)[2]
+        key: binding(
+            value, config.files, config.environment_names, responses=responses
+        )[2]
         for key, value in config.bindings.items()
     }
     for (plane, _), (selected, value) in config.nodes.items():
@@ -411,7 +486,8 @@ def validate_configuration(
             ("runtime", runtime),
             ("workflow", workflow),
             ("plane", planes[plane]),
-            ("node", node(value, config.files)[2]),
+            ("node", node(value, config.files, responses=responses)[2]),
+            responses=responses,
         )
 
 
@@ -436,18 +512,29 @@ def outcomes(value: object, code: str) -> list[str]:
 def _request_bytes(
     details: Mapping[str, object], identity: Mapping[str, object], prompt: str
 ) -> bytes:
-    body = {
-        "format": REQUEST_FORMAT,
-        **identity,
-        "workspace": details["cwd"],
-        "forge_version": FORGE_VERSION,
-        "python_min": [3, 12],
-        "backend": {
+    responses = details["contract"] == ADAPTER_CONTRACT_V3
+    backend = (
+        {
+            "kind": "openai_responses",
+            "auth": details["auth"],
+            "model": details["model"],
+            "reasoning_effort": details["reasoning_effort"],
+        }
+        if responses
+        else {
             "kind": "openai_compat",
             "base_url_env": details["base_url_env"],
             "auth": details["auth"],
             "model": details["model"],
-        },
+        }
+    )
+    body = {
+        "format": REQUEST_FORMAT_V3 if responses else REQUEST_FORMAT,
+        **identity,
+        "workspace": details["cwd"],
+        "forge_version": FORGE_VERSION,
+        "python_min": [3, 12],
+        "backend": backend,
         "budgets": details["budgets"],
         "outcomes": details["outcomes"],
         "task_prompt": prompt,
@@ -470,6 +557,8 @@ def probe_argv(executable: str, root: str) -> tuple[str, ...]:
 
 
 def _worker_sha256(contract: str) -> str:
+    if contract == ADAPTER_CONTRACT_V3:
+        return WORKER_SHA256_V3
     return WORKER_SHA256_V2 if contract == ADAPTER_CONTRACT_V2 else WORKER_SHA256
 
 
@@ -499,20 +588,107 @@ def _v2_worker(worker: bytes) -> bytes:
     )
 
 
+def _v3_worker(worker: bytes) -> bytes:
+    """Embed the Responses seam in the v2 standalone worker."""
+    worker = _v2_worker(worker)
+    source = worker.decode("utf-8")
+    source = source.replace(ADAPTER_CONTRACT_V2, ADAPTER_CONTRACT_V3, 1)
+    source = source.replace(REQUEST_FORMAT, REQUEST_FORMAT_V3, 1)
+    source = source.replace(ENVELOPE_FORMAT, ENVELOPE_FORMAT_V3, 1)
+    start = source.index('    backend = _exact(obj["backend"]')
+    end = source.index('    budgets = _exact(obj["budgets"]', start)
+    source = (
+        source[:start]
+        + '    _responses_request_backend(obj["backend"])\n'
+        + source[end:]
+    )
+    start = source.index("def _backend_values(")
+    end = source.index(
+        "# ---------------------------------------------------------------- output",
+        start,
+    )
+    source = source[:start] + source[end:]
+    source = source.replace(
+        '        url, key = _backend_values(request["backend"])',
+        "        key = _responses_key()",
+        1,
+    )
+    start = source.index("        client = forge.OpenAICompatClient(")
+    end = source.index("        runner = forge.WorkflowRunner(", start)
+    source = (
+        source[:start]
+        + '        client = _responses_client(forge, request["backend"], '
+        "budgets, key)\n" + "        del key\n" + source[end:]
+    )
+    source = source.replace(
+        "        if isinstance(exc, asyncio.CancelledError):\n",
+        "        if isinstance(exc, _Failure):\n            return exc.code\n"
+        "        if isinstance(exc, asyncio.CancelledError):\n",
+        1,
+    )
+    source = source.replace(
+        "def _envelope(invocation_id, status, semantic, code):",
+        "def _envelope(invocation_id, status, semantic, code, requests=None):",
+        1,
+    ).replace(
+        '            "failure_code": code,',
+        '            "failure_code": code,\n'
+        '            "provider_requests": requests or [],',
+        1,
+    )
+    source = (
+        source.replace(
+            "def _emit(out, invocation_id, code, semantic=None):",
+            "def _emit(out, invocation_id, code, semantic=None, *, requests=None):",
+            1,
+        )
+        .replace(
+            '_envelope(invocation_id, "completed", semantic, None)',
+            '_envelope(invocation_id, "completed", semantic, None, requests)',
+            1,
+        )
+        .replace(
+            '_envelope(invocation_id, "failed", None, code)',
+            '_envelope(invocation_id, "failed", None, code, requests)',
+            1,
+        )
+    )
+    source = source.replace(
+        'return _emit(out, request["invocation_id"], None, tools.finished)',
+        'return _emit(out, request["invocation_id"], None, tools.finished, '
+        "requests=client.requests)",
+        1,
+    ).replace(
+        'return _emit(out, request["invocation_id"], code)\n\n\ndef _run',
+        'return _emit(out, request["invocation_id"], code, '
+        "requests=client.requests)\n\n\ndef _run",
+        1,
+    )
+    start = source.index('if __name__ == "__main__":')
+    seam = (
+        resources.files(__package__).joinpath("forge_responses.py").read_text("utf-8")
+    )
+    return (source[:start] + seam + "\n\n" + source[start:]).encode("utf-8")
+
+
 def plan(request: InvocationRequest, *, contract: str = ADAPTER_CONTRACT) -> LaunchPlan:
     _contract(request.adapter_id, request.adapter_contract, contract)
     if request.seam_input is not None:
         raise RouterError("forge_seam_input_unsupported")
+    responses = contract == ADAPTER_CONTRACT_V3
     runtime, workflow, plane = (
-        settings_layer(value)
+        settings_layer(value, responses=responses)
         for value in (request.runtime, request.workflow, request.plane)
     )
     profile_path, profile_raw, parsed = binding(
         request.binding_config,
         request.files,
         request.environment_names,
+        responses=responses,
     )
-    prompt_source, task, overrides = node(request.node_config, request.files)
+    prompt_source, task, overrides = node(
+        request.node_config, request.files, responses=responses
+    )
     if request.result_contract != "json-v1":
         raise RouterError("invalid_forge_result_contract")
     declared = outcomes(request.outcomes, "invalid_forge_result_contract")
@@ -522,11 +698,14 @@ def plan(request: InvocationRequest, *, contract: str = ADAPTER_CONTRACT) -> Lau
         ("workflow", workflow),
         ("plane", plane),
         ("node", overrides),
+        responses=responses,
     )
     worker, probe = packaged_scripts()
     _scripts(worker, probe, WORKER_SHA256)
     if contract == ADAPTER_CONTRACT_V2:
         worker = _v2_worker(worker)
+    elif responses:
+        worker = _v3_worker(worker)
     root = str(request.invocation_root)
     details: dict[str, object] = {
         "format": LAUNCH_FORMAT,
@@ -546,7 +725,7 @@ def plan(request: InvocationRequest, *, contract: str = ADAPTER_CONTRACT) -> Lau
         "request_sha256": "",
         "forge_version": FORGE_VERSION,
         "environment_names": list(request.environment_names),
-        "base_url_env": parsed["base_url_env"],
+        "base_url_env": parsed.get("base_url_env"),
         "auth": parsed["auth"],
         "model": mapping(selected["effective"])["model"],
         "budgets": parsed["budgets"],
@@ -554,6 +733,10 @@ def plan(request: InvocationRequest, *, contract: str = ADAPTER_CONTRACT) -> Lau
         "outcomes": declared,
         "common_settings": dict(request.common_settings),
     }
+    if responses:
+        details["format"] = LAUNCH_FORMAT_V3
+        details.pop("base_url_env")
+        details["reasoning_effort"] = mapping(selected["effective"])["reasoning_effort"]
     identity = {
         "invocation_id": request.invocation_id,
         "plane_id": request.plane_id,
@@ -599,8 +782,14 @@ def launch_details(
     """Recheck the frozen projection from plan bytes and adapter constants only."""
     _contract(value.adapter_id, value.adapter_contract, contract)
     worker_sha256 = _worker_sha256(contract)
+    responses = contract == ADAPTER_CONTRACT_V3
     try:
-        obj = fields(value.details, DETAIL_FIELDS)
+        obj = fields(
+            value.details,
+            (DETAIL_FIELDS - {"base_url_env"}) | {"reasoning_effort"}
+            if responses
+            else DETAIL_FIELDS,
+        )
         root = str(PurePosixPath(_absolute(obj["worker_path"])).parent)
         _absolute(obj["cwd"])
         relative(obj["profile_path"])
@@ -610,17 +799,23 @@ def launch_details(
         names = obj["environment_names"]
         if not isinstance(names, list) or any(not isinstance(n, str) for n in names):
             raise RouterError("invalid_launch_plan")
-        env_name(obj["base_url_env"], names)
-        auth = mapping(obj["auth"])
-        if auth.get("kind") == "env":
-            fields(auth, {"kind", "name"})
-            if env_name(auth["name"], names) == obj["base_url_env"]:
+        if responses:
+            _responses_auth(obj["auth"], names)
+        else:
+            env_name(obj["base_url_env"], names)
+            auth = mapping(obj["auth"])
+            if auth.get("kind") == "env":
+                fields(auth, {"kind", "name"})
+                if env_name(auth["name"], names) == obj["base_url_env"]:
+                    raise RouterError("invalid_launch_plan")
+            elif auth != {"kind": "none"}:
                 raise RouterError("invalid_launch_plan")
-        elif auth != {"kind": "none"}:
-            raise RouterError("invalid_launch_plan")
-        model_value(obj["model"])
+        expected = {"model": obj["model"]}
+        if responses:
+            expected["reasoning_effort"] = obj["reasoning_effort"]
+        settings_layer(expected, responses=responses)
         if (
-            obj["format"] != LAUNCH_FORMAT
+            obj["format"] != (LAUNCH_FORMAT_V3 if responses else LAUNCH_FORMAT)
             or obj["adapter"] != ADAPTER_ID
             or obj["contract"] != contract
             or obj["invocation_id"] != value.invocation_id
@@ -641,16 +836,17 @@ def launch_details(
         )
         effective = mapping(selected["effective"])
         provenance = mapping(selected["provenance"])
-        source = fields(provenance.get("model"), {"source", "policy"})
         if (
-            effective != {"model": obj["model"]}
+            effective != expected
             or selected["requested"] != effective
             or selected["warnings"] != []
-            or set(provenance) != {"model"}
-            or source["source"] not in SOURCES
-            or source["policy"] is not None
+            or provenance.keys() != expected.keys()
         ):
             raise RouterError("invalid_launch_plan")
+        for setting in expected:
+            source = fields(provenance[setting], {"source", "policy"})
+            if source["source"] not in SOURCES or source["policy"] is not None:
+                raise RouterError("invalid_launch_plan")
         generated = value.generated_controls
         if (
             not value.argv
@@ -791,17 +987,28 @@ def probe_accepted(report: Mapping[str, object]) -> bool:
 
 
 def envelope_line(
-    invocation_id: str, status: str, semantic: str | None, code: str | None
+    invocation_id: str,
+    status: str,
+    semantic: str | None,
+    code: str | None,
+    *,
+    provider_requests: object = None,
 ) -> bytes:
+    body = {
+        "format": ENVELOPE_FORMAT if provider_requests is None else ENVELOPE_FORMAT_V3,
+        "invocation_id": invocation_id,
+        "status": status,
+        "semantic": semantic,
+        "failure_code": code,
+    }
+    if provider_requests is not None:
+        body["provider_requests"] = [
+            {key: receipt[key] for key in RESPONSES_RECEIPT_KEYS}
+            for receipt in provider_requests
+        ]
     return (
         json.dumps(
-            {
-                "format": ENVELOPE_FORMAT,
-                "invocation_id": invocation_id,
-                "status": status,
-                "semantic": semantic,
-                "failure_code": code,
-            },
+            body,
             separators=(",", ":"),
             ensure_ascii=False,
         )
@@ -810,7 +1017,11 @@ def envelope_line(
 
 
 def parse_envelope(
-    raw: bytes, invocation_id: str, exit_code: object
+    raw: bytes,
+    invocation_id: str,
+    exit_code: object,
+    *,
+    responses: Mapping[str, object] | None = None,
 ) -> tuple[dict[str, object], str | None]:
     """Return the retained envelope facts and, for ``completed``, the semantic."""
     facts: dict[str, object] = {
@@ -820,6 +1031,8 @@ def parse_envelope(
         "status": None,
         "worker_failure_code": None,
     }
+    if responses is not None:
+        facts["provider_requests"] = None
     if not raw:
         facts["parse"] = "missing"
         return facts, None
@@ -837,9 +1050,15 @@ def parse_envelope(
             obj.get("semantic"),
             obj.get("failure_code"),
         )
+        keys = (
+            ENVELOPE_KEYS
+            if responses is None
+            else (*ENVELOPE_KEYS, "provider_requests")
+        )
         if (
-            tuple(obj) != ENVELOPE_KEYS
-            or obj["format"] != ENVELOPE_FORMAT
+            tuple(obj) != keys
+            or obj["format"]
+            != (ENVELOPE_FORMAT if responses is None else ENVELOPE_FORMAT_V3)
             or not isinstance(obj["invocation_id"], str)
         ):
             return facts, None
@@ -862,12 +1081,16 @@ def parse_envelope(
                 return facts, None
         else:
             return facts, None
+        provider_requests = obj.get("provider_requests")
+        if responses is not None:
+            _responses_receipts(provider_requests, responses, status)
         if (
             envelope_line(
                 cast(str, obj["invocation_id"]),
                 status,
                 cast("str | None", semantic),
                 cast("str | None", code),
+                provider_requests=provider_requests,
             )
             != raw
         ):
@@ -875,6 +1098,8 @@ def parse_envelope(
     except (RouterError, UnicodeError, TypeError):
         return facts, None
     facts.update(status=status, worker_failure_code=code)
+    if responses is not None:
+        facts["provider_requests"] = provider_requests
     if obj["invocation_id"] != invocation_id or exit_code != (
         0 if status == "completed" else 3
     ):
@@ -882,6 +1107,52 @@ def parse_envelope(
         return facts, None
     facts["parse"] = "ok"
     return facts, cast("str | None", semantic)
+
+
+def _responses_receipts(
+    value: object, details: Mapping[str, object], status: str
+) -> None:
+    maximum = mapping(details["budgets"])["max_iterations"]
+    if not isinstance(value, list) or len(value) > maximum:
+        raise RouterError("completion_integrity")
+    model = cast(str, details["model"])
+    model_pattern = re.compile(re.escape(model) + r"(?:-\d{4}-\d{2}-\d{2})?")
+    tools = []
+    for index, item in enumerate(value):
+        obj = fields(item, set(RESPONSES_RECEIPT_KEYS))
+        http_status, response_model = obj["http_status"], obj["response_model"]
+        echoed, tool = obj["echoed_effort"], obj["tool"]
+        if (
+            obj["sent_effort"] != details["reasoning_effort"]
+            or (
+                http_status is not None
+                and (type(http_status) is not int or not 100 <= http_status <= 599)
+            )
+            or (
+                response_model is not None
+                and (
+                    http_status != 200
+                    or not isinstance(response_model, str)
+                    or not model_pattern.fullmatch(response_model)
+                )
+            )
+            or (
+                echoed is not None
+                and (response_model is None or echoed not in RESPONSES_EFFORTS)
+            )
+            or (
+                tool is not None
+                and (
+                    response_model is None
+                    or tool not in {"read_file", "list_dir", "finish"}
+                )
+            )
+            or (index < len(value) - 1 and tool not in {"read_file", "list_dir"})
+        ):
+            raise RouterError("completion_integrity")
+        tools.append(tool)
+    if status == "completed" and (not tools or tools[-1] != "finish"):
+        raise RouterError("completion_integrity")
 
 
 # ---------------------------------------------------------------- disposition
@@ -1065,10 +1336,11 @@ def validate_completion(
     """W-RV-02 over plan, completion and adapter constants only."""
     try:
         details = launch_details(plan, contract=contract)  # 1
+        responses = contract == ADAPTER_CONTRACT_V3
         e = fields(completion.evidence, EVIDENCE_FIELDS)  # 2
         if (
             e != seal(e)
-            or e["format"] != RESULT_FORMAT
+            or e["format"] != (RESULT_FORMAT_V3 if responses else RESULT_FORMAT)
             or e["launch_sha256"] != digest(encoded(details))
         ):
             raise RouterError("completion_integrity")
@@ -1138,7 +1410,8 @@ def validate_completion(
                     "parse",
                     "status",
                     "worker_failure_code",
-                },
+                }
+                | ({"provider_requests"} if responses else set()),
             )
             assert main is not None
             # B2: exact integers within declared bounds before any equality.
@@ -1158,7 +1431,11 @@ def validate_completion(
             ):
                 raise RouterError("completion_integrity")
             if env["parse"] in {"missing", "malformed"}:
-                if env["status"] is not None or env["worker_failure_code"] is not None:
+                if (
+                    env["status"] is not None
+                    or env["worker_failure_code"] is not None
+                    or env.get("provider_requests") is not None
+                ):
                     raise RouterError("completion_integrity")
             elif env["status"] == "completed":
                 if env["worker_failure_code"] is not None:
@@ -1169,6 +1446,10 @@ def validate_completion(
                 or env["worker_failure_code"] not in WORKER_CODES
             ):
                 raise RouterError("completion_integrity")
+            if responses and env["parse"] in {"ok", "contradiction"}:
+                _responses_receipts(
+                    env["provider_requests"], details, cast(str, env["status"])
+                )
             if env["parse"] == "ok":
                 semantic = (
                     completion.stdout.decode("utf-8")
@@ -1180,6 +1461,7 @@ def validate_completion(
                     cast(str, env["status"]),
                     semantic,
                     cast("str | None", env["worker_failure_code"]),
+                    provider_requests=env.get("provider_requests"),
                 )
                 if (
                     len(rebuilt) != env["bytes"]

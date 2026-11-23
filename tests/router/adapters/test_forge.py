@@ -1995,7 +1995,9 @@ def test_plus_resolver_selects_exact_pair():
     assert type(selected) is adapter.ForgeRunnerAdapter
     selected_v2 = resolve_adapter(c.ADAPTER_ID, c.ADAPTER_CONTRACT_V2)
     assert type(selected_v2) is adapter.ForgeRunnerV2Adapter
-    for contract in ("millrace-forge-runner/v3", "millrace-forge-runner"):
+    selected_v3 = resolve_adapter(c.ADAPTER_ID, c.ADAPTER_CONTRACT_V3)
+    assert type(selected_v3) is adapter.ForgeRunnerV3Adapter
+    for contract in ("millrace-forge-runner/v4", "millrace-forge-runner"):
         with pytest.raises(RouterError) as error:
             resolve_adapter(c.ADAPTER_ID, contract)
         assert code_of(error) == "unsupported_adapter_contract"
