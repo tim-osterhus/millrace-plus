@@ -388,7 +388,8 @@ def git_facts(home: Any, invocation: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def capture_git(
-    home: Any, snapshot: dict[str, Any], invocation: Mapping[str, Any]
+    home: Any, snapshot: dict[str, Any], invocation: Mapping[str, Any], *,
+    identity_submitted_at: str | None,
 ) -> dict[str, Any]:
     facts = git_facts(home, invocation)
     remaining = invocation["deadline"] - time.time()
@@ -401,8 +402,9 @@ def capture_git(
     }
     if is_local_git(home):
         branch = home.config["external_policy"]["effects"][0]["target"]["branch"]
-        baseline["local_git"] = local_git.baseline(
-            home.target, branch, invocation["deadline"]
+        baseline["local_git"] = local_git.capture_baseline(
+            home.target, branch, invocation["deadline"],
+            identity_submitted_at=identity_submitted_at,
         )
     return baseline
 

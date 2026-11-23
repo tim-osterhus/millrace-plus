@@ -1640,9 +1640,21 @@ class Runtime:
         }
         from .cicd_effects import capture_git, is_local_git, selected
 
+        no_action = record["kind"] == "ci_event" and original["conclusion"] in {
+            "success",
+            "cancelled",
+            "skipped",
+        }
         if selected(self.home):
             try:
-                frozen["delivery_git"] = capture_git(self.home, view, mine)
+                submitted = (
+                    str(self.home.task(input_id)["submitted_at"])
+                    if not no_action and is_local_git(self.home)
+                    else None
+                )
+                frozen["delivery_git"] = capture_git(
+                    self.home, view, mine, identity_submitted_at=submitted
+                )
             except (OSError, CicdError, CicdV2Error) as exc:
                 if not is_local_git(self.home):
                     raise
@@ -1668,11 +1680,7 @@ class Runtime:
             ),
             phase="reproduce",
         )
-        if record["kind"] == "ci_event" and original["conclusion"] in {
-            "success",
-            "cancelled",
-            "skipped",
-        }:
+        if no_action:
             report_ref = self.home.retain(self._report(state, None, "no_action"))
             self._save(state, settlement_ref=report_ref, phase="settle")
             return _out("NO_ACTION")

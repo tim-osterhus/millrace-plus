@@ -206,19 +206,44 @@ def _baseline(git: Git) -> dict[str, Any]:
     }
 
 
-def baseline(target: Path, branch: str, deadline: float) -> dict[str, Any]:
-    return _baseline(Git(target, branch, deadline))
+def capture_baseline(
+    target: Path, branch: str, deadline: float, *, identity_submitted_at: str | None,
+) -> dict[str, Any]:
+    git = Git(target, branch, deadline)
+    baseline = _baseline(git)
+    if identity_submitted_at is not None:
+        _identity(git, identity_submitted_at)
+    return baseline
 
 
-def _identity(git: Git) -> tuple[str, str]:
+def _identity(git: Git, submitted_at: str) -> dict[str, str | int]:
     identity = []
     for key in ("user.name", "user.email"):
-        value = git.run("config", "--local", "--no-includes", "--get", key).decode()
-        text = value.removesuffix("\n")
+        value = git.run(
+            "config", "--local", "--no-includes", "--get", key, allowed=(0, 1)
+        )
+        if not value:
+            raise vr.CicdV2Error("local_git_identity_missing")
+        try:
+            text = value.decode().removesuffix("\n")
+        except UnicodeDecodeError as exc:
+            raise vr.CicdV2Error("invalid_local_git_identity") from exc
         if not IDENT.fullmatch(text) or text.strip() != text:
             raise vr.CicdV2Error("invalid_local_git_identity")
         identity.append(text)
-    return identity[0], identity[1]
+    name, email = identity
+    # Git can refuse a name made entirely of punctuation it trims.
+    if not name.strip(" ,:;\"\\'"):
+        raise vr.CicdV2Error("invalid_local_git_identity")
+    fields = {
+        "name": name,
+        "email": email,
+        "timestamp": int(datetime.fromisoformat(submitted_at).timestamp()),
+    }
+    actual = git.run("var", "GIT_COMMITTER_IDENT", env=_committer_env(fields))
+    if actual != (_ident(fields) + "\n").encode():
+        raise vr.CicdV2Error("invalid_local_git_identity")
+    return fields
 
 
 def _message(input_id: str) -> str:
@@ -320,7 +345,6 @@ def freeze_plan(
         )
     ):
         raise vr.CicdV2Error("local_git_scope_mismatch")
-    name, email = _identity(git)
     submitted = home.task(input_id)["submitted_at"]
     plan = {
         "format": PLAN,
@@ -331,13 +355,8 @@ def freeze_plan(
         "patch_ref": patch["patch_ref"],
         "delta_ref": delta_ref,
         "changed_paths": paths,
-        "name": name,
-        "email": email,
-        "timestamp": int(datetime.fromisoformat(submitted).timestamp()),
+        **_identity(git, submitted),
     }
-    identity = git.run("var", "GIT_COMMITTER_IDENT", env=_committer_env(plan))
-    if identity != (_ident(plan) + "\n").encode():
-        raise vr.CicdV2Error("invalid_local_git_identity")
     with tempfile.TemporaryDirectory(dir=home.workspace) as temp:
         result, _ = _stage(
             git, home, paths, delta, target["base_head"], Path(temp), isolated=True

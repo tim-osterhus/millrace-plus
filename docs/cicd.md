@@ -538,8 +538,17 @@ expected products and the captured command timeout and path policy. Python's
 
 Use Git 2.30 or later on the system path and an attached branch in a standalone
 checkout with a `.git` directory. Set repository-local `user.name` and
-`user.email` before submitting the input. Keep Git tools that refresh the index
-out of the checkout from input freeze through settlement. The backend requires
+`user.email` before submitting the input. Plus checks both keys before it
+freezes an input for reproduction. A missing local key holds the input with
+`local_git_identity_missing`. A supplied value rejected by Git or normalized
+to another value holds with `invalid_local_git_identity`. Close or cancel the
+held input, correct both keys as needed in the checkout's local Git config,
+and submit a genuine new CI producer attempt or a valid distinct report ID.
+Resubmitting the exact input returns its original receipt. CI events with
+`success`, `cancelled`, or `skipped` conclusions skip the identity check.
+
+Keep Git tools that refresh the index out of the checkout from input freeze
+through settlement. The backend requires
 the files ref store, a full index and local objects. Linked worktrees,
 sparse or split indexes, in-progress merge or rebase,
 and repositories with config includes or custom filters are outside this route.

@@ -7,12 +7,13 @@ import hashlib
 import json
 import signal
 import stat
+import subprocess
 import sys
 import textwrap
 from pathlib import Path
 
 import pytest
-from cicd_support import event, git, new_id, write_json
+from cicd_support import DEFECT, GIT_ENV, event, git, new_id, write_json
 from cicd_v2_support import initialized
 from test_cicd_effects import approval_decision, configure_effects
 from test_cicd_workflow import _resume, _run, _start, drive
@@ -76,7 +77,7 @@ def _sigkill_local_git_peer(witness, phase):
         """)
 
 
-def _checked_local_git(root, *, fault=None):
+def _configure_local_git(root, *, fault=None):
     def configure(value):
         configure_effects(root)(value)
         adapter = value["external_policy"]["adapters"]["commit"]
@@ -151,7 +152,11 @@ def _checked_local_git(root, *, fault=None):
                 }
             )
 
-    return _checked(root, configure=configure)
+    return configure
+
+
+def _checked_local_git(root, *, fault=None):
+    return _checked(root, configure=_configure_local_git(root, fault=fault))
 
 
 def _approve(fx, home, input_id):
@@ -278,6 +283,112 @@ def test_public_approved_fake_commit_completes_and_terminal_replay_advances_fifo
     _next_no_action(fx, reloaded)
     assert V2Home(fx["home"]).task(input_id)["terminal_receipt"] == receipt
     _unchanged_git(fx)
+    _stop(fx)
+
+
+def _assert_identity_hold(fx, home, input_id, reason):
+    assert home.task(input_id)["status"] == "held", _run(fx)
+    state = home.load_state(input_id)
+    report = home.read_ref(state["hold_ref"])
+    assert report["status"] == "held_stale", report
+    assert report["hold_reason"] == reason, report
+    assert not state["attempt_refs"]
+    assert not state["delivery_refs"]
+    assert home.status(input_id)["inputs"][0]["delivery_basis_ref"] is None
+    assert not (home.workspace / (input_id + ".freeze.json")).exists()
+    assert (home.target / "src/calc.py").read_text() == DEFECT
+    assert not {
+        "reproduce", "investigate", "repair", "checks", "review_1",
+        "prepare_effect", "execute_effect", "inspect_effect",
+    }.intersection(row["node"] for row in _run(fx)["invocations"])
+
+
+def test_public_local_git_global_identity_holds_until_new_attempt(
+    tmp_path, monkeypatch,
+):
+    fx = initialized(tmp_path, configure=_configure_local_git(tmp_path))
+    home = V2Home(fx["home"])
+    git_home = tmp_path / "git-home"
+    git_home.mkdir()
+    global_config = git_home / ".gitconfig"
+    email = "global-ci@example.invalid"
+    global_config.write_text(f"[user]\n\temail = {email}\n")
+    monkeypatch.setenv("HOME", str(git_home))
+    monkeypatch.delenv("GIT_CONFIG_GLOBAL", raising=False)
+    git(home.target, "config", "--local", "--unset", "user.email")
+    visible = subprocess.run(
+        ["git", "-C", str(home.target), "config", "--get", "user.email"],
+        env=GIT_ENV | {"HOME": str(git_home), "GIT_CONFIG_GLOBAL": str(global_config)},
+        check=True, capture_output=True, text=True, timeout=30,
+    )
+    assert visible.stdout.strip() == email
+
+    original = event(tmp_path, fx["head"])
+    first = home.submit(original)
+    _start(fx)
+    _assert_identity_hold(fx, home, first["input_id"], "local_git_identity_missing")
+    _cancel(fx, first["input_id"])
+    drive(fx, _resume)
+    assert home.task(first["input_id"])["status"] == "cancelled"
+    terminal = home.task(first["input_id"])["terminal_receipt"]
+    assert terminal is not None
+
+    git(home.target, "config", "--local", "user.email", "fixture-ci@example.invalid")
+    assert home.submit(original) == first | {
+        "receipt": first["receipt"] | {"disposition": "replayed"},
+    }
+    second = home.submit(event(tmp_path, fx["head"], name="second", attempt=2))
+    assert second["input_id"] != first["input_id"]
+    _resume(fx)
+    state = home.load_state(second["input_id"])
+    assert home.read_ref(state["hold_ref"])["status"] == "checked_patch"
+    _approve(fx, home, second["input_id"])
+    drive(fx, _resume)
+    assert home.task(second["input_id"])["status"] == "succeeded"
+    state = home.load_state(second["input_id"])
+    assert home.read_ref(state["settlement_ref"])["status"] == "published"
+    assert home.task(first["input_id"])["terminal_receipt"] == terminal
+    assert git(home.target, "rev-list", "--count", f'{fx["head"]}..HEAD').strip() == "1"
+    _stop(fx)
+
+
+@pytest.mark.parametrize(
+    "name", ["Fixture CI Operator,", "", ","],
+    ids=["normalized", "empty", "punctuation_only"],
+)
+def test_public_local_git_invalid_identity_holds_before_reproduction(tmp_path, name):
+    fx = initialized(tmp_path, configure=_configure_local_git(tmp_path))
+    home = V2Home(fx["home"])
+    git(home.target, "config", "--local", "user.name", name)
+    accepted = home.submit(event(tmp_path, fx["head"]))
+    _start(fx)
+    _assert_identity_hold(fx, home, accepted["input_id"], "invalid_local_git_identity")
+    _stop(fx)
+
+
+@pytest.mark.parametrize("conclusion", ["success", "cancelled", "skipped"])
+def test_public_local_git_no_action_keeps_baseline_without_identity(
+    tmp_path, conclusion,
+):
+    fx = initialized(tmp_path, configure=_configure_local_git(tmp_path))
+    home = V2Home(fx["home"])
+    git(home.target, "config", "--local", "--unset", "user.name")
+    git(home.target, "config", "--local", "--unset", "user.email")
+    accepted = home.submit(event(tmp_path, fx["head"], conclusion=conclusion))
+    input_id = accepted["input_id"]
+    drive(fx, _start)
+    assert home.task(input_id)["status"] == "succeeded"
+    state = home.load_state(input_id)
+    assert home.read_ref(state["settlement_ref"])["status"] == "no_action"
+    pointer = home.workspace / (input_id + ".freeze.json")
+    frozen = home.read_ref(json.loads(pointer.read_bytes()))
+    baseline = frozen["delivery_git"]["local_git"]
+    assert baseline["head"] == fx["head"]
+    assert baseline["repository"]["config_sha256"] == hashlib.sha256(
+        (home.target / ".git/config").read_bytes()
+    ).hexdigest()
+    assert not state["attempt_refs"]
+    assert not state["delivery_refs"]
     _stop(fx)
 
 
