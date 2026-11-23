@@ -1,4 +1,4 @@
-"""Standalone CI commit intents and exact inspection through trusted argv."""
+"""Standalone CI delivery intents and exact inspection through trusted argv."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from typing import Any
 
 from . import check_contracts as cc
 from . import cicd_git_commit as local_git
+from . import cicd_git_push as local_push
 from . import cicd_v2_records as vr
 from .cicd_records import CicdError
 from .cicd_source import (
@@ -41,8 +42,20 @@ def _fields(value: object, fields: tuple[str, ...], code: str) -> dict[str, Any]
     return vr._fields(value, fields, code)
 
 
-def _target(value: object) -> dict[str, Any]:
+def _target(value: object, kind: str = "commit") -> dict[str, Any]:
     code = "invalid_effect_target"
+    if kind == "push":
+        obj = _fields(
+            value, ("remote", "branch", "head_sha", "expected_remote_head"), code
+        )
+        local_push.validate_selector(
+            {"remote": obj["remote"], "branch": obj["branch"]}, code
+        )
+        old = vr._revision(obj["expected_remote_head"], code)
+        new = vr._revision(obj["head_sha"], code)
+        if len(old) != len(new) or old == new or not int(old, 16) or not int(new, 16):
+            raise vr.CicdV2Error(code)
+        return obj
     fields = (
         "repository_root", "branch", "base_head", "mode", "patch_sha256",
         "source_after_sha256",
@@ -67,9 +80,9 @@ def _effects(value: object) -> list[dict[str, Any]]:
     if len(rows) != 1:
         raise vr.CicdV2Error("unsupported_until_full_ci_d1")
     obj = _fields(rows[0], ("kind", "target"), "invalid_effects")
-    if obj["kind"] != "commit":
+    if obj["kind"] not in ("commit", "push"):
         raise vr.CicdV2Error("unsupported_until_full_ci_d1")
-    _target(obj["target"])
+    _target(obj["target"], obj["kind"])
     return [obj]
 
 
@@ -102,7 +115,7 @@ def validate_policy(value: object, config: Mapping[str, Any]) -> dict[str, Any]:
         if adapters != {}:
             raise vr.CicdV2Error(code)
         return obj
-    if len(effects) != 1:
+    if len(effects) not in (1, 2):
         raise vr.CicdV2Error("unsupported_until_full_ci_d1")
     effect = _fields(effects[0], ("kind", "target"), code)
     if effect["kind"] != "commit":
@@ -113,16 +126,34 @@ def validate_policy(value: object, config: Mapping[str, Any]) -> dict[str, Any]:
     if target["repository_root"] != config["target_root"]:
         raise vr.CicdV2Error("effect_target_mismatch")
     vr._text(target["branch"], code)
-    adapter = _fields(adapters, ("commit",), code)["commit"]
+    kinds = ("commit",)
+    if len(effects) == 2:
+        push = _fields(effects[1], ("kind", "target"), code)
+        if push["kind"] != "push":
+            raise vr.CicdV2Error("unsupported_until_full_ci_d1")
+        local_push.validate_selector(push["target"], code)
+        kinds += ("push",)
+    adapters = _fields(adapters, kinds, code)
+    commands = {row["id"]: row for row in config["commands"]}
+    commit = _validate_adapter(adapters["commit"], commands, code, kind="commit")
+    if len(effects) == 2:
+        if commit.get("backend") != "local_git":
+            raise vr.CicdV2Error("unsupported_until_full_ci_d1")
+        _validate_adapter(adapters["push"], commands, code, kind="push")
+    return obj
+
+
+def _validate_adapter(
+    adapter: object, commands: Mapping[str, Any], code: str, *, kind: str
+) -> dict[str, Any]:
     adapter_fields = ("prepare", "execute", "inspect", "capabilities")
-    if isinstance(adapter, dict) and "backend" in adapter:
+    if kind == "commit" and isinstance(adapter, dict) and "backend" in adapter:
         adapter_fields += ("backend",)
         if adapter["backend"] != "local_git":
             raise vr.CicdV2Error(code)
     adapter = _fields(adapter, adapter_fields, code)
-    commands = {row["id"]: row for row in config["commands"]}
     for operation in ("prepare", "execute", "inspect"):
-        command = commands.get(adapter[operation])
+        command = commands.get(vr._text(adapter[operation], code))
         if command is None or command["expected_products"]:
             raise vr.CicdV2Error(code)
         argv = command["argv"]
@@ -135,13 +166,17 @@ def validate_policy(value: object, config: Mapping[str, Any]) -> dict[str, Any]:
         ):
             raise vr.CicdV2Error(code)
     capabilities = vr._list(adapter["capabilities"], code, nonempty=True)
-    if len(capabilities) != 1:
+    supported = {"exact_inspection"}
+    if kind == "push":
+        supported.add("expected_ref_cas")
+    if len(capabilities) != len(supported):
         raise vr.CicdV2Error(code)
-    capability = _fields(capabilities[0], ("id", "evidence_ref"), code)
-    if capability["id"] != "exact_inspection":
+    rows = [_fields(item, ("id", "evidence_ref"), code) for item in capabilities]
+    if {vr._text(row["id"], code) for row in rows} != supported:
         raise vr.CicdV2Error("unsupported_until_full_ci_d1")
-    vr._ref(capability["evidence_ref"], code)
-    return obj
+    for row in rows:
+        vr._ref(row["evidence_ref"], code)
+    return adapter
 
 
 def validate_approval(value: object) -> dict[str, Any]:
@@ -216,7 +251,8 @@ def validate_request(value: object, operation: str | None = None) -> dict[str, A
     if operation is not None and obj["operation"] != operation:
         raise vr.CicdV2Error("effect_operation_mismatch")
     vr._subject(obj["input_id"], obj["candidate_id"], code)
-    if obj["candidate_id"] is not None or obj["kind"] != "commit":
+    kind = obj["kind"]
+    if obj["candidate_id"] is not None or kind not in ("commit", "push"):
         raise vr.CicdV2Error("unsupported_until_full_ci_d1")
     for key in (
         "delivery_id",
@@ -227,11 +263,15 @@ def validate_request(value: object, operation: str | None = None) -> dict[str, A
     ):
         vr._sha(obj[key], code)
     vr._ref(obj["permission_ref"], code)
-    target = _target(obj["target"])
-    if any(target[key] != obj[key] for key in ("patch_sha256", "source_after_sha256")):
+    target = _target(obj["target"], kind)
+    if kind == "commit" and any(
+        target[key] != obj[key] for key in ("patch_sha256", "source_after_sha256")
+    ):
         raise vr.CicdV2Error("effect_target_mismatch")
-    vr._refs(obj["prior_effect_refs"], code)
-    vr._refs(obj["evidence_refs"], code)
+    prior = vr._refs(obj["prior_effect_refs"], code)
+    evidence = vr._refs(obj["evidence_refs"], code)
+    if kind == "push" and (len(prior) != 1 or len(evidence) != 1):
+        raise vr.CicdV2Error(code)
     if obj["effect_id"] != effect_identity(obj):
         raise vr.CicdV2Error("effect_identity_mismatch")
     return obj
@@ -270,6 +310,8 @@ def validate_result(value: object, request: Mapping[str, Any]) -> dict[str, Any]
         obj["remote_id"] is None or obj["observed_head"] is None
     ):
         raise vr.CicdV2Error("effect_evidence_missing")
+    if request["kind"] == "push":
+        local_push.validate_result_fields(obj, request)
     return obj
 
 
@@ -299,7 +341,11 @@ def _result_evidence(
         refs = retained
     for ref in refs:
         home.resolve_ref(ref)
-    if result["status"] not in {"applied", "not_applied"}:
+    if request["kind"] == "push":
+        local_push.validate_evidence(home, result, request, refs)
+    if result["status"] not in {"applied", "not_applied"} and not (
+        request["kind"] == "push" and refs
+    ):
         return
     proof = _object(
         home.read_ref(refs[0]),
@@ -372,6 +418,10 @@ def is_local_git(home: Any) -> bool:
     return adapter.get("backend") == "local_git"
 
 
+def push_selected(home: Any) -> bool:
+    return "push" in home.config["external_policy"]["adapters"]
+
+
 def git_facts(home: Any, invocation: Mapping[str, Any]) -> dict[str, Any]:
     def read(args: list[str]) -> bytes:
         remaining = invocation["deadline"] - time.time()
@@ -409,8 +459,11 @@ def capture_git(
     return baseline
 
 
-def basis_ref(home: Any, input_id: str) -> dict[str, Any] | None:
-    path = home.workspace / (input_id + ".delivery-basis.json")
+def basis_ref(
+    home: Any, input_id: str, *, push: bool = False
+) -> dict[str, Any] | None:
+    suffix = ".push-basis.json" if push else ".delivery-basis.json"
+    path = home.workspace / (input_id + suffix)
     if not path.exists():
         return None
     return home.file_ref(path)
@@ -481,13 +534,70 @@ def freeze_basis(
     return home.file_ref(path)
 
 
+def _push_target(home: Any, basis: dict[str, Any]) -> dict[str, Any]:
+    plan = local_git.plan_for(home, basis["target"])
+    selector = home.config["external_policy"]["effects"][1]["target"]
+    return _target(selector | {
+        "head_sha": plan["commit"],
+        "expected_remote_head": basis["target"]["base_head"],
+    }, "push")
+
+
+def _freeze_push_basis(
+    runtime: Any, state: dict[str, Any], invocation: Mapping[str, Any]
+) -> None:
+    home = runtime.home
+    delivery, operations = history(home, state)
+    for row in operations:
+        _completion(runtime, row)
+    accepted = state["delivery_refs"][-1]
+    commit = home.read_ref(delivery["basis_ref"])
+    target = _push_target(home, commit)
+    try:
+        captured = local_push.capture(home, target, invocation["deadline"])
+    except (OSError, IntakeError) as exc:
+        raise vr.CicdV2Error("push_receiver_unproven") from exc
+    basis = commit | captured | {
+        "format": local_push.BASIS,
+        "target": target,
+        "commit_ref": accepted,
+    }
+    del basis["git"]
+    path = home.workspace / (state["input_id"] + ".push-basis.json")
+    write_exact(path, canonical(basis), "push_basis_conflict")
+
+
+def _approval_basis(
+    home: Any, state: Mapping[str, Any],
+) -> tuple[str, dict[str, Any], dict[str, Any]]:
+    kind = "commit"
+    if state["delivery_refs"]:
+        delivery, operations = history(home, state)
+        if not (
+            push_selected(home)
+            and home.read_ref(delivery["intent_ref"])["kind"] == "commit"
+            and _disposition(home, operations, "commit") == "complete"
+        ):
+            raise vr.CicdV2Error("delivery_already_approved")
+        _processes_closed(home, operations)
+        kind = "push"
+    ref = basis_ref(home, state["input_id"], push=kind == "push")
+    if ref is None:
+        raise vr.CicdV2Error("delivery_basis_missing")
+    basis = home.read_ref(ref)
+    if kind == "push":
+        commit = home.read_ref(delivery["basis_ref"])
+        _push_basis_authority(home, basis, commit, state["delivery_refs"][-1])
+    else:
+        _basis_authority(home, state, basis)
+    return kind, ref, basis
+
+
 def check_permission(
     home: Any, state: Mapping[str, Any], decision: Mapping[str, Any]
 ) -> dict[str, Any]:
     if not selected(home):
         raise vr.CicdV2Error("delivery_requires_authorized_policy")
-    if state["delivery_refs"]:
-        raise vr.CicdV2Error("delivery_already_approved")
     if (
         state["hold_ref"] is None
         or decision["basis_sha256"] != state["hold_ref"]["sha256"]
@@ -495,15 +605,16 @@ def check_permission(
         raise vr.CicdV2Error("delivery_decision_basis_changed")
     if decision["expected_state_version"] != state["version"]:
         raise vr.CicdV2Error("delivery_decision_state_changed")
-    ref = basis_ref(home, state["input_id"])
-    if ref is None:
-        raise vr.CicdV2Error("delivery_basis_missing")
-    basis = home.read_ref(ref)
+    kind, ref, basis = _approval_basis(home, state)
     report = vr.validate_report(home.read_ref(state["hold_ref"]))
     if (
         report["status"] != "checked_patch"
         or report["patch_ref"] != basis["patch_ref"]
         or report["source_after_sha256"] != basis["source_after_sha256"]
+        or kind == "push" and (
+            report["hold_reason"] != "push_requires_operator"
+            or report["delivery_refs"] != state["delivery_refs"]
+        )
     ):
         raise vr.CicdV2Error("delivery_basis_changed")
     permission = validate_permission(home.read_ref(decision["permission_ref"]))
@@ -514,7 +625,7 @@ def check_permission(
         "patch_sha256": basis["patch_ref"]["sha256"],
         "source_after_sha256": basis["source_after_sha256"],
         "config_sha256": home.config_sha256,
-        "effects": [{"kind": "commit", "target": basis["target"]}],
+        "effects": [{"kind": kind, "target": basis["target"]}],
         "authority_ref": home.config["external_policy"]["authority_ref"],
     }
     if any(
@@ -524,6 +635,8 @@ def check_permission(
         raise vr.CicdV2Error("action_permission_mismatch")
     if permission["issuer"] != approval["issuer"]:
         raise vr.CicdV2Error("action_approval_mismatch")
+    if kind == "push" and ref not in approval["evidence_refs"]:
+        raise vr.CicdV2Error("push_approval_basis_missing")
     home.resolve_ref(permission["authority_ref"])
     for item in approval["evidence_refs"]:
         home.resolve_ref(item)
@@ -533,7 +646,6 @@ def check_permission(
         or basis["claim"] != home.task(state["input_id"])["claim"]
     ):
         raise vr.CicdV2Error("delivery_basis_changed")
-    _basis_authority(home, state, basis)
     return permission
 
 
@@ -576,12 +688,46 @@ def _basis_authority(
     return basis
 
 
+def _push_basis_authority(
+    home: Any, value: object, commit: dict[str, Any], accepted: dict[str, Any]
+) -> dict[str, Any]:
+    basis = _object(
+        value,
+        "format input_id config_ref authority_ref patch_ref source_after_sha256 "
+        "target check_plan_ref review_plan_ref attempt_refs claim commit_ref "
+        "receiver capability_ref receiver_config_sha256 reflog_prefix prefix_ref",
+        local_push.BASIS, "invalid_push_basis",
+    )
+    if (
+        basis["commit_ref"] != accepted
+        or basis["target"] != _push_target(home, commit)
+        or any(
+            basis[key] != commit[key]
+            for key in (
+                "input_id", "config_ref", "authority_ref", "patch_ref",
+                "source_after_sha256", "check_plan_ref", "review_plan_ref",
+                "attempt_refs", "claim",
+            )
+        )
+    ):
+        raise vr.CicdV2Error("push_basis_changed")
+    local_push.validate_basis(home, basis)
+    return basis
+
+
 def approve(
     runtime: Any, state: dict[str, Any], decision: dict[str, Any]
 ) -> dict[str, Any]:
     home = runtime.home
     permission = check_permission(home, state, decision)
-    ref = basis_ref(home, state["input_id"])
+    kind = permission["effects"][0]["kind"]
+    ref = basis_ref(home, state["input_id"], push=kind == "push")
+    prior = []
+    if kind == "push":
+        _, operations = history(home, state)
+        for row in operations:
+            _completion(runtime, row)
+        prior = [state["delivery_refs"][-1]]
     delivery_id = vr.digest(
         {
             "input_id": state["input_id"],
@@ -594,7 +740,7 @@ def approve(
         "operation": "execute",
         "delivery_id": delivery_id,
         "effect_id": "0" * 64,
-        "kind": "commit",
+        "kind": kind,
         "input_id": state["input_id"],
         "candidate_id": None,
         "patch_sha256": permission["patch_sha256"],
@@ -602,11 +748,15 @@ def approve(
         "config_sha256": home.config_sha256,
         "permission_ref": decision["permission_ref"],
         "target": permission["effects"][0]["target"],
-        "prior_effect_refs": [],
+        "prior_effect_refs": prior,
         "evidence_refs": [ref],
     }
     request["effect_id"] = effect_identity(request)
     validate_request(request)
+    intent_ref = home.retain(request)
+    if kind == "push":
+        # The B0 receiver and guard read this same retained execute request.
+        os.chmod(home.resolve_ref(intent_ref), 0o400, follow_symlinks=False)
     delivery = {
         "format": DELIVERY,
         "delivery_id": delivery_id,
@@ -614,11 +764,11 @@ def approve(
         "basis_ref": ref,
         "permission_ref": decision["permission_ref"],
         "decision_ref": home.retain(decision),
-        "intent_ref": home.retain(request),
+        "intent_ref": intent_ref,
     }
     state = runtime._save(
         state,
-        delivery_refs=[home.retain(delivery)],
+        delivery_refs=[*state["delivery_refs"], home.retain(delivery)],
         hold_ref=None,
         phase="guard_delivery",
         applied_decision_ids=[*state["applied_decision_ids"], decision["request_id"]],
@@ -633,9 +783,35 @@ def approve(
 def history(
     home: Any, state: Mapping[str, Any]
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    return _segments(home, state)[-1]
+
+
+def _segments(
+    home: Any, state: Mapping[str, Any]
+) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
     refs = state["delivery_refs"]
     if not refs:
         raise vr.CicdV2Error("delivery_missing")
+    if push_selected(home):
+        for index, ref in enumerate(refs[1:], 1):
+            if home.read_ref(ref).get("format") != DELIVERY:
+                continue
+            commit = _segment(home, state, refs[:index])
+            if _disposition(home, commit[1], "commit") != "complete":
+                raise vr.CicdV2Error("push_prior_commit_unproven")
+            _processes_closed(home, commit[1])
+            push = _segment(
+                home, state, refs[index:], commit=commit[0], prior=refs[:index]
+            )
+            return [commit, push]
+    return [_segment(home, state, refs)]
+
+
+def _segment(
+    home: Any, state: Mapping[str, Any], refs: list[dict[str, Any]], *,
+    commit: dict[str, Any] | None = None, prior: list[dict[str, Any]] | None = None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    kind = "commit" if commit is None else "push"
     delivery = _object(
         home.read_ref(refs[0]),
         "format delivery_id input_id basis_ref permission_ref decision_ref intent_ref",
@@ -646,9 +822,16 @@ def history(
     if (
         delivery["input_id"] != state["input_id"]
         or delivery["delivery_id"] != intent["delivery_id"]
+        or intent["kind"] != kind
     ):
         raise vr.CicdV2Error("delivery_subject_mismatch")
-    basis = _basis_authority(home, state, home.read_ref(delivery["basis_ref"]))
+    value = home.read_ref(delivery["basis_ref"])
+    if commit is None:
+        basis = _basis_authority(home, state, value)
+    else:
+        basis = _push_basis_authority(
+            home, value, home.read_ref(commit["basis_ref"]), prior[-1]
+        )
     if delivery["delivery_id"] != vr.digest(
         {
             "input_id": state["input_id"],
@@ -667,13 +850,29 @@ def history(
         or decision["permission_ref"] != delivery["permission_ref"]
         or intent["permission_ref"] != delivery["permission_ref"]
         or intent["evidence_refs"] != [delivery["basis_ref"]]
-        or basis["format"] != BASIS
         or basis["config_ref"] != home.config_ref
         or basis["input_id"] != state["input_id"]
         or basis["attempt_refs"] != state["attempt_refs"]
         or basis["claim"] != home.task(state["input_id"])["claim"]
     ):
         raise vr.CicdV2Error("delivery_authority_changed")
+    if kind == "push":
+        report_sha = decision["basis_sha256"]
+        report = vr.validate_report(
+            home.read_ref({"path": report_sha + ".json", "sha256": report_sha})
+        )
+        if (
+            intent["prior_effect_refs"] != [prior[-1]]
+            or delivery["basis_ref"] not in approval["evidence_refs"]
+            or report["status"] != "checked_patch"
+            or report["hold_reason"] != "push_requires_operator"
+            or report["delivery_refs"] != prior
+            or report["input_id"] != intent["input_id"]
+            or report["patch_ref"] != basis["patch_ref"]
+            or report["source_after_sha256"] != basis["source_after_sha256"]
+            or report["config_sha256"] != intent["config_sha256"]
+        ):
+            raise vr.CicdV2Error("push_approval_basis_changed")
     expected = {
         "input_id": state["input_id"],
         "candidate_id": None,
@@ -681,7 +880,7 @@ def history(
         "source_after_sha256": basis["source_after_sha256"],
         "config_sha256": home.config_sha256,
         "authority_ref": basis["authority_ref"],
-        "effects": [{"kind": "commit", "target": basis["target"]}],
+        "effects": [{"kind": kind, "target": basis["target"]}],
     }
     if any(
         permission[key] != value or approval[key] != value
@@ -757,7 +956,7 @@ def history(
             or context["node"] != record["operation"] + "_effect"
         ):
             raise vr.CicdV2Error("effect_context_changed")
-        command_id = home.config["external_policy"]["adapters"]["commit"][
+        command_id = home.config["external_policy"]["adapters"][kind][
             record["operation"]
         ]
         command = copy.deepcopy(
@@ -810,30 +1009,8 @@ def history(
             or record["result_ref"] is not None
         ):
             raise vr.CicdV2Error("effect_history_conflict")
-        if not same:
-            permitted = "prepare" if prior is None else None
-            if prior is not None:
-                prior_result = (
-                    None
-                    if prior["result_ref"] is None
-                    else home.read_ref(prior["result_ref"])
-                )
-                if (
-                    prior["status"] == "accepted"
-                    and prior_result["status"] == "applied"
-                ):
-                    permitted = None
-                elif prior["status"] == "accepted" and (
-                    prior["operation"] == "prepare"
-                    and prior_result["status"] == "prepared"
-                    or prior["operation"] == "inspect"
-                    and prior_result["status"] == "not_applied"
-                ):
-                    permitted = "execute"
-                elif any(row["operation"] == "execute" for row in operations):
-                    permitted = "inspect"
-            if record["operation"] != permitted:
-                raise vr.CicdV2Error("effect_history_conflict")
+        if not same and record["operation"] != _disposition(home, operations, kind):
+            raise vr.CicdV2Error("effect_history_conflict")
         if record["status"] == "reserved" and record["completion_ref"] is not None:
             raise vr.CicdV2Error("effect_history_conflict")
         if record["status"] == "accepted" and (
@@ -976,7 +1153,11 @@ def accept_observation(runtime: Any, state: dict[str, Any]) -> dict[str, Any]:
 
 
 def disposition(home: Any, state: Mapping[str, Any]) -> str:
-    _, operations = history(home, state)
+    delivery, operations = history(home, state)
+    return _disposition(home, operations, home.read_ref(delivery["intent_ref"])["kind"])
+
+
+def _disposition(home: Any, operations: list[dict[str, Any]], kind: str) -> str:
     if not operations:
         return "prepare"
     last = operations[-1]
@@ -989,6 +1170,8 @@ def disposition(home: Any, state: Mapping[str, Any]) -> str:
             else "held"
         )
     result = home.read_ref(last["result_ref"])
+    if kind == "push" and result["diagnostic"] in local_push.DISPLACEMENTS:
+        return "displaced"
     if result["status"] == "applied":
         return "complete"
     if last["operation"] == "prepare" and result["status"] == "prepared":
@@ -1006,7 +1189,9 @@ def current_basis(
     runtime: Any, state: dict[str, Any], invocation: Mapping[str, Any]
 ) -> None:
     home = runtime.home
-    delivery, _ = history(home, state)
+    segments = _segments(home, state)
+    delivery, operations = segments[-1]
+    kind = home.read_ref(delivery["intent_ref"])["kind"]
     basis = home.read_ref(delivery["basis_ref"])
     report = runtime._report(state, None, "checked_patch")
     if (
@@ -1017,9 +1202,11 @@ def current_basis(
     if is_local_git(home):
         if source_identity(home.observe()) != basis["source_after_sha256"]:
             raise vr.CicdV2Error("source_changed")
-        completed = disposition(home, state) == "complete"
+        completed = kind == "push" or _disposition(home, operations, kind) == "complete"
+        commit = home.read_ref(segments[0][0]["basis_ref"])
         expected = "applied" if completed else "not_applied"
-        if local_git.observe(home, basis["target"], invocation["deadline"]) != expected:
+        observed = local_git.observe(home, commit["target"], invocation["deadline"])
+        if observed != expected:
             raise vr.CicdV2Error("delivery_git_changed")
     else:
         runtime._source(state, basis["source_after_sha256"])
@@ -1036,15 +1223,21 @@ def guard(
     runtime: Any, state: dict[str, Any], invocation: Mapping[str, Any]
 ) -> dict[str, Any]:
     state = accept_observation(runtime, state)
-    current_basis(runtime, state, invocation)
-    choice = disposition(runtime.home, state)
+    home = runtime.home
+    delivery, operations = history(home, state)
+    kind = home.read_ref(delivery["intent_ref"])["kind"]
+    choice = _disposition(home, operations, kind)
+    if push_selected(home):
+        _processes_closed(home, operations)
     stopping = [
         row
-        for row in runtime.home.decisions(state["input_id"])
+        for row in home.decisions(state["input_id"])
         if row["kind"] in {"cancel", "close"}
         and row["request_id"] not in state["applied_decision_ids"]
     ]
     if stopping:
+        if not push_selected(home):
+            current_basis(runtime, state, invocation)
         settlement_guard(runtime, state, invocation)
         report = (
             runtime.home.retain(runtime._report(state, None, "cancelled"))
@@ -1053,8 +1246,15 @@ def guard(
         )
         runtime._save(state, settlement_ref=report, phase="settle")
         return {"outcome": "COMPLETE", "summary": "operator_stop", "refs": []}
+    # An unresolved local commit may already have changed HEAD.
+    if push_selected(home) and choice in {"displaced", "inspect", "held"}:
+        return _hold_effect(runtime, state, operations, choice)
+    current_basis(runtime, state, invocation)
     if choice == "complete":
-        report = runtime.home.retain(runtime._report(state, None, "published"))
+        if push_selected(home) and kind == "commit":
+            _freeze_push_basis(runtime, state, invocation)
+            return runtime._hold(state, "push_requires_operator", "checked_patch")
+        report = home.retain(runtime._report(state, None, "published"))
         runtime._save(state, settlement_ref=report, phase="settle")
         return {"outcome": "COMPLETE", "summary": "COMPLETE", "refs": []}
     if choice in {"prepare", "execute"}:
@@ -1064,6 +1264,20 @@ def guard(
             "refs": [],
         }
     return runtime._hold(state, "effect_inspection_required")
+
+
+def _hold_effect(
+    runtime: Any, state: dict, operations: list[dict], choice: str,
+) -> dict:
+    ref = operations[-1]["result_ref"]
+    result = runtime.home.read_ref(ref) if ref is not None else None
+    reason = result["diagnostic"] if result is not None else None
+    if choice != "displaced" and not reason:
+        reason = (
+            "effect_inspection_required" if choice == "inspect"
+            else "effect_preparation_uncertain"
+        )
+    return runtime._hold(state, reason, "checked_patch")
 
 
 def operation(
@@ -1085,9 +1299,14 @@ def operation(
         state = runtime._state(event_from_key(task["intake_key"]))
         runtime._stopped(state, invocation)
         state = accept_observation(runtime, state)
-        delivery, operations = history(home, state)
+        segments = _segments(home, state)
+        delivery, operations = segments[-1]
+        kind = home.read_ref(delivery["intent_ref"])["kind"]
         _processes_closed(home, operations)
-        choice = disposition(home, state)
+        if kind == "push":
+            for row in segments[0][1]:
+                _completion(runtime, row)
+        choice = _disposition(home, operations, kind)
         if name not in {"prepare", "execute", "inspect"}:
             raise vr.CicdV2Error("effect_operation_mismatch")
         if name != "inspect" and choice != name:
@@ -1114,7 +1333,7 @@ def operation(
         request = validate_request(intent | {"operation": name}, name)
         if supplied is not None and supplied != request:
             raise vr.CicdV2Error("effect_intent_changed")
-        command_id = home.config["external_policy"]["adapters"]["commit"][name]
+        command_id = home.config["external_policy"]["adapters"][kind][name]
         command = copy.deepcopy(
             next(row for row in home.config["commands"] if row["id"] == command_id)
         )
@@ -1127,6 +1346,11 @@ def operation(
             "{request_file}": str(home.resolve_ref(request_ref)),
             "{result_file}": str(result_path),
         }
+        if kind == "push" and name == "execute" and (
+            request_ref != delivery["intent_ref"]
+            or home.resolve_ref(request_ref).stat().st_mode & 0o222
+        ):
+            raise vr.CicdV2Error("push_request_binding_changed")
         command["argv"] = [replacements.get(arg, arg) for arg in command["argv"]]
         record = {
             "format": RETAINED_OPERATION,
@@ -1179,6 +1403,7 @@ def operation(
     result_ref = None
     retained_evidence_refs = []
     status = "uncertain"
+    diagnostic = None
     try:
         from .cicd_v2_runtime import _read
 
@@ -1186,12 +1411,16 @@ def operation(
         result, result_ref, retained_evidence_refs = _retain_result(home, raw, request)
         if observed["status"] == "passed":
             status = result["status"]
+            diagnostic = result["diagnostic"]
     except (OSError, ValueError, vr.CicdV2Error, CicdError, IntakeError):
         pass  # Preserve malformed/missing response and the possible-send record.
     with home.lock(), home.state_lock():
         latest = runtime._state(state["input_id"])
         if latest != state:
             raise vr.CicdV2Error("effect_state_changed")
+        retain = observed["status"] == "passed" and (
+            status != "uncertain" or kind == "push"
+        ) and result_ref is not None
         _append(
             runtime,
             state,
@@ -1199,9 +1428,9 @@ def operation(
             | {
                 "status": "observed",
                 "process_ref": home.retain(process),
-                "result_ref": result_ref if status != "uncertain" else None,
+                "result_ref": result_ref if retain else None,
                 "retained_evidence_refs": (
-                    retained_evidence_refs if status != "uncertain" else []
+                    retained_evidence_refs if retain else []
                 ),
             },
         )
@@ -1212,17 +1441,29 @@ def operation(
         "pending": "PENDING",
         "refused": "REFUSED",
     }.get(status, "UNCERTAIN")
-    return {"outcome": outcome, "summary": status, "refs": []}
+    summary = (diagnostic or status) if kind == "push" else status
+    return {"outcome": outcome, "summary": summary, "refs": []}
 
 
 def reconcile(runtime: Any, state: dict[str, Any]) -> dict[str, Any]:
     state = accept_observation(runtime, state)
-    _, operations = history(runtime.home, state)
+    home = runtime.home
+    delivery, operations = history(home, state)
+    kind = home.read_ref(delivery["intent_ref"])["kind"]
     try:
         _processes_closed(runtime.home, operations)
     except vr.CicdV2Error as exc:
         return runtime._hold(state, exc.code)
-    choice = disposition(runtime.home, state)
+    choice = _disposition(home, operations, kind)
+    if kind == "push" and choice in {"displaced", "held"}:
+        return _hold_effect(runtime, state, operations, choice)
+    if push_selected(home) and kind == "commit" and choice == "complete":
+        hold = state["hold_ref"]
+        if (
+            hold is not None
+            and home.read_ref(hold)["hold_reason"] == "push_requires_operator"
+        ):
+            return {"outcome": "HOLD", "summary": "push_requires_operator", "refs": []}
     if choice == "inspect":
         # A completed uncertain inspection is held until an explicit resume;
         # reconcile is precisely that public resume boundary.
@@ -1247,14 +1488,17 @@ def settlement_guard(
         if published:
             raise vr.CicdV2Error("delivery_missing")
         return
-    _, operations = history(runtime.home, state)
-    _processes_closed(runtime.home, operations)
-    for row in operations:
-        _completion(runtime, row)
-    choice = disposition(runtime.home, state)
+    home = runtime.home
+    segments = _segments(home, state)
+    for delivery, operations in segments:
+        _processes_closed(home, operations)
+        for row in operations:
+            _completion(runtime, row)
+    kind = home.read_ref(delivery["intent_ref"])["kind"]
+    choice = _disposition(home, operations, kind)
     if not any(row["operation"] == "execute" for row in operations) and not published:
         return
-    if choice not in {"complete", "execute", "prepare"}:
+    if choice not in {"complete", "execute", "prepare", "displaced"}:
         raise vr.CicdV2Error("effect_unresolved")
     if published and choice != "complete":
         raise vr.CicdV2Error("effect_unresolved")
@@ -1262,11 +1506,15 @@ def settlement_guard(
     if choice == "execute" and operations[-1]["operation"] == "execute":
         raise vr.CicdV2Error("effect_unresolved")
     if published:
+        publication_decision(home, state)
         current_basis(runtime, state, invocation)
 
 
 def publication_decision(home: Any, state: Mapping[str, Any]) -> dict[str, Any]:
-    delivery, _ = history(home, state)
+    segments = _segments(home, state)
+    if push_selected(home) and len(segments) != 2:
+        raise vr.CicdV2Error("push_delivery_missing")
+    delivery, _ = segments[-1]
     return home.read_ref(delivery["decision_ref"])
 
 

@@ -490,7 +490,7 @@ changes FIFO, original input identity, source mapping or command authority.
 
 ## Standalone commit intents
 
-V2 retains hold mode by default. An optional authorized policy supports one
+V2 retains hold mode by default. An optional authorized policy supports a
 `commit` selector in `working_tree` mode. It requires an exact operator authority,
 explicit approval/permission and a trusted argv adapter with exact inspection.
 The built-in `local_git` backend creates one commit on the selected local branch.
@@ -658,12 +658,80 @@ candidate facade, these commands require `--execution-home`, `--node`, `--plane`
 and `--script` identifying the actual captured command invocation. An arbitrary
 operator shell cannot impersonate that invocation.
 
-Full CI-D1 still includes retained-tree delivery, `expected_ref_cas` push
-semantics, PRs, remote checks, deploy, publication-chain rules and shared
-cooperative waits. These operations remain deferred. CI-D2 health/rollback and
+Retained-tree delivery, PRs, hosted pushes, remote checks, deploy and shared
+cooperative waits remain deferred. CI-D2 health/rollback and
 Factory F2 remain unsupported. Factory `approve-delivery` still refuses with
 `unsupported_until_factory_f2`. Existing v1 homes retain their original hold-only
 behavior, schemas and refusal codes.
+
+### Follow a local commit with a guarded push
+
+The standalone `local_git` route can push one approved commit to an existing
+branch on a qualified, owned bare Git receiver. The qualification covers the
+receiver entry point, guard and Git toolchain for that route.
+
+Append the push selector after the local commit selector in
+`external_policy.effects`. Use the full receiver branch ref.
+
+```json
+{"kind":"push","target":{"remote":"owned-receiver","branch":"refs/heads/delivery"}}
+```
+
+Add `external_policy.adapters.push` and the `local-push` command before
+`prepare`. Use the same command contract as `local-git`.
+
+```json
+{
+  "prepare": "local-push",
+  "execute": "local-push",
+  "inspect": "local-push",
+  "capabilities": [
+    {"id":"expected_ref_cas","evidence_ref":{"path":"push-capability.json","sha256":"..."}},
+    {"id":"exact_inspection","evidence_ref":{"path":"push-capability.json","sha256":"..."}}
+  ]
+}
+```
+
+```json
+["/owned/venv/bin/python", "-I", "-m", "millrace_plus.cicd_git_push", "{request_file}", "{result_file}"]
+```
+
+Both capabilities reference the same `millrace-plus-cicd-local-push-capability/v1`
+record. Set `qualification_sha256` to the digest of the route's qualification
+evidence. Capture `remote` and the receiver's `path`, `device` and `inode`.
+Capture `scripts` in the order entry point, guard and receiver code. Capture
+`tools` in the order Git, receive-pack and the receiver's Python. Each entry
+contains `path`, `resolved_path`, numeric `mode` and `sha256`. The receiver's
+read-only `route.json` beside the bare repo pins those same route facts and the
+actual `project/main` workspace's path, device and inode. The qualified entry
+point is `receive-pack`, with sibling `hooks/pre-receive` and `receiver.py`.
+The receiver uses the files ref store, branch reflogs and `receive.autogc=false`.
+Keep background maintenance and other uncontrolled writers out of the receiver
+while this workflow owns an intent.
+
+Approve and resume the local commit first. After it applies, `status` exposes
+the push `delivery_basis_ref` and a `checked_patch` report with
+`push_requires_operator`. That report retains the local commit operations.
+The push basis pins the exact `remote`, `branch`, `head_sha` and
+`expected_remote_head`. The new OID is the accepted commit. The receiver must
+still point to its parent when Plus freezes the push basis and branch reflog
+prefix.
+
+Create a new approval and permission for just that push target. Include the push
+`delivery_basis_ref` in the approval's `evidence_refs`. Submit
+`approve_delivery` with the new held report digest and state version. Resume the
+graph to send the exact saved OID to the full branch ref. The push request's
+`prior_effect_refs` pins the accepted local commit operation.
+
+Inspect `delivery_refs` for both operation segments. Push evidence contains the
+receiver tip, guard receipt when present, and the branch reflog prefix and
+suffix. A lost response requires read-only inspection on public resume. An
+unchanged prefix with the branch still at the old OID permits an identical
+retry. An attributable update can settle as `published`. A subsequent branch
+transition holds with `push_superseded` and preserves the observed current tip.
+A complete record of movement without the approved update holds with
+`push_ref_moved`. Close or cancel either hold through the existing controls.
+An uncertain push remains inspectable and prevents closure and resend.
 
 ### Recover an interrupted local index update
 

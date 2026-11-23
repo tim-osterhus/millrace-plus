@@ -160,6 +160,17 @@ def derive_graph(
     ):
         invoke = cast(dict[str, object], nodes[name]["invoke"])
         invoke["timeout_seconds"] = budget["effective_seconds"]
+    external = cast(dict[str, object], checked["external_policy"])
+    if "push" in cast(dict[str, object], external["adapters"]):
+        # Check the stopped effect and its evidence before choosing a push hold.
+        for name, outcomes in (
+            ("prepare_effect", ("REFUSED", "UNCERTAIN")),
+            ("execute_effect", ("NOT_APPLIED", "PENDING", "REFUSED", "UNCERTAIN")),
+            ("inspect_effect", ("PENDING", "UNCERTAIN")),
+        ):
+            effect_routes = cast(dict[str, object], nodes[name]["on"])
+            for outcome in outcomes:
+                effect_routes[outcome] = {"goto": "guard_delivery"}
     return graph
 
 
@@ -714,8 +725,12 @@ class V2Home:
         return {"service_id": self.service_id, "inputs": results}
 
     def _delivery_basis(self, input_id):
-        from .cicd_effects import basis_ref
+        from .cicd_effects import basis_ref, push_selected
 
+        if push_selected(self):
+            ref = basis_ref(self, input_id, push=True)
+            if ref is not None:
+                return ref
         return basis_ref(self, input_id)
 
     def decision_dispositions(self, input_id):
@@ -830,10 +845,18 @@ class V2Home:
                     self.resolve_ref(item)
                 if record["changed_cause_ref"] is not None:
                     self.resolve_ref(record["changed_cause_ref"])
-                if record["kind"] == "close" and state["delivery_refs"]:
-                    from .cicd_effects import disposition
+                if (
+                    record["kind"] in {"close", "cancel"} and state is not None
+                    and state["delivery_refs"]
+                ):
+                    from .cicd_effects import disposition, history, push_selected
 
-                    if disposition(self, state) == "inspect":
+                    check_unresolved = record["kind"] == "close"
+                    if record["kind"] == "cancel" and push_selected(self):
+                        delivery, _ = history(self, state)
+                        effect_intent = self.read_ref(delivery["intent_ref"])
+                        check_unresolved = effect_intent["kind"] == "push"
+                    if check_unresolved and disposition(self, state) == "inspect":
                         raise CicdV2Error("effect_unresolved")
                 if record["kind"] == "approve_delivery":
                     from .cicd_effects import check_permission
@@ -1192,10 +1215,10 @@ class Runtime:
             )
             runs.add(str(cast(dict[str, object], prep["invocation"])["run_id"]))
         if state["delivery_refs"]:
-            from .cicd_effects import history
+            from .cicd_effects import _segments
 
-            _, operations = history(self.home, state)
-            runs.update(str(row["invocation"]["run_id"]) for row in operations)
+            for _, operations in _segments(self.home, state):
+                runs.update(str(row["invocation"]["run_id"]) for row in operations)
         for run_id in runs:
             view = self._run(run_id)
             for row in cast(list[dict[str, object]], view["invocations"]):
@@ -2784,15 +2807,25 @@ class Runtime:
             from . import cicd_effects as effects
 
             state = effects.accept_observation(self, state)
-            pending_stop = any(
-                row["kind"] in {"close", "cancel"}
-                and row["request_id"] not in state["applied_decision_ids"]
+            pending = [
+                row["kind"]
                 for row in self.home.decisions(str(state["input_id"]))
-            )
-            _, operations = effects.history(self.home, state)
+                if row["request_id"] not in state["applied_decision_ids"]
+            ]
+            delivery, operations = effects.history(self.home, state)
             possible = any(row["operation"] == "execute" for row in operations)
             choice = effects.disposition(self.home, state)
-            if not pending_stop or (possible and choice not in {"complete", "execute"}):
+            pending_stop = pending and pending[0] in {"close", "cancel"}
+            pending_push = (
+                pending and pending[0] == "approve_delivery"
+                and effects.push_selected(self.home)
+                and self.home.read_ref(delivery["intent_ref"])["kind"] == "commit"
+                and choice == "complete"
+            )
+            if not pending_push and (
+                not pending_stop
+                or possible and choice not in {"complete", "execute", "displaced"}
+            ):
                 return effects.reconcile(self, state)
         plan_path = self.home.workspace / (str(state["input_id"]) + ".settlement.json")
         if plan_path.exists():

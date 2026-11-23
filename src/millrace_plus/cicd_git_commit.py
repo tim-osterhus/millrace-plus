@@ -570,7 +570,8 @@ def main(argv: list[str] | None = None) -> int:
             last = history[-1]
             stem = request["effect_id"] + "-" + last["invocation"]["invocation_id"]
             if (
-                not effects.is_local_git(home) or last["status"] != "reserved"
+                request["kind"] != "commit" or not effects.is_local_git(home)
+                or last["status"] != "reserved"
                 or last["operation"] != operation
                 or home.resolve_ref(last["request_ref"]) != request_path
                 or result_path != home.workspace / (stem + ".effect-result.json")

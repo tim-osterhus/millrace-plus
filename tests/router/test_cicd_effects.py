@@ -97,9 +97,10 @@ def configure_effects(root: Path, scenario: str = "normal"):
     return configure
 
 
-def approval_decision(home, input_id):
+def approval_decision(home, input_id, kind="commit"):
     state = home.load_state(input_id)
-    basis = home.read_ref(home.status(input_id)["inputs"][0]["delivery_basis_ref"])
+    basis_ref = home.status(input_id)["inputs"][0]["delivery_basis_ref"]
+    basis = home.read_ref(basis_ref)
     shared = {
         "issuer": "offline fixture operator",
         "input_id": input_id,
@@ -107,7 +108,7 @@ def approval_decision(home, input_id):
         "patch_sha256": basis["patch_ref"]["sha256"],
         "source_after_sha256": basis["source_after_sha256"],
         "config_sha256": home.config_sha256,
-        "effects": [{"kind": "commit", "target": basis["target"]}],
+        "effects": [{"kind": kind, "target": basis["target"]}],
         "authority_ref": basis["authority_ref"],
     }
     approval = effects.validate_approval(
@@ -115,7 +116,7 @@ def approval_decision(home, input_id):
             "format": effects.APPROVAL,
             "approval_id": new_id(),
             **shared,
-            "evidence_refs": [],
+            "evidence_refs": [basis_ref] if kind == "push" else [],
         }
     )
     permission = effects.validate_permission(
