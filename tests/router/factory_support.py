@@ -621,28 +621,69 @@ def resume(fixture, run_id):
     return holder["applied_control"]
 
 
-def until_jobs(fixture, count, *, statuses=None):
+def until_jobs(fixture, count, *, statuses=None, invocation_deadline=False):
+    """Observe `count` Factory rows reach `statuses` within the 1200s window.
+
+    `invocation_deadline` is only for one selected final integration wait. Rows
+    already terminal with another status, or a Factory hold, fail at once. If the
+    window ends while a job invocation is in flight, its Core-recorded deadline
+    becomes the one final bound; later invocations never extend it.
+    """
+    import time
+
+    expected = statuses if statuses is not None else ["succeeded"] * count
+
+    def latest_view():
+        run = control.inspect_instance(fixture.instance, state_home=fixture.state)[
+            "runs"
+        ][-1]
+        return control.inspect_run(
+            fixture.instance, run["id"], state_home=fixture.state
+        )
+
     def done():
         home = factory.Home(fixture.home)
         rows = home.intake.tasks()
         if len(rows) != count:
             return None
-        run = control.inspect_instance(fixture.instance, state_home=fixture.state)[
-            "runs"
-        ][-1]
-        view = control.inspect_run(
-            fixture.instance, run["id"], state_home=fixture.state
-        )
+        view = latest_view()
         if view["status"] == "paused":
             raise AssertionError(
                 json.dumps(view.get("planes"))
                 + "\n"
                 + json.dumps([r for r in view["completions"][-4:]])
             )
-        expected = statuses if statuses is not None else ["succeeded"] * count
-        return rows if [row["status"] for row in rows] == expected else None
+        actual = [row["status"] for row in rows]
+        if invocation_deadline and (
+            any(
+                status in {"succeeded", "failed", "cancelled"} and status != wanted
+                for status, wanted in zip(actual, expected, strict=True)
+            )
+            or "held" in actual
+            or any(plane.get("cursor") == "hold" for plane in view["planes"].values())
+        ):
+            raise AssertionError(json.dumps([actual, view.get("planes")]))
+        return rows if actual == expected else None
 
-    return fixture.public.until(done, seconds=1200)
+    try:
+        return fixture.public.until(done, seconds=1200)
+    except AssertionError as exc:
+        if not invocation_deadline or exc.args != (
+            "bounded public runtime observation expired",
+        ):
+            raise
+        active = {"claimed", "running"} & {
+            row["status"] for row in factory.Home(fixture.home).intake.tasks()
+        }
+        view = latest_view()
+        deadlines = [
+            row["deadline"]
+            for row in view["invocations"]
+            if row["id"] in view["inflight_invocations"] and row["deadline"] is not None
+        ]
+        if not active or not deadlines:
+            raise
+        return fixture.public.until(done, seconds=min(deadlines) - time.time())
 
 
 def close(fixture, run_id):

@@ -105,6 +105,8 @@ def test_public_two_command_tasks_preserve_target_failure_and_explicit_abandonme
     from millrace_plus import lad_service_runtime as service_runtime
     from millrace_plus.router import control
 
+    _release_unrelated_fixture_parent(runtime)
+
     # Source-test commands need the fixture's exact package roots. Installed
     # artifact journeys use their installed packages independently.
     ordinary_settings = service_runtime._settings
@@ -234,7 +236,9 @@ def test_public_two_command_tasks_preserve_target_failure_and_explicit_abandonme
             result = service_runtime.Runtime(Service(home)).stop(stop_id)
             return result if result["status"] == "stopped" else None
 
-        assert runtime.until(stopped, seconds=20)["status"] == "stopped"
+        # Give the first stop its own budget before observing same-ID continuation.
+        result = stopped() or runtime.until(stopped, seconds=20)
+        assert result["status"] == "stopped"
     finally:
         # Preserve service-aware cleanup obligations and their exact IDs on failure.
         state = Service(home).status()

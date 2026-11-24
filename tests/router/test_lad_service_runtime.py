@@ -772,6 +772,102 @@ def test_stop_never_cancels_parent_while_child_disposition_is_missing(setup):
     assert saved["cancel"]["reservation"] == "unsent"
 
 
+def test_stop_expired_send_resumes_without_redispatch_or_observing_joined_rows(
+    setup, monkeypatch
+):
+    active = activate(setup)
+    peer = setup.peer
+    instance, run_id = active.record["instance_id"], active.record["run_id"]
+    parent = peer.runs[(instance, run_id)]
+    parent["status"] = peer.instances[instance]["runs"][0]["status"] = "paused"
+    submit = peer.submit
+
+    def expire_after_cancel_dispatch(envelope, *, deadline):
+        observed = submit(envelope, deadline=deadline)
+        parent["controls"].append(observed["core_receipt"])
+        if envelope["operation"] == "cancel_run":
+            parent["status"] = "cancelled"
+            peer.instances[instance]["runs"][0]["status"] = "cancelled"
+            raise SubworkflowError("observation_window_expired")
+        return observed
+
+    monkeypatch.setattr(peer, "submit", expire_after_cancel_dispatch)
+    stop_id = uuid.uuid4().hex
+    assert active.stop(stop_id) == {
+        "request_id": stop_id,
+        "status": "pending",
+        "reason": "cleanup_window_expired",
+    }
+    stop = active.service.intake.lifecycle()[1]["stops"][stop_id]
+    assert stop["pause"]["reservation"] == "observed"
+    assert stop["cancel"]["reservation"] == "unknown"
+    assert stop["phase"] == "pause-claims"
+    posted = [row["request_id"] for row in peer.sent]
+    assert posted[-2:] == [
+        stop["pause"]["envelope"]["request_id"],
+        stop["cancel"]["envelope"]["request_id"],
+    ]
+
+    finished = {"request_id": stop_id, "status": "stopped"}
+    assert runtime.Runtime(Service(setup.home), client=peer).stop(stop_id) == finished
+    observed = [row["request_id"] for row in peer.observed]
+    assert observed == [
+        stop["cancel"]["envelope"]["request_id"],
+        active.record["start"]["envelope"]["request_id"],
+    ]
+    assert runtime.Runtime(Service(setup.home), client=peer).stop(stop_id) == finished
+    assert [row["request_id"] for row in peer.sent] == posted
+    assert [row["request_id"] for row in peer.observed] == observed
+
+    parent["controls"][0]["code"] = "conflicting_receipt"
+    with pytest.raises(IntakeError, match="receipt_conflict"):
+        runtime.Runtime(Service(setup.home), client=peer).stop(stop_id)
+    assert [row["request_id"] for row in peer.sent] == posted
+    assert [row["request_id"] for row in peer.observed] == observed
+
+
+def test_stop_refuses_fresh_parent_receipt_conflict_before_completion(
+    setup, monkeypatch
+):
+    active = activate(setup)
+    peer = setup.peer
+    instance, run_id = active.record["instance_id"], active.record["run_id"]
+    parent = peer.runs[(instance, run_id)]
+    parent["status"] = peer.instances[instance]["runs"][0]["status"] = "paused"
+    submit = peer.submit
+
+    def cancel_with_conflicting_core_receipt(envelope, *, deadline):
+        observed = submit(envelope, deadline=deadline)
+        current = copy.deepcopy(observed["core_receipt"])
+        if envelope["operation"] == "cancel_run":
+            parent["status"] = "cancelled"
+            peer.instances[instance]["runs"][0]["status"] = "cancelled"
+            current["code"] = "conflicting_receipt"
+        parent["controls"].append(current)
+        return observed
+
+    monkeypatch.setattr(peer, "submit", cancel_with_conflicting_core_receipt)
+    stop_id = uuid.uuid4().hex
+    with pytest.raises(IntakeError, match="receipt_conflict"):
+        active.stop(stop_id)
+    saved = active.service.intake.lifecycle()[1]["stops"][stop_id]
+    assert saved["phase"] == "pause-claims"
+    assert saved["cancel"]["reservation"] == "observed"
+    assert runtime._joined(active.service, saved["cancel"])
+    assert saved["cancel"]["receipt"] != parent["controls"][-1]
+
+
+def test_stop_preserves_unrelated_send_error(setup, monkeypatch):
+    active = activate(setup)
+
+    def invalid_capabilities(*, deadline):
+        raise SubworkflowError("invalid_os_capabilities")
+
+    monkeypatch.setattr(setup.peer, "capabilities", invalid_capabilities)
+    with pytest.raises(SubworkflowError, match="invalid_os_capabilities"):
+        active.stop(uuid.uuid4().hex)
+
+
 def parent_request(active, f, *, operation="resume_run", expected=1, **changes):
     sent = runtime._env(
         operation,

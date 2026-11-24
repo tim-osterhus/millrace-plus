@@ -1130,7 +1130,12 @@ def test_held_lad_retains_parent_joins_across_operator_and_idle_expiry(
         )
         third.write_text(json.dumps(subject))
         third_receipt = current.submit(third)
-        final = until_jobs(f, 3, statuses=["succeeded", "failed", "succeeded"])
+        final = until_jobs(
+            f,
+            3,
+            statuses=["succeeded", "failed", "succeeded"],
+            invocation_deadline=next_lad,
+        )
         next_proof = None
         latest = factory.Home(f.home)
         if next_lad:

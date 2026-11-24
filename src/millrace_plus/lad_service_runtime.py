@@ -2393,7 +2393,53 @@ class Runtime:
     def stop(self, request_id: str) -> dict[str, object]:
         identity(request_id)
         deadline = time.monotonic() + 30
-        self.parent()
+        expired: dict[str, object] = {
+            "request_id": request_id,
+            "status": "pending",
+            "reason": "cleanup_window_expired",
+        }
+
+        def check_receipt(value: object, row: dict[str, object]) -> None:
+            receipt = validate_receipt(value, mapping(row["envelope"]))
+            saved = row["receipt"]
+            if (
+                saved is not None
+                and mapping(saved)["status"] != "queued"
+                and saved != receipt
+            ):
+                raise IntakeError("receipt_conflict")
+
+        def send_stop(
+            row: dict[str, object], current_controls: tuple[object, ...] = ()
+        ) -> bool:
+            receipt = row["receipt"]
+            if (
+                row["reservation"] == "observed"
+                and receipt is not None
+                and mapping(receipt)["status"] != "queued"
+                and _joined(self.service, row)
+            ):
+                sent = mapping(row["envelope"])
+                for value in current_controls:
+                    if mapping(value).get("request_id") == sent["request_id"]:
+                        check_receipt(value, row)
+                return True
+            try:
+                _send(
+                    self.service,
+                    self.intent,
+                    self.record,
+                    row,
+                    self.connection,
+                    deadline,
+                )
+            except SubworkflowError as exc:
+                if exc.code != "observation_window_expired":
+                    raise
+                return False
+            return True
+
+        instance, parent = self.parent()
         with target_lock(self.service.config, protected_roots=(self.service.home,)):
             stops = mapping(self.record["stops"])
             if request_id not in stops:
@@ -2448,14 +2494,11 @@ class Runtime:
             or saved["parent_run_id"] != self.record["run_id"]
         ):
             raise IntakeError("stop_authority_changed")
-        _send(
-            self.service,
-            self.intent,
-            self.record,
+        if not send_stop(
             mapping(stop["pause"]),
-            self.connection,
-            deadline,
-        )
+            (*instance.get("controls", []), *parent.get("controls", [])),
+        ):
+            return expired
         if mapping(stop["pause"])["receipt"] is not None:
             if mapping(mapping(stop["pause"])["receipt"])["status"] in {
                 "queued",
@@ -2501,47 +2544,31 @@ class Runtime:
             if item.get("scope") == "parent":
                 rows.append(mapping(item["call"]))
         known = {
-            mapping(row["envelope"])["request_id"]: mapping(row["envelope"])
+            mapping(row["envelope"])["request_id"]: row
             for row in rows
             if row["envelope"] is not None
         }
-        for value in [*instance.get("controls", []), *parent.get("controls", [])]:
-            receipt = mapping(value)
-            sent = known.get(receipt.get("request_id"))
-            if sent is None:
-                raise IntakeError("unknown_parent_control")
-            validate_receipt(receipt, sent)
-        if time.monotonic() >= deadline:
-            return {
-                "request_id": request_id,
-                "status": "pending",
-                "reason": "cleanup_window_expired",
-            }
-        _send(
-            self.service,
-            self.intent,
-            self.record,
-            mapping(stop["cancel"]),
-            self.connection,
-            deadline,
-        )
+
+        def check_roster(
+            instance: dict[str, object], parent: dict[str, object]
+        ) -> None:
+            for value in [*instance.get("controls", []), *parent.get("controls", [])]:
+                row = known.get(mapping(value).get("request_id"))
+                if row is None:
+                    raise IntakeError("unknown_parent_control")
+                check_receipt(value, row)
+
+        check_roster(instance, parent)
+        if time.monotonic() >= deadline or not send_stop(mapping(stop["cancel"])):
+            return expired
         for row in rows:
             if time.monotonic() >= deadline:
-                return {
-                    "request_id": request_id,
-                    "status": "pending",
-                    "reason": "cleanup_window_expired",
-                }
+                return expired
             if row["envelope"] is not None and row["reservation"] != "unsent":
-                _send(
-                    self.service,
-                    self.intent,
-                    self.record,
-                    row,
-                    self.connection,
-                    deadline,
-                )
-        _, parent = self.parent()
+                if not send_stop(row):
+                    return expired
+        instance, parent = self.parent()
+        check_roster(instance, parent)
         from .subworkflow_v2 import closed
 
         if (

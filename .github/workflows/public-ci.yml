@@ -71,9 +71,6 @@ jobs:
         run: git diff --check
 
   matched-validation:
-    # Two interrupted serial omarchy-1 runs: 2,934 of 4,519 cases took 75 minutes.
-    # Hosted runtime is unmeasured.
-    timeout-minutes: 150
     name: Exact Core and Plus validation
     runs-on: ubuntu-latest
     env:
@@ -165,7 +162,7 @@ jobs:
               set -- tests/demo
             fi
             plus_pytest -q --collect-only "$@" > "$RUNNER_TEMP/plus-$session.ids"
-            plus_pytest -q -ra --basetemp="$base/$session" --junitxml="$RUNNER_TEMP/plus-$session.xml" "$@"
+            plus_pytest -x -v -ra --basetemp="$base/$session" --junitxml="$RUNNER_TEMP/plus-$session.xml" "$@"
           done
           python3 - <<'PYCODE'
           import os, xml.etree.ElementTree as ET

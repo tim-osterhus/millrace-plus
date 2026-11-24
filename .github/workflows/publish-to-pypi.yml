@@ -15,17 +15,14 @@ env:
   # All-zero digests mark unfrozen values; every check below refuses them.
   # Plus: digests of the checked 0.23.2 build. Any change to an sdist member
   # (README, docs/*.md, tests, src, public-ci.yml) requires a rebuild and refreeze.
-  EXPECTED_WHEEL_SHA256: "6d2521b3f9954e12448b6ae250e765f1daf7ebea6923a5b1d585af04556d1e5c"
-  EXPECTED_SDIST_SHA256: "ff68396e68fa976511ecc8050a4a788d76e65440367e54311c7e9fb48170f2cc"
+  EXPECTED_WHEEL_SHA256: "c203a46db469618688954d90594fbc5dd5ffba66fc3f2b170f8f1431025ff8bf"
+  EXPECTED_SDIST_SHA256: "31d89767d641a9a9fdb3ae35eb795ca578981e57ecd043337c9cba353ff67659"
   # Core: the exact public millrace-ai 0.23.2 wheel and sdist (Core publishes first).
   CORE_WHEEL_SHA256: "bc6ccd5a3de66c32d4e9122fa467cae6f01f0fabbb541d8a83893ab40542b41a"
   CORE_SDIST_SHA256: "b1b8123f05ea092aca38d884dc27b853acd41ca6a1ac970842b85645c140315a"
 
 jobs:
   validate:
-    # Two interrupted serial omarchy-1 runs: 2,934 of 4,519 cases took 75 minutes.
-    # Hosted runtime is unmeasured.
-    timeout-minutes: 150
     if: ${{ github.event_name == 'push' && github.ref == 'refs/tags/v0.23.2' }}
     runs-on: ubuntu-latest
     steps:
@@ -141,7 +138,7 @@ jobs:
               set -- tests/demo
             fi
             plus_pytest -q --collect-only "$@" > "$RUNNER_TEMP/plus-$session.ids"
-            plus_pytest -q -ra --basetemp="$base/$session" --junitxml="$RUNNER_TEMP/plus-$session.xml" "$@"
+            plus_pytest -x -v -ra --basetemp="$base/$session" --junitxml="$RUNNER_TEMP/plus-$session.xml" "$@"
           done
           python3 - <<'PYCODE'
           import os, xml.etree.ElementTree as ET
