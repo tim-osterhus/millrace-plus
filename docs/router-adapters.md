@@ -26,10 +26,11 @@ Offline verification does not qualify a live adapter route.
 
 ## Forge runner
 
-The optional `forge_runner` adapter accepts `millrace-forge-runner/v1` and
-`millrace-forge-runner/v2`. Each invocation runs one short-lived worker for Antoine
-Zambelli's Forge SDK (`forge-guardrails` 0.10.1) against an OpenAI-compatible endpoint
-named by environment reference. The binding `executable` is a separate CPython
+The optional `forge_runner` adapter accepts `millrace-forge-runner/v1`,
+`millrace-forge-runner/v2` and `millrace-forge-runner/v3`. Each invocation runs one
+short-lived worker for Antoine Zambelli's Forge SDK (`forge-guardrails` 0.10.1).
+V1 and v2 use an OpenAI-compatible endpoint named by environment reference. V3 uses
+the OpenAI Responses API with an explicit model and reasoning effort. The binding `executable` is a separate CPython
 3.12+ worker interpreter. Plus never imports `forge`, and the SDK is not a Plus
 dependency. The worker exposes read-only `list_dir`, `read_file` and a sole-call
 `finish`. V2 accepts explicit `null` for optional read-window arguments and applies
@@ -39,8 +40,9 @@ error.
 The v1 closeout ran source regressions and a 19-case real-SDK cohort against a
 loopback peer on an installed Plus wheel. It used Forge 0.10.1 in one minimal locked
 Linux x86_64 CPython 3.12.14 worker environment. Earlier real-SDK source runs
-apply to their checked source. No live backend, model, credential or account is
-qualified. See the profile, limits and checked behavior in the
+apply to their checked source. One installed v3 smoke on macOS arm64 completed a
+synthetic file task with `gpt-6-luna` at `low` effort. No other live backend, model,
+effort, credential or account is qualified. See the profile, limits and checked behavior in the
 [Forge runner adapter guide](forge-runner-adapter.md).
 
 ## Install And Handshake

@@ -4,18 +4,36 @@
 invocation through Plus. Millforge owns its Pi session and native tools. Core
 owns the graph, durable state, cancellation and `json-v1` routing.
 
-Use Core 0.23.2 or later with public `owned-process-v1`, matched Plus, and an
-independently installed trusted Millforge executable. The selected native
-contract is Millforge 0.2.0 / Pi 1.4.0 with Node >=22.19.0. Plus does not install
-Node, npm packages, models or credentials. This guide does not assert that a
-public npm release is available. Use an explicitly supplied, verified artifact
-and its absolute executable path. PATH must select the intended Node runtime.
+## Install Millforge
 
-This adapter translates Millforge's public request and saved-record contracts.
-The M4 task acceptance receipt owns exact artifacts, verification evidence and
-qualification limits. Live Plus adapter routes require separate qualification.
-Standalone Millforge's selected Luna OAuth receipt does not qualify this bridge,
-another model or another platform.
+Use Core 0.23.2 or later with public `owned-process-v1` and a compatible Plus
+installation. Plus ships the adapter. The `millrace` Python bundle installs
+Core, Plus and OS. Install the Millforge runtime separately from npm.
+
+The adapter targets Millforge 0.2.0 with Pi 1.4.0. Use Node 22.19.0 or newer and
+choose an absolute install prefix you own. Replace both example paths with
+your actual Node directory and install prefix.
+
+```sh
+node_bin=/home/operator/.local/opt/node-v22.19.0/bin
+export PATH="$node_bin:$PATH"
+test "$(command -v node)" = "$node_bin/node"
+node --version
+prefix=/home/operator/.local/opt/millforge-0.2.0
+npm install --prefix "$prefix" --save-exact @millrace-ai/millforge@0.2.0
+test -x "$prefix/node_modules/.bin/millforge"
+```
+
+Set the binding's `executable` to the absolute installed path. The npm
+entry point locates `node` through `PATH`. Create the router instance from the
+shell with the selected Node directory on `PATH` so Core captures that search
+path. When creating an instance through the control API, include the Node
+directory in its `path` argument.
+
+The installed bridge was exercised on Linux x86-64 with a scripted loopback
+endpoint using Millforge 0.2.0, Pi 1.4.0 and Node 26.7.0. That check covered the
+recorded artifacts and route. Live provider and OAuth routes require their own
+qualification.
 
 ## Capture a profile and task
 
@@ -41,14 +59,25 @@ Core validates their types and project-relative references. A completed
 `needs_work` outcome follows that graph branch normally. It is not an adapter
 failure. Millforge's runtime status and the task's domain outcome are distinct.
 
-Add the manifest, task and every declared asset to the graph's `control_files`.
-Use this binding fragment for a profile with no assets and non-OAuth auth:
+Select a profile at `profiles/millforge/profile.json` and save the task prompt
+as `prompts/task.md` under the workflow. Add both paths to the graph's
+`control_files`. Add every asset declared in the profile when the profile uses
+assets.
+
+```json
+{
+  "control_files": ["profiles/millforge/profile.json", "prompts/task.md"]
+}
+```
+
+Put this binding under the graph's `bindings.forge` for a profile with no
+assets and `auth.kind` set to `none` or `env`.
 
 ```json
 {
   "adapter": "millforge_run",
   "contract": "millrace-millforge-run/v1",
-  "executable": "/absolute/prefix/node_modules/.bin/millforge",
+  "executable": "/home/operator/.local/opt/millforge-0.2.0/node_modules/.bin/millforge",
   "config": {
     "profile": "profiles/millforge/profile.json",
     "assets": {}
@@ -61,8 +90,7 @@ path. For example, `"assets/context.md":"profiles/millforge/assets/context.md"`
 inside `config.assets` preserves the native layout. Asset hashes must match the
 manifest. Missing, extra or overlapping assets refuse.
 
-A node can use that binding as follows, assuming its graph binding key is
-`forge`:
+Use the `forge` binding in the node.
 
 ```json
 {
@@ -93,6 +121,10 @@ native binding.
 in the selected plane project directory. Plus cannot switch modes or override
 native limits. Each invocation captures profile/request bytes and uses a fresh,
 exclusive output directory. No ambient selected profile or previous run is used.
+
+Choose credentials in the profile's `model.auth` section. Store secrets in the
+selected environment or OAuth store. The captured profile references
+credentials through its auth configuration.
 
 For an OAuth profile, add `"auth_home":"forge_auth"` to the binding config and
 supply `host_paths={"forge_auth":"/absolute/owned/millforge-auth"}` when creating
@@ -167,9 +199,3 @@ reconciliation and explicit retry controls for held failures. There is no
 automatic replay. No local process observation attests provider backend abort.
 Diagnostics retain fixed adapter codes and counts/hashes, with synthesized
 stderr rather than raw native exception text.
-
-M4 verification uses fake peers and loopback provider fixtures, including real
-installed CLI records. It establishes only its recorded artifact/platform
-scope. It makes no local-model quality, general provider, macOS, retained-history
-or release claim. Required harness/capability support and optional Harness²
-useful-task proof do not depend on a bare local model passing first.

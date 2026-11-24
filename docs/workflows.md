@@ -1,6 +1,6 @@
-# Bundled graph-v3 workflows
+# Bundled workflows
 
-The installed catalog contains `software-change`, `document-review`, and `lad`. All are editable physical copies with their own graph, prompts and scripts. Use `millrace-plus catalog init bundled:NAME DESTINATION` to create a copy. Existing copies survive package replacement unchanged.
+The installed catalog contains the graph-v3 examples `software-change` and `document-review`, and the graph-v4 workflows `lad`, `lad-service` ([persistent LAD](persistent-lad.md)), `cicd` and `cicd-v2` ([CI/CD](cicd.md)), `software-factory` ([Software Factory](software-factory.md)) and `hardware-demo` ([demo](demo.md)). All are editable physical copies with their own graph, prompts and scripts. Use `millrace-plus catalog init bundled:NAME DESTINATION` to create a copy. Existing copies survive package replacement unchanged.
 
 ## Small examples
 

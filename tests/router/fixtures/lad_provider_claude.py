@@ -1,10 +1,10 @@
 """Inert scripted Claude CLI peer for the LAD provider-wait graph (no provider).
 
-Installed by ``lad_provider_support.fake_cli`` as an executable with a
-``sys.executable`` shebang and a sibling ``<executable>.json`` options file:
+Copied by ``lad_provider_support.fake_cli`` next to a shell launcher and a
+sibling ``<payload>.json`` options file:
 
 ``{"version": TEXT, "plan": [STEP, ...], "counter": PATH, "peer": PATH,
-"scripts": PATH, "scenario": NAME}``
+"scenario": NAME}``
 
 ``--version`` prints the supported version banner. Each prompt run consumes the
 next plan step (the last step repeats): an integer emits the pinned typed
@@ -67,7 +67,6 @@ if isinstance(step, int) and not isinstance(step, bool):
     sys.exit(0)
 if step != "success":
     sys.exit(7)  # an ordinary stopped native error without a terminal envelope
-sys.path.insert(0, options["scripts"])
 spec = importlib.util.spec_from_file_location("lad_peer", options["peer"])
 peer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(peer)

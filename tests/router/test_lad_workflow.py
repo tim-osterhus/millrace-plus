@@ -4446,8 +4446,8 @@ def test_provider_retry_does_not_consume_ordinary_replacement_escalation(
     reply = subprocess.run(
         [
             sys.executable,
+            "-P",
             "-c",
-            "import sys; sys.path.insert(0, sys.argv[1]);"
             "from pathlib import Path; from lad_state import run, emit;"
             "from prepare_role import prepare;"
             "run(lambda: emit(prepare(Path.cwd(), Path.cwd(), 'planner',"
@@ -4458,7 +4458,11 @@ def test_provider_retry_does_not_consume_ordinary_replacement_escalation(
         cwd=project / "foreground",
         capture_output=True,
         check=True,
-        env={"PATH": str(Path(sys.executable).parent), "PYTHONDONTWRITEBYTECODE": "1"},
+        env={
+            "PATH": str(Path(sys.executable).parent),
+            "PYTHONPATH": str(project / "scripts"),
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
     )
     result = json.loads(reply.stdout)
     assert result["outcome"] == "REFUSED"

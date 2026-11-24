@@ -16,6 +16,7 @@ never changed, nothing sleeps and no live timestamp is edited.
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
 import subprocess
 import sys
@@ -45,17 +46,21 @@ def fake_cli(
     """Install the scripted peer; ``plan`` steps are statuses or ``"success"``."""
     root.mkdir(parents=True, exist_ok=True)
     executable = root / "fake-claude"
-    source = FIXTURES / "lad_provider_claude.py"
-    executable.write_text(f"#!{sys.executable}\n" + source.read_text())
+    payload = root / "fake-claude.py"
+    shutil.copyfile(FIXTURES / "lad_provider_claude.py", payload)
+    executable.write_text(
+        "#!/bin/sh\n"
+        f"PYTHONPATH={shlex.quote(str(scripts))} "
+        f"exec {shlex.quote(sys.executable)} -P {shlex.quote(str(payload))} \"$@\"\n"
+    )
     executable.chmod(0o700)
-    Path(str(executable) + ".json").write_text(
+    Path(str(payload) + ".json").write_text(
         json.dumps(
             {
                 "version": VERSION,
                 "plan": plan,
                 "counter": str(root / "count"),
                 "peer": str(FIXTURES / "lad_peer.py"),
-                "scripts": str(scripts),
                 "scenario": scenario,
             }
         )
@@ -344,13 +349,17 @@ def script(project: Path, code: str) -> dict:
     result = subprocess.run(
         [
             sys.executable,
+            "-P",
             "-c",
-            "import sys; sys.path.insert(0, sys.argv[1]);"
-            "from pathlib import Path; foreground = Path.cwd()\n" + code,
+            "import sys; from pathlib import Path; foreground = Path.cwd()\n" + code,
             str(project / "scripts"),
         ],
         cwd=project / "foreground",
-        env={"PATH": str(Path(sys.executable).parent), "PYTHONDONTWRITEBYTECODE": "1"},
+        env={
+            "PATH": str(Path(sys.executable).parent),
+            "PYTHONPATH": str(project / "scripts"),
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
         capture_output=True,
         check=True,
     )

@@ -1,6 +1,6 @@
 # Local workflow catalog
 
-`millrace-plus catalog list`, `init SELECTOR DESTINATION`, and `copy SOURCE DESTINATION` operate on ordinary graph-v3 folders. Add `--catalog-home PATH` to any of these commands to select a local root for that command. Without an override, Plus uses your saved catalog root, then falls back to `~/.local/share/millrace-plus/workflows/`. Listing a missing root is empty; create that directory before copying a new entry into it.
+`millrace-plus catalog list`, `init SELECTOR DESTINATION`, and `copy SOURCE DESTINATION` operate on ordinary graph-v3 or graph-v4 folders. Add `--catalog-home PATH` to any of these commands to select a local root for that command. Without an override, Plus uses your saved catalog root, then falls back to `~/.local/share/millrace-plus/workflows/`. Listing a missing root is empty; create that directory before copying a new entry into it.
 
 Save a custom catalog root once for future CLI calls and Python API calls:
 
@@ -21,7 +21,7 @@ Init creates a new folder outside known catalog/bundled roots. Copy accepts a fi
 
 `init_template` verifies the source and copy against a definition fingerprint before it succeeds. The digest covers each regular file's relative POSIX path, executable bits (`mode & 0o111`), and content SHA-256, serialized as compact UTF-8 JSON with sorted keys. Symlinks and special files refuse; `__pycache__` is excluded. Init results include `source`, `destination`, and descriptive `provenance` (`template_id`, installed `plus_version`, and the verified copy digest). Provenance is returned to the caller and is not written into the workflow. A package update leaves existing workspace copies, local catalog entries, and the saved catalog-home setting intact; new bundled copies come from the installed package.
 
-The catalog checks strict JSON and the `millrace-router/v3` format marker only. It rejects duplicate keys and nonfinite numbers. Core graph and selected-adapter validation occur at registration/validation; live native prerequisites occur at invocation. List/init/copy import no Core or native adapter and probe no native credentials, executables, or external runtime versions. Local command/other graphs retain their authored bindings.
+The catalog checks strict JSON and a `millrace-router/v3` or `millrace-router/v4` format marker only. It rejects duplicate keys and nonfinite numbers. Core graph and selected-adapter validation occur at registration/validation; live native prerequisites occur at invocation. List/init/copy import no Core or native adapter and probe no native credentials, executables, or external runtime versions. Local command/other graphs retain their authored bindings.
 
 The Python API is `millrace_plus.catalog.list_templates`, `init_template`, `copy_workflow`, and `workflow_fingerprint(source: Path)`. The first three catalog operations accept keyword-only `catalog_home: Path | None = None`; `catalog_home_status()`, `set_catalog_home(Path)`, and `reset_catalog_home()` manage the saved default. Errors raise `CatalogError` with `code` and message. CLI errors emit stderr JSON and exit 2; successful commands emit JSON. A missing destination parent produces `destination_parent_missing` with an instruction to create it first.
 

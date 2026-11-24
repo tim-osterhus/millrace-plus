@@ -71,12 +71,16 @@ jobs:
         run: git diff --check
 
   matched-validation:
-    timeout-minutes: 30
+    # Two interrupted serial omarchy-1 runs: 2,934 of 4,519 cases took 75 minutes.
+    # Hosted runtime is unmeasured.
+    timeout-minutes: 150
     name: Exact Core and Plus validation
     runs-on: ubuntu-latest
     env:
-      CORE_SOURCE_SHA: dea6bc3f1529f9ca1ced665ccff050c8f4f58884
-      OS_PEER_SOURCE_SHA: 72bc08d81182822483e57e70ae309ed0fe9c31c7
+      # Core 0.23.2 source whose wheel runtime payload matches the frozen public
+      # Core wheel; the two wheels differ only in README METADATA and RECORD.
+      CORE_SOURCE_SHA: f4ce7eeda9be2e098b448ba077fdf03496bd7fe2
+      OS_PEER_SOURCE_SHA: be22a127aa08a8959b4b674e49f2182708da7605
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -96,17 +100,23 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
         with:
           version: 0.13.5
+          checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
       - name: Build exact selected Core
         run: |
           test "$(git -C .ci-core rev-parse HEAD)" = "$CORE_SOURCE_SHA"
           uv build .ci-core --out-dir "$RUNNER_TEMP/core-dist" --force-pep517 --python 3.12
-          echo "MILLRACE_TEST_CORE_WHEEL=$RUNNER_TEMP/core-dist/millrace_ai-0.23.1-py3-none-any.whl" >> "$GITHUB_ENV"
-          echo "MILLRACE_TEST_CORE_SDIST=$RUNNER_TEMP/core-dist/millrace_ai-0.23.1.tar.gz" >> "$GITHUB_ENV"
+          test "$(ls "$RUNNER_TEMP/core-dist" | tr '\n' ' ')" = "millrace_ai-0.23.2-py3-none-any.whl millrace_ai-0.23.2.tar.gz "
+          sha256sum "$RUNNER_TEMP"/core-dist/*
+          echo "MILLRACE_TEST_CORE_WHEEL=$RUNNER_TEMP/core-dist/millrace_ai-0.23.2-py3-none-any.whl" >> "$GITHUB_ENV"
+          echo "MILLRACE_TEST_CORE_SDIST=$RUNNER_TEMP/core-dist/millrace_ai-0.23.2.tar.gz" >> "$GITHUB_ENV"
+      # OS source peer with the router request capability route and joined calls.
+      # Its package version is 0.23.1; no OS publication is required.
       - name: Build isolated accepted OS peer for deterministic bridge tests
         run: |
           test "$(git -C .ci-os rev-parse HEAD)" = "$OS_PEER_SOURCE_SHA"
           uv build .ci-os --wheel --out-dir "$RUNNER_TEMP/os-peer" --force-pep517 --python 3.12
-          echo "MILLRACE_TEST_OS_PEER_WHEEL=$RUNNER_TEMP/os-peer/millrace_os-0.23.0-py3-none-any.whl" >> "$GITHUB_ENV"
+          test "$(ls "$RUNNER_TEMP/os-peer")" = millrace_os-0.23.1-py3-none-any.whl
+          echo "MILLRACE_TEST_OS_PEER_WHEEL=$RUNNER_TEMP/os-peer/millrace_os-0.23.1-py3-none-any.whl" >> "$GITHUB_ENV"
       - name: Download immutable package replacement baseline
         run: |
           python3 - <<'PYCODE'
@@ -117,6 +127,7 @@ jobs:
           digest = "5c2025e4f6d592bf4c927d659b4d729e17a62e49bc13f5b380de1b2d6bff480f"
           release = json.load(urllib.request.urlopen("https://pypi.org/pypi/millrace-plus/0.23.0/json", timeout=60))
           item, = [item for item in release["urls"] if item["filename"] == name]
+          assert item["yanked"] is False, f"{name} is yanked"
           assert item["digests"]["sha256"] == digest
           raw = urllib.request.urlopen(item["url"], timeout=60).read()
           assert hashlib.sha256(raw).hexdigest() == digest
@@ -129,18 +140,66 @@ jobs:
         run: uv run --no-project --python 3.12 --with 'uv_build==0.11.30' python -c 'import uv_build'
       - name: Full matched artifact suite
         run: |
-          env -u PYTHONPATH uv run --no-project --python 3.12 --with pytest==9.1.1 --with hatchling==1.32.4 --with "$MILLRACE_TEST_CORE_WHEEL" --with "$MILLRACE_TEST_OS_PEER_WHEEL" --with . pytest -q -ra --junitxml="$RUNNER_TEMP/plus-results.xml"
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import tomllib
+          paths = tomllib.load(open("pyproject.toml", "rb"))["tool"]["pytest"]["ini_options"]["testpaths"]
+          sessions = ["tests/router", "tests/test_package_metadata.py", "tests/test_public_package_boundary.py",
+                      "tests/test_agent_skill_assets.py", "tests/test_public_test_support_boundary.py", "tests/demo"]
+          assert sorted(paths) == sorted(sessions), paths
+          PYCODE
+          # tests/demo runs separately: tests/demo/test_cli.py and tests/router/test_cli.py share
+          # a module basename. Service tests bind AF_UNIX sockets under tmp_path, so the base
+          # temporary directory stays short.
+          base="$(mktemp -d /tmp/mp.XXXXXX)"
+          plus_pytest() {
+            env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --no-project --python 3.12 \
+              --with pytest==9.1.1 --with hatchling==1.32.4 --with httpx==0.28.1 \
+              --with "$MILLRACE_TEST_CORE_WHEEL" --with "$MILLRACE_TEST_OS_PEER_WHEEL" --with . pytest "$@"
+          }
+          for session in main demo; do
+            if [ "$session" = main ]; then
+              set -- tests/router tests/test_package_metadata.py tests/test_public_package_boundary.py \
+                tests/test_agent_skill_assets.py tests/test_public_test_support_boundary.py
+            else
+              set -- tests/demo
+            fi
+            plus_pytest -q --collect-only "$@" > "$RUNNER_TEMP/plus-$session.ids"
+            plus_pytest -q -ra --basetemp="$base/$session" --junitxml="$RUNNER_TEMP/plus-$session.xml" "$@"
+          done
           python3 - <<'PYCODE'
           import os, xml.etree.ElementTree as ET
           from pathlib import Path
-          results = ET.parse(Path(os.environ["RUNNER_TEMP"]) / "plus-results.xml")
-          cases = list(results.iter("testcase"))
-          assert len(cases) == 1028, len(cases)
-          skipped = [case for case in cases if case.find("skipped") is not None]
-          assert len(skipped) == 21, len(skipped)
-          for case in skipped:
-              assert "test_paperclip_plugin" in case.attrib["classname"]
-              assert "task-owned pinned Node/loader profile is unavailable" in case.find("skipped").attrib["message"]
+          root = Path(os.environ["RUNNER_TEMP"])
+          # Optional proofs whose task-owned inputs CI does not supply. Any other skip fails.
+          allowed = [
+              ("tests.router.test_paperclip_plugin", "task-owned pinned Node/loader profile is unavailable"),
+              ("tests.router.test_lad_compatibility", "Exact retained old Core inputs required for v7 integration"),
+              ("tests.router.test_cicd_push_workflow", "requires the admitted B0 receiver on omarchy-1"),
+              ("tests.router.test_forge_distribution", "no real CPython 3.11 available"),
+              ("tests.router.test_forge_distribution", "unrun: no admitted artifact manifest named by"),
+              ("tests.router.test_forge_responses", "could not import 'forge'"),
+              ("tests.router.test_forge_responses", "this case requires the pinned Forge SDK"),
+              ("tests.router.test_millforge_configuration", "public digest vectors require explicit Millforge and Node"),
+              ("tests.router.test_millforge_distribution", "installed M4 proof requires explicit prebuilt artifact inputs"),
+          ]
+          for session in ("main", "demo"):
+              ids = [line for line in (root / f"plus-{session}.ids").read_text().splitlines() if "::" in line]
+              cases = list(ET.parse(root / f"plus-{session}.xml").iter("testcase"))
+              assert ids and len(cases) == len(ids), (session, len(cases), len(ids))
+              broken = [c.attrib["name"] for c in cases if c.find("failure") is not None or c.find("error") is not None]
+              assert not broken, (session, broken)
+              unknown, skipped = [], 0
+              for case in cases:
+                  skip = case.find("skipped")
+                  if skip is None:
+                      continue
+                  skipped += 1
+                  module, text = case.attrib["classname"], skip.attrib.get("message", "") + " " + (skip.text or "")
+                  if not any((module == m or module.startswith(m + ".")) and r in text for m, r in allowed):
+                      unknown.append((module, case.attrib["name"], skip.attrib.get("message")))
+              assert not unknown, unknown
+              print(session, len(cases), "cases,", skipped, "allowed skips")
           PYCODE
           uv run --no-project --python 3.12 --with ruff==0.15.21 ruff check src tests
       - name: Check source unchanged

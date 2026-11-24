@@ -87,6 +87,7 @@ def test_production_imports_only_public_core_modules() -> None:
         "forge.py",
         "forge_configuration.py",
         "forge_probe.py",
+        "forge_responses.py",
         "forge_worker.py",
         "millforge.py",
         "millforge_configuration.py",
