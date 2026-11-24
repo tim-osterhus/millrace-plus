@@ -228,6 +228,11 @@ def test_shared_lad_initializer_runs_from_core_capture_and_uses_pinned_target(ru
         for name in initializer["outcomes"]
     }
     value = graph({}, start="init_session")
+    # Captured provider recovery still requires the stock binding. No node uses it.
+    value["bindings"]["claude"] = {
+        **original["bindings"]["claude"],
+        "executable": value["bindings"]["command"]["executable"],
+    }
     value["control_files"] = original["control_files"] + [
         "scripts/lad_bootstrap_probe.py"
     ]

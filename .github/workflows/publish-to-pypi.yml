@@ -16,7 +16,7 @@ env:
   # Plus: digests of the checked 0.23.2 build. Any change to an sdist member
   # (README, docs/*.md, tests, src, public-ci.yml) requires a rebuild and refreeze.
   EXPECTED_WHEEL_SHA256: "6d2521b3f9954e12448b6ae250e765f1daf7ebea6923a5b1d585af04556d1e5c"
-  EXPECTED_SDIST_SHA256: "20a632e196bfd461c287a06cd4c3442828dc59f5d1036e2f6a53f85c5d8e334e"
+  EXPECTED_SDIST_SHA256: "ff68396e68fa976511ecc8050a4a788d76e65440367e54311c7e9fb48170f2cc"
   # Core: the exact public millrace-ai 0.23.2 wheel and sdist (Core publishes first).
   CORE_WHEEL_SHA256: "bc6ccd5a3de66c32d4e9122fa467cae6f01f0fabbb541d8a83893ab40542b41a"
   CORE_SDIST_SHA256: "b1b8123f05ea092aca38d884dc27b853acd41ca6a1ac970842b85645c140315a"
