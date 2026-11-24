@@ -34,7 +34,7 @@ jobs:
 
       - name: Public standalone tests
         run: |
-          env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with hatchling pytest -q \
+          env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with 'hatchling==1.32.4' pytest -q \
             tests/test_package_metadata.py \
             tests/test_public_package_boundary.py \
             tests/test_agent_skill_assets.py \
